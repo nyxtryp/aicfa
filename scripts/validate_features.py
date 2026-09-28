@@ -1,6 +1,6 @@
 """Validate AICFA processed feature datasets.
 
-Checks shape, schema, NaN warmup, finite values, causal lookahead,
+Checks shape, schema, warmup NaNs, infinite values, causal lookahead,
 and basic feature ranges without modifying source data.
 """
 
@@ -53,13 +53,39 @@ def validate(symbol: str, timeframe: str) -> None:
 
     feature_cols = [c for c in processed.columns if c not in REQUIRED]
     numeric = processed[feature_cols].apply(pd.to_numeric, errors="coerce")
-    non_finite = int((~np.isfinite(numeric.to_numpy())).sum())
-    if non_finite:
-        raise AssertionError(f"non-finite feature values: {non_finite}")
 
+    # NaNs are expected during rolling-feature warmup. They are valid only
+    # as a contiguous prefix of each feature (or for the entire column when
+    # the dataset is shorter than the feature's required lookback).
     nan_counts = numeric.isna().sum()
-    if (nan_counts > 0).any():
-        print(f"  warmup NaNs: {int(nan_counts.sum())} total across {int((nan_counts > 0).sum())} columns")
+    total_nans = int(nan_counts.sum())
+    columns_with_nans = int((nan_counts > 0).sum())
+
+    for column in feature_cols:
+        values = numeric[column]
+        if values.isna().all():
+            continue
+
+        first_valid = values.first_valid_index()
+        if first_valid is None:
+            continue
+
+        trailing_nans = values.iloc[first_valid:].isna()
+        if trailing_nans.any():
+            raise AssertionError(
+                f"{column} has NaNs after its first valid value"
+            )
+
+    # NaN is allowed only for warmup; +/-inf is never valid.
+    infinite = int(np.isinf(numeric.to_numpy()).sum())
+    if infinite:
+        raise AssertionError(f"infinite feature values: {infinite}")
+
+    if total_nans:
+        print(
+            f"  warmup NaNs: {total_nans} total across "
+            f"{columns_with_nans} columns"
+        )
 
     bounded = {
         "close_location": (0.0, 1.0),
