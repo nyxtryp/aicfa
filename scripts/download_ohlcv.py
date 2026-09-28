@@ -13,6 +13,7 @@ missing candles after the latest saved timestamp are requested.
 from __future__ import annotations
 
 import argparse
+import os
 import time
 from pathlib import Path
 
@@ -21,7 +22,8 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW_DIR = ROOT / "data" / "raw"
+DATA_DIR = Path(os.getenv("AICFA_DATA_DIR", str(ROOT / "data")))
+RAW_DIR = DATA_DIR / "raw"
 DEFAULT_TIMEFRAMES = ["15m", "1h", "4h"]
 LIMIT = 1000
 PAUSE_SECONDS = 0.2
