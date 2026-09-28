@@ -29,7 +29,7 @@ def build_labels(
       - future_mae_long/short: maximum adverse excursion
       - time_to_mfe_long/short: candles until the maximum favorable excursion
       - time_to_long_tp/long_sl and time_to_short_tp/short_sl: first barrier
-        hit in candles, or NaN when the barrier is not reached
+        hit in candles; horizon + 1 means the barrier was not reached
       - triple_barrier: +1/-1 for the first directional barrier, 0 for
         unresolved/ambiguous outcomes, NaN when the future window is incomplete
 
@@ -112,14 +112,28 @@ def build_labels(
         short_sl = c + barrier_atr * atr
 
         triple = np.full(len(x), np.nan, dtype=float)
+        # horizon + 1 means the barrier was not reached inside the window.
+        # This keeps censored observations usable in the training dataset.
+        censored_time = float(horizon + 1)
         time_long_tp = np.full(len(x), np.nan, dtype=float)
         time_long_sl = np.full(len(x), np.nan, dtype=float)
         time_short_tp = np.full(len(x), np.nan, dtype=float)
         time_short_sl = np.full(len(x), np.nan, dtype=float)
 
         for i in range(len(x) - horizon):
-            if not complete.iloc[i] or pd.isna(atr.iloc[i]):
+            if not complete.iloc[i]:
                 continue
+            if pd.isna(atr.iloc[i]):
+                time_long_tp[i] = censored_time
+                time_long_sl[i] = censored_time
+                time_short_tp[i] = censored_time
+                time_short_sl[i] = censored_time
+                continue
+
+            time_long_tp[i] = censored_time
+            time_long_sl[i] = censored_time
+            time_short_tp[i] = censored_time
+            time_short_sl[i] = censored_time
 
             tp_long = long_tp.iloc[i]
             sl_long = long_sl.iloc[i]
