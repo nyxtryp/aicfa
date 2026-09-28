@@ -20,14 +20,21 @@ def build_labels(
 ) -> pd.DataFrame:
     """Build future-outcome labels from OHLC candles.
 
-    For each row t, all label values may use candles after t. This function
-    must therefore only be used to create targets, never model inputs.
+    The feature row at time t may only use information available at t.
+    Labels may use candles after t and therefore belong only to targets.
 
-    The triple-barrier label is:
-      +1: long take-profit reached before long stop
-      -1: short take-profit reached before short stop
-       0: neither barrier reached, or both barriers are touched in the same
-          candle and their intrabar order cannot be known from OHLC data.
+    For every horizon this produces:
+      - future_return: close-to-close return after the horizon
+      - future_mfe_long/short: maximum favorable excursion
+      - future_mae_long/short: maximum adverse excursion
+      - time_to_mfe_long/short: candles until the maximum favorable excursion
+      - time_to_long_tp/long_sl and time_to_short_tp/short_sl: first barrier
+        hit in candles, or NaN when the barrier is not reached
+      - triple_barrier: +1/-1 for the first directional barrier, 0 for
+        unresolved/ambiguous outcomes, NaN when the future window is incomplete
+
+    ATR is calculated only from candles up to t, so barrier distance does not
+    leak future information.
     """
     required = ["timestamp", "open", "high", "low", "close"]
     missing = [c for c in required if c not in df.columns]
@@ -46,7 +53,7 @@ def build_labels(
     h = x["high"].astype(float)
     l = x["low"].astype(float)
 
-    # Wilder-style ATR proxy using only candles up to the current row.
+    # ATR proxy uses only candles through the current row.
     prev_close = c.shift(1)
     true_range = pd.concat(
         [
@@ -62,33 +69,53 @@ def build_labels(
 
     for horizon in horizons:
         future_close = c.shift(-horizon)
+        complete = future_close.notna()
+
         out[f"future_return_{horizon}"] = future_close / c.clip(lower=EPS) - 1.0
 
-        future_high = pd.concat(
+        future_high_frame = pd.concat(
             [h.shift(-i) for i in range(1, horizon + 1)],
             axis=1,
-        ).max(axis=1)
-        future_low = pd.concat(
+        )
+        future_low_frame = pd.concat(
             [l.shift(-i) for i in range(1, horizon + 1)],
             axis=1,
-        ).min(axis=1)
-
-        out[f"future_mfe_long_{horizon}"] = (
-            future_high / c.clip(lower=EPS) - 1.0
-        )
-        out[f"future_mfe_short_{horizon}"] = (
-            1.0 - future_low / c.clip(lower=EPS)
         )
 
-        # Only complete future windows can receive a valid horizon label.
-        complete = future_close.notna()
+        future_high = future_high_frame.max(axis=1)
+        future_low = future_low_frame.min(axis=1)
+
+        out[f"future_mfe_long_{horizon}"] = future_high / c.clip(lower=EPS) - 1.0
+        out[f"future_mfe_short_{horizon}"] = 1.0 - future_low / c.clip(lower=EPS)
+
+        # MAE is the worst movement against the hypothetical position.
+        out[f"future_mae_long_{horizon}"] = 1.0 - future_low / c.clip(lower=EPS)
+        out[f"future_mae_short_{horizon}"] = future_high / c.clip(lower=EPS) - 1.0
+
+        # Time until the most favorable excursion inside the horizon.
+        mfe_long_time = np.full(len(x), np.nan, dtype=float)
+        mfe_short_time = np.full(len(x), np.nan, dtype=float)
+        for i in range(len(x) - horizon):
+            if not complete.iloc[i]:
+                continue
+            highs = h.iloc[i + 1 : i + horizon + 1].to_numpy(dtype=float)
+            lows = l.iloc[i + 1 : i + horizon + 1].to_numpy(dtype=float)
+            mfe_long_time[i] = float(np.nanargmax(highs) + 1)
+            mfe_short_time[i] = float(np.nanargmin(lows) + 1)
+
+        out[f"time_to_mfe_long_{horizon}"] = mfe_long_time
+        out[f"time_to_mfe_short_{horizon}"] = mfe_short_time
 
         long_tp = c + barrier_atr * atr
         long_sl = c - barrier_atr * atr
         short_tp = c - barrier_atr * atr
         short_sl = c + barrier_atr * atr
 
-        values = np.zeros(len(x), dtype=np.int8)
+        triple = np.full(len(x), np.nan, dtype=float)
+        time_long_tp = np.full(len(x), np.nan, dtype=float)
+        time_long_sl = np.full(len(x), np.nan, dtype=float)
+        time_short_tp = np.full(len(x), np.nan, dtype=float)
+        time_short_sl = np.full(len(x), np.nan, dtype=float)
 
         for i in range(len(x) - horizon):
             if not complete.iloc[i] or pd.isna(atr.iloc[i]):
@@ -99,32 +126,64 @@ def build_labels(
             tp_short = short_tp.iloc[i]
             sl_short = short_sl.iloc[i]
 
-            for j in range(i + 1, i + horizon + 1):
+            result = 0.0
+            for offset, j in enumerate(range(i + 1, i + horizon + 1), start=1):
                 hit_long_tp = h.iloc[j] >= tp_long
                 hit_long_sl = l.iloc[j] <= sl_long
                 hit_short_tp = l.iloc[j] <= tp_short
                 hit_short_sl = h.iloc[j] >= sl_short
 
-                if (hit_long_tp and hit_long_sl) or (hit_short_tp and hit_short_sl):
-                    values[i] = 0
+                if hit_long_tp and hit_long_sl:
+                    time_long_tp[i] = offset
+                    time_long_sl[i] = offset
+                    result = 0.0
+                    break
+                if hit_short_tp and hit_short_sl:
+                    time_short_tp[i] = offset
+                    time_short_sl[i] = offset
+                    result = 0.0
                     break
 
-                if hit_long_tp or hit_short_sl:
-                    values[i] = 1
+                if hit_long_tp:
+                    time_long_tp[i] = offset
+                    result = 1.0
+                    break
+                if hit_long_sl:
+                    time_long_sl[i] = offset
+                    result = -1.0
+                    break
+                if hit_short_tp:
+                    time_short_tp[i] = offset
+                    result = -1.0
+                    break
+                if hit_short_sl:
+                    time_short_sl[i] = offset
+                    result = 1.0
                     break
 
-                if hit_long_sl or hit_short_tp:
-                    values[i] = -1
-                    break
+            triple[i] = result
 
-        values[~complete.to_numpy()] = 0
-        out[f"triple_barrier_{horizon}"] = values
+        out[f"time_to_long_tp_{horizon}"] = time_long_tp
+        out[f"time_to_long_sl_{horizon}"] = time_long_sl
+        out[f"time_to_short_tp_{horizon}"] = time_short_tp
+        out[f"time_to_short_sl_{horizon}"] = time_short_sl
+        out[f"triple_barrier_{horizon}"] = triple
 
-        # Final rows have no complete future window and are explicitly NaN,
-        # rather than pretending that zero is a real observed outcome.
-        out.loc[~complete, f"triple_barrier_{horizon}"] = np.nan
-        out.loc[~complete, f"future_return_{horizon}"] = np.nan
-        out.loc[~complete, f"future_mfe_long_{horizon}"] = np.nan
-        out.loc[~complete, f"future_mfe_short_{horizon}"] = np.nan
+        # No complete future window means no observed outcome.
+        for column in (
+            f"future_return_{horizon}",
+            f"future_mfe_long_{horizon}",
+            f"future_mfe_short_{horizon}",
+            f"future_mae_long_{horizon}",
+            f"future_mae_short_{horizon}",
+            f"time_to_mfe_long_{horizon}",
+            f"time_to_mfe_short_{horizon}",
+            f"time_to_long_tp_{horizon}",
+            f"time_to_long_sl_{horizon}",
+            f"time_to_short_tp_{horizon}",
+            f"time_to_short_sl_{horizon}",
+            f"triple_barrier_{horizon}",
+        ):
+            out.loc[~complete, column] = np.nan
 
     return out
