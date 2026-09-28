@@ -1,4 +1,4 @@
-""""Causal-to-past feature labels built from future market outcomes.
+"""Causal-to-past feature labels built from future market outcomes.
 
 Labels intentionally look forward from each candle. They are targets for
 training/evaluation and must never be fed into the feature set.
@@ -18,24 +18,7 @@ def build_labels(
     horizons: tuple[int, ...] = (5, 20, 60),
     barrier_atr: float = 1.0,
 ) -> pd.DataFrame:
-    """Build future-outcome labels from OHLC candles.
-
-    The feature row at time t may only use information available at t.
-    Labels may use candles after t and therefore belong only to targets.
-
-    For every horizon this produces:
-      - future_return: close-to-close return after the horizon
-      - future_mfe_long/short: maximum favorable excursion
-      - future_mae_long/short: maximum adverse excursion
-      - time_to_mfe_long/short: candles until the maximum favorable excursion
-      - time_to_long_tp/long_sl and time_to_short_tp/short_sl: first barrier
-        hit in candles; horizon + 1 means the barrier was not reached
-      - triple_barrier: +1/-1 for the first directional barrier, 0 for
-        unresolved/ambiguous outcomes, NaN when the future window is incomplete
-
-    ATR is calculated only from candles up to t, so barrier distance does not
-    leak future information.
-    """
+    """Build future-outcome labels from OHLC candles."""
     required = ["timestamp", "open", "high", "low", "close"]
     missing = [c for c in required if c not in df.columns]
     if missing:
@@ -53,7 +36,6 @@ def build_labels(
     h = x["high"].astype(float)
     l = x["low"].astype(float)
 
-    # ATR proxy uses only candles through the current row.
     prev_close = c.shift(1)
     true_range = pd.concat(
         [
@@ -85,18 +67,19 @@ def build_labels(
         future_high = future_high_frame.max(axis=1)
         future_low = future_low_frame.min(axis=1)
 
-        # MFE/MAE are defined as non-negative excursions from the entry close.
-        long_favorable = (future_high / c.clip(lower=EPS) - 1.0).clip(lower=0.0)
-        short_favorable = (1.0 - future_low / c.clip(lower=EPS)).clip(lower=0.0)
-        long_adverse = (1.0 - future_low / c.clip(lower=EPS)).clip(lower=0.0)
-        short_adverse = (future_high / c.clip(lower=EPS) - 1.0).clip(lower=0.0)
+        out[f"future_mfe_long_{horizon}"] = (
+            future_high / c.clip(lower=EPS) - 1.0
+        ).clip(lower=0.0)
+        out[f"future_mfe_short_{horizon}"] = (
+            1.0 - future_low / c.clip(lower=EPS)
+        ).clip(lower=0.0)
+        out[f"future_mae_long_{horizon}"] = (
+            1.0 - future_low / c.clip(lower=EPS)
+        ).clip(lower=0.0)
+        out[f"future_mae_short_{horizon}"] = (
+            future_high / c.clip(lower=EPS) - 1.0
+        ).clip(lower=0.0)
 
-        out[f"future_mfe_long_{horizon}"] = long_favorable
-        out[f"future_mfe_short_{horizon}"] = short_favorable
-        out[f"future_mae_long_{horizon}"] = long_adverse
-        out[f"future_mae_short_{horizon}"] = short_adverse
-
-        # Time until the most favorable excursion inside the horizon.
         mfe_long_time = np.full(len(x), np.nan, dtype=float)
         mfe_short_time = np.full(len(x), np.nan, dtype=float)
         for i in range(len(x) - horizon):
@@ -112,11 +95,8 @@ def build_labels(
 
         long_tp = c + barrier_atr * atr
         long_sl = c - barrier_atr * atr
-        short_tp = c - barrier_atr * atr
-        short_sl = c + barrier_atr * atr
 
         triple = np.full(len(x), np.nan, dtype=float)
-        # horizon + 1 means the barrier was not reached inside the window.
         censored_time = float(horizon + 1)
         time_long_tp = np.full(len(x), np.nan, dtype=float)
         time_long_sl = np.full(len(x), np.nan, dtype=float)
@@ -126,6 +106,7 @@ def build_labels(
         for i in range(len(x) - horizon):
             if not complete.iloc[i]:
                 continue
+
             if pd.isna(atr.iloc[i]):
                 time_long_tp[i] = censored_time
                 time_long_sl[i] = censored_time
@@ -142,13 +123,15 @@ def build_labels(
             sl_long = long_sl.iloc[i]
 
             result = 0.0
-            for offset, j in enumerate(range(i + 1, i + horizon + 1), start=1):
+            for offset, j in enumerate(
+                range(i + 1, i + horizon + 1), start=1
+            ):
                 hit_upper = h.iloc[j] >= tp_long
                 hit_lower = l.iloc[j] <= sl_long
 
-                # Upper is simultaneously long TP + short SL.
-                # Lower is simultaneously long SL + short TP.
-                # If both happen in one candle, intrabar ordering is unknown.
+                # Upper = long TP + short SL.
+                # Lower = long SL + short TP.
+                # Both in one OHLC candle are ambiguous intrabar.
                 if hit_upper and hit_lower:
                     time_long_tp[i] = offset
                     time_short_sl[i] = offset
@@ -177,7 +160,6 @@ def build_labels(
         out[f"time_to_short_sl_{horizon}"] = time_short_sl
         out[f"triple_barrier_{horizon}"] = triple
 
-        # No complete future window means no observed outcome.
         for column in (
             f"future_return_{horizon}",
             f"future_mfe_long_{horizon}",
@@ -195,4 +177,3 @@ def build_labels(
             out.loc[~complete, column] = np.nan
 
     return out
-"
