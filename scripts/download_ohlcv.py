@@ -24,7 +24,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.getenv("AICFA_DATA_DIR", str(ROOT / "data")))
 RAW_DIR = DATA_DIR / "raw"
-DEFAULT_TIMEFRAMES = ["15m", "1h", "4h"]
+DEFAULT_TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"]
 LIMIT = 1000
 PAUSE_SECONDS = 0.2
 
@@ -32,21 +32,13 @@ PAUSE_SECONDS = 0.2
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download AICFA OHLCV data")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        "--symbols",
-        nargs="+",
-        help="Symbols such as BTC/USDT ETH/USDT",
-    )
-    group.add_argument(
-        "--all",
-        action="store_true",
-        help="Download all active USDT spot symbols available on Binance",
-    )
+    group.add_argument("--symbols", nargs="+", help="Symbols such as BTC/USDT ETH/USDT")
+    group.add_argument("--all", action="store_true", help="Download all active USDT spot symbols available on Binance")
     parser.add_argument(
         "--timeframes",
         nargs="+",
         default=DEFAULT_TIMEFRAMES,
-        help="Timeframes to download (default: 15m 1h 4h)",
+        help="Timeframes to download (default: 1m 5m 15m 1h 4h 1d 1w 1M)",
     )
     parser.add_argument(
         "--since",
@@ -89,7 +81,6 @@ def get_symbols(exchange: ccxt.Exchange, requested: list[str] | None, all_symbol
     missing = [symbol for symbol in symbols if symbol not in exchange.markets]
     if missing:
         raise ValueError(f"Symbols not found on Binance: {', '.join(missing[:20])}")
-
     return symbols
 
 
@@ -235,7 +226,6 @@ def download_one(
 def main() -> None:
     args = parse_args()
     exchange = make_exchange()
-
     symbols = get_symbols(exchange, args.symbols, args.all)
 
     invalid_timeframes = [
@@ -253,7 +243,7 @@ def main() -> None:
         else None
     )
 
-    print(f"Exchange: Binance spot")
+    print("Exchange: Binance spot")
     print(f"Symbols: {len(symbols)}")
     print(f"Timeframes: {', '.join(args.timeframes)}")
     print(f"Raw data: {RAW_DIR}")
