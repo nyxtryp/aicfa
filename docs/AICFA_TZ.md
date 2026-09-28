@@ -215,6 +215,24 @@ DEPLOY ONLY IF VALIDATED
 
 # 5. Market Data Engine
 
+AICFA должен проектироваться сразу с расчётом на большое количество цифровых активов. BTC/USDT является первым эталонным активом для разработки, а не архитектурным ограничением.
+
+## 5.1 Universe of Assets
+
+Market Data Engine должен поддерживать:
+
+- множество symbols;
+- spot и futures markets;
+- индивидуальную доступность таймфреймов и derivatives data;
+- метаданные актива;
+- market type;
+- exchange;
+- base/quote asset;
+- listing/delisting periods;
+- liquidity/volume context.
+
+Нельзя считать, что каждый актив имеет одинаковый набор данных. Отсутствующие источники явно маркируются как unavailable и не заменяются выдуманными значениями.
+
 Первая стадия:
 
 - BTC/USDT;
@@ -310,65 +328,200 @@ timestamp T
 features(T)
 ~~~
 
-Группы признаков:
+Feature Engine должен быть универсальным для большого количества активов. Символ, тип рынка, ликвидность и доступность источников данных являются частью контекста.
 
-### Price
+## 7.1 Price
+
 - returns;
-- ranges;
+- log returns;
 - candle body;
-- wicks;
+- upper/lower wick;
+- candle range;
+- body/range;
+- gap;
+- close position inside candle;
+- candle sequences;
+- impulse;
+- compression;
 - rolling highs/lows;
-- distance to levels.
+- distance to important levels;
+- distance to recent extremes;
+- reaction after level interaction.
 
-### Volume
-- volume;
-- relative volume;
-- expansion;
-- contraction;
-- volume/price relationships.
+## 7.2 Volatility
 
-### Volatility
 - rolling volatility;
 - ATR-подобные признаки;
-- range expansion;
-- compression;
-- volatility regime.
+- range relative to average;
+- volatility expansion/contraction;
+- volatility regime;
+- extreme moves;
+- volatility persistence;
+- volatility compression;
+- volatility shock.
 
-### Structure
+## 7.3 Market Structure
+
 - HH;
 - HL;
 - LH;
 - LL;
+- swing highs/lows;
+- internal structure;
+- external structure;
 - BOS;
 - CHoCH;
 - MSS;
-- trend/range;
+- trend;
+- range;
 - consolidation;
-- displacement.
+- structure strength;
+- displacement;
+- structural persistence;
+- structural break quality.
 
-### Liquidity
+Каждое понятие должно иметь формальное алгоритмическое определение и воспроизводимые параметры.
+
+## 7.4 Liquidity
+
+- previous high/low;
 - equal highs/lows;
-- previous highs/lows;
-- liquidity pools;
-- sweeps/grabs;
-- breakout traps.
+- local liquidity pools;
+- internal liquidity;
+- external liquidity;
+- distance to nearest liquidity;
+- liquidity sweep/grab;
+- rejection after sweep;
+- breakout;
+- failed breakout;
+- breakout trap;
+- stop-run behaviour;
+- reaction after liquidity event.
 
-### SMC
+## 7.5 SMC
+
 - FVG;
 - IFVG;
 - imbalance;
-- order blocks;
+- displacement;
+- order-block candidates;
+- bullish/bearish order blocks;
+- breaker candidates;
 - breaker;
 - mitigation;
-- premium/discount;
+- invalidation;
+- premium;
+- discount;
 - equilibrium;
+- dealing range;
 - inducement;
 - POI;
 - SMT/divergence;
 - internal/external liquidity;
 - internal/external structure.
 
-Каждый признак должен иметь формальное алгоритмическое определение.
+SMC не является встроенной истиной. Каждый концепт превращается в измеримый признак или событие и проходит историческую статистическую проверку.
+
+## 7.6 Volume
+
+- raw volume;
+- volume change;
+- volume SMA/EMA;
+- relative volume;
+- volume anomaly;
+- price/volume divergence;
+- volume on expansion;
+- volume on rejection;
+- volume persistence;
+- abnormal volume events.
+
+## 7.7 Market Regime
+
+- trend;
+- range;
+- expansion;
+- compression;
+- high-volatility regime;
+- low-volatility regime;
+- directional strength;
+- persistence;
+- mean-reversion tendency;
+- transition between regimes.
+
+## 7.8 Multi-Timeframe Representation
+
+Базовый набор:
+
+- 1m;
+- 5m;
+- 15m;
+- 1h;
+- 4h;
+- 1d;
+- 1w;
+- 1M.
+
+AICFA должен уметь связывать:
+
+~~~text
+HTF trend
+↓
+HTF liquidity
+↓
+HTF structure
+↓
+LTF structure
+↓
+LTF liquidity event
+↓
+entry context
+~~~
+
+Не требуется использовать все таймфреймы в каждом решении.
+
+## 7.9 Derivatives Features
+
+По мере доступности:
+
+- Open Interest;
+- OI change;
+- Funding;
+- Liquidations;
+- Long/Short Ratio;
+- Basis;
+- Futures Volume;
+- Spot/Futures divergence;
+- derivatives positioning.
+
+## 7.10 Order Flow / Market Microstructure
+
+Позднее, при наличии исторических источников:
+
+- Order Book;
+- Market Depth;
+- Bid/Ask imbalance;
+- aggressive buying/selling;
+- absorption;
+- delta;
+- CVD;
+- liquidity walls;
+- order-book changes.
+
+## 7.11 Feature Provenance
+
+Для каждого feature желательно сохранять:
+
+- feature name;
+- definition;
+- calculation parameters;
+- source data;
+- timestamp;
+- timeframe;
+- symbol;
+- causal availability;
+- feature version.
+
+Это необходимо для воспроизводимости, исследований и объяснения решений модели.
 
 # 8. SMC как исследовательская система
 
