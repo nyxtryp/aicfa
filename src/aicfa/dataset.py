@@ -24,10 +24,10 @@ def build_dataset(features: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
     label_frame = labels.copy()
 
     feature_frame["timestamp"] = pd.to_datetime(
-        feature_frame["timestamp"], utc=True, errors="raise"
+        feature_frame["timestamp"], unit="ms", utc=True, errors="raise"
     )
     label_frame["timestamp"] = pd.to_datetime(
-        label_frame["timestamp"], utc=True, errors="raise"
+        label_frame["timestamp"], unit="ms", utc=True, errors="raise"
     )
 
     if feature_frame["timestamp"].duplicated().any():
