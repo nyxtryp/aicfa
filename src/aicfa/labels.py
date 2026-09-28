@@ -1,4 +1,4 @@
-"""Causal-to-past feature labels built from future market outcomes.
+""""Causal-to-past feature labels built from future market outcomes.
 
 Labels intentionally look forward from each candle. They are targets for
 training/evaluation and must never be fed into the feature set.
@@ -85,12 +85,16 @@ def build_labels(
         future_high = future_high_frame.max(axis=1)
         future_low = future_low_frame.min(axis=1)
 
-        out[f"future_mfe_long_{horizon}"] = future_high / c.clip(lower=EPS) - 1.0
-        out[f"future_mfe_short_{horizon}"] = 1.0 - future_low / c.clip(lower=EPS)
+        # MFE/MAE are defined as non-negative excursions from the entry close.
+        long_favorable = (future_high / c.clip(lower=EPS) - 1.0).clip(lower=0.0)
+        short_favorable = (1.0 - future_low / c.clip(lower=EPS)).clip(lower=0.0)
+        long_adverse = (1.0 - future_low / c.clip(lower=EPS)).clip(lower=0.0)
+        short_adverse = (future_high / c.clip(lower=EPS) - 1.0).clip(lower=0.0)
 
-        # MAE is the worst movement against the hypothetical position.
-        out[f"future_mae_long_{horizon}"] = 1.0 - future_low / c.clip(lower=EPS)
-        out[f"future_mae_short_{horizon}"] = future_high / c.clip(lower=EPS) - 1.0
+        out[f"future_mfe_long_{horizon}"] = long_favorable
+        out[f"future_mfe_short_{horizon}"] = short_favorable
+        out[f"future_mae_long_{horizon}"] = long_adverse
+        out[f"future_mae_short_{horizon}"] = short_adverse
 
         # Time until the most favorable excursion inside the horizon.
         mfe_long_time = np.full(len(x), np.nan, dtype=float)
@@ -113,7 +117,6 @@ def build_labels(
 
         triple = np.full(len(x), np.nan, dtype=float)
         # horizon + 1 means the barrier was not reached inside the window.
-        # This keeps censored observations usable in the training dataset.
         censored_time = float(horizon + 1)
         time_long_tp = np.full(len(x), np.nan, dtype=float)
         time_long_sl = np.full(len(x), np.nan, dtype=float)
@@ -137,42 +140,33 @@ def build_labels(
 
             tp_long = long_tp.iloc[i]
             sl_long = long_sl.iloc[i]
-            tp_short = short_tp.iloc[i]
-            sl_short = short_sl.iloc[i]
 
             result = 0.0
             for offset, j in enumerate(range(i + 1, i + horizon + 1), start=1):
-                hit_long_tp = h.iloc[j] >= tp_long
-                hit_long_sl = l.iloc[j] <= sl_long
-                hit_short_tp = l.iloc[j] <= tp_short
-                hit_short_sl = h.iloc[j] >= sl_short
+                hit_upper = h.iloc[j] >= tp_long
+                hit_lower = l.iloc[j] <= sl_long
 
-                if hit_long_tp and hit_long_sl:
+                # Upper is simultaneously long TP + short SL.
+                # Lower is simultaneously long SL + short TP.
+                # If both happen in one candle, intrabar ordering is unknown.
+                if hit_upper and hit_lower:
                     time_long_tp[i] = offset
-                    time_long_sl[i] = offset
-                    result = 0.0
-                    break
-                if hit_short_tp and hit_short_sl:
-                    time_short_tp[i] = offset
                     time_short_sl[i] = offset
+                    time_long_sl[i] = offset
+                    time_short_tp[i] = offset
                     result = 0.0
                     break
 
-                if hit_long_tp:
+                if hit_upper:
                     time_long_tp[i] = offset
-                    result = 1.0
-                    break
-                if hit_long_sl:
-                    time_long_sl[i] = offset
-                    result = -1.0
-                    break
-                if hit_short_tp:
-                    time_short_tp[i] = offset
-                    result = -1.0
-                    break
-                if hit_short_sl:
                     time_short_sl[i] = offset
                     result = 1.0
+                    break
+
+                if hit_lower:
+                    time_long_sl[i] = offset
+                    time_short_tp[i] = offset
+                    result = -1.0
                     break
 
             triple[i] = result
@@ -201,3 +195,4 @@ def build_labels(
             out.loc[~complete, column] = np.nan
 
     return out
+"
