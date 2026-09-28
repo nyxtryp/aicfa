@@ -35,15 +35,25 @@ def test_labels_keep_input_schema_and_expected_columns() -> None:
     ]
     assert "future_return_20" in labels.columns
     assert "future_mfe_long_5" in labels.columns
+    assert "future_mae_short_5" in labels.columns
+    assert "time_to_mfe_long_5" in labels.columns
+    assert "time_to_long_tp_20" in labels.columns
+    assert "time_to_short_sl_20" in labels.columns
     assert "triple_barrier_20" in labels.columns
 
 
 def test_final_rows_have_no_fake_future_outcomes() -> None:
     labels = build_labels(make_ohlc(), horizons=(5,))
 
-    assert labels["future_return_5"].iloc[-1:].isna().all()
-    assert labels["future_mfe_long_5"].iloc[-5:].isna().all()
-    assert labels["triple_barrier_5"].iloc[-5:].isna().all()
+    for column in (
+        "future_return_5",
+        "future_mfe_long_5",
+        "future_mae_short_5",
+        "time_to_mfe_long_5",
+        "time_to_long_tp_5",
+        "triple_barrier_5",
+    ):
+        assert labels[column].iloc[-5:].isna().all()
 
 
 def test_labels_are_allowed_to_depend_on_future_prices() -> None:
@@ -57,6 +67,24 @@ def test_labels_are_allowed_to_depend_on_future_prices() -> None:
 
     # A target at t may change when a future candle changes. This is expected.
     assert a["future_return_5"].iloc[56] != b["future_return_5"].iloc[56]
+
+
+def test_mae_and_mfe_are_non_negative() -> None:
+    labels = build_labels(make_ohlc(), horizons=(5,))
+
+    valid = labels.dropna(subset=["future_mfe_long_5", "future_mfe_short_5"])
+    assert (valid["future_mfe_long_5"] >= 0).all()
+    assert (valid["future_mfe_short_5"] >= 0).all()
+    assert (valid["future_mae_long_5"] >= 0).all()
+    assert (valid["future_mae_short_5"] >= 0).all()
+
+
+def test_time_to_mfe_is_inside_horizon() -> None:
+    labels = build_labels(make_ohlc(), horizons=(5,))
+
+    valid = labels.dropna(subset=["time_to_mfe_long_5"])
+    assert valid["time_to_mfe_long_5"].between(1, 5).all()
+    assert valid["time_to_mfe_short_5"].between(1, 5).all()
 
 
 def test_no_infinite_labels() -> None:
