@@ -160,7 +160,7 @@ def build_labels(
         out[f"time_to_short_sl_{horizon}"] = time_short_sl
         out[f"triple_barrier_{horizon}"] = triple
 
-        for column in (
+        label_columns = (
             f"future_return_{horizon}",
             f"future_mfe_long_{horizon}",
             f"future_mfe_short_{horizon}",
@@ -173,7 +173,8 @@ def build_labels(
             f"time_to_short_tp_{horizon}",
             f"time_to_short_sl_{horizon}",
             f"triple_barrier_{horizon}",
-        ):
+        )
+        for column in label_columns:
             out.loc[~complete, column] = np.nan
 
     return out
