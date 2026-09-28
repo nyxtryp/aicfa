@@ -56,7 +56,7 @@ def test_labels_are_allowed_to_depend_on_future_prices() -> None:
     b = build_labels(altered, horizons=(5,))
 
     # A target at t may change when a future candle changes. This is expected.
-    assert a["future_return_5"].iloc[50] != b["future_return_5"].iloc[50]
+    assert a["future_return_5"].iloc[56] != b["future_return_5"].iloc[56]
 
 
 def test_no_infinite_labels() -> None:
