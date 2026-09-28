@@ -87,6 +87,16 @@ def test_time_to_mfe_is_inside_horizon() -> None:
     assert valid["time_to_mfe_short_5"].between(1, 5).all()
 
 
+def test_unhit_barriers_are_censored_not_missing() -> None:
+    labels = build_labels(make_ohlc(), horizons=(5,))
+
+    valid = labels.dropna(subset=["triple_barrier_5"])
+    assert valid["time_to_long_tp_5"].between(1, 6).all()
+    assert valid["time_to_long_sl_5"].between(1, 6).all()
+    assert valid["time_to_short_tp_5"].between(1, 6).all()
+    assert valid["time_to_short_sl_5"].between(1, 6).all()
+
+
 def test_no_infinite_labels() -> None:
     labels = build_labels(make_ohlc(), horizons=(5, 20, 60))
     numeric = labels.drop(columns=["timestamp"]).to_numpy(dtype=float)
