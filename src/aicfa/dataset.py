@@ -7,7 +7,17 @@ from pathlib import Path
 import pandas as pd
 
 RAW_COLUMNS = {"open", "high", "low", "close", "volume"}
-LABEL_PREFIXES = (\n    "future_return_",\n    "future_mfe_",\n    "future_mae_",\n    "time_to_mfe_",\n    "time_to_long_tp_",\n    "time_to_long_sl_",\n    "time_to_short_tp_",\n    "time_to_short_sl_",\n    "triple_barrier_",\n)
+LABEL_PREFIXES = (
+    "future_return_",
+    "future_mfe_",
+    "future_mae_",
+    "time_to_mfe_",
+    "time_to_long_tp_",
+    "time_to_long_sl_",
+    "time_to_short_tp_",
+    "time_to_short_sl_",
+    "triple_barrier_",
+)
 
 
 def build_dataset(features: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
