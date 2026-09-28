@@ -85,7 +85,7 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         out[f"close_vs_mean_{n}"] = c / mean_n.clip(lower=EPS) - 1.0
 
     # Time context; all derived from the current candle timestamp.
-    ts = pd.to_datetime(out["timestamp"], utc=True)
+    ts = pd.to_datetime(out["timestamp"], unit="ms", utc=True)
     out["hour_utc"] = ts.dt.hour.astype("int8")
     out["day_of_week"] = ts.dt.dayofweek.astype("int8")
 
