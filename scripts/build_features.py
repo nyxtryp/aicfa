@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
 
 import pandas as pd
 
 from aicfa.features import build_features
 
 
-ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.getenv("AICFA_DATA_DIR", str(ROOT / "data")))
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
@@ -20,7 +23,11 @@ PROCESSED_DIR = DATA_DIR / "processed"
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--symbols", nargs="+", default=["BTC/USDT"])
-    parser.add_argument("--timeframes", nargs="+", default=["1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"])
+    parser.add_argument(
+        "--timeframes",
+        nargs="+",
+        default=["1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"],
+    )
     args = parser.parse_args()
 
     for symbol in args.symbols:
