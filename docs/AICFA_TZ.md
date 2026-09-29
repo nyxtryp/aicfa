@@ -1738,3 +1738,31 @@ Exchange-source note: Binance documents futures market streams including
 `aggTrade` and `depth`, and futures order-book data exposes price/quantity
 levels. The collector must preserve source event/availability timestamps
 before synchronization.
+
+
+# CVD / Cumulative Taker Delta — 2026-09-29
+
+CVD is implemented as a descriptive cumulative taker-delta feature.
+
+Required source fields:
+- `timestamp` — availability time of the completed flow interval;
+- `taker_buy_volume`;
+- `taker_sell_volume`.
+
+Optional `reset` explicitly starts a new cumulative segment. The implementation does
+not infer resets from arbitrary calendar boundaries. Without documented reset semantics,
+CVD is cumulative over the supplied source sequence.
+
+For each completed interval:
+- `taker_delta = taker_buy_volume - taker_sell_volume`;
+- CVD is the cumulative sum within the current source segment.
+
+Causality:
+- source timestamps are availability timestamps;
+- base observations use only source intervals with timestamp <= T;
+- backward as-of alignment carries only the latest already-known CVD state;
+- future flow observations cannot change earlier CVD values.
+
+Scope limitation: this does not claim to reconstruct an exchange-native lifetime/session
+CVD unless the source explicitly defines that scope. Chunked historical data requires an
+explicit continuity contract. CVD remains descriptive and is not a standalone trade signal.
