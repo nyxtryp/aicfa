@@ -304,3 +304,51 @@ Required next step:
 2. run the mandatory full pytest suite;
 3. if green, accept the adapter code;
 4. separately test a real local/self-hosted vision model before making it the active provider.
+
+
+## 2026-09-29 — Self-hosted chart vision adapter verification and local model selection
+
+### Server verification
+
+FrostDeploy release:
+`2026-09-29T16-44-59-56b75f0`
+
+Mandatory full-project verification:
+```
+245 passed, 4863 warnings in 40.65s
+```
+
+The remaining pytest-cache Permission denied warning is the known non-blocking warning caused by immutable FrostDeploy release permissions. No test failures remain.
+
+**Self-hosted Chart Vision adapter code is GREEN / accepted.**
+
+### Local vision provider
+
+The next operational step is to install and test a real local multimodal model through Ollama.
+
+Baseline candidate selected for the first real chart test:
+- `qwen3-vl:4b` — current Ollama local vision model, approximately 3.3 GB model size;
+- it accepts text + image input and is intended to provide the visual perception layer only;
+- AICFA's Knowledge Base, evidence reasoning, scenario reasoning, setup analysis and Decision Layer remain the authoritative analytical system;
+- the provider must not generate trade execution instructions or bypass AICFA evidence validation.
+
+The current server has 3 GB RAM, so the 4B model should not be installed blindly. Increase RAM first (target at least 6 GB total for this baseline) and then test actual CPU inference. If the real server test shows insufficient memory/performance, use a smaller vision model rather than changing the AICFA architecture.
+
+No model is considered production-active until:
+1. Ollama is installed and healthy;
+2. the selected model is pulled successfully;
+3. a real BTC/USDT chart screenshot is processed;
+4. the provider output passes AICFA Knowledge Base/evidence validation;
+5. the full pytest suite remains green after any integration changes.
+
+### Immediate operator step
+
+On the AICFA server, first inspect resources and Ollama state:
+```bash
+free -h
+nproc
+ollama --version || true
+nvidia-smi || true
+```
+
+Then proceed with the local model installation/test. Do not expose Ollama port 11434 publicly; AICFA should use the local endpoint `127.0.0.1:11434`.
