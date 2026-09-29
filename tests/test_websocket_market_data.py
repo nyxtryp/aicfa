@@ -2,6 +2,7 @@ import json
 
 import pandas as pd
 import pytest
+from websocket import WebSocketTimeoutException
 
 from aicfa.data_reliability import DataFreshness, LocalMarketStateStore
 from aicfa.market_data import MarketKey
@@ -99,6 +100,42 @@ def test_transport_subscribes_reconnects_and_updates_local_state():
     assert sleeps == [0.5]
     assert store.freshness(key, now_ms=1700000060000).status is DataFreshness.FRESH
     assert sockets == []
+
+
+class TimeoutThenMessageSocket(FakeSocket):
+    def __init__(self, message):
+        super().__init__([message])
+        self.timed_out = False
+
+    def recv(self):
+        if not self.timed_out:
+            self.timed_out = True
+            raise WebSocketTimeoutException("read timed out")
+        return super().recv()
+
+
+def test_transport_ignores_read_timeout_and_keeps_connection():
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    socket = TimeoutThenMessageSocket(_message())
+    connections = []
+
+    def connector(url, *, timeout):
+        connections.append((url, timeout))
+        return socket
+
+    transport = BinanceWebSocketMarketDataTransport(
+        keys=(key,),
+        connector=connector,
+        timeout_seconds=1,
+        max_reconnects=0,
+    )
+
+    observation = next(transport.stream(max_observations=1))
+
+    assert observation.key == key
+    assert len(connections) == 1
+    assert socket.closed is True
+
 
 
 def test_transport_resubscribes_after_reconnect():
