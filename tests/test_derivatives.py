@@ -56,6 +56,37 @@ def test_derivatives_optional_liquidations_are_preserved_and_causal():
     assert out.loc[4, "liquidation_volume"] == 2
 
 
+def test_derivatives_liquidation_imbalance_is_event_based_and_causal():
+    base = base_frame()
+    d = derivatives_frame()
+    d["long_liquidation_volume"] = [4.0, 6.0, 2.0, 9.0, 3.0, 8.0]
+    d["short_liquidation_volume"] = [6.0, 2.0, 8.0, 3.0, 7.0, 2.0]
+
+    out = build_derivatives(base, d, baseline_window=2)
+
+    assert np.isclose(out.loc[0, "liquidation_imbalance"], -0.2)
+    assert pd.isna(out.loc[1, "liquidation_imbalance"])
+    assert np.isclose(out.loc[2, "liquidation_imbalance"], 0.0)
+    assert out.loc[4, "liquidation_imbalance"] > 0.0
+
+    altered = d.copy()
+    altered.loc[altered["timestamp"] >= pd.Timestamp("2026-01-01T00:08:00Z"), "long_liquidation_volume"] *= 10
+    altered.loc[altered["timestamp"] >= pd.Timestamp("2026-01-01T00:08:00Z"), "short_liquidation_volume"] *= 0.1
+    changed = build_derivatives(base, altered, baseline_window=2)
+    pd.testing.assert_frame_equal(out.iloc[:8], changed.iloc[:8], check_dtype=False)
+
+
+def test_derivatives_liquidation_imbalance_handles_zero_event_volume():
+    base = base_frame()
+    d = derivatives_frame()
+    d["long_liquidation_volume"] = [0.0] * len(d)
+    d["short_liquidation_volume"] = [0.0] * len(d)
+
+    out = build_derivatives(base, d, baseline_window=2)
+
+    assert pd.isna(out.loc[0, "liquidation_imbalance"])
+
+
 def test_derivatives_positioning_basis_features_are_causal():
     base = base_frame()
     d = derivatives_frame()
