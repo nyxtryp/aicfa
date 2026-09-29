@@ -17,8 +17,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-EPS = 1e-12
-
 
 def _validate(df: pd.DataFrame) -> pd.DataFrame:
     required = ["timestamp", "open", "high", "low", "close", "volume"]
@@ -68,26 +66,16 @@ def build_order_blocks(
     out = x.copy()
     n = len(x)
 
-    columns = {
-        "order_block_bullish": 0,
-        "order_block_bearish": 0,
-        "order_block": 0,
-        "order_block_mitigated": 0,
-        "order_block_invalidated": 0,
-        "order_block_active": 0,
-        "breaker_bullish": 0,
-        "breaker_bearish": 0,
-        "breaker": 0,
-        "order_block_displacement_bullish": 0,
-        "order_block_displacement_bearish": 0,
-    }
-    for column, default in columns.items():
-        out[column] = default
     for column in [
-        "order_block_bullish_low",
-        "order_block_bullish_high",
-        "order_block_bearish_low",
-        "order_block_bearish_high",
+        "order_block_bullish", "order_block_bearish", "order_block",
+        "order_block_mitigated", "order_block_invalidated", "order_block_active",
+        "breaker_bullish", "breaker_bearish", "breaker",
+        "order_block_displacement_bullish", "order_block_displacement_bearish",
+    ]:
+        out[column] = 0
+    for column in [
+        "order_block_bullish_low", "order_block_bullish_high",
+        "order_block_bearish_low", "order_block_bearish_high",
     ]:
         out[column] = np.nan
 
@@ -95,9 +83,10 @@ def build_order_blocks(
 
     displacement = build_displacement(x) if require_displacement else None
 
-    # Each state stores [low, high, invalidated, breaker, mitigated].
+    # Active state: (low, high, mitigated).
     active_bullish = None
     active_bearish = None
+    # Invalidated state: (low, high, breaker_already_emitted).
     invalidated_bullish = None
     invalidated_bearish = None
 
@@ -107,6 +96,23 @@ def build_order_blocks(
     closes = x["close"].to_numpy()
 
     for i in range(n):
+        # Breaker checks deliberately happen BEFORE the current active OB
+        # lifecycle, so an OB invalidated on candle i cannot become a breaker
+        # until a strictly later candle.
+        if invalidated_bullish is not None:
+            low_bound, high_bound, emitted = invalidated_bullish
+            if not emitted and highs[i] >= low_bound and closes[i] < low_bound:
+                out.at[i, "breaker_bearish"] = 1
+                out.at[i, "breaker"] = 1
+                invalidated_bullish = (low_bound, high_bound, True)
+
+        if invalidated_bearish is not None:
+            low_bound, high_bound, emitted = invalidated_bearish
+            if not emitted and lows[i] <= high_bound and closes[i] > high_bound:
+                out.at[i, "breaker_bullish"] = 1
+                out.at[i, "breaker"] = 1
+                invalidated_bearish = (low_bound, high_bound, True)
+
         # Existing active bullish OB lifecycle.
         if active_bullish is not None:
             low_bound, high_bound, mitigated = active_bullish
@@ -136,22 +142,6 @@ def build_order_blocks(
             else:
                 active_bearish = (low_bound, high_bound, mitigated)
                 out.at[i, "order_block_active"] = 1
-
-        # Invalidated bullish OB -> bearish breaker on a later retest from below.
-        if invalidated_bullish is not None:
-            low_bound, high_bound, breaker_emitted = invalidated_bullish
-            if not breaker_emitted and highs[i] >= low_bound and closes[i] < low_bound:
-                out.at[i, "breaker_bearish"] = 1
-                out.at[i, "breaker"] = 1
-                invalidated_bullish = (low_bound, high_bound, True)
-
-        # Invalidated bearish OB -> bullish breaker on a later retest from above.
-        if invalidated_bearish is not None:
-            low_bound, high_bound, breaker_emitted = invalidated_bearish
-            if not breaker_emitted and lows[i] <= high_bound and closes[i] > high_bound:
-                out.at[i, "breaker_bullish"] = 1
-                out.at[i, "breaker"] = 1
-                invalidated_bearish = (low_bound, high_bound, True)
 
         if i < 1:
             continue
