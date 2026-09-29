@@ -481,10 +481,64 @@ Current limitations:
 - absorption is not implemented;
 - CVD remains deferred until its source/reset semantics are defined.
 
+
+## 2026-09-29 — Level-by-level Order Book / Liquidity Walls implementation started
+
+### `4a6ea7764cc1628aff3910da32af1d045348a9d5`
+**Add causal level-by-level order book changes and liquidity walls**
+
+Added `src/aicfa/order_book_levels.py`.
+
+Implemented:
+- normalized bid/ask level validation;
+- per-level size delta;
+- displayed additions;
+- displayed cancellations/removals;
+- aggregate bid/ask displayed-flow changes;
+- persistent liquidity-wall detection;
+- same-side snapshot-relative wall threshold;
+- wall size multiple.
+
+The layer remains descriptive. A removed level is accounted for as displayed cancellation/removal, without claiming the economic reason.
+
+### `2d92f387be47ce3f869006ac0129a4f764d8c773`
+**Fix liquidity wall persistence across unchanged snapshots**
+
+Corrected wall persistence so a wall can remain a wall even when its displayed size does not change between consecutive complete snapshots. Persistence is now evaluated from the complete snapshot sequence rather than only from change rows.
+
+### `6a86c2cf4d1f13bc60b4c202089f3def36a3f74b`
+**Test level changes and liquidity wall features**
+
+Added tests for:
+- additions and cancellations;
+- explicit level removal;
+- aggregate bid/ask displayed flow;
+- persistence-required wall detection;
+- future-change invariance;
+- invalid side and negative-size rejection.
+
+### `f6df0f23bd2e3691a94e3c4be87d342c5db69066`
+**Document level order book and liquidity wall semantics**
+
+Documented the level-by-level source contract, wall persistence semantics and the limitation that displayed liquidity does not prove execution.
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step:
+1. deploy the current commits to FrostDeploy;
+2. run the mandatory full pytest suite;
+3. fix any real failures;
+4. rerun until green;
+5. only then mark this stage accepted.
+
+Absorption is intentionally deferred until synchronized trade/taker flow + order-book changes + price-response semantics are defined.
+
 # 10. Immediate next work
 
-1. Verify the current Order Book / Market Depth implementation on FrostDeploy.
-2. After acceptance, continue with level-by-level order-book changes, liquidity walls and absorption where reliable source contracts exist.
+1. Verify the current level-by-level Order Book / Liquidity Walls implementation on FrostDeploy.
+2. After acceptance, define and implement absorption from synchronized trade/taker flow + book changes + price response.
 3. Keep all market-microstructure features descriptive and causal; no premature signals.
 4. Then continue market-state completeness before ML.
 
@@ -541,4 +595,4 @@ Latest full-suite result:
 
 **Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, spot/futures relationship, and Taker Flow / Order Flow are implemented, deployed and verified green.
 
-**Next task:** verify the current Order Book / Market Depth implementation on FrostDeploy. It is not yet marked green. Preserve strict causality and the pre-ML development boundary.
+**Next task:** verify the current level-by-level Order Book / Liquidity Walls implementation on FrostDeploy. It is not yet marked green. Preserve strict causality and the pre-ML development boundary.
