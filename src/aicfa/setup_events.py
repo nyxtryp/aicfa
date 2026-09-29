@@ -55,17 +55,18 @@ def build_setup_events(state: pd.DataFrame) -> pd.DataFrame:
 
     previous_identity = identity.shift(1).fillna("")
     previous_active = previous_identity.ne("")
+    identity_changed = valid_identity & identity.ne(previous_identity)
 
-    created = valid_identity & ~previous_active
+    # A new identity is created both when there was no previous setup and
+    # when an existing setup is replaced by a different identity.
+    created = identity_changed
     same_identity = valid_identity & identity.eq(previous_identity)
     strengthened = same_identity & _num(x, "market_state_changed").ne(0)
 
     # A replacement invalidates the previous setup even though the new setup
     # is created on the same observation. Expiration is the inactive form of
     # invalidation.
-    invalidated = previous_active & (
-        identity.eq("") | identity.ne(previous_identity)
-    )
+    invalidated = previous_active & identity.ne(previous_identity)
     expired = invalidated & ~valid_identity
 
     # Replacement carries both lifecycle flags: invalidated for the previous
