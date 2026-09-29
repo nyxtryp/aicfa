@@ -77,6 +77,15 @@ def test_feature_columns_and_shape():
         "market_state_smc_ready",
         "market_state_context_availability_mask",
         "market_state_changed",
+        "setup_event_active",
+        "setup_event_direction",
+        "setup_event_family",
+        "setup_event_type",
+        "setup_event_created",
+        "setup_event_strengthened",
+        "setup_event_invalidated",
+        "setup_event_expired",
+        "setup_event_outcome",
     ]:
         assert column in result.columns
 
