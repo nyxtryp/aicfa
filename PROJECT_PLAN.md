@@ -297,6 +297,7 @@ Current equal-high/equal-low detection compares sequential confirmed swings. It 
 
 ### `cb0d9298a20ec3db367a4bd70ff94241461044cc`
 **Add causal market structure engine**
+
 Added `src/aicfa/structure.py`.
 
 Implemented:
@@ -341,6 +342,7 @@ Adjusted test so it works both in a normal repository checkout and FrostDeploy i
 Adjusted the test fixture/anchor only. Production label logic was not changed.
 
 ### Server verification
+
 17 tests passed:
 ```
 17 passed, 12 warnings
@@ -385,6 +387,7 @@ Added tests for:
 Connected liquidity output to `src/aicfa/features.py`.
 
 ### Server verification after initial Liquidity integration
+
 The FrostDeploy suite was run against the current release and found two failures:
 - `tests/test_liquidity.py::test_low_sweep_and_reclaim_is_causal` — the fixture closes exactly at the sell-side liquidity level on reclaim; production logic used a strict `>` boundary.
 - `tests/test_structure.py::test_hh_hl_lh_ll` — the fixture did not actually contain a confirmed HL/LL sequence under the configured one-candle swing rule.
@@ -496,6 +499,7 @@ Combine:
 - premium/discount
 
 into a causal market-state representation.
+
 ### Step 10 — Multi-timeframe
 Only after the single-timeframe components are reliable:
 - 1M
@@ -604,767 +608,68 @@ This file is the persistent handoff/memory for future chats.
 
 # 12. Current checkpoint
 
-**Latest implementation commits:** `5ef0952a80ffecd7e9d9129fe9cf402507b21f80`, `cb392b6b85b08daa5c373ae62cdc59ba3b509fd7`, `95708f427120eb92d884a6c8f05846c55afe4a81`, `6f5caadbc8d5d87f14c02caf907667c92992847b`, `9479ce89d55a712a8938ee13980d4b549437fca`, `25437f0ec230364c2f9eaebb471b0c349bd39bad`, `5e237c9a29f7e8111539189177a98b708fdbc14b`, `e65a99d1a909ab7dfd35d681ab0b8344187a926f`.
+**Latest implementation commits:** `b022845fbae914e5db59a84c65581ac3f067b6fd` (Derivatives refinement), preceded by `a82d51aa1dd0689e8d04bd3e8335c252806a5944`, `092113d0b91d67defd19d9b4dd042b6bb9e99b19`, `389b26c127c3df7d76dd10a08b2d9b99e0e47d37`, `f10aa5b06d0a48963ac7feb60bffc1e61ae23448`.
 
-**Current layer:** Multi-Timeframe Structure — implementation complete and fully verified.
+**Current layer:** Derivatives — first causal funding/open-interest/liquidation representation implemented and fully verified.
 
 **Current state:**
-- Market Structure: first causal implementation complete, refinement pending.
-- Liquidity: first causal implementation complete, server verification complete.
-- Displacement: first causal implementation complete, server verification complete.
+- Market Structure: refined causal implementation complete and verified.
+- Liquidity: refined causal implementation complete and verified.
+- Displacement: causal implementation complete and verified.
 - FVG: implemented and verified green on FrostDeploy.
 - Order Blocks: implemented, integrated into the feature engine, and verified green on FrostDeploy.
-- Premium / Discount: structural dealing-range implementation added and verified green on FrostDeploy (`50 passed, 142 warnings`).
-- Unified SMC: causal unified state representation implemented and integrated; server verification complete.
-- Multi-timeframe: causal standalone implementation complete; explicit coverage includes the required grid **1m, 5m, 15m, 1h, 4h, 1d, 1w**; full server verification is green.
-- Scenario Engine: not started.
+- Premium / Discount: structural dealing-range implementation added and verified green.
+- Unified SMC: causal unified state representation implemented and integrated; refined structure and liquidity namespaces verified.
+- Multi-timeframe: causal standalone implementation complete; explicit coverage includes **1m, 5m, 15m, 1h, 4h, 1d, 1w**; integration and future-change coverage verified.
+- Volume / Volatility: causal regime layer implemented, integrated, and verified.
+- **Derivatives: first causal layer implemented, integrated, and verified.**
+- Scenario Engine: implemented and verified; scenario hypotheses remain descriptive and are not final trading decisions.
 - ML dataset/model: not started.
 - Experience DB: not started.
 - Vision: not started.
 - Paper Trading: not started.
 - Top-100 assets: explicitly postponed.
 
-**MTF test coverage update:**
-Commit `5e237c9a29f7e8111539189177a98b708fdbc14b` adds a test that constructs the complete AICFA timeframe grid and asserts that all seven timeframe-specific feature namespaces are emitted, including **1m**.
+## 2026-09-29 — Derivatives refinement and server verification
 
-**Server verification:** **PASS** — FrostDeploy release `2026-09-29T05-27-14-e65a99d`.
+Implementation/refinement commit:
+- `99c024e2ba7a4e69259822407a3e507551b3fbf7` — Fix point-in-time derivatives alignment semantics.
+- `b022845fbae914e5db59a84c65581ac3f067b6fd` — Refine derivatives funding and OI alignment semantics.
 
-Result:
+The first implementation used backward alignment for all derivative fields, which incorrectly carried funding observations into base candles between funding updates. The refinement separates semantics:
+- funding-rate fields are point-in-time and are visible only at their exact observation timestamp;
+- open interest is treated as a state observation and the latest known OI is carried forward causally until a newer observation;
+- all derivative-derived changes/z-scores are calculated in derivative-observation order before alignment;
+- optional liquidation fields remain causal and are not invented when absent;
+- price/OI relationship fields remain descriptive only.
+
+The first server run exposed the expected semantic mismatch in the initial implementation:
 ```
-59 passed, 250 warnings in 5.16s
+90 passed, 1 failed, 2844 warnings
 ```
+Failure:
+`tests/test_derivatives.py::test_derivatives_align_only_known_observations` — OI at the intervening base candle needed to retain the last known observation.
 
-Warnings are non-blocking:
-- pandas deprecation in `tests/test_dataset.py`;
-- pandas DataFrame fragmentation PerformanceWarnings in `src/aicfa/features.py`;
-- NumPy timedelta deprecation in `src/aicfa/labels.py`;
-- NumPy timedelta deprecations in `src/aicfa/multi_timeframe.py`;
-- pandas FutureWarning in the Premium/Discount test fixture;
-- pytest cache permission warning in the immutable FrostDeploy release.
+After the refinement, FrostDeploy verification passed against release `2026-09-29T06-27-33-b022845`:
 
-The MTF layer is accepted. The warnings are deferred to a dedicated cleanup/optimization pass and do not block the next analytical layer.
-
-**Next concrete action:** integrate the verified MTF representation into `build_features()`, with dedicated feature-integration tests and causal/future-change coverage, before starting Scenario Engine.
-
-# 13. Rule for this document
-
-This document is **living project memory**.
-
-After each commit, immediately update:
-- the change log;
-- current checkpoint;
-- server verification;
-- known issues;
-- next task.
-
-Before each new implementation step, read this document and continue from the checkpoint rather than reconstructing the project from chat history.
-
----
-
-## 2026-09-29 — Displacement Engine
-
-Implementation commits:
-- `18aa8bdf8479c2094c4c8cc3ab5d7870606a29ac` — Add causal displacement engine.
-- `c147fec530f8abca4426147f2593e13393813618` — Add displacement engine tests.
-- `37f4db3b5b6ba47b1aaceab35238219197e77449` — Expose displacement features.
-
-Implemented: range expansion, body expansion, close efficiency, strictly past-only relative volume, impulsive close direction, directional displacement, multi-factor displacement events, and displacement+BOS relationships. Tests cover causality, directionality, multi-factor requirements, and validation.
-
-Server verification: pending. The next concrete action is the full FrostDeploy pytest run against this implementation. If green, proceed to FVG / Imbalance.
-
----
-
-## 2026-09-29 — Displacement server verification
-
-Full FrostDeploy test suite was run against release `2026-09-29T04-39-36-a2834ab` using the mandatory command.
-
-Result:
 ```
-32 passed, 12 warnings in 3.10s
+91 passed, 2843 warnings in 30.84s
 ```
 
 Verification status: **PASS**.
 
-The 12 warnings are non-blocking and unchanged in scope:
-- pandas deprecation warning in `tests/test_dataset.py`;
-- NumPy timedelta deprecation warnings in `src/aicfa/labels.py`;
-- pytest cache permission warning caused by the immutable FrostDeploy release directory.
-
-No production fixes were required after the Displacement implementation. The Displacement layer is therefore accepted as the current verified foundation for the next layer.
-
-**Next concrete task:** implement the causal FVG / Imbalance Engine, with bullish/bearish FVG detection, size, displacement relationship, mitigation/fill state, and invalidation, followed by focused tests and full FrostDeploy verification.
-
----
-
-## 2026-09-29 — FVG / Imbalance Engine implementation
-
-Implementation commits:
-- `28aa8f8c3b5d27751bbfb8a64e0ff1ca9af3c859` — Add causal FVG and imbalance engine.
-- `436f8d07fcbd8f9e5bbef5b659684bf497118442` — Add FVG and imbalance engine tests.
-- `d4f10cb61e652f12c8373d3e10575f457aa07824` — Expose FVG and imbalance features.
-
-Implemented:
-- bullish three-candle FVG;
-- bearish three-candle FVG;
-- gap size and percentage size;
-- optional minimum gap filter;
-- optional causal displacement requirement;
-- FVG creation at the first candle where the gap is knowable;
-- causal mitigation and fill lifecycle;
-- invalidation state;
-- active FVG state;
-- bullish/bearish gap bounds;
-- focused causality and validation tests.
-
-Server verification: pending.
-
-**Next concrete action:** run the complete FrostDeploy pytest suite against the FVG implementation. If green, accept the layer and continue to Order Blocks. If failures occur, fix only the actual failures and re-verify.
-
----
-
-## 2026-09-29 — FVG test fixture correction
-
-The first FrostDeploy verification exposed five FVG test failures caused by invalid OHLC fixtures in `tests/test_fvg.py` (some test candles had `low > open`). The FVG validation itself correctly rejected those malformed candles.
-
-Commit:
-- `a0424090ddd5eb04f7d3b573f11b68a41325baf3` — Fix invalid OHLC fixtures in FVG tests.
-
-No FVG engine logic was weakened or changed. The fixtures were corrected to valid OHLC while preserving the intended FVG scenarios.
-
-**Next concrete action:** rerun the complete FrostDeploy pytest suite.
-
----
-
-## 2026-09-29 — FVG fixture follow-up
-
-The next server verification found one remaining invalid OHLC fixture in the displacement-gated FVG test. Commit `09bc639f6ddb69fecaf666c423b3fb754157012e` corrected only that fixture; FVG engine logic remains unchanged.
-
-**Next concrete action:** rerun the complete FrostDeploy pytest suite.
-
----
-
-## 2026-09-29 — Final FVG displacement fixture correction
-
-The subsequent FrostDeploy traceback showed that row 20 of `test_fvg_requires_current_displacement_when_requested` was still malformed: its `low=100.8` was above `open=100`. This was a test-data error, not an FVG engine failure.
-
-Commit:
-- `9db454289be817f5369614b8fadb23be52817b89` — Fix invalid FVG displacement fixture.
-
-Only that test fixture was changed, setting row 20 low to `99.8` so the OHLC relationship is valid while preserving the intended non-displacement scenario. Production FVG logic was not changed.
-
-**Next concrete action:** rerun the complete FrostDeploy pytest suite. If green, record FVG as verified and begin Order Block Engine.
-
----
-
-## 2026-09-29 — Order Block Engine implementation
-
-Implementation commits:
-- `7b14e092c5897c53f5268bdd4088830c72e39bbd` — Add causal Order Block engine.
-- `3cbff2f68ac9cb5f27561438985947fcbc501b93` — Define causal Order Block lifecycle semantics.
-- `4f35f0427d9ad71b69aac4211a5af6d59330df5` — Add Order Block engine tests.
-- `16dcab97627b5739a6ec89cb033d157b9dc9bd16` — Expose causal Order Block features.
-
-Implemented:
-- bullish OB from the immediately preceding bearish candle plus bullish displacement;
-- bearish OB from the immediately preceding bullish candle plus bearish displacement;
-- full source-candle high/low as the zone;
-- recognition only on the displacement candle, never backdated;
-- causal mitigation;
-- causal invalidation;
-- later-only breaker transition;
-- displacement-gated creation;
-- focused tests for direction, lifecycle, displacement requirement, causality, and validation;
-- integration into `build_features()`.
-
-Known design limitation:
-The first implementation tracks one latest active bullish and one latest active bearish OB lifecycle. Multiple simultaneous historical OB pools are not yet modeled. That is a later refinement after the unified causal foundation is verified.
-
-Server verification: pending.
-
-**Next concrete action:** run the complete FrostDeploy pytest suite against the Order Block implementation.
-
----
-
-## 2026-09-29 — Order Block verification and test fixture correction
-
-The first complete FrostDeploy verification of the Order Block layer exposed one failure in `tests/test_order_blocks.py::test_bearish_order_block_is_recognized_on_displacement_candle`. The bearish test fixture contained an invalid OHLC candle (`low` above `open/close`). The Order Block validator correctly rejected the malformed fixture.
-
-Commit:
-- `a53e59cdd8cf287389060d1edf49ee77b0146fca` — Fix invalid bearish Order Block test OHLC.
-  
-The subsequent verification exposed that the first candle in the same fixture was also malformed (`low=99` while `close=98`). This was again a test-data issue; production Order Block logic was not changed.
-
-Commit:
-- `d4e82cb4b55802dd10c2419208c348ec48de74c1` — Fix remaining invalid bearish Order Block fixture.
-
-Final FrostDeploy verification was run against release `2026-09-29T04-53-44-d4e82cb` using the mandatory command.
-
-Result:
-```
-46 passed, 96 warnings in 3.15s
-```
-
-Verification status: **PASS**.
-
-The remaining warnings are non-blocking:
-- pandas deprecation warning in `tests/test_dataset.py`;
-- pandas DataFrame fragmentation PerformanceWarnings in `src/aicfa/features.py`;
-- NumPy timedelta deprecation warning in `src/aicfa/labels.py`;
-- pytest cache permission warning in the immutable FrostDeploy release directory.
-
-No production Order Block changes were required to obtain the green suite. The Order Block layer is accepted.
-
-Known limitation remains:
-The current Order Block engine tracks one latest active bullish and one latest active bearish lifecycle. Multiple simultaneous historical OB pools are deferred to a later refinement.
-
-**Next concrete task:** Premium / Discount refinement using structural/dealing ranges rather than only generic rolling ranges.
-
----
-
-## 2026-09-29 — Structural Premium / Discount implementation
-
-Implementation commits:
-- `89fcdb22ae10728fe451494354026aeee7227ee8` — Add causal structural Premium Discount engine.
-- `37bcfd181eb34e87bd50f85002a9e58ccf592d4a` — Add Premium Discount engine tests.
-- `8c35677b16ec59eab652b7000b2d3973bac3d93e` — Integrate structural Premium Discount features.
-
-Implemented:
-- active dealing range from the latest confirmed swing high and swing low;
-- structural equilibrium;
-- normalized dealing-range position;
-- continuous Premium/Discount score;
-- discrete premium, discount, and equilibrium states;
-- causal future-change test;
-- validation and parameter tests;
-- retention of the generic rolling range as separate context features;
-- structural range exposed as the primary `dealing_range_*` / `premium_discount` fields.
-
-Design rule:
-The structural range uses only swing information emitted by the causal Market Structure engine at confirmation time. It does not backdate a newly confirmed swing into earlier candles.
-
-Server verification: **pending**.
-
-Known limitation:
-The current range is the latest confirmed swing-high/swing-low pair. More advanced dealing-range selection/protected-range semantics will be refined later alongside Market Structure and Unified SMC.
-
-**Next concrete action:** run the complete FrostDeploy pytest suite against the Premium / Discount implementation. If green, accept the layer and proceed to Unified SMC state.
-
----
-
-## 2026-09-29 — Premium / Discount server verification
-
-Full FrostDeploy test suite was run against release `2026-09-29T04-56-35-35f7d72` using the mandatory command.
-
-Result:
-```
-50 passed, 142 warnings in 3.71s
-```
-
-Verification status: **PASS**.
-
-Warnings remain non-blocking:
-- pandas deprecation warning in `tests/test_dataset.py`;
-- pandas DataFrame fragmentation PerformanceWarnings in `src/aicfa/features.py`;
-- NumPy timedelta deprecation warning in `src/aicfa/labels.py`;
-- pandas FutureWarning in the Premium/Discount future-change test fixture;
-- pytest cache permission warning in the immutable FrostDeploy release directory.
-
-No production fixes were required after the Premium / Discount implementation. The structural Premium / Discount layer is accepted.
-
-Known limitation remains:
-The active range is currently the latest confirmed swing-high/swing-low pair. More advanced protected-range semantics remain deferred to later Market Structure refinement.
-
-**Next concrete task:** implement and verify Unified SMC State.
-
----
-
-## 2026-09-29 — Unified SMC State implementation
-
-Implementation commits:
-- `5ef0952a80ffecd7e9d9129fe9cf402507b21f80` — Add causal unified SMC state engine.
-- `cb392b6b85b08daa5c373ae62cdc59ba3b509fd7` — Add unified SMC state tests.
-- `95708f427120eb92d884a6c8f05846c55afe4a81` — Integrate unified SMC state features.
-- `6f5caadbc8d5d87f14c02caf907667c92992847b` — Cover unified SMC features in feature integration test.
-
-Implemented:
-- canonical `smc_*` representation combining Market Structure, Liquidity, Displacement, FVG, Order Blocks, and structural Premium/Discount;
-- separate structure direction, break event, and CHoCH/structure-shift event;
-- normalized liquidity sweep/reclaim observations;
-- displacement direction and displacement+BOS relationships;
-- FVG creation direction, lifecycle, and active state;
-- Order Block creation direction, lifecycle, active state, and breaker observations;
-- structural Premium/Discount position and state;
-- `smc_state_ready` indicating that a confirmed structural dealing range exists;- explicit avoidance of a generic `smc_score` / `smc_signal` confirmation-count verdict.
-
-Causality rule:
-Unified SMC does not introduce future information or backdate events. It only normalizes outputs from the already-causal component engines.
-
-Design rule:
-SMC components remain observations/features to test statistically. The unified layer does not convert them into an automatic LONG/SHORT/BUY/SELL decision.
-
-Known limitation:
-FVG and Order Block lifecycle direction is currently represented separately from aggregate active/lifecycle flags because their first-generation engines expose aggregate lifecycle state. More detailed multi-pool object tracking is deferred to later refinement.
-
-Server verification: **PASS** — FrostDeploy release `2026-09-29T05-15-03-e4994fb`, `53 passed, 217 warnings in 4.41s`.
-
-The Unified SMC layer is accepted. Warnings are non-blocking and are retained for a later dedicated cleanup/optimization pass.
-
-**Next concrete action:** implement Multi-Timeframe Structure.
-
----
-
-## 2026-09-29 — Multi-Timeframe Structure implementation
-
-Implementation commits:
-- `9479ce89d55a712a8938ee13980d4b549437fca6` — Add causal multi-timeframe structure engine.
-- `25437f0ec230364c2f9eaebb471b0c349bd39bad` — Add multi-timeframe structure tests.
-- `5e237c9a29f7e8111539189177a98b708fdbc14b` — Test complete AICFA timeframe grid including 1m.
-- `e65a99d1a909ab7dfd35d681ab0b8344187a926f` — Record complete AICFA timeframe grid coverage.
-
-Implemented a dedicated causal MTF layer that consumes independently aggregated OHLCV frames, exposes higher-timeframe structure only after the source candle closes, preserves the existing Market Structure confirmation delay, uses backward as-of alignment, and keeps each timeframe in separate `mtf_<timeframe>_*` columns. It validates OHLCV and does not implicitly resample lower-timeframe data.
-
-The explicit AICFA timeframe grid is now covered by a test:
-- `1m`
-- `5m`
-- `15m`
-- `1h`
-- `4h`
-- `1d`
-- `1w`
-
-The test asserts that each timeframe gets its own structure namespace and that the result retains the base-row count. This explicitly prevents the 1m timeframe from being forgotten.
-
-Tests also cover: no state before higher-timeframe close; causal confirmation timing; future-change invariance; multiple timeframes; invalid inputs.
-
-Server verification: **PASS** — FrostDeploy release `2026-09-29T05-27-14-e65a99d`.
-
-Result:
-```
-59 passed, 250 warnings in 5.16s
-```
-
-Warnings are non-blocking:
-- pandas deprecation in `tests/test_dataset.py`;
-- pandas DataFrame fragmentation PerformanceWarnings in `src/aicfa/features.py`;
-- NumPy timedelta deprecation in `src/aicfa/labels.py`;
-- NumPy timedelta deprecations in `src/aicfa/multi_timeframe.py`;
-- pandas FutureWarning in the Premium/Discount test fixture;
-- pytest cache permission warning in the immutable FrostDeploy release.
-
-The MTF layer is accepted. The warnings are deferred to a dedicated cleanup/optimization pass and do not block the next analytical layer.
-
-**Next concrete task:** integrate the verified MTF representation into `build_features()`, with dedicated feature-integration tests and causal/future-change coverage, before starting Scenario Engine.
-
-
----
-
-## 2026-09-29 — Multi-Timeframe integration into feature engine
-
-Implementation commits:
-- **pending** — integrate the verified MTF engine into `build_features()`.
-
-Implemented:
-- optional `multi_timeframe_frames` input to `build_features()`;
-- no implicit resampling;
-- 1m remains the canonical base timeframe;
-- higher-timeframe structure is exposed through `mtf_<timeframe>_*` columns only after source-candle close;
-- dedicated integration coverage for `5m`, `15m`, `1h`, `4h`, `1d`, `1w`;
-- future-change test proving that later higher-timeframe mutations do not rewrite earlier base rows;
-- backward compatibility test for `build_features()` without MTF frames.
-
-Server verification: **pending**.
-
-**Next concrete task after green verification:** start Scenario Engine.
-
----
-
-## 2026-09-29 — Multi-Timeframe feature integration verification
-
-Implementation commits:
-- `8c884b5c1ad914c5c8fd430229bfa7cf98108574` — Integrate causal MTF structure into feature engine.
-- `0536b03c4a1b93876fd49f32f988bde45a22333b` — Test MTF feature integration and causality.
-- `e537c095f056fa4b3c8b6a55b428f1a041fdf29e` — Record MTF integration step.
-
-FrostDeploy verification:
-- Release: `2026-09-29T05-45-44-e537c09`
-- Result: **PASS — 62 passed, 691 warnings in 12.36s**
-
-Verified:
-- optional MTF integration into `build_features()`;
-- required higher-timeframe namespaces: 5m, 15m, 1h, 4h, 1d, 1w;
-- 1m remains the canonical base timeframe;
-- no implicit resampling;
-- future higher-timeframe changes do not rewrite earlier base rows;
-- legacy `build_features(base)` behavior remains supported.
-
-Warnings remain non-blocking and are deferred to the dedicated cleanup/optimization pass. They include pandas/NumPy deprecations, DataFrame fragmentation warnings, a Premium/Discount fixture dtype warning, and the immutable-release pytest cache permission warning.
-
-**MTF integration is accepted.**
-
-**Next concrete task:** begin Scenario Engine.
-
----
-
-## 2026-09-29 — Scenario Engine implementation
-
-Implementation commits:
-- `9c435ab89d54aa1efe89a94e58875474e3544099` — Add causal Scenario Engine.
-- `82e07614983505649dffe2e2a5c391371be4398b` — Add Scenario Engine tests.
-- `232035f8dc39694c1d186aa4d3d0d84c813e36e2` — Integrate Scenario Engine into `build_features()`.
-
-Implemented:
-- causal scenario hypotheses derived only from the verified SMC market-state representation;
-- expansion up/down events requiring matching displacement and structural BOS;
-- continuation up/down events using established structure plus directional displacement;
-- reversal up/down events from causal structure shifts or explicit liquidity sweep/reclaim plus displacement;
-- failed-breakout events from liquidity sweep/reclaim observations;
-- range context when structural state is ready without a current break/displacement event;
-- independent scenario flags are retained so overlapping hypotheses are not collapsed into a confirmation-count score;
-- compact `scenario_event` taxonomy is emitted only when exactly one scenario family is active;
-- `scenario_direction` records scenario-event direction only and is not a trade verdict;
-- descriptive current-close entry reference; actual risk sizing and final entry/SL/TP construction remain deferred to Risk/Decision layers.
-
-Design constraints preserved:
-- no generic scenario score;
-- no confirmation counting;
-- no future data;
-- scenarios remain measurable hypotheses to evaluate against historical outcomes;
-- the engine does not replace the later Risk Engine or Decision Engine.
-
-Tests cover:
-- scenario namespace and required fields;
-- absence of scenario score/signal fields;
-- mechanical failed-breakout detection;
-- matching displacement+BOS requirement for expansion;
-- future-change invariance;
-- invalid state validation.
-
-Server verification: **pending**.
-
-Known limitations:
-- current scenario rules are the first mechanical hypothesis layer, not the final trading policy;
-- MTF context is already present in the feature frame, but scenario-specific HTF alignment rules are intentionally not hard-coded yet;
-- invalidation reference is currently reserved for the later Risk/Decision layer rather than inventing SL/TP policy prematurely.
-
-**Next concrete action:** run the full FrostDeploy pytest suite against this Scenario Engine implementation. If green, record verification and proceed to the next planned analytical refinement/dataset stage without jumping to ML.
-
-
-## 2026-09-29 — Scenario Engine server verification
-
-FrostDeploy verification was run against release `2026-09-29T05-50-59-76ae936` using the mandatory full-suite command.
-
-Result:
-```
-68 passed, 1281 warnings in 14.84s
-```
-
-Verification status: **PASS**.
-
-Verified:
-- Scenario Engine tests;
-- integration into `build_features()`;
-- mechanical scenario families;
-- no scenario score/signal;
-- displacement+BOS expansion requirement;
-- causal future-change invariance;
-- invalid-state validation;
-- full existing regression suite remains green.
-
-Warnings remain non-blocking and are deferred to the dedicated cleanup/optimization pass:
-- pandas datetime dtype deprecation;
-- DataFrame fragmentation PerformanceWarnings from the existing column-by-column feature construction;
-- NumPy timedelta deprecations;
-- Premium/Discount test-fixture dtype FutureWarning;
-- pytest cache permission warning in the immutable FrostDeploy release.
-
-The Scenario Engine is **accepted as the current verified layer**.
-
-Known limitations remain:
-- first-generation scenario rules are measurable hypotheses, not final trading policy;
-- scenario-specific higher-timeframe alignment rules are not yet hard-coded;
-- invalidation/SL/TP policy remains deferred to Risk/Decision;
-- overlapping scenario flags are preserved rather than forced into a single verdict.
-
-**Next concrete action:** continue the analytical core without jumping to ML. The next planned work is refinement of the existing causal market representation (Market Structure/Liquidity/SMC semantics) before labels/datasets, unless a dedicated Scenario/MTF refinement is needed from further tests.
-
-
----
-
-## 2026-09-29 — Market Structure refinement
-
-Implementation commits:
-- 8bd791744d6f14dc04e4c878219f62a8ca0b8c96 — Refine causal market structure semantics.
-- 2b8f0d5389b5359af25e6b5038e63fcd2bcd6502 — Test refined market structure semantics.
-
-Implemented in src/aicfa/structure.py:
-- shared causal swing-layer helper for external and internal structure;
-- configurable internal structure with default 1/1 swing sensitivity;
-- explicit internal HH/HL/LH/LL, BOS and CHoCH namespaces;
-- protected-high/protected-low prices and lifecycle state;
-- protected-level creation tied to confirmed external BOS;
-- later-close invalidation of protected levels;
-- MSS is no longer a CHoCH alias: it is emitted only when a supplied causal displacement frame has matching directional displacement on the CHoCH row;
-- without displacement, MSS remains zero by design.
-
-Tests added/expanded in tests/test_structure.py:
-- internal structure namespace and causality;
-- protected level creation/lifecycle;
-- MSS requires displacement;
-- displacement input validation;
-- existing swing classification and future-change invariance retained.
-
-Server verification: **pending**. The mandatory FrostDeploy suite must be run against the deployed main branch before accepting this refinement.
-
-Known limitations:
-- protected levels are currently a mechanical hypothesis and require statistical validation against BTC history;
-- internal/external structure are sensitivity layers, not yet a full multi-pool structural graph;
-- Liquidity still needs previous-high/low pools, multiple active pools, internal/external liquidity and pool lifecycle refinement;
-- Unified SMC currently exposes the first-generation structure namespace and should be extended to carry the new protected/internal/MSS observations after this structure layer is verified.
-
-**Next concrete action:** run the full FrostDeploy pytest suite. If green, extend Unified SMC with protected/internal/MSS observations and add integration/causality tests, then continue Liquidity refinement.
-
-
-### Verification correction — protected-high fixture
-
-Commit:
-- 3c512c21b642db11956e8dd6bc30d34b7f7ab6c2 — Correct protected high lifecycle fixture.
-
-The server run exposed a test-fixture expectation error, not an implementation failure: with the current causal rule, a bearish BOS protects the latest confirmed external swing high known at that row. In this fixture that level is 101.5, so the test was corrected from 105.5 to 101.5. The implementation was not changed.
-
-Server status after this test-only correction: **pending rerun**.
-
-Next concrete action: rerun the mandatory FrostDeploy suite. If green, accept the Market Structure refinement and extend Unified SMC with the new protected/internal/MSS observations.
-
-
-### Verification correction — protected-low fixture
-
-Commit:
-- a5b0fa466eacc66256c3e0387dc2d2668a7e2122 — Correct protected low lifecycle fixture.
-
-The next FrostDeploy run exposed the symmetric fixture expectation error on the bullish BOS row: with the current causal rule, a bullish BOS protects the latest confirmed external swing low known at that row. In this fixture that level is 97.5, not 98.5. Only the test expectation was corrected; production Market Structure logic was not changed.
-
-Server status after this test-only correction: **pending rerun**.
-
-Next concrete action: rerun the mandatory FrostDeploy suite. If green, accept the Market Structure refinement and extend Unified SMC with protected/internal/MSS observations and integration/causality tests.
-
-
-## 2026-09-29 — Market Structure refinement verified / Unified SMC refinement
-
-Server verification for the refined Market Structure layer is now green on FrostDeploy release `2026-09-29T06-04-45-0e08c89`:
-
-```
-72 passed, 1281 warnings in 20.32s
-```
-
-The verified layer now covers causal external/internal HH/HL/LH/LL, BOS/CHoCH, protected high/low lifecycle, displacement-aware MSS, validation, and future-change invariance. The protected-level fixture corrections were test-only; production Market Structure logic was not changed by those corrections.
-
-**Next implementation step:** refine Unified SMC so it carries the new Market Structure observations into the canonical `smc_*` namespace:
-- internal HH/HL/LH/LL;
-- internal BOS/CHoCH and internal structure direction;
-- protected high/low prices and lifecycle;
-- displacement-aware MSS up/down.
-
-Add focused integration tests for column presence, value propagation, and causal future-change invariance. Do not add a score, signal, confirmation counter, or ML logic. After this layer is green, continue the planned Liquidity refinement.
-
-
-### Unified SMC refinement implementation
-
-Commit:
-- 045f7480aebb7b19bfe72bb02952d49a4c9a661d — Expose refined Market Structure in Unified SMC.
-
-Unified SMC now carries the refined Market Structure namespace into canonical `smc_*` fields: internal swing classifications, internal BOS/CHoCH and direction, displacement-aware MSS, and protected high/low prices plus created/active/broken lifecycle observations. When Unified SMC builds its own structure, it now passes the causal displacement frame into Market Structure so MSS remains genuinely displacement-aware rather than becoming a CHoCH alias.
-
-No score, signal, confirmation counter, or ML logic was added.
-
-Server verification: pending.
-
-
-### Unified SMC refinement tests
-
-Commit:
-- 468f8aaf2d0661a00f73ba64925096d779cd25e0 — Test refined Unified SMC structure integration.
-
-Added tests for canonical refined columns, propagation of internal structure/MSS/protected-level values, and future-change invariance of the unified representation. Server verification remains pending; the mandatory FrostDeploy suite must be run against the deployed release before accepting this layer.
-
-**Next concrete action:** run the full FrostDeploy pytest suite. If green, record the verification and proceed to the planned Liquidity refinement.
-
-## 2026-09-29 — Unified SMC refinement verified
-
-FrostDeploy verification was run against release `2026-09-29T06-09-09-a5a69ac` using the mandatory full-suite command.
-
-Result:
-```
-74 passed, 1281 warnings in 21.92s
-```
-
-Verification status: **PASS**.
-
-Verified:
-- refined Unified SMC canonical columns for internal HH/HL/LH/LL;
-- internal BOS/CHoCH and internal structure direction;
-- protected high/low prices and created/active/broken lifecycle;
-- displacement-aware MSS propagation;
-- causal future-change invariance of the refined unified representation;
-- full existing regression suite remains green.
-
-The 1281 warnings remain non-blocking and are deferred to the dedicated cleanup/optimization pass. The visible warnings include pandas/NumPy deprecations, DataFrame fragmentation warnings in the feature/MTF construction, a Premium/Discount fixture dtype warning, and the immutable-release pytest cache permission warning.
-
-The refined Unified SMC layer is **accepted**.
-
-Known limitations remain:
-- FVG and Order Block lifecycle direction is still first-generation aggregate state;
-- multiple simultaneous historical liquidity/OB pools are not yet modeled;
-- no score, signal, confirmation counter, or ML logic has been added.
-
-**Next concrete task:** refine Liquidity with previous highs/lows, multiple active liquidity pools, internal/external liquidity, pool lifecycle, sweep-vs-breakout distinction, and invalidation. After that, rerun the full FrostDeploy suite before accepting the Liquidity refinement.
-
-
-## 2026-09-29 — Liquidity refinement implementation
-
-Implementation commits:
-- `ea591de63b32fb37d1b72e37e3b3292aea32141a` — Refine causal liquidity pools and lifecycle.
-- `0278f7036d877020f1f560cd9b55b9780cb4a22e` — Test refined liquidity lifecycle and pool semantics.
-- `5d7b79f58752f293b4a589dc29d64bc762980668` — Expose refined liquidity in Unified SMC.
-- `de5cc728aca997a82b07c9570c5c5fbffa3aa518` — Integrate refined liquidity features.
-- `3f99569ad5e138ff725d7f20c52be48348e0ce3a` — Test refined liquidity feature integration.
-- `e0d195d9a631cd59dab85851d61a11e7cf06bfa1` — Test refined liquidity propagation in Unified SMC.
-
-Implemented:
-- causal previous confirmed highs/lows;
-- separate internal and external liquidity sensitivity;
-- multiple simultaneously active liquidity pools;
-- explicit active pool counts and latest active pool levels;
-- pool lifecycle: creation, active, swept, broken/invalidated;
-- explicit sweep-vs-breakout distinction;
-- causal invalidation on close beyond a known liquidity level;
-- refined liquidity observations propagated into Unified SMC;
-- refined liquidity features exposed through build_features();
-- focused integration and future-change causality tests.
-
-Design rule:
-A pool can only be acted upon by candles after its confirmation/creation row. A sweep requires a wick through the known level and a close back across it. A breakout requires a close beyond the known level and invalidates that pool. Existing pools are not overwritten when a new equal-high/equal-low pool is created.
-
-Server verification: **pending**.
-
-Known limitation:
-Pool identity is currently represented by causal state/counts and event levels rather than a persistent externally-addressable pool ID/object store. This is sufficient for the current feature layer; richer historical pool objects can be added later if outcome analysis requires them.
-
-**Next concrete action:** run the complete FrostDeploy pytest suite against this Liquidity refinement. If green, accept the refinement and continue the analytical core; do not jump to ML.
-
-
-## 2026-09-29 — Liquidity refinement verified
-
-FrostDeploy verification was run against release `2026-09-29T06-16-07-452b759`.
-
-Result:
-```
-80 passed, 2035 warnings in 28.34s
-```
-
-Verification status: **PASS**.
-
-Verified:
-- causal previous confirmed highs/lows;
-- internal/external liquidity separation;
-- multiple active liquidity pools;
-- pool creation and lifecycle;
-- sweep versus breakout distinction;
-- pool invalidation;
-- refined liquidity propagation into Unified SMC;
-- refined liquidity exposure through the feature engine;
-- future-change causality/invariance;
-- full regression suite remains green.
-
-The 2035 warnings are non-blocking and remain deferred to the dedicated cleanup/optimization pass. They include existing pandas/NumPy deprecations, DataFrame fragmentation warnings, fixture dtype warnings, and the immutable-release pytest cache permission warning.
-
-Liquidity refinement is **accepted**.
-
-**Next concrete task:** continue the analytical core with the next documented layer; keep the current no-lookahead/causal contract and do not introduce ML, scoring, or final trading decisions prematurely.
-
-
-## 2026-09-29 — Volume / Volatility causal layer implementation
-
-Implementation commits:
-- `abfb47e0eb08f34435ccd2bb180eef478da15795` — Add causal volume and volatility regime engine.
-- `ddcddc9f8ed34b04a5881241a038f28a56fc7d9a` — Test causal volume and volatility regime engine.
-- `c85725674580bf9275db26ec710c577a1b3d59a1` — Integrate causal volume and volatility features.
-- `7c2f63a4bf3b1b6b126f4a10292d8c82c0ff75e0` — Test volume volatility feature integration.
-
-Implemented as a dedicated causal layer:
-- realized volatility;
-- true range and ATR / ATR percentage;
-- causal range z-score;
-- causal volume z-score and relative volume;
-- volatility ratio versus a strictly prior baseline;
-- volatility expansion/compression;
-- volume expansion/dry-up;
-- descriptive volume and volatility regimes.
-
-The regime baselines are shifted so the current candle cannot redefine its own classification threshold. Future-change invariance tests were added.
-
-The existing generic feature-engine volatility/volume columns remain intact; this layer adds a more explicit, testable state representation rather than replacing prior features.
-
-No score, signal, trading decision, derivatives logic, or ML was introduced.
-
-Server verification: **pending**.
-
-**Next concrete action:** run the complete FrostDeploy pytest suite against this volume/volatility layer. If green, accept it and proceed to the next analytical component, Derivatives, beginning with causal funding/open-interest/liquidation representations where historical data is available.
-
-
-## 2026-09-29 — Volume / Volatility layer verified
-
-FrostDeploy verification was run against release `2026-09-29T06-19-09-2a0cf02`.
-
-Result:
-```
-85 passed, 2375 warnings in 28.90s
-```
-
-Verification status: **PASS**.
-
-Verified:
-- causal realized volatility, true range and ATR;
-- causal range and volume statistics;
-- prior-baseline volatility ratio;
-- volatility expansion/compression;
-- volume expansion/dry-up;
-- descriptive volume/volatility regimes;
-- future-change invariance;
-- integration into the main feature engine;
-- full regression suite remains green.
-
-Warnings are non-blocking and remain deferred to the dedicated cleanup/optimization pass. They include existing pandas/NumPy deprecations, DataFrame fragmentation warnings in feature/MTF construction, a Premium/Discount fixture dtype warning, and the immutable-release pytest cache permission warning.
-
-The Volume / Volatility layer is **accepted**.
-
-**Next concrete task:** implement the first causal Derivatives layer. Start with funding-rate and open-interest representations, plus liquidation data when the historical source schema supports it. Keep derivatives as descriptive/causal market-state observations; do not turn them into a score or trading signal.
-
-## 2026-09-29 — Derivatives causal layer implementation
-
-Implementation commits:
-- `a82d51aa1dd0689e8d04bd3e8335c252806a5944` — Add causal derivatives engine.
-- `092113d0b91d67defd19d9b4dd042b6bb9e99b19` — Integrate causal derivatives features.
-- `389b26c127c3df7d76dd10a08b2d9b99e0e47d37` — Test causal derivatives engine.
-- `f10aa5b06d0a48963ac7feb60bffc1e61ae23448` — Test derivatives feature integration.
-
-Implemented:
-- causal funding-rate observations;
-- causal open-interest observations;
-- funding-rate delta, change percentage and prior-baseline z-score;
-- open-interest delta, percentage change and prior-baseline z-score;
-- descriptive price/OI relationship states;
-- optional liquidation-volume, long-liquidation and short-liquidation fields when supplied by the historical source schema;
-- point-in-time derivative alignment with `merge_asof(direction="backward")`;
-- validation for required fields, numeric values and non-negative open interest/liquidation values;
-- feature-engine integration through optional `derivatives_frame`;
-- future-change invariance and integration tests.
-
-Design constraints:
-- derivative observations are never forward-filled from the future;
-- no liquidation fields are invented when the source does not provide them;
-- derivatives remain descriptive market-state observations;
-- no score, signal, trading verdict, risk policy, or ML logic was introduced.
-
-Server verification: **pending**.
-
-**Next concrete action:** run the complete FrostDeploy pytest suite against the Derivatives implementation. If green, record the exact release/result and accept the layer before moving to the next documented analytical refinement.
+The 2843 warnings are non-blocking and deferred to the dedicated cleanup/optimization pass. They include:
+- pandas/NumPy deprecations;
+- DataFrame fragmentation PerformanceWarnings in feature/MTF construction;
+- a Premium/Discount test-fixture dtype FutureWarning;
+- immutable FrostDeploy release pytest-cache permission warnings.
+
+The Derivatives layer is **accepted**.
+
+Known limitations for the next derivatives expansion:
+- current derivatives layer covers funding and OI plus optional liquidation fields;
+- Long/Short Ratio, Basis and broader positioning data are still pending;
+- richer order-flow/order-book/microstructure data remains future work;
+- derivatives remain descriptive market-state inputs and do not yet produce trading signals or decisions.
+
+**Next concrete task:** continue the documented analytical core with the next missing derivatives/market-state components — Long/Short Ratio, Basis and positioning where historical source data is available — while preserving the causal contract. Do not jump to ML yet.
