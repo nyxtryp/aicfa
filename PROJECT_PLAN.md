@@ -711,3 +711,9 @@ Commit:
 No FVG engine logic was weakened or changed. The fixtures were corrected to valid OHLC while preserving the intended FVG scenarios.
 
 **Next concrete action:** rerun the complete FrostDeploy pytest suite.
+
+## 2026-09-29 — FVG fixture follow-up
+
+The next server verification found one remaining invalid OHLC fixture in the displacement-gated FVG test. Commit `09bc639f6ddb69fecaf666c423b3fb754157012e` corrected only that fixture; FVG engine logic remains unchanged.
+
+**Next concrete action:** rerun the complete FrostDeploy pytest suite.
