@@ -14,6 +14,12 @@ from typing import Callable, Protocol
 
 import pandas as pd
 
+try:
+    from websocket import WebSocketTimeoutException
+except ImportError:  # pragma: no cover - runtime dependency is pinned in requirements
+    class WebSocketTimeoutException(TimeoutError):
+        pass
+
 from .data_reliability import LocalMarketStateStore
 from .market_data import MarketKey, validate_ohlcv
 
@@ -164,7 +170,7 @@ class BinanceWebSocketMarketDataTransport:
                 while max_observations is None or observations < max_observations:
                     try:
                         raw = connection.recv()
-                    except TimeoutError:
+                    except (TimeoutError, WebSocketTimeoutException):
                         # A read timeout does not mean the WebSocket is dead. The
                         # transport accepts only closed candles, so it can legitimately
                         # wait across a socket timeout for the next candle close.
