@@ -1050,3 +1050,42 @@ Known limitations:
 - invalidation reference is currently reserved for the later Risk/Decision layer rather than inventing SL/TP policy prematurely.
 
 **Next concrete action:** run the full FrostDeploy pytest suite against this Scenario Engine implementation. If green, record verification and proceed to the next planned analytical refinement/dataset stage without jumping to ML.
+
+
+## 2026-09-29 — Scenario Engine server verification
+
+FrostDeploy verification was run against release `2026-09-29T05-50-59-76ae936` using the mandatory full-suite command.
+
+Result:
+```
+68 passed, 1281 warnings in 14.84s
+```
+
+Verification status: **PASS**.
+
+Verified:
+- Scenario Engine tests;
+- integration into `build_features()`;
+- mechanical scenario families;
+- no scenario score/signal;
+- displacement+BOS expansion requirement;
+- causal future-change invariance;
+- invalid-state validation;
+- full existing regression suite remains green.
+
+Warnings remain non-blocking and are deferred to the dedicated cleanup/optimization pass:
+- pandas datetime dtype deprecation;
+- DataFrame fragmentation PerformanceWarnings from the existing column-by-column feature construction;
+- NumPy timedelta deprecations;
+- Premium/Discount test-fixture dtype FutureWarning;
+- pytest cache permission warning in the immutable FrostDeploy release.
+
+The Scenario Engine is **accepted as the current verified layer**.
+
+Known limitations remain:
+- first-generation scenario rules are measurable hypotheses, not final trading policy;
+- scenario-specific higher-timeframe alignment rules are not yet hard-coded;
+- invalidation/SL/TP policy remains deferred to Risk/Decision;
+- overlapping scenario flags are preserved rather than forced into a single verdict.
+
+**Next concrete action:** continue the analytical core without jumping to ML. The next planned work is refinement of the existing causal market representation (Market Structure/Liquidity/SMC semantics) before labels/datasets, unless a dedicated Scenario/MTF refinement is needed from further tests.
