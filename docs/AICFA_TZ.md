@@ -1625,3 +1625,44 @@ New Model Version
 ~~~
 
 Это обязательное архитектурное правило AICFA.
+
+
+# Order Book / Market Depth source contract — 2026-09-29
+
+The first market-microstructure implementation uses a causal snapshot contract.
+
+Required source fields:
+- `timestamp` — order-book snapshot availability timestamp;
+- `bid_price` — best bid price;
+- `ask_price` — best ask price;
+- `bid_size` — best bid size;
+- `ask_size` — best ask size.
+
+Optional source fields:
+- `bid_depth_volume`;
+- `ask_depth_volume`.
+
+Optional depth fields must represent a clearly defined aggregate depth region supplied by the source. They are not interpreted as individual liquidity walls.
+
+Derived descriptive features:
+- mid price;
+- spread and spread percentage;
+- microprice;
+- top-of-book Bid/Ask imbalance;
+- bid/ask size deltas and changes;
+- spread and mid-price changes;
+- optional aggregate depth total and depth imbalance.
+
+Causality:
+- a base observation at time T may use only an order-book snapshot whose availability timestamp is <= T;
+- snapshots are aligned with backward as-of semantics;
+- source snapshots are ordered by their own observation timestamps before deltas are calculated;
+- no future snapshot may alter an already available historical result.
+
+This stage does not yet implement:
+- level-by-level liquidity walls;
+- order-book cancellation/addition flow;
+- absorption;
+- CVD.
+
+Those require explicit source contracts and historical availability semantics before implementation.
