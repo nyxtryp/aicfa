@@ -674,3 +674,28 @@ The 12 warnings are non-blocking and unchanged in scope:
 No production fixes were required after the Displacement implementation. The Displacement layer is therefore accepted as the current verified foundation for the next layer.
 
 **Next concrete task:** implement the causal FVG / Imbalance Engine, with bullish/bearish FVG detection, size, displacement relationship, mitigation/fill state, and invalidation, followed by focused tests and full FrostDeploy verification.
+
+
+## 2026-09-29 — FVG / Imbalance Engine implementation
+
+Implementation commits:
+- `28aa8f8c3b5d27751bbfb8a64e0ff1ca9af3c859` — Add causal FVG and imbalance engine.
+- `436f8d07fcbd8f9e5bbef5b659684bf497118442` — Add FVG and imbalance engine tests.
+- `d4f10cb61e652f12c8373d3e10575f457aa07824` — Expose FVG and imbalance features.
+
+Implemented:
+- bullish three-candle FVG;
+- bearish three-candle FVG;
+- gap size and percentage size;
+- optional minimum gap filter;
+- optional causal displacement requirement;
+- FVG creation at the first candle where the gap is knowable;
+- causal mitigation and fill lifecycle;
+- invalidation state;
+- active FVG state;
+- bullish/bearish gap bounds;
+- focused causality and validation tests.
+
+Server verification: **pending**.
+
+**Next concrete action:** run the complete FrostDeploy pytest suite against the FVG implementation. If green, accept the layer and continue to Order Blocks. If failures occur, fix only the actual failures and re-verify.
