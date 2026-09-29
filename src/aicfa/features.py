@@ -108,6 +108,18 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     ]:
         out[column] = displacement[column].to_numpy()
 
+    # Causal FVG / imbalance engine. Gap creation is knowable at the current candle;
+    # lifecycle state is updated only from the creation candle forward.
+    from .fvg import build_fvg
+    fvg = build_fvg(x)
+    for column in [
+        "fvg_bullish", "fvg_bearish", "fvg", "fvg_size", "fvg_size_pct",
+        "fvg_displacement_bullish", "fvg_displacement_bearish",
+        "fvg_mitigated", "fvg_filled", "fvg_invalidated", "fvg_active",
+        "fvg_bullish_low", "fvg_bullish_high", "fvg_bearish_low", "fvg_bearish_high",
+    ]:
+        out[column] = fvg[column].to_numpy()
+
     # Trend proxies from causal rolling return and close-vs-mean location.
     for n in (15, 60):
         out[f"return_{n}"] = c.pct_change(n)
