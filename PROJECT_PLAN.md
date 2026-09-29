@@ -1173,3 +1173,63 @@ Verify current candidate market-data providers before implementation. Check actu
 - whether the provider can support the intended centralized 24/7 scanner.
 
 Only after that verification should the first concrete BTC/USDT provider adapter be implemented against the existing provider-agnostic contract.
+
+    
+## 2026-09-29 — First concrete market-data provider: Binance REST OHLCV
+
+### Provider verification research
+
+Current official Binance documentation confirms:
+- public market-data-only REST endpoints are available without authentication;
+- Spot klines are available through `data-api.binance.vision`;
+- public market-data WebSocket infrastructure is available;
+- Binance publishes downloadable public historical market data;
+- futures klines are available through the public futures REST API.
+
+These capabilities satisfy the immediate prototype requirement for a concrete BTC/USDT OHLCV source. They do **not** by themselves lock Binance as the permanent production provider.
+
+### Commits
+
+- `de77e3b3e0b5c74f09b22975ab41161004316df0` — Add Binance public market data adapter
+- `f29c2a37e0970522ebfa6e06a3b28111d7e4cd65` — Test Binance market data adapter
+- `136d15081cc11922d68d3e639980904d12875123` — Document Binance market data adapter
+
+### Implemented
+
+Added `src/aicfa/binance_market_data.py`:
+- public Spot OHLCV endpoint;
+- public USDⓈ-M futures OHLCV endpoint;
+- BTC/USDT symbol normalization;
+- canonical timeframe mapping;
+- incremental `startTime` support;
+- timeout configuration;
+- provider-response validation;
+- canonical six-column OHLCV output;
+- explicit deferral of `1M` scanner semantics.
+
+Added `tests/test_binance_market_data.py` covering:
+- Spot URL/parameter mapping;
+- futures endpoint selection;
+- limit validation;
+- explicit `1M` deferral.
+
+Added `docs/BINANCE_MARKET_DATA.md`.
+
+### Verification status
+
+**Implementation deployed but not yet server-verified.**
+
+Required next step:
+1. let FrostDeploy deploy the current main branch;
+2. run the mandatory full pytest suite;
+3. fix any actual failures;
+4. rerun until green;
+5. only then mark the concrete Binance adapter accepted.
+
+### Important limitation
+
+Binance is currently the **first concrete prototype provider**, not yet the permanent production-provider decision. Before locking it for the 24/7 Top-100 system, verify rate limits, WebSocket behavior, reconnect handling, latency, historical coverage, network/regional accessibility, commercial/usage terms and operational reliability.
+
+### Next task
+
+Server-verify the Binance adapter. If green, perform a real BTC/USDT provider smoke test and then extend the transport toward WebSocket/incremental live operation without changing the causal Feature Engine contract.
