@@ -48,6 +48,13 @@ def test_feature_columns_and_shape():
         "volatility_regime",
         "volume_regime",
         "return_60",
+        "pa_body",
+        "pa_breakout_up",
+        "pa_retest_up",
+        "pa_bullish_rejection",
+        "pa_expansion",
+        "pa_compression",
+        "pa_consolidation",
     ]:
         assert column in result.columns
 
