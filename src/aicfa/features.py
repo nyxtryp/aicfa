@@ -138,6 +138,12 @@ def build_features(
         if column.startswith("pa_"):
             out[column] = price_action[column].to_numpy()
 
+    from .wyckoff import build_wyckoff
+    wyckoff = build_wyckoff(x)
+    for column in wyckoff.columns:
+        if column.startswith("wyckoff_"):
+            out[column] = wyckoff[column].to_numpy()
+
     from .volume_volatility import build_volume_volatility
     volume_volatility = build_volume_volatility(x)
     for column in [
