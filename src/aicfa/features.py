@@ -159,6 +159,31 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     ]:
         out[column] = order_blocks[column].to_numpy()
 
+    # Unified SMC state: normalize the already-causal components into one
+    # market-state representation. This is observational, not a BUY/SELL score.
+    from .unified_smc import build_unified_smc
+    unified_smc = build_unified_smc(
+        x,
+        structure=structure,
+        liquidity=liquidity,
+        displacement=displacement,
+        fvg=fvg,
+        order_blocks=order_blocks,
+        premium_discount=premium_discount,
+    )
+    for column in [
+        "smc_structure_direction", "smc_structure_event", "smc_structure_shift",
+        "smc_liquidity_event", "smc_sweep_low_reclaim", "smc_sweep_high_reclaim",
+        "smc_buy_side_liquidity", "smc_sell_side_liquidity",
+        "smc_displacement_direction", "smc_displacement_bos_up", "smc_displacement_bos_down",
+        "smc_fvg_event", "smc_fvg_lifecycle", "smc_fvg_active",
+        "smc_order_block_event", "smc_order_block_lifecycle", "smc_order_block_active",
+        "smc_breaker_bullish", "smc_breaker_bearish",
+        "smc_dealing_range_position", "smc_premium_discount",
+        "smc_premium", "smc_discount", "smc_equilibrium", "smc_state_ready",
+    ]:
+        out[column] = unified_smc[column].to_numpy()
+
     # Trend proxies from causal rolling return and close-vs-mean location.
     for n in (15, 60):
         out[f"return_{n}"] = c.pct_change(n)
