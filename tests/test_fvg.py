@@ -21,7 +21,7 @@ def frame(opens, highs, lows, closes, volumes=None):
 
 def test_bullish_fvg_is_created_at_third_candle():
     df = frame(
-        [100, 101, 103],
+        [100, 101, 105],
         [102, 103, 106],
         [99, 100, 105],
         [101, 102, 105.5],
@@ -51,7 +51,7 @@ def test_bearish_fvg_is_created_at_third_candle():
 
 def test_small_gap_can_be_filtered_by_percentage():
     df = frame(
-        [100, 101, 102],
+        [100, 101, 102.2],
         [101, 102, 103],
         [99, 100.5, 102.01],
         [100, 101.5, 102.5],
@@ -62,7 +62,7 @@ def test_small_gap_can_be_filtered_by_percentage():
 
 def test_bullish_fvg_mitigation_and_fill_are_causal():
     df = frame(
-        [100, 101, 103, 104],
+        [100, 101, 105, 104],
         [102, 103, 106, 106],
         [99, 100, 105, 101],
         [101, 102, 105.5, 101.5],
@@ -84,14 +84,14 @@ def test_fvg_requires_current_displacement_when_requested():
     # Current candle creates a gap but is not displacement.
     df.loc[20, ["open", "high", "low", "close", "volume"]] = [100, 101, 100.8, 100.9, 10]
     df.loc[21, ["open", "high", "low", "close", "volume"]] = [100.9, 102, 100.8, 101.5, 10]
-    df.loc[22, ["open", "high", "low", "close", "volume"]] = [101.5, 104, 103, 103.8, 10]
+    df.loc[22, ["open", "high", "low", "close", "volume"]] = [103, 104, 103, 103.8, 10]
     r = build_fvg(df, require_displacement=True)
     assert r.loc[22, "fvg_bullish"] == 0
 
 
 def test_fvg_is_causal_under_future_changes():
     df = frame(
-        [100, 101, 103, 104, 104],
+        [100, 101, 105, 104, 104],
         [102, 103, 106, 106, 106],
         [99, 100, 105, 101, 101],
         [101, 102, 105.5, 101.5, 101.5],
@@ -104,7 +104,7 @@ def test_fvg_is_causal_under_future_changes():
 
 
 def test_invalid_parameters():
-    df = frame([100, 101, 103], [102, 103, 106], [99, 100, 105], [101, 102, 105.5])
+    df = frame([100, 101, 105], [102, 103, 106], [99, 100, 105], [101, 102, 105.5])
     with pytest.raises(ValueError):
         build_fvg(df, min_gap_pct=-0.01)
     with pytest.raises(ValueError):
