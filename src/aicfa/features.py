@@ -95,6 +95,19 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     ]:
         out[column] = liquidity[column].to_numpy()
 
+    # Causal displacement engine. Rolling baselines are strictly past-only.
+    from .displacement import build_displacement
+    displacement = build_displacement(x)
+    for column in [
+        "displacement_range_expansion", "displacement_body_expansion",
+        "displacement_close_efficiency", "displacement_relative_volume",
+        "displacement_close_location", "impulsive_close_up",
+        "impulsive_close_down", "directional_displacement",
+        "displacement_up", "displacement_down", "displacement",
+        "displacement_bos_up", "displacement_bos_down",
+    ]:
+        out[column] = displacement[column].to_numpy()
+
     # Trend proxies from causal rolling return and close-vs-mean location.
     for n in (15, 60):
         out[f"return_{n}"] = c.pct_change(n)
