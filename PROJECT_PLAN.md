@@ -1063,3 +1063,39 @@ Before locking a production provider, verify its actual rate limits, latency,
 WebSocket support, historical access, reliability and commercial terms.
 Then implement the first concrete BTC/USDT provider adapter against the
 provider-agnostic contract and verify the scanner on FrostDeploy.
+
+
+## 2026-09-29 — Live Market Data / Scanner verification attempt and test fixes
+
+### FrostDeploy verification attempt
+
+Current deployed test run:
+```
+2 failed, 172 passed, 4864 warnings in 42.96s
+```
+
+Failures:
+- `tests/test_market_data.py::test_merge_is_idempotent_and_keeps_newest_duplicate` — the test fixture changed `close` above the fixture's valid `high`, so production OHLCV validation correctly rejected the row.
+- `tests/test_market_scanner.py::test_scanner_processes_each_market_key_once_and_only_completed_data` — the expected latest derived value was incorrect. The completed latest candle has close `101.5`, so the test feature value is `203.0`.
+
+Production Live Market Data / Scanner code was not changed in response to these failures.
+
+### Fix commits
+
+- `92a7a9f5e434b6408b1e6b1cbc57867b750b4861` — fix live market data OHLCV test fixture
+  - changed the duplicate candle close to a valid value below its high;
+  - production validation unchanged.
+- `eab84fa73cf9e57f336606482622eb9703b5de94` — fix live scanner latest-state test expectation
+  - corrected expected derived value from `201.0` to `203.0`;
+  - scanner implementation unchanged.
+
+### Verification status
+
+**Still not server-verified green.**
+
+Both fixes are test-only. FrostDeploy will automatically deploy these commits from `main`.
+
+### Required next step
+
+Run the mandatory full pytest suite against the new automatically deployed release. Do not mark Live Market Data / Scanner foundation green until the new server output is clean.
+
