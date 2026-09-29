@@ -1971,3 +1971,32 @@ The implementation is on GitHub main. The stage is not GREEN until the current F
 2. Fix only actual failures.
 3. Rerun until green.
 4. Then build the Visual Evidence contract so user screenshots are mapped into structured evidence consumed by this Knowledge Base.
+
+## 2026-09-29 — Knowledge Base full-spec server verification
+
+FrostDeploy release: `2026-09-29T15-42-00-c01cbbf`
+
+Mandatory full-project verification on the deployed release:
+
+```
+203 passed, 4863 warnings in 42.78s
+```
+
+The expanded Knowledge Base stage is now **GREEN / accepted**.
+
+Verified on the current deployed release:
+- full pytest suite passes;
+- expanded Knowledge Base registry and contract tests pass;
+- required AICFA timeframe-grid test including 1m passes;
+- no test failures remain.
+
+Observed warnings are non-blocking and remain known technical debt:
+- pandas DataFrame fragmentation PerformanceWarning in Multi-Timeframe output construction;
+- pandas FutureWarning from the Premium/Discount test fixture dtype assignment;
+- pytest-cache permission warnings caused by immutable FrostDeploy release directories.
+
+These warnings do not block the Knowledge Base stage and are not being mixed into the analytical feature work.
+
+### Next implementation step
+
+Build the **Visual Evidence contract**: a causal, structured representation of user-supplied chart screenshots that can be consumed by the existing Knowledge Base and analytical rules. Screenshot evidence remains inference-time input, not training data, and the user must not manually label BOS/FVG/liquidity/OB concepts.
