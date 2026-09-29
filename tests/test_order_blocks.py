@@ -37,7 +37,7 @@ def test_bearish_order_block_is_recognized_on_displacement_candle():
     df = frame(
         [100, 98, 101, 100],
         [102, 100, 104, 101],
-        [99, 97, 96, 95],
+        [98, 97, 96, 95],
         [98, 99, 97, 96],
     )
     r = build_order_blocks(df, require_displacement=False)
