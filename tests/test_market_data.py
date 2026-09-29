@@ -55,10 +55,10 @@ def test_completed_ohlcv_excludes_open_candle():
 def test_merge_is_idempotent_and_keeps_newest_duplicate():
     first = candles([0, 60000])
     second = candles([60000, 120000])
-    second.loc[0, "close"] = 101.25
+    second.loc[0, "close"] = 101.75
     out = merge_ohlcv(first, second)
     assert out["timestamp"].tolist() == [0, 60000, 120000]
-    assert out.loc[1, "close"] == 101.25
+    assert out.loc[1, "close"] == 101.75
 
 
 def test_next_since_uses_next_candle_open():
