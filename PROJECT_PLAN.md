@@ -1621,3 +1621,36 @@ The prior full suite was green at 195 passed, 4863 warnings in 33.94s, but that 
 3. rerun real Binance Spot + Futures BTC/USDT WebSocket smoke;
 4. if both pass, record WebSocket transport as GREEN;
 5. then connect live WebSocket observations to the centralized scanner and Setup Event lifecycle.
+
+
+## 2026-09-29 — WebSocket bounded idle-timeout fix
+
+### Real smoke finding
+
+After the read-timeout fix, Spot received a real closed BTC/USDT 1m candle, but the combined Spot/Futures smoke remained waiting indefinitely on Futures. Treating every read timeout as harmless removed the previous immediate failure but introduced an unbounded wait if the stream stops delivering messages.
+
+### Forward-only fix
+
+Commits:
+- `a613810720c32c2af7a1a51a39dd35ba3d5ffbaf` — Bound continuous Binance WebSocket read timeouts
+- `dd09e7c966febc85869857b03dd2b48c2fcb6a65` — Test bounded Binance WebSocket idle timeout
+
+Behavior:
+- normal read timeouts remain non-fatal;
+- a healthy 1m stream may wait across the 15-second socket read timeout;
+- continuous timeout without any message is now bounded by an idle watchdog;
+- default idle budget is two fixed candle periods (for example, 120 seconds for 1m);
+- after the idle budget, the connection enters the existing reconnect path;
+- the idle timeout is injectable in tests;
+- no market observation is fabricated.
+
+### Verification status
+
+**PENDING server verification.**
+
+Next:
+1. wait for the new FrostDeploy release;
+2. run the full pytest suite;
+3. rerun real Binance Spot + Futures BTC/USDT WebSocket smoke;
+4. if both pass, mark WebSocket transport GREEN;
+5. then connect live WebSocket observations to the centralized scanner and Setup Event lifecycle.
