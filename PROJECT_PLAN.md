@@ -1250,3 +1250,33 @@ Known limitation:
 Pool identity is currently represented by causal state/counts and event levels rather than a persistent externally-addressable pool ID/object store. This is sufficient for the current feature layer; richer historical pool objects can be added later if outcome analysis requires them.
 
 **Next concrete action:** run the complete FrostDeploy pytest suite against this Liquidity refinement. If green, accept the refinement and continue the analytical core; do not jump to ML.
+
+
+## 2026-09-29 — Liquidity refinement verified
+
+FrostDeploy verification was run against release `2026-09-29T06-16-07-452b759`.
+
+Result:
+```
+80 passed, 2035 warnings in 28.34s
+```
+
+Verification status: **PASS**.
+
+Verified:
+- causal previous confirmed highs/lows;
+- internal/external liquidity separation;
+- multiple active liquidity pools;
+- pool creation and lifecycle;
+- sweep versus breakout distinction;
+- pool invalidation;
+- refined liquidity propagation into Unified SMC;
+- refined liquidity exposure through the feature engine;
+- future-change causality/invariance;
+- full regression suite remains green.
+
+The 2035 warnings are non-blocking and remain deferred to the dedicated cleanup/optimization pass. They include existing pandas/NumPy deprecations, DataFrame fragmentation warnings, fixture dtype warnings, and the immutable-release pytest cache permission warning.
+
+Liquidity refinement is **accepted**.
+
+**Next concrete task:** continue the analytical core with the next documented layer; keep the current no-lookahead/causal contract and do not introduce ML, scoring, or final trading decisions prematurely.
