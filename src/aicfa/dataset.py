@@ -9,24 +9,24 @@ import pandas as pd
 RAW_COLUMNS = {"open", "high", "low", "close", "volume"}
 LABEL_PREFIXES = (
     "future_return_",
+    "future_log_return_",
     "future_mfe_",
     "future_mae_",
+    "future_",
     "time_to_mfe_",
-    "time_to_long_tp_",
-    "time_to_long_sl_",
-    "time_to_short_tp_",
-    "time_to_short_sl_",
-    "triple_barrier_",
+    "target_vol_",
+    "event_",
 )
 
 
 def build_dataset(features: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
     """Join causal features with future targets without exposing raw market columns.
 
-    The returned dataset contains timestamp, engineered causal features, and
-    future-outcome targets. Raw OHLCV columns are intentionally excluded from
-    model inputs; they remain available in the source datasets for backtesting.
+    This function intentionally keeps the target family separate from model
+    inputs. Training code should select the target(s) required by one task
+    rather than treating every future target as one universal label.
     """
+
     if "timestamp" not in features.columns or "timestamp" not in labels.columns:
         raise ValueError("Both features and labels must contain timestamp")
 
@@ -76,7 +76,9 @@ def build_dataset(features: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
     ).reset_index(drop=True)
 
     if dataset.empty:
-        raise ValueError("No complete rows remain after joining and removing warmup/future rows")
+        raise ValueError(
+            "No complete rows remain after joining and removing warmup/future rows"
+        )
 
     return dataset
 
