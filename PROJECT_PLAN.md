@@ -1217,3 +1217,36 @@ Known limitations remain:
 - no score, signal, confirmation counter, or ML logic has been added.
 
 **Next concrete task:** refine Liquidity with previous highs/lows, multiple active liquidity pools, internal/external liquidity, pool lifecycle, sweep-vs-breakout distinction, and invalidation. After that, rerun the full FrostDeploy suite before accepting the Liquidity refinement.
+
+
+## 2026-09-29 — Liquidity refinement implementation
+
+Implementation commits:
+- `ea591de63b32fb37d1b72e37e3b3292aea32141a` — Refine causal liquidity pools and lifecycle.
+- `0278f7036d877020f1f560cd9b55b9780cb4a22e` — Test refined liquidity lifecycle and pool semantics.
+- `5d7b79f58752f293b4a589dc29d64bc762980668` — Expose refined liquidity in Unified SMC.
+- `de5cc728aca997a82b07c9570c5c5fbffa3aa518` — Integrate refined liquidity features.
+- `3f99569ad5e138ff725d7f20c52be48348e0ce3a` — Test refined liquidity feature integration.
+- `e0d195d9a631cd59dab85851d61a11e7cf06bfa1` — Test refined liquidity propagation in Unified SMC.
+
+Implemented:
+- causal previous confirmed highs/lows;
+- separate internal and external liquidity sensitivity;
+- multiple simultaneously active liquidity pools;
+- explicit active pool counts and latest active pool levels;
+- pool lifecycle: creation, active, swept, broken/invalidated;
+- explicit sweep-vs-breakout distinction;
+- causal invalidation on close beyond a known liquidity level;
+- refined liquidity observations propagated into Unified SMC;
+- refined liquidity features exposed through build_features();
+- focused integration and future-change causality tests.
+
+Design rule:
+A pool can only be acted upon by candles after its confirmation/creation row. A sweep requires a wick through the known level and a close back across it. A breakout requires a close beyond the known level and invalidates that pool. Existing pools are not overwritten when a new equal-high/equal-low pool is created.
+
+Server verification: **pending**.
+
+Known limitation:
+Pool identity is currently represented by causal state/counts and event levels rather than a persistent externally-addressable pool ID/object store. This is sufficient for the current feature layer; richer historical pool objects can be added later if outcome analysis requires them.
+
+**Next concrete action:** run the complete FrostDeploy pytest suite against this Liquidity refinement. If green, accept the refinement and continue the analytical core; do not jump to ML.
