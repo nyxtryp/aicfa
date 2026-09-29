@@ -197,7 +197,6 @@ Previously verified analytical stages remain accepted as recorded in Git history
 
 The current control point is the **GREEN Decision Layer verification above**.
 
-
 ## 2026-09-29 — Chart Vision inference boundary implementation started
 
 ### Commits
@@ -276,7 +275,6 @@ The remaining pytest-cache permission warning is the known non-blocking immutabl
 
 Proceed to the real chart-vision provider/adapter stage. Keep it provider-agnostic and cost-conscious: the analytical AICFA core remains the intelligence layer, while the vision component only converts user screenshots into structured visual evidence. Do not assume OpenAI API usage or any other paid external model unless explicitly chosen and verified.
 
-
 ## 2026-09-29 — Self-hosted chart vision adapter started
 
 ### Commits
@@ -304,7 +302,6 @@ Required next step:
 2. run the mandatory full pytest suite;
 3. if green, accept the adapter code;
 4. separately test a real local/self-hosted vision model before making it the active provider.
-
 
 ## 2026-09-29 — Self-hosted chart vision adapter verification and local model selection
 
@@ -352,7 +349,6 @@ nvidia-smi || true
 ```
 
 Then proceed with the local model installation/test. Do not expose Ollama port 11434 publicly; AICFA should use the local endpoint `127.0.0.1:11434`.
-
 
 ## 2026-09-29 — Local Chart Vision model shortlist revised
 
@@ -422,7 +418,6 @@ The project plan is the source of truth for **what we are building, why, current
 
 Never rely on the chat history alone for project state.
 
-
 ## 2026-09-29 — Real local vision benchmark: MiniCPM-V 4.6 rejected
 
 ### Operator actions and environment
@@ -450,7 +445,6 @@ Do not activate any model in production until a candidate passes a real chart te
 ### Control rule reaffirmed
 All assistant and operator actions relevant to AICFA development must be recorded in this `PROJECT_PLAN.md`. The plan is the persistent source of truth; chat history alone is not sufficient. Before the next implementation/model step, read this plan first.
 
-
 ## 2026-09-29 — Granite 3.2 Vision 2B installed for benchmark
 
 ### Operator action
@@ -463,7 +457,6 @@ All assistant and operator actions relevant to AICFA development must be recorde
 - Measure inference latency and observe RAM/CPU usage.
 - Compare visual recognition of chart structure, HH/HL/LH/LL, BOS/CHoCH, liquidity/sweep, FVG/imbalance, Order Block, Premium/Discount, uncertainty and hallucinations.
 - Do not change AICFA code or declare the model suitable before the benchmark result is reviewed.
-
 
 ## 2026-09-29 — Granite 3.2 Vision 2B benchmark: resource observation
 
@@ -486,7 +479,6 @@ Wait for the current Granite request to finish and record:
 
 Then decide whether Granite is rejected or retained for a deeper AICFA validation test.
 
-
 ## 2026-09-29 — Granite 3.2 Vision 2B benchmark: inference timeout
 
 ### Operator result
@@ -506,7 +498,6 @@ Then decide whether Granite is rejected or retained for a deeper AICFA validatio
 3. Record the final resource state.
 4. Remove `granite3.2-vision` if the user wants to keep the current low-resource server configuration.
 5. Before trying another model, decide whether to test a smaller candidate or increase RAM/vCPU based on these measured constraints.
-
 
 ## 2026-09-30 — Server resources increased for Granite re-test
 
@@ -529,4 +520,28 @@ Repeat the same Granite 3.2 Vision 2B benchmark, using the same /tmp/btc.png and
 - actual chart/SMC recognition quality;
 - structured-output quality and AICFA validation compatibility.
 
-Do not change AICFA code during this hardware comparison.
+## 2026-09-30 — Granite 3.2 Vision 2B re-test failed; model removed
+
+### Operator result
+- User repeated the Granite 3.2 Vision 2B benchmark after increasing the server to **4.8 GiB RAM and 2 vCPU**.
+- During inference, `llama-server` reached approximately **3.7 GiB RSS / 76.6% RAM** and about **198% CPU** across the two vCPUs.
+- Swap remained almost unused during the observed run, so the larger RAM allocation removed the previous severe swap pressure, but CPU inference was still fully saturated.
+- The same HTTP request again failed to complete within the configured **600 second timeout** and ended with Python `TimeoutError: timed out`.
+- No usable Granite response was produced; therefore chart/SMC quality and structured-output compatibility could not be validated.
+- After the timeout, the user stopped Ollama and confirmed there was no remaining `ollama`/`llama-server` process. Final resource state: **4.8 GiB RAM total, ~565 MiB used, ~3.8 GiB free, ~4.3 GiB available; 2 GiB swap with only 36 MiB used**.
+
+### Decision
+**Granite 3.2 Vision 2B is rejected for AICFA local chart-vision testing on this server.** The rejection is based on the repeated >10-minute inference timeout even after the hardware was increased to 2 vCPU / 4.8 GiB RAM. No claim is made about its visual quality because it never returned a usable benchmark response.
+
+The model is no longer installed. Ollama itself remains installed for the next candidate.
+
+### Next exact step
+Proceed to the next shortlisted candidate: **Qwen3.5 2B**.
+
+Before pulling it:
+1. start the existing Ollama service;
+2. confirm `ollama --version` and available RAM;
+3. pull the Qwen3.5 2B vision-capable model;
+4. run the same `/tmp/btc.png` benchmark with the same evidence-focused Russian prompt;
+5. record latency, peak RAM/swap, CPU usage and actual structured chart output;
+6. do not modify AICFA code during the model comparison.
