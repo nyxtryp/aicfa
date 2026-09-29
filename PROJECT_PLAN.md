@@ -611,6 +611,109 @@ Never claim deployment/test verification without actual server output.
 
 ---
 
+
+
+## 2026-09-29 — Absorption and CVD verification
+
+### Absorption accepted
+
+FrostDeploy verification confirmed the causal Absorption layer and its tests as part of the full suite. The feature remains an **absorption candidate**, not proof of execution.
+
+Verified semantics:
+- synchronized taker flow + level-by-level displayed liquidity;
+- persistence and displayed replenishment/cancellation;
+- bounded contemporaneous price-response measurements;
+- strict backward window and availability-time causality;
+- no future price movement in the live feature.
+
+### CVD accepted
+
+FrostDeploy release:
+`2026-09-29T08-53-55-8153eb4`
+
+Full suite:
+```
+133 passed, 2847 warnings in 34.70s
+```
+
+The CVD layer is now **accepted and green**.
+
+Verified:
+- completed taker-flow interval alignment;
+- cumulative taker delta;
+- explicit reset semantics;
+- derived CVD delta/change fields;
+- future-change invariance;
+- invalid negative-flow validation.
+
+Known non-blocking warnings remain unchanged: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and immutable FrostDeploy pytest-cache permission warnings.
+
+## 2026-09-29 — Price Action implementation started
+
+### `a396c16f2fb355cc8443d7935ed0b15de21c9bb0`
+**Add causal Price Action feature layer**
+
+Added `src/aicfa/price_action.py`.
+
+Implemented descriptive, causal features for:
+- candle body and wick proportions;
+- close location;
+- bullish/bearish rejection;
+- prior support/resistance levels;
+- breakout and failed breakout;
+- breakout retest;
+- short candle-sequence continuation;
+- short candle-sequence reversal;
+- range expansion/compression;
+- consolidation.
+
+Prior levels are calculated strictly from previously available candles.
+
+### `1f7b98d41d4844ababb50cd954d1316e0511f404`
+**Test causal Price Action features**
+
+Added tests for:
+- required Price Action columns;
+- strictly-prior level construction;
+- future-change invariance;
+- rejection classification;
+- parameter validation.
+
+### `6e72ff14ae80dea71e2b0e95ad7b264958e1dd78`
+**Document Price Action source contract and causality**
+
+Added `docs/PRICE_ACTION.md`.
+
+### `7ad4680dd5bfd3c1b31d6b48aea5be6d7d7a8456`
+**Integrate causal Price Action features**
+
+Integrated `pa_*` features into the main Feature Engine.
+
+### `16bd7c53f2b96b222536059ef4cc112f3370cda9`
+**Test Price Action feature integration**
+
+Extended Feature Engine integration coverage.
+
+### `f632c111f7b275c11b562e1a3d53a5aba233a63f`
+**Define causal Price Action contract**
+
+Updated `docs/AICFA_TZ.md` with the Price Action source contract and limitations.
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step:
+1. deploy current Price Action commits to FrostDeploy;
+2. run the mandatory full pytest suite;
+3. fix any real failures;
+4. rerun until green;
+5. only then mark Price Action accepted.
+
+## Current implementation direction
+
+With SMC, derivatives and the market-microstructure stack now substantially represented, the next conceptual layer after Price Action is **Wyckoff**, implemented as explicit causal events/states and kept descriptive until historical statistical validation.
+
 # 13. Current checkpoint
 
 Latest implementation:
