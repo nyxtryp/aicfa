@@ -1543,3 +1543,41 @@ This stage transports kline observations only. Funding, open interest, liquidati
 3. If green, connect live transport to the centralized scanner and Setup Event lifecycle.
 4. Then begin persistent historical situations / Experience-Outcome storage.
 5. Screenshot/Vision remains a planned first-class input path sharing the analytical core; it is not dependent on live provider availability.
+
+
+## 2026-09-29 — WebSocket malformed-payload verification fix
+
+### Server verification attempt
+
+Current FrostDeploy run produced:
+```
+1 failed, 194 passed, 4864 warnings in 40.59s
+```
+
+Failure:
+```
+tests/test_websocket_market_data.py::test_parse_binance_websocket_rejects_invalid_payload
+Failed: DID NOT RAISE WebSocketTransportError
+```
+
+The failure exposed a validation-order bug in the WebSocket parser: an incomplete kline payload such as `{"k": {"x": true}}` was treated as a non-matching stream before its required kline identity was validated. That allowed malformed input to be silently ignored instead of rejected.
+
+### Fix
+
+- `de46379d7ce6155cb902b2b938228a7ecfe17841` — **Fix WebSocket malformed kline validation**
+- malformed kline payloads now require the kline identity fields (`s`, `i`, `x`) before stream-mismatch filtering;
+- required candle fields now include the Binance close/event timestamp `T`;
+- invalid top-level payloads are explicitly rejected;
+- removed an accidental duplicate `default_websocket_connector` definition.
+
+Production transport behavior remains forward-only; no rollback.
+
+### Status
+
+**WebSocket stage remains PENDING verification.**
+
+Next:
+1. wait for the new FrostDeploy release;
+2. rerun the full pytest suite;
+3. if green, run the real Binance Spot/Futures WebSocket smoke test;
+4. only then mark WebSocket transport GREEN.
