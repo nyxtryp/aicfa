@@ -1442,3 +1442,34 @@ Proceed with **REST transport recovery and failure handling** behind the provide
 
 After REST recovery is green, implement WebSocket incremental transport with reconnect/resubscribe.
 
+## 2026-09-29 — Binance REST recovery / failure handling implementation
+
+### Commits
+- `01f0cd5392460f920d80a4ac5a51a5641a5f0ac3` — Add Binance REST recovery and failure classification
+- `e5fd2f6b9eb4708910371cf4b38a37b63eb6ce73` — Test Binance REST recovery and failure handling
+- `1be82d3b2e2a14b31a83bcdbbcd52468698f9824` — Document Binance REST recovery behavior
+
+### Implemented
+- bounded retry budget for Binance REST requests;
+- exponential backoff with injectable sleeper for deterministic tests;
+- transient classification for network/timeout errors, HTTP 429 and HTTP 5xx;
+- non-recoverable classification for other HTTP 4xx errors;
+- explicit `BinanceTransportError` carrying retryability state;
+- no fabricated OHLCV data after exhausted transport failures.
+
+### Verification status
+**Implementation deployed to GitHub main; current FrostDeploy/server verification is pending.**
+
+The new tests cover:
+- transient network retry and backoff;
+- 429 and 5xx recovery;
+- non-recoverable 4xx behavior;
+- exhausted transient failures;
+- invalid recovery configuration.
+
+### Important boundary
+REST recovery does not decide whether market state is stale. `LocalMarketStateStore` remains responsible for retaining the last confirmed observation and exposing `FRESH` / `STALE` / `UNAVAILABLE`.
+
+### Next step
+Run the full FrostDeploy pytest suite. If green, perform a real failure/recovery smoke test where practical. Then proceed to provider-agnostic WebSocket incremental transport with reconnect/resubscribe, while feeding confirmed observations into the existing local-state boundary.
+
