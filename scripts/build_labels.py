@@ -1,4 +1,4 @@
-"""Build persistent training labels from raw OHLCV datasets."""
+"""Build persistent AICFA research labels from raw OHLCV datasets."""
 
 from __future__ import annotations
 
@@ -36,10 +36,22 @@ def main() -> None:
         help="Future horizon lengths in candles.",
     )
     parser.add_argument(
-        "--barrier-atr",
+        "--volatility-span",
+        type=int,
+        default=64,
+        help="EWMA span for causal realized volatility.",
+    )
+    parser.add_argument(
+        "--pt-mult",
+        type=float,
+        default=2.0,
+        help="Profit-taking barrier in target-volatility units.",
+    )
+    parser.add_argument(
+        "--sl-mult",
         type=float,
         default=1.0,
-        help="ATR multiple used by triple-barrier labels.",
+        help="Stop-loss barrier in target-volatility units.",
     )
     args = parser.parse_args()
 
@@ -58,7 +70,9 @@ def main() -> None:
             labels = build_labels(
                 raw,
                 horizons=tuple(args.horizons),
-                barrier_atr=args.barrier_atr,
+                volatility_span=args.volatility_span,
+                pt_mult=args.pt_mult,
+                sl_mult=args.sl_mult,
             )
             target_dir.mkdir(parents=True, exist_ok=True)
             labels.to_csv(target, index=False)
