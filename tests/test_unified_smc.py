@@ -119,3 +119,45 @@ def test_unified_smc_refined_structure_is_causal():
     a = build_unified_smc(base)
     b = build_unified_smc(altered)
     pd.testing.assert_frame_equal(a.iloc[:85], b.iloc[:85], check_dtype=False)
+
+
+def test_unified_smc_propagates_refined_liquidity():
+    from aicfa.liquidity import build_liquidity
+
+    base = frame(180)
+    liquidity = build_liquidity(base)
+    result = build_unified_smc(base, liquidity=liquidity)
+
+    for column in [
+        "smc_previous_high", "smc_previous_low",
+        "smc_internal_previous_high", "smc_internal_previous_low",
+        "smc_active_buy_liquidity_pools", "smc_active_sell_liquidity_pools",
+        "smc_active_external_buy_pools", "smc_active_external_sell_pools",
+        "smc_active_internal_buy_pools", "smc_active_internal_sell_pools",
+        "smc_liquidity_breakout_high", "smc_liquidity_breakout_low",
+        "smc_liquidity_pool_created_high", "smc_liquidity_pool_created_low",
+        "smc_liquidity_pool_swept_high", "smc_liquidity_pool_swept_low",
+        "smc_liquidity_pool_invalidated_high", "smc_liquidity_pool_invalidated_low",
+    ]:
+        assert column in result.columns
+
+    np.testing.assert_array_equal(
+        result["smc_active_buy_liquidity_pools"],
+        liquidity["active_buy_liquidity_pools"],
+    )
+    np.testing.assert_array_equal(
+        result["smc_liquidity_breakout_high"],
+        liquidity["liquidity_breakout_high"],
+    )
+
+
+def test_unified_smc_refined_liquidity_is_causal():
+    base = frame(180)
+    altered = base.copy()
+    altered.loc[120:, "high"] *= 1000
+    altered.loc[120:, "low"] *= 0.001
+    altered.loc[120:, "close"] *= 500
+
+    a = build_unified_smc(base)
+    b = build_unified_smc(altered)
+    pd.testing.assert_frame_equal(a.iloc[:120], b.iloc[:120], check_dtype=False)
