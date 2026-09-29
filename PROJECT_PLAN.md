@@ -1280,3 +1280,32 @@ The 2035 warnings are non-blocking and remain deferred to the dedicated cleanup/
 Liquidity refinement is **accepted**.
 
 **Next concrete task:** continue the analytical core with the next documented layer; keep the current no-lookahead/causal contract and do not introduce ML, scoring, or final trading decisions prematurely.
+
+
+## 2026-09-29 — Volume / Volatility causal layer implementation
+
+Implementation commits:
+- `abfb47e0eb08f34435ccd2bb180eef478da15795` — Add causal volume and volatility regime engine.
+- `ddcddc9f8ed34b04a5881241a038f28a56fc7d9a` — Test causal volume and volatility regime engine.
+- `c85725674580bf9275db26ec710c577a1b3d59a1` — Integrate causal volume and volatility features.
+- `7c2f63a4bf3b1b6b126f4a10292d8c82c0ff75e0` — Test volume volatility feature integration.
+
+Implemented as a dedicated causal layer:
+- realized volatility;
+- true range and ATR / ATR percentage;
+- causal range z-score;
+- causal volume z-score and relative volume;
+- volatility ratio versus a strictly prior baseline;
+- volatility expansion/compression;
+- volume expansion/dry-up;
+- descriptive volume and volatility regimes.
+
+The regime baselines are shifted so the current candle cannot redefine its own classification threshold. Future-change invariance tests were added.
+
+The existing generic feature-engine volatility/volume columns remain intact; this layer adds a more explicit, testable state representation rather than replacing prior features.
+
+No score, signal, trading decision, derivatives logic, or ML was introduced.
+
+Server verification: **pending**.
+
+**Next concrete action:** run the complete FrostDeploy pytest suite against this volume/volatility layer. If green, accept it and proceed to the next analytical component, Derivatives, beginning with causal funding/open-interest/liquidation representations where historical data is available.
