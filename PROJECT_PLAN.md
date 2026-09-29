@@ -731,3 +731,86 @@ Latest full-suite result:
 
 **Next task:** deploy and verify Price Action. After Price Action is green, continue with the causal Wyckoff representation before moving toward historical statistical evaluation and the pre-ML dataset/model boundary.
 
+
+
+## 2026-09-29 — Causal Wyckoff implementation
+
+### `ca545ba24805acc088f83763cc7f9d06b0ca2a12`
+**Add causal Wyckoff feature layer**
+
+Added `src/aicfa/wyckoff.py` with deterministic, causal descriptive features for:
+- trading-range boundaries and position;
+- breakout / failed breakout;
+- Spring candidate;
+- Upthrust candidate;
+- Sign of Strength / Sign of Weakness;
+- range expansion/compression;
+- optional volume context;
+- deterministic Wyckoff state;
+- explicit Accumulation/Distribution proxy fields.
+
+The implementation is asset-agnostic and timeframe-agnostic. Missing optional
+volume is represented by unavailable volume-derived features rather than
+fabricated values. Order Book is not required.
+
+### `d906773b6224c5c77550af14ef6d667dd1176f55`
+**Test causal Wyckoff features**
+
+Added coverage for:
+- required Wyckoff features;
+- strictly-prior range levels;
+- Spring / Upthrust observable candidates;
+- future-change invariance;
+- operation without volume;
+- parameter validation.
+
+### `9be43129653fc6b7acbbbfa9d022c61fc0fd06d6`
+**Document Wyckoff source contract and causality**
+
+Added `docs/WYCKOFF.md` documenting source availability, causal semantics,
+observable-event limitations and the non-signal nature of the layer.
+
+### `2e6c97310b9643b174e212917f435b2a5237bf63`
+**Integrate causal Wyckoff features**
+
+Integrated `wyckoff_*` features into the main Feature Engine.
+
+### `091d3e80252f3d649f996bd1094f62f8ada0272a`
+**Test Wyckoff feature integration**
+
+Extended Feature Engine integration coverage for core Wyckoff fields.
+
+### `a9ef16b957e4c6361ac3b7535538a2958a00d406`
+**Define causal Wyckoff contract**
+
+Updated `docs/AICFA_TZ.md` with the Wyckoff source contract, asset/timeframe
+generality, optional-volume semantics and the explicit rule that Order Book is
+not required.
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step:
+1. deploy current Wyckoff commits to FrostDeploy;
+2. run the mandatory full pytest suite;
+3. fix any real failures;
+4. rerun until green;
+5. only then mark Wyckoff accepted.
+
+## 2026-09-29 — Current checkpoint after Wyckoff implementation
+
+Latest implementation:
+`a9ef16b957e4c6361ac3b7535538a2958a00d406`
+
+Latest verified release remains:
+`2026-09-29T08-58-11-9d4e39`
+
+Latest verified full-suite result remains:
+`138 passed, 3279 warnings in 33.75s`
+
+**Current unverified stage:** causal Wyckoff representation.
+
+**Next task:** server verification of the current Wyckoff implementation. If
+green, continue with the next market-state representation layer; do not mark
+Wyckoff accepted before actual FrostDeploy test output.
