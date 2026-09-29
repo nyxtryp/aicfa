@@ -244,6 +244,15 @@ The actual image-recognition model/provider is intentionally **not** faked or ha
 
 **PENDING FrostDeploy/server verification after syntax correction.**
 
+The deployed release `2026-09-29T16-34-57-882bea1` still failed collection with:
+```
+SyntaxError: unmatched ')'
+```
+The previous correction accidentally left the test with an extra closing parenthesis. This has now been corrected again in:
+- `f518af2cb2065a3f05b5ec94f4cff78669f44d3f` — fix chart vision test closing parenthesis.
+
+No production Chart Vision code was changed. The next verification must use the FrostDeploy release containing `f518af2...` and the mandatory full pytest suite.
+
 Required next step:
 1. wait for FrostDeploy deployment of commit `4438518b2fcf4924c14f143e66dc2f1d65f50ce4`;
 2. run the mandatory full pytest suite;
