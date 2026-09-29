@@ -155,3 +155,39 @@ def test_feature_integration_exposes_volume_volatility_regimes():
         "volatility_regime", "volume_regime",
     ]:
         assert column in result.columns
+
+
+def test_feature_integration_exposes_causal_derivatives():
+    base = sample_frame(180)
+    ts = pd.to_datetime(base["timestamp"], unit="ms", utc=True)
+    derivatives = pd.DataFrame({
+        "timestamp": ts.iloc[::5].to_numpy(),
+        "funding_rate": np.linspace(-0.001, 0.002, len(ts.iloc[::5])),
+        "open_interest": np.linspace(1000, 1500, len(ts.iloc[::5])),
+    })
+    result = build_features(base, derivatives_frame=derivatives)
+    for column in [
+        "funding_rate", "funding_rate_delta", "funding_rate_zscore",
+        "open_interest", "open_interest_delta", "open_interest_zscore",
+        "oi_price_up_up", "oi_price_up_down", "oi_price_down_up",
+        "oi_price_down_down",
+    ]:
+        assert column in result.columns
+
+
+def test_feature_derivatives_future_changes_do_not_rewrite_earlier_rows():
+    base = sample_frame(180)
+    ts = pd.to_datetime(base["timestamp"], unit="ms", utc=True)
+    derivatives = pd.DataFrame({
+        "timestamp": ts.iloc[::5].to_numpy(),
+        "funding_rate": np.linspace(-0.001, 0.002, len(ts.iloc[::5])),
+        "open_interest": np.linspace(1000, 1500, len(ts.iloc[::5])),
+    })
+    altered = derivatives.copy()
+    cutoff = base.loc[100, "timestamp"]
+    mask = altered["timestamp"].astype("int64") // 10**6 >= cutoff
+    altered.loc[mask, "funding_rate"] *= 100
+    altered.loc[mask, "open_interest"] *= 10
+    original = build_features(base, derivatives_frame=derivatives)
+    changed = build_features(base, derivatives_frame=altered)
+    pd.testing.assert_frame_equal(original.iloc[:100], changed.iloc[:100], check_dtype=False)
