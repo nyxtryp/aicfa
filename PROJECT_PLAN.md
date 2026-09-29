@@ -386,9 +386,28 @@ Added tests for:
 
 Connected liquidity output to `src/aicfa/features.py`.
 
-### Server status
-**NOT YET VERIFIED after the latest liquidity commits.**
-Next verification must run the server pytest command and inspect failures before adding more production logic.
+### Server verification after initial Liquidity integration
+The FrostDeploy suite was run against the current release and found two failures:
+- `tests/test_liquidity.py::test_low_sweep_and_reclaim_is_causal` — the fixture closes exactly at the sell-side liquidity level on reclaim; production logic used a strict `>` boundary.
+- `tests/test_structure.py::test_hh_hl_lh_ll` — the fixture did not actually contain a confirmed HL/LL sequence under the configured one-candle swing rule.
+
+Fix commits:
+
+### `d7a04d0ac22e0bed23dcb00a3198474676bdea27`
+**Fix low liquidity reclaim boundary**
+
+Changed low sweep/reclaim recognition from `close > level` to `close >= level`, making reclaim symmetric with crossing back to/through the known sell-side level and matching the existing causal test definition.
+
+### `57a180b2f8cde42ec815bb06b506b4c528221804`
+**Fix market structure swing test fixture**
+
+Adjusted only the test data so it contains actual confirmed HH/HL/LH/LL swing points while remaining valid OHLC.
+
+**Production impact:** only the low-reclaim boundary changed; no unrelated engine logic was changed.
+
+**Post-fix server verification:** pending. The server must rerun the full pytest command after these commits.
+
+Warnings remain non-blocking: pandas deprecation, NumPy timedelta deprecations, and pytest cache permission warnings in immutable FrostDeploy releases.
 
 ---
 
@@ -588,9 +607,9 @@ This file is the persistent handoff/memory for future chats.
 
 # 12. Current checkpoint
 
-**Last code commit:** `c804aca1a789f6b0ecef6d99601750b126ab4714`
+**Last code commits:** `d7a04d0ac22e0bed23dcb00a3198474676bdea27` and `57a180b2f8cde42ec815bb06b506b4c528221804`
 
-**Current layer:** Liquidity
+**Current layer:** Liquidity — failure fixes applied, post-fix server verification pending
 
 **Current state:**
 - Market Structure: first causal implementation complete, refinement pending.
@@ -607,7 +626,7 @@ This file is the persistent handoff/memory for future chats.
 - Paper Trading: not started.
 - Top-100 assets: explicitly postponed.
 
-**Immediate action:** verify current tests on FrostDeploy, then proceed to Displacement only after the current foundation is green.
+**Immediate action:** rerun the full pytest suite on FrostDeploy after the two fix commits. Proceed to Displacement only after the current foundation is green.
 
 ---
 
