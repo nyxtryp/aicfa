@@ -1417,3 +1417,28 @@ Implement provider-agnostic live transport reliability:
 
 No live transport implementation should fabricate missing market observations.
 
+## 2026-09-29 — Provider-independent screenshot analysis requirement
+
+AICFA's analytical core must remain usable when live market-data providers are unavailable.
+
+### Required behavior
+
+- Live provider failure means no new live observations are accepted.
+- AICFA must not fabricate price, volume, structure, liquidity, or other market data.
+- The latest confirmed local market state may remain available as `STALE` for descriptive/reference analysis.
+- Automatic live setup creation must stop while required live data is unavailable/stale; decision flow supports `WAIT`.
+- Screenshot/chart analysis remains independently available because it operates on user-supplied visual evidence plus AICFA's own analytical knowledge.
+- Screenshot analysis must not be represented as live provider data unless the screenshot itself contains the relevant evidence.
+- Live data transport and screenshot analysis are separate input paths into the same analytical knowledge/rule core.
+
+### Next implementation stage
+
+Proceed with **REST transport recovery and failure handling** behind the provider-agnostic market-data contract:
+1. classify transient vs non-recoverable provider errors;
+2. bounded retry/backoff;
+3. preserve last confirmed state during transport failure;
+4. expose failure/freshness state without fabricating observations;
+5. add tests for recovery, failure, and no-data behavior.
+
+After REST recovery is green, implement WebSocket incremental transport with reconnect/resubscribe.
+
