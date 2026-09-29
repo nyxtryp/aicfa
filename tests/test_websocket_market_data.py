@@ -165,6 +165,39 @@ def test_transport_bounds_continuous_read_timeouts():
     assert socket.closed is True
 
 
+
+def test_transport_bounds_wait_for_confirmed_candle():
+    key = MarketKey("binance", "BTC/USDT", "futures", "1m")
+
+    class OpenThenTimeoutSocket(FakeSocket):
+        def __init__(self):
+            super().__init__([_message(closed=False)])
+            self.calls = 0
+
+        def recv(self):
+            if self.messages:
+                return super().recv()
+            self.calls += 1
+            raise WebSocketTimeoutException("read timed out")
+
+    socket = OpenThenTimeoutSocket()
+    now = iter((0.0, 0.0, 61.0))
+
+    transport = BinanceWebSocketMarketDataTransport(
+        keys=(key,),
+        connector=lambda url, timeout: socket,
+        max_reconnects=0,
+        observation_timeout_seconds=60,
+        idle_timeout_seconds=120,
+        clock=lambda: next(now),
+    )
+
+    with pytest.raises(WebSocketTransportError):
+        next(transport.stream(max_observations=1))
+
+    assert socket.closed is True
+
+
 def test_transport_resubscribes_after_reconnect():
     key = MarketKey("binance", "BTC/USDT", "futures", "5m")
     sockets = [FakeSocket([]), FakeSocket([_message(interval="5m")])]
