@@ -40,6 +40,7 @@ def test_replacement_creates_new_event():
     out = build_setup_events(state())
 
     assert out.loc[5, "setup_event_type"] == "created"
+    assert out.loc[5, "setup_event_created"] == 1
     assert out.loc[5, "setup_event_invalidated"] == 1
     assert out.loc[5, "setup_event_family"] == "failed_breakout"
     assert out.loc[5, "setup_event_direction"] == -1
@@ -53,6 +54,7 @@ def test_conflicted_setup_has_no_directional_event():
     assert out.loc[1, "setup_event_type"] == ""
     assert out.loc[1, "setup_event_direction"] == 0
     assert out.loc[1, "setup_event_family"] == ""
+    assert out.loc[1, "setup_event_identity"] == ""
 
 
 def test_outcome_is_never_generated_live():
