@@ -36,6 +36,8 @@ def test_new_label_schema() -> None:
     assert "event_end_offset_20" in labels.columns
     assert "event_target_vol_20" in labels.columns
     assert "event_ambiguous_20" in labels.columns
+    assert "label_end_timestamp_5" in labels.columns
+    assert "label_end_timestamp_20" in labels.columns
 
 
 def test_future_rows_are_nan() -> None:
