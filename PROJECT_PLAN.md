@@ -881,3 +881,20 @@ Server verification: **PASS** — FrostDeploy release `2026-09-29T05-15-03-e4994
 The Unified SMC layer is accepted. Warnings are non-blocking and are retained for a later dedicated cleanup/optimization pass.
 
 **Next concrete action:** implement Multi-Timeframe Structure.
+
+
+## 2026-09-29 — Multi-Timeframe Structure implementation
+
+Implementation commits:
+- 9479ce89d55a712a8938ee13980d4b549437fca6 — Add causal multi-timeframe structure engine.
+- 25437f0ec230364c2f9eaebb471b0c349bd39bad — Add multi-timeframe structure tests.
+
+Implemented a dedicated causal MTF layer that consumes independently aggregated OHLCV frames, exposes higher-timeframe structure only after the source candle closes, preserves the existing Market Structure confirmation delay, uses backward as-of alignment, and keeps each timeframe in separate mtf_<timeframe>_* columns. It validates OHLCV and does not implicitly resample lower-timeframe data.
+
+Tests cover: no state before higher-timeframe close; causal confirmation timing; future-change invariance; multiple timeframes; invalid inputs.
+
+Server verification: PENDING.
+
+Known limitation: automatic exchange-data resampling/storage orchestration is deferred to the data pipeline. MTF is not yet injected into build_features(); integration follows green standalone verification.
+
+Next concrete action: run the complete FrostDeploy pytest suite. If green, accept MTF and integrate it into the feature pipeline before Scenario Engine.
