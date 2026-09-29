@@ -162,7 +162,13 @@ class BinanceWebSocketMarketDataTransport:
                 self._subscribe(connection)
                 reconnects = 0
                 while max_observations is None or observations < max_observations:
-                    raw = connection.recv()
+                    try:
+                        raw = connection.recv()
+                    except TimeoutError:
+                        # A read timeout does not mean the WebSocket is dead. The
+                        # transport accepts only closed candles, so it can legitimately
+                        # wait across a socket timeout for the next candle close.
+                        continue
                     for key in self.keys:
                         observation = parse_binance_kline_message(raw, key)
                         if observation is None:
