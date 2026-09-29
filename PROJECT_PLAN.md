@@ -449,3 +449,17 @@ Do not activate any model in production until a candidate passes a real chart te
 
 ### Control rule reaffirmed
 All assistant and operator actions relevant to AICFA development must be recorded in this `PROJECT_PLAN.md`. The plan is the persistent source of truth; chat history alone is not sufficient. Before the next implementation/model step, read this plan first.
+
+
+## 2026-09-29 — Granite 3.2 Vision 2B installed for benchmark
+
+### Operator action
+- User pulled `granite3.2-vision` successfully through local Ollama.
+- Downloaded model components: approximately 1.5 GB + 892 MB; manifest verification and write completed successfully.
+- The model is installed locally but is **not production-active**.
+
+### Next exact step
+- Run the same `/tmp/btc.png` historical BTC/USDT chart benchmark used for MiniCPM-V 4.6.
+- Measure inference latency and observe RAM/CPU usage.
+- Compare visual recognition of chart structure, HH/HL/LH/LL, BOS/CHoCH, liquidity/sweep, FVG/imbalance, Order Block, Premium/Discount, uncertainty and hallucinations.
+- Do not change AICFA code or declare the model suitable before the benchmark result is reviewed.
