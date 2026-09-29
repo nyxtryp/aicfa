@@ -2122,3 +2122,19 @@ The layer requires contradiction-free evidence, a supported scenario and at leas
 Verification status: **PENDING FrostDeploy/server verification.**
 
 Next: add Setup Analysis contract tests, document the layer, deploy, and run the mandatory full pytest suite.
+
+
+### `29263479df43b9a34cf707789e42686fb26925d3`
+**Test setup analysis layer**
+
+Added `tests/test_setup_analysis.py` covering:
+- conditional continuation setup formation;
+- zone and price-location propagation;
+- no fabricated numeric levels;
+- insufficient supporting evidence;
+- missing contextual zone;
+- contradiction propagation to WAIT;
+- preservation of multiple plausible setup candidates;
+- absence of execution/order fields.
+
+Verification remains **PENDING FrostDeploy/server verification**.
