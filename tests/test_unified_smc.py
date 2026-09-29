@@ -23,6 +23,25 @@ def test_unified_smc_exposes_canonical_state_columns():
         "smc_structure_direction",
         "smc_structure_event",
         "smc_structure_shift",
+        "smc_internal_hh",
+        "smc_internal_hl",
+        "smc_internal_lh",
+        "smc_internal_ll",
+        "smc_internal_bos_up",
+        "smc_internal_bos_down",
+        "smc_internal_choch_up",
+        "smc_internal_choch_down",
+        "smc_internal_structure_direction",
+        "smc_mss_up",
+        "smc_mss_down",
+        "smc_protected_high_price",
+        "smc_protected_low_price",
+        "smc_protected_high_active",
+        "smc_protected_low_active",
+        "smc_protected_high_created",
+        "smc_protected_low_created",
+        "smc_protected_high_broken",
+        "smc_protected_low_broken",
         "smc_liquidity_event",
         "smc_displacement_direction",
         "smc_fvg_event",
@@ -57,3 +76,46 @@ def test_unified_smc_is_causal_under_future_changes():
     a = build_unified_smc(base)
     b = build_unified_smc(altered)
     pd.testing.assert_frame_equal(a.iloc[:70], b.iloc[:70], check_dtype=False)
+
+
+def test_unified_smc_propagates_refined_structure_observations():
+    from aicfa.displacement import build_displacement
+    from aicfa.structure import build_structure
+
+    base = frame(120)
+    structure = build_structure(base, displacement=build_displacement(base))
+    result = build_unified_smc(base, structure=structure)
+
+    for column in [
+        "smc_internal_hh", "smc_internal_hl", "smc_internal_lh", "smc_internal_ll",
+        "smc_internal_bos_up", "smc_internal_bos_down",
+        "smc_internal_choch_up", "smc_internal_choch_down",
+        "smc_internal_structure_direction", "smc_mss_up", "smc_mss_down",
+        "smc_protected_high_price", "smc_protected_low_price",
+        "smc_protected_high_active", "smc_protected_low_active",
+        "smc_protected_high_created", "smc_protected_low_created",
+        "smc_protected_high_broken", "smc_protected_low_broken",
+    ]:
+        assert column in result.columns
+
+    np.testing.assert_array_equal(result["smc_internal_hh"], structure["internal_hh"])
+    np.testing.assert_array_equal(result["smc_mss_up"], structure["mss_up"])
+    np.testing.assert_array_equal(result["smc_mss_down"], structure["mss_down"])
+    np.testing.assert_allclose(
+        result["smc_protected_high_price"],
+        structure["protected_high_price"],
+        equal_nan=True,
+    )
+
+
+def test_unified_smc_refined_structure_is_causal():
+    base = frame(120)
+    altered = base.copy()
+    altered.loc[85:, "high"] *= 1000
+    altered.loc[85:, "low"] *= 0.001
+    altered.loc[85:, "close"] *= 500
+    altered.loc[85:, "volume"] *= 100
+
+    a = build_unified_smc(base)
+    b = build_unified_smc(altered)
+    pd.testing.assert_frame_equal(a.iloc[:85], b.iloc[:85], check_dtype=False)
