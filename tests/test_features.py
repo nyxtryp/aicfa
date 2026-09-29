@@ -55,6 +55,13 @@ def test_feature_columns_and_shape():
         "pa_expansion",
         "pa_compression",
         "pa_consolidation",
+        "wyckoff_range_high",
+        "wyckoff_range_low",
+        "wyckoff_spring",
+        "wyckoff_upthrust",
+        "wyckoff_sign_of_strength",
+        "wyckoff_sign_of_weakness",
+        "wyckoff_state",
     ]:
         assert column in result.columns
 
