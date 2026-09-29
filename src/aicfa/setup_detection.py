@@ -172,7 +172,9 @@ def build_setup_candidates(df: pd.DataFrame) -> pd.DataFrame:
     family_count = family_matrix.sum(axis=1)
     labels = np.array([name for name, _ in family_definitions], dtype=object)
     out["setup_primary_family"] = np.where(
-        family_count == 1, labels[family_matrix.argmax(axis=1)], ""
+        (family_count == 1) & ~(any_up & any_down),
+        labels[family_matrix.argmax(axis=1)],
+        "",
     )
 
     direction = np.where(any_up & ~any_down, 1, np.where(any_down & ~any_up, -1, 0))
