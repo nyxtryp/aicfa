@@ -679,3 +679,41 @@ Important limitation: this is an absorption **candidate** based on synchronized
 market aggregates. A displayed level is not proof of execution. Future price
 movement remains a separate outcome/label and is never used by the live feature.
 
+
+
+## 2026-09-29 — CVD / Cumulative Taker Delta implementation started
+
+### `00aa4889f88289ac9b0838bf7f5dcff5a68b2f1d`
+**Add causal CVD feature layer**
+
+Added `src/aicfa/cvd.py` using completed taker-flow intervals. The feature provides cumulative taker delta, CVD delta, and change percentage, with optional explicit reset markers.
+
+Causality is enforced by availability timestamps and backward as-of alignment. Future observations cannot alter earlier CVD values.
+
+### `5a822dcfe5d5a0b6aeaae37fa244006246f40960`
+**Test causal CVD features**
+
+Added tests for completed-interval alignment, explicit resets, future-change invariance, derived fields, and invalid negative flow.
+
+### `ec91b5c7c938ad8c5fa40c6985da8c706d2465c2`
+**Document CVD source contract and causality**
+
+Added `docs/CVD.md` describing source scope, reset semantics, causal alignment, and the limitation that supplied CVD is not automatically an exchange-native lifetime/session series.
+
+### `c13edccf2eba1f2c370290286bd67419143ba106`
+**Document causal CVD contract**
+
+Updated `docs/AICFA_TZ.md` with the CVD source contract and strict availability-time semantics.
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step:
+1. deploy current commits to FrostDeploy;
+2. run the mandatory full pytest suite;
+3. fix any real failures;
+4. rerun until green;
+5. only then mark CVD accepted.
+
+Important limitation: CVD scope depends on the supplied source sequence and explicit reset/continuity semantics. It is not treated as a standalone signal.
