@@ -978,3 +978,30 @@ Implemented:
 Server verification: **pending**.
 
 **Next concrete task after green verification:** start Scenario Engine.
+
+---
+
+## 2026-09-29 — Multi-Timeframe feature integration verification
+
+Implementation commits:
+- `8c884b5c1ad914c5c8fd430229bfa7cf98108574` — Integrate causal MTF structure into feature engine.
+- `0536b03c4a1b93876fd49f32f988bde45a22333b` — Test MTF feature integration and causality.
+- `e537c095f056fa4b3c8b6a55b428f1a041fdf29e` — Record MTF integration step.
+
+FrostDeploy verification:
+- Release: `2026-09-29T05-45-44-e537c09`
+- Result: **PASS — 62 passed, 691 warnings in 12.36s**
+
+Verified:
+- optional MTF integration into `build_features()`;
+- required higher-timeframe namespaces: 5m, 15m, 1h, 4h, 1d, 1w;
+- 1m remains the canonical base timeframe;
+- no implicit resampling;
+- future higher-timeframe changes do not rewrite earlier base rows;
+- legacy `build_features(base)` behavior remains supported.
+
+Warnings remain non-blocking and are deferred to the dedicated cleanup/optimization pass. They include pandas/NumPy deprecations, DataFrame fragmentation warnings, a Premium/Discount fixture dtype warning, and the immutable-release pytest cache permission warning.
+
+**MTF integration is accepted.**
+
+**Next concrete task:** begin Scenario Engine.
