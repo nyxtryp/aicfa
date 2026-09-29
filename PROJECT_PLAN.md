@@ -1114,3 +1114,62 @@ Fix commit:
 - `70667b74a2746e960b23a1362d4a92331ef380ad` — `Fix duplicate OHLCV fixture bounds`; changed the test duplicate close to `100.75`, preserving the intended duplicate-replacement assertion while keeping the candle valid.
 
 Status remains **not green** until the next FrostDeploy full-suite run passes.
+
+## 2026-09-29 — Live Market Data / Scanner final verification
+
+### Final test-fixture fix
+
+- `70667b74a2746e960b23a1362d4a92331ef380ad` — `Fix duplicate OHLCV fixture bounds`
+  - changed the duplicate test candle close from `101.75` to `100.75` so it remains valid against `high=101.0`;
+  - production market-data validation and scanner logic were unchanged.
+- `b5a3bc400261a09948eaecad83034ef1846436a3` — `Record remaining live scanner test fixture fix`
+  - recorded this final fixture correction and the pending verification state in the project control log.
+
+### Final FrostDeploy verification — 2026-09-29
+
+Deployed release:
+`2026-09-29T11-56-14-b5a3bc4`
+
+Mandatory full suite:
+```
+174 passed, 4863 warnings in 42.23s
+```
+
+The provider-agnostic **Live Market Data / Scanner foundation is now accepted and green**.
+
+Verified coverage includes:
+- OHLCV validation and causal completed-candle handling;
+- deterministic deduplication and idempotent incremental merge;
+- incremental cursor calculation;
+- centralized one-pass-per-market-key scanning;
+- incremental second scans;
+- completed-candle-only Feature Engine input;
+- retained-history feature rebuild and current-state output;
+- duplicate-universe rejection.
+
+Known non-blocking warning:
+- pytest cache cannot be created inside immutable FrostDeploy release directories due to permissions.
+
+### Current limitations
+
+- no concrete exchange/provider adapter is locked;
+- no WebSocket transport;
+- no retry/backoff or rate-limit scheduler;
+- no persistent live raw-data store;
+- no Top-100 discovery;
+- no subscriptions/notifications;
+- derivatives/order-book live transport is not connected;
+- `1M` completion remains provider-specific.
+
+### Next task
+
+Verify current candidate market-data providers before implementation. Check actual:
+- REST/WebSocket availability;
+- rate limits and connection limits;
+- BTC/USDT historical access;
+- realtime latency and candle semantics;
+- reliability and reconnect behavior;
+- commercial/usage terms;
+- whether the provider can support the intended centralized 24/7 scanner.
+
+Only after that verification should the first concrete BTC/USDT provider adapter be implemented against the existing provider-agnostic contract.
