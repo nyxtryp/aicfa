@@ -717,106 +717,17 @@ With SMC, derivatives and the market-microstructure stack now substantially repr
 # 13. Current checkpoint
 
 Latest implementation:
-`97c16f66e5d436651fb803ecedbe72fee52c0103`
+`122c397e4d80b97e138a60695df00fed0e17a9df`
 
 Latest verified FrostDeploy release:
-`2026-09-29T08-13-25-97c16f6`
+`2026-09-29T08-53-55-8153eb4`
 
 Latest full-suite result:
-`123 passed, 2843 warnings in 31.56s`
+`133 passed, 2847 warnings in 34.70s`
 
-**Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, spot/futures relationship, Taker Flow / Order Flow, Order Book / Market Depth, and level-by-level Order Book / Liquidity Walls are implemented, deployed and verified green.
+**Current status:** Market Structure, Liquidity, Displacement, FVG, Order Blocks, Premium/Discount, Unified SMC, Multi-Timeframe, Volume/Volatility, Scenario Engine, Derivatives, Taker Flow / Order Flow, Order Book / Market Depth, level-by-level Order Book / Liquidity Walls, Absorption, and CVD are implemented and verified green.
 
-**Next task:** define and implement causal Absorption using synchronized Taker Flow, level-by-level book changes and price response. Preserve strict causality and the pre-ML development boundary.
+**Current unverified stage:** Price Action.
 
+**Next task:** deploy and verify Price Action. After Price Action is green, continue with the causal Wyckoff representation before moving toward historical statistical evaluation and the pre-ML dataset/model boundary.
 
-## 2026-09-29 — Causal Absorption implementation started
-
-### `e88a8e0a8c6f881208a9fe92777c73de23c9e7e1`
-**Add causal absorption feature layer**
-
-Added `src/aicfa/absorption.py`.
-
-The layer combines, over an explicit backward window:
-- taker buy/sell flow;
-- opposing-side level-by-level displayed liquidity;
-- level persistence;
-- displayed replenishment/cancellation;
-- contemporaneous price response.
-
-The implementation never reads observations after event time T.
-
-### `8286f9cd6e548c85b2fde220bc73d080944882cd`
-**Test causal absorption features**
-
-Added tests covering:
-- synchronized aggressive flow + liquidity + replenishment;
-- rejection of wall-only absorption without replenishment;
-- future-change invariance;
-- parameter validation.
-
-### `efe3789f54606ffb145700dd679f40819ac9698e`
-**Document absorption source contract and causality**
-
-Added `docs/ABSORPTION.md` with the source contract, causal window,
-conditions and limitations.
-
-### `fc6723565727b59eadba3b6ccca732a030d44599`
-**Fix absorption replenishment fixture**
-
-Adjusted only the test fixture so the positive case contains displayed
-replenishment across snapshots.
-
-### Verification status
-
-**Not yet server-verified.**
-
-Required next step:
-1. deploy current commits to FrostDeploy;
-2. run the mandatory full pytest suite;
-3. fix any real failures;
-4. rerun until green;
-5. only then mark Absorption accepted.
-
-Important limitation: this is an absorption **candidate** based on synchronized
-market aggregates. A displayed level is not proof of execution. Future price
-movement remains a separate outcome/label and is never used by the live feature.
-
-
-
-## 2026-09-29 — CVD / Cumulative Taker Delta implementation started
-
-### `00aa4889f88289ac9b0838bf7f5dcff5a68b2f1d`
-**Add causal CVD feature layer**
-
-Added `src/aicfa/cvd.py` using completed taker-flow intervals. The feature provides cumulative taker delta, CVD delta, and change percentage, with optional explicit reset markers.
-
-Causality is enforced by availability timestamps and backward as-of alignment. Future observations cannot alter earlier CVD values.
-
-### `5a822dcfe5d5a0b6aeaae37fa244006246f40960`
-**Test causal CVD features**
-
-Added tests for completed-interval alignment, explicit resets, future-change invariance, derived fields, and invalid negative flow.
-
-### `ec91b5c7c938ad8c5fa40c6985da8c706d2465c2`
-**Document CVD source contract and causality**
-
-Added `docs/CVD.md` describing source scope, reset semantics, causal alignment, and the limitation that supplied CVD is not automatically an exchange-native lifetime/session series.
-
-### `c13edccf2eba1f2c370290286bd67419143ba106`
-**Document causal CVD contract**
-
-Updated `docs/AICFA_TZ.md` with the CVD source contract and strict availability-time semantics.
-
-### Verification status
-
-**Not yet server-verified.**
-
-Required next step:
-1. deploy current commits to FrostDeploy;
-2. run the mandatory full pytest suite;
-3. fix any real failures;
-4. rerun until green;
-5. only then mark CVD accepted.
-
-Important limitation: CVD scope depends on the supplied source sequence and explicit reset/continuity semantics. It is not treated as a standalone signal.
