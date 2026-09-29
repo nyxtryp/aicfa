@@ -130,9 +130,9 @@ def test_derivatives_spot_futures_relationship_is_causal():
 
     assert out.loc[0, "spot_price"] == 100.0
     assert np.isclose(out.loc[1, "futures_spot_spread"], 0.2)
-    assert np.isclose(out.loc[2, "futures_spot_spread"], 0.4)
+    assert np.isclose(out.loc[2, "futures_spot_spread"], -0.3)
     assert np.isclose(out.loc[2, "futures_spot_spread_pct"], 101.7 / 102.0 - 1.0)
-    assert np.isclose(out.loc[3, "futures_spot_spread"], 0.7)
+    assert np.isclose(out.loc[3, "futures_spot_spread"], 0.5)
     assert "futures_spot_spread_delta" in out
     assert "futures_spot_spread_zscore" in out
 
