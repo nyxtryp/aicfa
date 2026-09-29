@@ -1899,3 +1899,38 @@ If historical context is needed for a specific analysis, AICFA should prefer ask
 
 Existing market-data code may remain available as optional infrastructure for on-demand current evidence and future explicitly requested uses. It must not drive the roadmap or justify autonomous scanning.
 
+
+
+## 2026-09-29 — Knowledge Base v1 implementation
+
+The knowledge-first stage has now started in code.
+
+### Commits
+- 76cc1d2ac95483beb933e9af1ba7a4d797709d97 — add structured AICFA Knowledge Base v1 module;
+- 1f2c6f48d0a5517780a92e90ea2799a833826296 — add Knowledge Base contract tests;
+- 7f9b7ac7a2bda9f2f75d6407c3f809d09bdaa683 — document Knowledge Base v1 and its runtime/history boundaries.
+
+### Implemented
+
+src/aicfa/knowledge_base.py introduces an immutable KnowledgeEntry contract with:
+- stable identifier;
+- domain;
+- definition;
+- observable chart evidence;
+- relationships to other concepts;
+- confirmations;
+- invalidations;
+- counterexamples;
+- setup relevance.
+
+The initial registry covers Market Structure, Liquidity, FVG/Imbalance, Order Blocks, Premium/Discount, Price Action, Wyckoff, Derivatives and Risk/Invalidation.
+
+The registry is deliberately descriptive. It does not emit LONG/SHORT signals and has no dependency on OHLCV history, screenshots as training data, live providers or historical outcomes.
+
+### Verification boundary
+
+The implementation and tests are committed to main. FrostDeploy full-suite verification is required before this stage can be marked GREEN.
+
+### Next implementation step
+
+Expand the Knowledge Base to the full project specification, including the remaining SMC concepts, structure states, liquidity variants, FVG/IFVG, order-block lifecycle, volume/volatility, derivatives/microstructure semantics, Wyckoff/Price Action relationships, scenario/risk semantics and contradictory-evidence handling. Then build the visual-evidence contract that will map user screenshots into this knowledge layer.
