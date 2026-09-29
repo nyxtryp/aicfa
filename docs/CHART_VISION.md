@@ -95,3 +95,26 @@ There is no fixed four-timeframe requirement. AICFA requests the timeframes need
 This stage defines and validates the interface. It intentionally does not hard-code a particular external vision provider or pretend that image recognition has already been implemented.
 
 The next stage can attach an actual vision implementation to `ChartVisionAnalyzer` without changing the downstream analytical contracts.
+
+## Self-hosted provider adapter
+
+`OllamaChartVisionAnalyzer` is an optional adapter for a self-hosted Ollama multimodal model.
+
+It:
+- sends the screenshot as base64 image input;
+- supplies the asset/timeframe context and strict evidence-only instructions;
+- requests JSON output;
+- converts the response into `VisualObservation` records;
+- validates every concept against the canonical Knowledge Base before returning it.
+
+The adapter is opt-in and does not require the Ollama Python package or a paid external API. A multimodal vision model must already be installed and served by Ollama.
+
+Example:
+
+    from aicfa.chart_vision import ChartVisionRequest, OllamaChartVisionAnalyzer
+    analyzer = OllamaChartVisionAnalyzer("YOUR_VISION_MODEL")
+    output = analyzer.analyze(
+        ChartVisionRequest(image=chart_bytes, asset="BTC/USDT", timeframe="1h")
+    )
+
+The repository does not automatically install, download, or select a vision model. This keeps the production analytical core independent from a specific provider and prevents accidental paid API usage.
