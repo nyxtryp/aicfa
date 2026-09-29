@@ -210,6 +210,12 @@ def build_features(
         if column.startswith("market_state_"):
             out[column] = market_state[column].to_numpy()
 
+    from .setup_events import build_setup_events
+    setup_events = build_setup_events(out)
+    for column in setup_events.columns:
+        if column.startswith("setup_event_"):
+            out[column] = setup_events[column].to_numpy()
+
     for n in (15,60):
         out[f"return_{n}"]=c.pct_change(n)
         mean_n=c.rolling(n,min_periods=n).mean()
