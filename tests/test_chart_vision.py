@@ -105,3 +105,73 @@ def test_missing_context_and_conflicts_are_preserved():
     assert evidence.missing_context == ("higher timeframe",)
     assert evidence.conflicts == ("visible rejection conflicts with continuation",)
     assert evidence.observations[0].state == "possible"
+
+
+def test_ollama_chart_vision_analyzer_parses_structured_provider_output(monkeypatch):
+    import json
+
+    from aicfa.chart_vision import OllamaChartVisionAnalyzer
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return json.dumps({
+                "message": {
+                    "content": json.dumps({
+                        "observations": [{
+                            "concept_id": "market_structure.bos",
+                            "state": "observed",
+                            "confidence": 0.9,
+                            "evidence": ["visible break above swing"],
+                            "direction": "long",
+                        }],
+                        "visible_context": ["BTC/USDT", "1h"],
+                        "missing_context": ["higher timeframe"],
+                        "conflicts": [],
+                    })
+                }
+            }).encode()
+
+    def fake_urlopen(request, timeout):
+        assert request.full_url.endswith("/api/chat")
+        payload = json.loads(request.data.decode())
+        assert payload["model"] == "test-vision"
+        assert payload["stream"] is False
+        assert payload["messages"][0]["images"]
+        assert "ONLY what is visibly supported" in payload["messages"][0]["content"]
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        fake_urlopen,
+    )
+    analyzer = OllamaChartVisionAnalyzer(
+        "test-vision",
+        endpoint="http://vision.test/api/chat",
+    )
+    output = analyzer.analyze(_request("1h"))
+    assert output.observations[0].concept_id == "market_structure.bos"
+    assert output.observations[0].direction == "long"
+    assert output.missing_context == ("higher timeframe",)
+
+
+def test_ollama_chart_vision_rejects_unknown_concept_from_provider():
+    import pytest
+
+    from aicfa.chart_vision import _parse_vision_output, validate_vision_output
+
+    output = _parse_vision_output({
+        "observations": [{
+            "concept_id": "unknown.concept",
+            "state": "observed",
+            "confidence": 0.9,
+            "evidence": ["visible"],
+        }]
+    })
+    with pytest.raises(ValueError, match="unknown Knowledge Base concept"):
+        validate_vision_output(output)
