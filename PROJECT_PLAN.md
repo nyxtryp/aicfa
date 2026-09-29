@@ -2078,3 +2078,22 @@ PYTHONPATH=src .venv/bin/python -m pytest -q
 ```
 
 After the deployed suite is green, the next implementation stage is the **AICFA evidence/reasoning layer**: map visual/live observations to Knowledge Base relationships, preserve contradictions and determine when more evidence is required before producing setup analysis or WAIT.
+
+## 2026-09-29 — Scenario Reasoning implementation
+
+Commits:
+- `a2e6ab0356c0bb088cd9ba42d044bdd370b051b7` — add Scenario Reasoning layer;
+- `8af787ca2faa5959b729397c9f7e9a2d5e018040` — test Scenario Reasoning;
+- `b151633a045a0d5de4592c882d79dc5535be28c2` — document Scenario Reasoning.
+
+Implemented:
+- continuation, reversal, range and breakout-failure hypothesis families;
+- preservation of multiple plausible scenarios;
+- confirmation and invalidation requirements per hypothesis;
+- propagation of evidence insufficiency and contradictions;
+- no automatic direction, entry, stop or execution fields;
+- dynamic multi-timeframe input without a fixed four-timeframe chain.
+
+Verification status: **PENDING FrostDeploy/server verification.**
+
+Next after green: combine scenario hypotheses with richer Knowledge Base confirmation/invalidation semantics and evidence quality into structured setup analysis.
