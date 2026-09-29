@@ -1798,3 +1798,40 @@ Causality:
 Scope limitation: this does not claim to reconstruct an exchange-native lifetime/session
 CVD unless the source explicitly defines that scope. Chunked historical data requires an
 explicit continuity contract. CVD remains descriptive and is not a standalone trade signal.
+
+
+## 10.1 Causal Wyckoff Representation
+
+AICFA includes a deterministic Wyckoff-inspired representation layer.
+
+Source contract:
+- required: `timestamp`, `open`, `high`, `low`, `close`;
+- optional: `volume`;
+- `timestamp` is the availability time of the completed candle;
+- trading-range boundaries use only strictly prior candles.
+
+The layer provides descriptive features/events for:
+- trading-range boundaries and range position;
+- breakout and failed breakout;
+- Spring candidate;
+- Upthrust candidate;
+- Sign of Strength;
+- Sign of Weakness;
+- range expansion/compression;
+- optional relative volume and volume expansion;
+- deterministic Wyckoff state context;
+- explicit Accumulation/Distribution proxy fields.
+
+The Accumulation/Distribution fields are proxies, not claims about hidden
+participant intent and not ground-truth labels. AICFA must statistically
+evaluate these concepts historically before predictive use.
+
+Wyckoff is asset-agnostic and timeframe-agnostic. The same definitions can be
+applied across supported symbols and timeframes. If optional volume is
+unavailable, volume-derived fields are omitted rather than fabricated.
+
+Order Book / Market Depth is not a prerequisite for Wyckoff and is not a
+prerequisite for the core AICFA market representation. If microstructure data
+is unavailable, the remaining causal layers continue to operate.
+
+No Wyckoff feature is a standalone LONG/SHORT decision or trade signal.
