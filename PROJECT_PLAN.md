@@ -957,3 +957,24 @@ Warnings are non-blocking:
 The MTF layer is accepted. The warnings are deferred to a dedicated cleanup/optimization pass and do not block the next analytical layer.
 
 **Next concrete task:** integrate the verified MTF representation into `build_features()`, with dedicated feature-integration tests and causal/future-change coverage, before starting Scenario Engine.
+
+
+---
+
+## 2026-09-29 — Multi-Timeframe integration into feature engine
+
+Implementation commits:
+- **pending** — integrate the verified MTF engine into `build_features()`.
+
+Implemented:
+- optional `multi_timeframe_frames` input to `build_features()`;
+- no implicit resampling;
+- 1m remains the canonical base timeframe;
+- higher-timeframe structure is exposed through `mtf_<timeframe>_*` columns only after source-candle close;
+- dedicated integration coverage for `5m`, `15m`, `1h`, `4h`, `1d`, `1w`;
+- future-change test proving that later higher-timeframe mutations do not rewrite earlier base rows;
+- backward compatibility test for `build_features()` without MTF frames.
+
+Server verification: **pending**.
+
+**Next concrete task after green verification:** start Scenario Engine.
