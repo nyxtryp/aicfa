@@ -2034,3 +2034,24 @@ Next: add contract tests, document the screenshot evidence path, then deploy and
 Added contract tests for immutable observations, confidence/evidence validation, screenshot provenance, duplicate protection, multi-timeframe bundles, and separation from live-provider state.
 
 Verification remains pending on the deployed FrostDeploy release.
+
+
+### `356d465c66b1907c0dd72b44fb2d7e8a53fc50fe`
+**Document screenshot visual evidence contract**
+
+Added `docs/VISUAL_EVIDENCE.md` describing the runtime path from user screenshots through vision into the Knowledge Base, including no-manual-labeling, no-fabricated-history, screenshot/live separation, multi-timeframe evidence and no-signal-generation boundaries.
+
+### Verification status
+
+**PENDING FrostDeploy/server verification.**
+
+The Visual Evidence contract implementation is complete for this stage. Required next verification:
+
+```bash
+sudo -u fd-aicfa bash -lc '
+cd "$(readlink -f /srv/frostdeploy/aicfa/current)"
+PYTHONPATH=src .venv/bin/python -m pytest -q
+'
+```
+
+After the deployed suite is green, the next implementation stage is the **AICFA evidence/reasoning layer**: map visual/live observations to Knowledge Base relationships, preserve contradictions and determine when more evidence is required before producing setup analysis or WAIT.
