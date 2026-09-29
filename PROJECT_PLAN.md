@@ -485,3 +485,24 @@ Wait for the current Granite request to finish and record:
 5. final peak RAM/swap observation if available.
 
 Then decide whether Granite is rejected or retained for a deeper AICFA validation test.
+
+
+## 2026-09-29 — Granite 3.2 Vision 2B benchmark: inference timeout
+
+### Operator result
+- User ran the Granite benchmark against the same historical `/tmp/btc.png` chart.
+- The Ollama HTTP request did not complete within the configured **600 second timeout** and ended with Python `TimeoutError: timed out`.
+- No usable Granite model response was produced, so chart-recognition quality and structured-output validation could not be evaluated.
+- The earlier live resource observation remains relevant: approximately 2.4 GiB RSS for `llama-server`, only ~136 MiB free RAM, ~1.06 GiB swap used, and ~80% iowait.
+- This is a failed benchmark on the current hardware, not evidence that Granite's visual quality is poor in general. The practical issue demonstrated here is that the current 1 vCPU / 3 GB RAM environment cannot complete this test within 10 minutes.
+- Do not leave the model process consuming the server indefinitely after the timeout; first confirm that no active `llama-server` remains, then reclaim resources.
+
+### Decision status
+**Granite 3.2 Vision 2B is not suitable for continued testing on the current server configuration unless resources are increased.** It is not production-active.
+
+### Next exact step
+1. Check `ollama ps` and `pgrep -af llama-server` to confirm whether inference has stopped.
+2. If the model process is still running, stop only the stuck inference process.
+3. Record the final resource state.
+4. Remove `granite3.2-vision` if the user wants to keep the current low-resource server configuration.
+5. Before trying another model, decide whether to test a smaller candidate or increase RAM/vCPU based on these measured constraints.
