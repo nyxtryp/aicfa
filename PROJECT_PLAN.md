@@ -1972,6 +1972,27 @@ The implementation is on GitHub main. The stage is not GREEN until the current F
 3. Rerun until green.
 4. Then build the Visual Evidence contract so user screenshots are mapped into structured evidence consumed by this Knowledge Base.
 
+### Evidence reasoning implementation
+
+Commits:
+- `ad1f37c6a21d470c3b5a1d98367b9cb22dcd9726` — add evidence reasoning layer;
+- `8ff426d47fe1aa023bc6f02b3dddad97cdad740f` — test evidence reasoning;
+- `a4d43b1313176fb3d05d9d3e801fadfea879c6b3` — document evidence reasoning.
+
+Implemented:
+- evidence sufficiency assessment before scenario/setup reasoning;
+- PROCEED / NEED_MORE_EVIDENCE / WAIT states;
+- required concept/timeframe checks;
+- uncertainty preservation;
+- contradiction preservation;
+- Knowledge Base relationship lookup;
+- explicit separation from directional trade signals;
+- dynamic multi-timeframe support without a four-timeframe limit.
+
+Verification status: **PENDING FrostDeploy/server verification.**
+
+Next step after green verification: build the scenario reasoning layer that combines supported Knowledge Base concepts and their relationships into continuation/reversal/range/breakout-failure hypotheses while preserving evidence quality, invalidation and WAIT semantics.
+
 ## 2026-09-29 — Knowledge Base full-spec server verification
 
 FrostDeploy release: `2026-09-29T15-42-00-c01cbbf`
