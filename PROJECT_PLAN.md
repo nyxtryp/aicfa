@@ -1991,6 +1991,8 @@ Implemented:
 
 Verification status: **PENDING FrostDeploy/server verification.**
 
+Post-deploy test correction: `8ff426d` asserted a relationship that was not present in the canonical Knowledge Base (`liquidity.sweep` relates to `market_structure.choch`). Corrected by `0d3447c2e01e5c08ebbebeebac39daae9fb31bcb`; no analytical behavior was changed.
+
 Next step after green verification: build the scenario reasoning layer that combines supported Knowledge Base concepts and their relationships into continuation/reversal/range/breakout-failure hypotheses while preserving evidence quality, invalidation and WAIT semantics.
 
 ## 2026-09-29 — Knowledge Base full-spec server verification
