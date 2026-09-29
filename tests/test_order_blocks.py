@@ -37,7 +37,7 @@ def test_bearish_order_block_is_recognized_on_displacement_candle():
     df = frame(
         [100, 98, 101, 100],
         [102, 100, 104, 101],
-        [99, 97, 100, 95],
+        [99, 97, 96, 95],
         [98, 99, 97, 96],
     )
     r = build_order_blocks(df, require_displacement=False)
@@ -56,15 +56,10 @@ def test_order_block_lifecycle_mitigation_invalidation_and_later_breaker():
     )
     r = build_order_blocks(df, require_displacement=False)
 
-    # Candle 2 creates bullish OB from candle 1.
     assert r.loc[2, "order_block_bullish"] == 1
     assert r.loc[2, "order_block_active"] == 1
-
-    # Candle 3 closes below the OB low -> invalidation.
     assert r.loc[3, "order_block_invalidated"] == 1
     assert r.loc[3, "breaker"] == 0
-
-    # Candle 4 is a later retest from below and rejects -> bearish breaker.
     assert r.loc[4, "breaker_bearish"] == 1
     assert r.loc[4, "breaker"] == 1
 
