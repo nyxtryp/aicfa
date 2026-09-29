@@ -608,7 +608,7 @@ This file is the persistent handoff/memory for future chats.
 
 **Latest implementation commits:** `7b14e092c5897c53f5268bdd4088830c72e39bbd`, `3cbff2f68ac9cb5f27561438985947fcbc501b93`, `4f35f0427d9ad71c2f4577b961c13e6df12af6e4`, `16dcab97627b5739a6ec89cb033d157b9dc9bd16`, and `d4e82cb4b55802dd10c2419208c348ec48de74c1`
 
-**Current layer:** Order Blocks — implementation complete, server verification complete
+**Current layer:** Premium / Discount — implementation complete, server verification pending
 
 **Current state:**
 - Market Structure: first causal implementation complete, refinement pending.
@@ -616,6 +616,7 @@ This file is the persistent handoff/memory for future chats.
 - Displacement: first causal implementation complete, server verification complete.
 - FVG: implemented and verified green on FrostDeploy.
 - Order Blocks: implemented, integrated into the feature engine, and verified green on FrostDeploy.
+- Premium / Discount: structural dealing-range implementation added and integrated; server verification pending.
 - Unified SMC: not started.
 - Multi-timeframe: not started.
 - Scenario Engine: not started.
@@ -625,7 +626,7 @@ This file is the persistent handoff/memory for future chats.
 - Paper Trading: not started.
 - Top-100 assets: explicitly postponed.
 
-**Immediate action:** accept the verified Order Block layer and proceed to Premium / Discount refinement. Before implementation, re-read this document and preserve the causal/no-lookahead design rules.
+**Immediate action:** run the complete FrostDeploy pytest suite against the Premium / Discount implementation. If green, accept the layer and proceed to Unified SMC state. If failures occur, fix only the actual failures and re-verify.
 
 # 13. Rule for this document
 
@@ -791,3 +792,32 @@ Known limitation remains:
 The current Order Block engine tracks one latest active bullish and one latest active bearish lifecycle. Multiple simultaneous historical OB pools are deferred to a later refinement.
 
 **Next concrete task:** Premium / Discount refinement using structural/dealing ranges rather than only generic rolling ranges.
+
+
+## 2026-09-29 — Structural Premium / Discount implementation
+
+Implementation commits:
+- `89fcdb22ae10728fe451494354026aeee7227ee8` — Add causal structural Premium Discount engine.
+- `37bcfd181eb34e87bd50f85002a9e58ccf592d4a` — Add Premium Discount engine tests.
+- `8c35677b16ec59eab652b7000b2d3973bac3d93e` — Integrate structural Premium Discount features.
+
+Implemented:
+- active dealing range from the latest confirmed swing high and swing low;
+- structural equilibrium;
+- normalized dealing-range position;
+- continuous Premium/Discount score;
+- discrete premium, discount, and equilibrium states;
+- causal future-change test;
+- validation and parameter tests;
+- retention of the generic rolling range as separate context features;
+- structural range exposed as the primary `dealing_range_*` / `premium_discount` fields.
+
+Design rule:
+The structural range uses only swing information emitted by the causal Market Structure engine at confirmation time. It does not backdate a newly confirmed swing into earlier candles.
+
+Server verification: **pending**.
+
+Known limitation:
+The current range is the latest confirmed swing-high/swing-low pair. More advanced dealing-range selection/protected-range semantics will be refined later alongside Market Structure and Unified SMC.
+
+**Next concrete action:** run the complete FrostDeploy pytest suite against the Premium / Discount implementation. If green, accept the layer and proceed to Unified SMC state.
