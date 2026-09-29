@@ -1326,3 +1326,49 @@ Current state at this checkpoint:
 - Data Reliability / Freshness layer: **architecture fixed, implementation pending**;
 - Knowledge Base: **planned, intentionally separate from live market history/experience**.
 
+## 2026-09-29 — Data Reliability / Freshness layer implementation
+
+### Commits
+- `656ddb081f86c3d320caf3b0ad09e4442901f1d6` — Add data reliability and freshness layer
+- `974cbf29f3a1ff15d79e2d55306ebeafcc6df360` — Add data reliability tests
+- `277bc0a77943b556ad4e7b796537c5601452d76a` — Document data reliability and freshness
+
+### Implemented
+Added `src/aicfa/data_reliability.py` with:
+- `DataFreshness.FRESH / STALE / UNAVAILABLE`;
+- `ConfirmedMarketState` for the latest locally confirmed observation;
+- `FreshnessSnapshot` with `last_update_ms`, `data_age_ms` and configured freshness window;
+- `LocalMarketStateStore` that retains confirmed state independently of provider health;
+- explicit non-fabrication semantics.
+
+A provider outage therefore does not erase the last confirmed market state. Time passing changes freshness metadata only; it does not create new market observations.
+
+### Tests
+Added coverage for:
+- retaining last confirmed state;
+- stale transition without fabricated data;
+- unavailable state;
+- invalid configuration/time rejection.
+
+### Verification status
+**Implementation deployed to FrostDeploy but not yet server-verified.**
+
+Mandatory next step:
+```
+sudo -u fd-aicfa bash -lc '
+cd "$(readlink -f /srv/frostdeploy/aicfa/current)"
+PYTHONPATH=src .venv/bin/python -m pytest -q
+'
+```
+
+Do not mark this layer green until current deployed server output passes.
+
+### Current architectural boundary
+This layer is intentionally separate from provider transport. Binance REST, future WebSocket, recovery REST calls and future provider failover can all feed the same local confirmed-state boundary without changing the analytical core.
+
+### Next task
+1. Server-verify the Binance/reliability changes.
+2. Perform real BTC/USDT REST smoke test.
+3. Extend provider transport with retry/reconnect semantics and WebSocket behind the existing provider-agnostic contract.
+4. Connect fresh/stale status to centralized scanner and Setup Event lifecycle.
+
