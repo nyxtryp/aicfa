@@ -203,7 +203,8 @@ The current control point is the **GREEN Decision Layer verification above**.
 ### Commits
 - `5dd7ca8d3fa05d371b3ccc911893d39b55638a12` — add chart vision inference boundary;
 - `6fa38127fe769534acb05f71a51b6af9f419fc16` — test chart vision inference boundary;
-- `1aa5699c0154024507fc9534fe5e0a8b36f94746` — document chart vision inference boundary.
+- `1aa5699c0154024507fc9534fe5e0a8b36f94746` — document chart vision inference boundary;
+- `672a0d7c16f7867e067058bf5028383e1dff480b` — fix test fixture to use a canonical Knowledge Base concept.
 
 ### Implemented
 
@@ -213,6 +214,13 @@ Added `src/aicfa/chart_vision.py` with:
 - `ChartVisionAnalyzer` protocol as the adapter boundary for the future actual vision implementation;
 - Knowledge Base validation for every emitted concept;
 - conversion into the canonical `VisualEvidence` / `VisualEvidenceSet` contracts.
+
+The first deployed verification exposed one test-fixture error:
+```
+FAILED tests/test_chart_vision.py::test_build_evidence_set_preserves_multi_timeframe_inputs
+ValueError: vision output references unknown Knowledge Base concept: market_structure.range
+```
+The canonical Knowledge Base currently contains `premium_discount.dealing_range` but not `market_structure.range`, so the fixture was corrected to use the existing canonical concept. The validator itself was not weakened.
 
 Important boundaries:
 - no manual user labeling;
@@ -227,12 +235,16 @@ The actual image-recognition model/provider is intentionally **not** faked or ha
 
 ### Verification status
 
-**PENDING FrostDeploy/server verification.**
+**PENDING FrostDeploy/server verification after fixture correction.**
+
+The attempted verification on the deployed correction reported:
+```
+1 failed, 242 passed, 4864 warnings in 40.66s
+```
+The failure was isolated to the stale test fixture above.
 
 Required next step:
-1. wait for FrostDeploy deployment of the current main branch;
-2. run the mandatory full pytest suite;
-3. fix only actual failures;
-4. rerun until green;
-5. only then accept the Chart Vision inference boundary.
-
+1. wait for FrostDeploy deployment of commit `672a0d7c16f7867e067058bf5028383e1dff480b`;
+2. run the mandatory full pytest suite again;
+3. if green, accept the Chart Vision inference boundary;
+4. only then proceed to attaching a real vision implementation.
