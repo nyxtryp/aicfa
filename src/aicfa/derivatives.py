@@ -14,6 +14,7 @@ import pandas as pd
 _REQUIRED = {"timestamp", "funding_rate", "open_interest"}
 _OPTIONAL_NONNEGATIVE = {
     "liquidation_volume",
+    "futures_volume",
     "long_liquidation_volume",
     "short_liquidation_volume",
 }
@@ -100,6 +101,11 @@ def build_derivatives(
         _add_observation_features(d, col, baseline_window)
     for col in sorted(_OPTIONAL_NONNEGATIVE & set(d.columns)):
         d[f"{col}_delta"] = d[col].diff()
+        if col == "futures_volume":
+            d[f"{col}_change_pct"] = (
+                d[f"{col}_delta"] / d[col].shift(1).abs().replace(0, np.nan)
+            ).replace([np.inf, -np.inf], np.nan)
+            d[f"{col}_zscore"] = _zscore_against_past(d[col], baseline_window)
 
     # Funding is point-in-time; state/positioning fields carry forward only
     # from observations at or before the base timestamp.
@@ -129,7 +135,7 @@ def build_derivatives(
         allow_exact_matches=True,
     )
 
-    # Liquidations are event observations: only the event at its own timestamp
+    # Futures volume and liquidations are event observations: only the event at its own timestamp
     # is retained, rather than inventing repeated liquidation volume.
     for col in sorted(_OPTIONAL_NONNEGATIVE & set(d.columns)):
         liq = d[["timestamp", col]].copy()
@@ -166,7 +172,10 @@ def build_derivatives(
     ]
     for col in sorted((_OPTIONAL_RATIO | _OPTIONAL_SIGNED) & set(d.columns)):
         out_cols += [col, f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
-    out_cols += sorted(_OPTIONAL_NONNEGATIVE & set(d.columns))
+    for col in sorted(_OPTIONAL_NONNEGATIVE & set(d.columns)):
+        out_cols.append(col)
+        if col == "futures_volume":
+            out_cols += [f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
     if "liquidation_imbalance" in aligned:
         out_cols.append("liquidation_imbalance")
 
