@@ -342,7 +342,6 @@ Adjusted test so it works both in a normal repository checkout and FrostDeploy i
 Adjusted the test fixture/anchor only. Production label logic was not changed.
 
 ### Server verification
-
 17 tests passed:
 ```
 17 passed, 12 warnings
@@ -387,7 +386,6 @@ Added tests for:
 Connected liquidity output to `src/aicfa/features.py`.
 
 ### Server verification after initial Liquidity integration
-
 The FrostDeploy suite was run against the current release and found two failures:
 - `tests/test_liquidity.py::test_low_sweep_and_reclaim_is_causal` — the fixture closes exactly at the sell-side liquidity level on reclaim; production logic used a strict `>` boundary.
 - `tests/test_structure.py::test_hh_hl_lh_ll` — the fixture did not actually contain a confirmed HL/LL sequence under the configured one-candle swing rule.
