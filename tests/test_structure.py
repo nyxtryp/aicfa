@@ -12,8 +12,8 @@ def test_swing_confirmation_delay():
     r=build_structure(df,left=2,right=2); assert r.loc[2,"swing_high"]==0; assert r.loc[4,"swing_high"]==1; assert r.loc[4,"swing_high_price"]==106
 
 def test_hh_hl_lh_ll():
-    close=[100,102,105,102,101,103,108,104,102,99,101,98,96]; highs=[c+.4 for c in close]; lows=[c-.4 for c in close]
-    highs[2],lows[2]=106,104; highs[4],lows[4]=101.5,100; highs[6],lows[6]=109,107; highs[8],lows[8]=102.5,101; highs[10],lows[10]=102,100; highs[12],lows[12]=96.5,95
+    close=[100,102,105,102,101,103,108,104,102,104,101,102,96]; highs=[c+.4 for c in close]; lows=[c-.4 for c in close]
+    highs[2],lows[2]=106,104; highs[4],lows[4]=101.5,100; highs[6],lows[6]=109,107; highs[8],lows[8]=102.5,101; highs[9],lows[9]=104.4,103; highs[10],lows[10]=102,99; highs[11],lows[11]=102.4,100; highs[12],lows[12]=96.5,95
     r=build_structure(frame(close,highs,lows),left=1,right=1)
     assert r["hh"].sum()>=1 and r["hl"].sum()>=1 and r["lh"].sum()>=1 and r["ll"].sum()>=1
 
