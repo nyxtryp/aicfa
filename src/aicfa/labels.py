@@ -122,6 +122,7 @@ def _path_metrics(
 
     out[f"time_to_mfe_long_{horizon}"] = time_to_mfe_long
     out[f"time_to_mfe_short_{horizon}"] = time_to_mfe_short
+    out[f"label_end_timestamp_{horizon}"] = x_timestamp.shift(-horizon)
 
 
 def _triple_barrier(
