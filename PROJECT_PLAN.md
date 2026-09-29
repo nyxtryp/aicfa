@@ -2138,3 +2138,32 @@ Added `tests/test_setup_analysis.py` covering:
 - absence of execution/order fields.
 
 Verification remains **PENDING FrostDeploy/server verification**.
+
+
+### `99c9ae859ff17d6f70dd228e29a18491811c952e`
+**Document setup analysis layer**
+
+Added `docs/SETUP_ANALYSIS.md` covering:
+- READY / NEED_MORE_EVIDENCE / WAIT semantics;
+- setup candidate contents;
+- formation requirements;
+- Knowledge Base confirmation/invalidation integration;
+- preservation of multiple scenarios;
+- no fabricated numeric levels;
+- no execution/order placement;
+- screenshot/live evidence flow.
+
+Verification remains **PENDING FrostDeploy/server verification**.
+
+### Next verification
+
+Deploy the current main branch through FrostDeploy and run:
+
+```bash
+sudo -u fd-aicfa bash -lc '
+cd "$(readlink -f /srv/frostdeploy/aicfa/current)"
+PYTHONPATH=src .venv/bin/python -m pytest -q
+'
+```
+
+Do not mark Setup Analysis GREEN until the current deployed release passes the full suite.
