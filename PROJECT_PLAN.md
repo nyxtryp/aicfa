@@ -1338,3 +1338,33 @@ Warnings are non-blocking and remain deferred to the dedicated cleanup/optimizat
 The Volume / Volatility layer is **accepted**.
 
 **Next concrete task:** implement the first causal Derivatives layer. Start with funding-rate and open-interest representations, plus liquidation data when the historical source schema supports it. Keep derivatives as descriptive/causal market-state observations; do not turn them into a score or trading signal.
+
+## 2026-09-29 — Derivatives causal layer implementation
+
+Implementation commits:
+- `a82d51aa1dd0689e8d04bd3e8335c252806a5944` — Add causal derivatives engine.
+- `092113d0b91d67defd19d9b4dd042b6bb9e99b19` — Integrate causal derivatives features.
+- `389b26c127c3df7d76dd10a08b2d9b99e0e47d37` — Test causal derivatives engine.
+- `f10aa5b06d0a48963ac7feb60bffc1e61ae23448` — Test derivatives feature integration.
+
+Implemented:
+- causal funding-rate observations;
+- causal open-interest observations;
+- funding-rate delta, change percentage and prior-baseline z-score;
+- open-interest delta, percentage change and prior-baseline z-score;
+- descriptive price/OI relationship states;
+- optional liquidation-volume, long-liquidation and short-liquidation fields when supplied by the historical source schema;
+- point-in-time derivative alignment with `merge_asof(direction="backward")`;
+- validation for required fields, numeric values and non-negative open interest/liquidation values;
+- feature-engine integration through optional `derivatives_frame`;
+- future-change invariance and integration tests.
+
+Design constraints:
+- derivative observations are never forward-filled from the future;
+- no liquidation fields are invented when the source does not provide them;
+- derivatives remain descriptive market-state observations;
+- no score, signal, trading verdict, risk policy, or ML logic was introduced.
+
+Server verification: **pending**.
+
+**Next concrete action:** run the complete FrostDeploy pytest suite against the Derivatives implementation. If green, record the exact release/result and accept the layer before moving to the next documented analytical refinement.
