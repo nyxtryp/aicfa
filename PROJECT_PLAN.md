@@ -1581,3 +1581,43 @@ Next:
 2. rerun the full pytest suite;
 3. if green, run the real Binance Spot/Futures WebSocket smoke test;
 4. only then mark WebSocket transport GREEN.
+
+
+## 2026-09-29 — WebSocket read-timeout handling fix
+
+### Real smoke finding
+
+The real Binance smoke test successfully received a closed BTC/USDT Spot 1m candle, but the combined Spot/Futures run then failed on Futures with:
+
+    websocket._exceptions.WebSocketTimeoutException: Connection timed out
+
+The failure occurred because the client read timeout (timeout_seconds=15) was shorter than the possible wait until the next closed 1m candle. Binance can continue sending/opening the stream while AICFA intentionally ignores incomplete candles. A socket read timeout therefore does not by itself prove that the WebSocket connection is dead.
+
+### Forward-only fix
+
+Commits:
+- bf8122eee4922d44cfbcc58bf14d0d5e72bbee67 — Handle WebSocket read timeouts without reconnecting
+- 70ffc81fb8b0b3ffdb5f402a1384fc8a3276685a — Handle Binance WebSocket read timeout exception
+- b99f5c353b678513c767da36e741196e88dce1ce — Test WebSocket read timeout handling
+- 49ba7b5f21ca20de8e5464728d24e60fbb211383 — Document WebSocket read timeout behavior
+
+Behavior:
+- TimeoutError / WebSocketTimeoutException during recv() is treated as a read wait;
+- the existing connection is retained;
+- the transport continues waiting for the next closed candle;
+- actual disconnect/network errors still use the bounded reconnect/resubscribe path;
+- no market observation is fabricated.
+
+### Verification status
+
+WebSocket stage remains PENDING server verification.
+
+The prior full suite was green at 195 passed, 4863 warnings in 33.94s, but that was before this fix. The fix must be deployed and the full suite rerun.
+
+### Next step
+
+1. wait for the new FrostDeploy release;
+2. rerun the mandatory full pytest suite;
+3. rerun real Binance Spot + Futures BTC/USDT WebSocket smoke;
+4. if both pass, record WebSocket transport as GREEN;
+5. then connect live WebSocket observations to the centralized scanner and Setup Event lifecycle.
