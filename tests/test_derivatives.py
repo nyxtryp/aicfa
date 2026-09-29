@@ -68,7 +68,9 @@ def test_derivatives_positioning_basis_features_are_causal():
     assert out.loc[3, "long_short_ratio_global"] == 1.2
     assert out.loc[3, "long_short_ratio_top_trader"] == 1.1
     assert out.loc[3, "basis"] == 0.002
-    assert pd.isna(out.loc[1, "basis"])
+    # Basis is a latest-known state, so the first observation remains visible
+    # on intervening base candles until a newer basis observation arrives.
+    assert out.loc[1, "basis"] == 0.001
     assert "long_short_ratio_global_zscore" in out
     assert "basis_delta" in out
 

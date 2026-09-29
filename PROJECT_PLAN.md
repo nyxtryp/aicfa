@@ -209,7 +209,18 @@ Added tests for:
 - future-change invariance;
 - invalid ratio rejection.
 
-**Server verification:** pending. The implementation is not accepted until the complete FrostDeploy suite is run.
+### Verification attempt — 2026-09-29
+FrostDeploy run:
+```
+91 passed, 1 failed, 2844 warnings in 29.31s
+```
+
+Failure:
+`tests/test_derivatives.py::test_derivatives_positioning_basis_features_are_causal`.
+
+The failure was in the test expectation, not in the causal alignment implementation: the test expected `basis` to be empty on an intervening base candle, while the documented semantics treat basis as a latest-known state, just like positioning and OI. The first basis observation therefore remains visible until a newer observation arrives.
+
+The fix is limited to the test expectation; no production derivative logic is changed.
 
 ---
 
@@ -258,8 +269,8 @@ Never claim green status without the current deployed release output.
 
 # 10. Immediate next work
 
-1. Run and verify the new Derivatives positioning/basis layer.
-2. If failures occur, fix only the actual semantic/test failure and rerun the full suite.
+1. Deploy the test-only semantic correction.
+2. Rerun the complete FrostDeploy suite.
 3. If green, record the exact release and test count here.
 4. Continue remaining derivatives/market-state inputs:
    - broader positioning;
@@ -314,12 +325,12 @@ Never claim deployment/test verification without actual server output.
 Latest implementation:
 `666edd4f7beacbff3d9dbb8c3f2fbbf12c1f8f2b`
 
-Latest tests:
+Latest tests before correction:
 `91a0b4c94d6373e8db7495ed15522ababe834b80`
 
 Latest documentation:
 this commit.
 
-**Current task:** verify Long/Short Ratio + Basis + positioning expansion on FrostDeploy.
+**Current task:** deploy the test-only basis alignment expectation correction and rerun the full FrostDeploy suite.
 
 **Important:** The positioning expansion is implemented but NOT YET ACCEPTED until the full server suite is green.
