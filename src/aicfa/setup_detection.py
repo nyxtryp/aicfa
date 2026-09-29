@@ -110,7 +110,11 @@ def build_setup_candidates(df: pd.DataFrame) -> pd.DataFrame:
     }
     for output, source in context_flags.items():
         if source in x.columns:
-            out[output] = x[source].fillna(0).astype(float).ne(0).astype("int8")
+            values = pd.to_numeric(x[source], errors="coerce").fillna(0).astype(float)
+            if output in {"setup_cvd_positive_context", "setup_taker_positive_context"}:
+                out[output] = values.gt(0).astype("int8")
+            else:
+                out[output] = values.ne(0).astype("int8")
         else:
             out[output] = pd.Series(0, index=x.index, dtype="int8")
 
