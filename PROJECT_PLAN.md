@@ -2167,3 +2167,20 @@ PYTHONPATH=src .venv/bin/python -m pytest -q
 ```
 
 Do not mark Setup Analysis GREEN until the current deployed release passes the full suite.
+
+
+### `212803ff1f84e20106c4b51d29c279e27116dbae`
+**Fix setup scenario test coverage**
+
+The first deployed Setup Analysis test run exposed one test fixture issue:
+the multiple-scenario fixture supported continuation with only one continuation
+concept (`market_structure.bos`), while Setup Analysis intentionally requires
+at least two supporting concepts for a READY candidate.
+
+Updated the fixture to include `displacement`, so continuation now satisfies
+the documented threshold while reversal and breakout-failure remain supported.
+
+Previous server result:
+`1 failed, 228 passed, 4864 warnings in 41.55s`.
+
+Verification status remains **PENDING** after this forward-only test correction.
