@@ -1309,3 +1309,32 @@ No score, signal, trading decision, derivatives logic, or ML was introduced.
 Server verification: **pending**.
 
 **Next concrete action:** run the complete FrostDeploy pytest suite against this volume/volatility layer. If green, accept it and proceed to the next analytical component, Derivatives, beginning with causal funding/open-interest/liquidation representations where historical data is available.
+
+
+## 2026-09-29 — Volume / Volatility layer verified
+
+FrostDeploy verification was run against release `2026-09-29T06-19-09-2a0cf02`.
+
+Result:
+```
+85 passed, 2375 warnings in 28.90s
+```
+
+Verification status: **PASS**.
+
+Verified:
+- causal realized volatility, true range and ATR;
+- causal range and volume statistics;
+- prior-baseline volatility ratio;
+- volatility expansion/compression;
+- volume expansion/dry-up;
+- descriptive volume/volatility regimes;
+- future-change invariance;
+- integration into the main feature engine;
+- full regression suite remains green.
+
+Warnings are non-blocking and remain deferred to the dedicated cleanup/optimization pass. They include existing pandas/NumPy deprecations, DataFrame fragmentation warnings in feature/MTF construction, a Premium/Discount fixture dtype warning, and the immutable-release pytest cache permission warning.
+
+The Volume / Volatility layer is **accepted**.
+
+**Next concrete task:** implement the first causal Derivatives layer. Start with funding-rate and open-interest representations, plus liquidation data when the historical source schema supports it. Keep derivatives as descriptive/causal market-state observations; do not turn them into a score or trading signal.
