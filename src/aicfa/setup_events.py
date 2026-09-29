@@ -45,37 +45,44 @@ def build_setup_events(state: pd.DataFrame) -> pd.DataFrame:
     family = _text(x, "market_state_setup_family")
 
     # A live setup identity is the descriptive family + resolved direction.
-    # Conflicts have no active identity and therefore cannot generate a
-    # directional event.
-    identity = family.where(active & ~conflicted & direction.ne(0), "")
-    identity = identity + "|" + direction.where(identity.ne(""), 0).astype(str)
+    # Inactive or conflicted observations have no identity and therefore
+    # cannot generate a directional event.
+    valid_identity = active & ~conflicted & direction.ne(0) & family.ne("")
+    identity = pd.Series("", index=x.index, dtype=object)
+    identity.loc[valid_identity] = (
+        family.loc[valid_identity] + "|" + direction.loc[valid_identity].astype(str)
+    )
 
     previous_identity = identity.shift(1).fillna("")
     previous_active = previous_identity.ne("")
 
-    created = active & ~conflicted & direction.ne(0) & ~previous_active
-    same_identity = identity.ne("") & identity.eq(previous_identity)
-    strengthened = same_identity & (
-        _num(x, "market_state_changed").ne(0)
-    )
+    created = valid_identity & ~previous_active
+    same_identity = valid_identity & identity.eq(previous_identity)
+    strengthened = same_identity & _num(x, "market_state_changed").ne(0)
+
+    # A replacement invalidates the previous setup even though the new setup
+    # is created on the same observation. Expiration is the inactive form of
+    # invalidation.
     invalidated = previous_active & (
         identity.eq("") | identity.ne(previous_identity)
-    ) & ~created
-    expired = invalidated & ~active
+    )
+    expired = invalidated & ~valid_identity
 
-    # When a new setup replaces an old one, emit the old lifecycle transition
-    # as invalidated and the new one as created on the same observation.
+    # Replacement carries both lifecycle flags: invalidated for the previous
+    # identity and created for the new identity. The event type describes the
+    # new/current lifecycle event, so creation takes precedence over
+    # invalidation on a replacement row.
     event = pd.Series("", index=x.index, dtype=object)
-    event.loc[created] = "created"
-    event.loc[strengthened] = "strengthened"
     event.loc[invalidated] = "invalidated"
     event.loc[expired] = "expired"
+    event.loc[strengthened] = "strengthened"
+    event.loc[created] = "created"
 
     out = pd.DataFrame(index=x.index)
     out["timestamp"] = x["timestamp"].to_numpy()
-    out["setup_event_active"] = active.astype("int8")
-    out["setup_event_direction"] = direction.where(active & ~conflicted, 0).astype("int8")
-    out["setup_event_family"] = family.where(active & ~conflicted, "")
+    out["setup_event_active"] = valid_identity.astype("int8")
+    out["setup_event_direction"] = direction.where(valid_identity, 0).astype("int8")
+    out["setup_event_family"] = family.where(valid_identity, "")
     out["setup_event_identity"] = identity
     out["setup_event_created"] = created.astype("int8")
     out["setup_event_strengthened"] = strengthened.astype("int8")
