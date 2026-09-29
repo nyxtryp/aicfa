@@ -279,7 +279,7 @@ Full suite:
 
 The causal liquidation imbalance feature is now **accepted and green**.
 
-Known non-blocking warnings remain unchanged: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and pytest-cache permission warnings in immutable releases.
+Known non-blocking warnings remain unchanged: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and immutable FrostDeploy pytest-cache permission warnings.
 
 ---
 
@@ -609,9 +609,6 @@ After every meaningful commit:
 
 Never claim deployment/test verification without actual server output.
 
----
-
-
 
 ## 2026-09-29 — Absorption and CVD verification
 
@@ -730,7 +727,6 @@ Latest full-suite result:
 **Current unverified stage:** Price Action.
 
 **Next task:** deploy and verify Price Action. After Price Action is green, continue with the causal Wyckoff representation before moving toward historical statistical evaluation and the pre-ML dataset/model boundary.
-
 
 
 ## 2026-09-29 — Causal Wyckoff implementation
@@ -853,7 +849,47 @@ Market Data Engine должен использовать абстракцию pr
 ### Status
 
 Зафиксировано как архитектурное направление/требование. Реализация scanner начинается после достаточной полноты market-state representation и не должна преждевременно заменять текущий causal feature-engineering этап.
-\n\n## 2026-09-29 — Setup Detection Engine implementation\n\n### New causal analytical layer\n\nImplemented `src/aicfa/setup_detection.py` and integrated it into the main Feature Engine.\n\nInitial setup families:\n- liquidity reversal up/down;\n- structure continuation up/down;\n- breakout retest up/down;\n- failed breakout up/down;\n- Wyckoff Spring/Upthrust;\n- expansion up/down.\n\nThe engine also exposes separate contextual fields for available FVG, Order Block, Premium/Discount, absorption, CVD, taker-flow and derivatives state. No additive confirmation score is used.\n\nOpposite-direction candidates on the same timestamp are marked `setup_candidate_conflicted`; direction is set to neutral rather than forced.\n\nThe engine is causal and descriptive. It does not create future labels, probabilities, confidence scores or trade instructions.\n\n### Commits\n\n- `98777dd7bea6058c33cc7adb4c0189eed1d082bf` — setup engine\n- `c1d4c96a0f80176b7420d7e03e85fe86172a80cb` — setup tests\n- `20b9d7983f3e37da88de2392120ae7bbbf98db64` — setup documentation\n- `1db0286c6b9738bdabbe755c037842997c93b989` — Feature Engine integration\n- `bbb42d8a5523e2c53b60461875c97088b22a5bb3` — integration test\n- `492380a23b741e83a1b70acfcc918f60d65e73ee` — positive flow context fix\n\n### Verification status\n\n**Not yet server-verified.**\n\nRequired next step: deploy the current main branch to FrostDeploy and run the mandatory full pytest suite. Do not mark Setup Detection green before actual server output.\n\n### Next after verification\n\nIf green, extend setup coverage with additional causal market-state combinations and then build the Setup Event lifecycle (created / updated / invalidated / expired / outcome) before the live 24/7 scanner. Historical future outcome labels remain a separate pipeline.\n
+
+
+## 2026-09-29 — Setup Detection Engine implementation
+
+### New causal analytical layer
+
+Implemented `src/aicfa/setup_detection.py` and integrated it into the main Feature Engine.
+
+Initial setup families:
+- liquidity reversal up/down;
+- structure continuation up/down;
+- breakout retest up/down;
+- failed breakout up/down;
+- Wyckoff Spring/Upthrust;
+- expansion up/down.
+
+The engine also exposes separate contextual fields for available FVG, Order Block, Premium/Discount, absorption, CVD, taker-flow and derivatives state. No additive confirmation score is used.
+
+Opposite-direction candidates on the same timestamp are marked `setup_candidate_conflicted`; direction is set to neutral rather than forced.
+
+The engine is causal and descriptive. It does not create future labels, probabilities, confidence scores or trade instructions.
+
+### Commits
+
+- `98777dd7bea6058c33cc7adb4c0189eed1d082bf` — setup engine
+- `c1d4c96a0f80176b7420d7e03e85fe86172a80cb` — setup tests
+- `20b9d7983f3e37da88de2392120ae7bbbf98db64` — setup documentation
+- `1db0286c6b9738bdabbe755c037842997c93b989` — Feature Engine integration
+- `bbb42d8a5523e2c53b60461875c97088b22a5bb3` — integration test
+- `492380a23b741e83a1b70acfcc918f60d65e73ee` — positive flow context fix
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step: deploy the current main branch to FrostDeploy and run the mandatory full pytest suite. Do not mark Setup Detection green before actual server output.
+
+### Next after verification
+
+If green, extend setup coverage with additional causal market-state combinations and then build the Setup Event lifecycle (created / updated / invalidated / expired / outcome) before the live 24/7 scanner. Historical future outcome labels remain a separate pipeline.
+
 
 ## 2026-09-29 — Canonical Market State implementation
 
@@ -915,13 +951,43 @@ Commits:
 - `6138493c20819d38847181c955892fe8ee3f422d` — Feature Engine integration
 - `4e16c4fea4ca887ed51f318274ecef1da9faeacb` — setup event documentation
 - `c2bb4411d7a136e79228d6759dc08246442a9281` — integration coverage
+- `e8bedcd63f2c311ca8f32ba622498aa2e8b8acd5` — fix setup event lifecycle precedence and identity
+- `c9c72b339ebe21f75b5cbff2e95e686be5a0b306` — strengthen setup event lifecycle regression tests
+- `d9df6e6708c839dba577f27098c50f37813b623c` — fix setup creation on replacement identity
+- `43b06bf5d8acff21dc6eaf012c083624204a02cd` — make setup creation transition explicit
+- `ba03388ab9945536b25a27ce75db0efebbaac6c2` — fix setup event replacement test fixture
 
-### Verification status
+### Final FrostDeploy verification — 2026-09-29
 
-**Not yet server-verified.**
+Deployed release:
+`2026-09-29T11-33-43-ba03388`
 
-Required next step: deploy current main to FrostDeploy and run the mandatory full pytest suite. Do not mark Setup Event Engine accepted before actual server output.
+Full suite:
+```
+163 passed, 4863 warnings in 38.29s
+```
 
-### Next after verification
+The Setup Event Engine is now **accepted and green**.
 
-Move to the provider-agnostic live Market Data / Scanner foundation: source contracts, incremental current-data updates, asset/timeframe universe and centralized scan loop. Free APIs remain provisional until rate limits, latency, WebSocket availability and commercial/reliability constraints are verified.
+Verified coverage includes:
+- creation of a new setup identity;
+- strengthening of an unchanged active identity when descriptive state changes;
+- direct replacement of an active identity producing `created=1` and `invalidated=1`;
+- expiration when an active identity disappears without replacement;
+- creation after expiration without falsely marking the new setup as an invalidation;
+- neutral handling of conflicted setups;
+- causal future-change invariance;
+- no live outcome labels.
+
+Known non-blocking warning:
+- pytest cache cannot be created inside immutable FrostDeploy release directories due to permissions.
+
+### Current next task
+
+Proceed to the **provider-agnostic Live Market Data / Scanner foundation**:
+- define source contracts for live/incremental market data;
+- define asset/timeframe universe and canonical current-state updates;
+- implement centralized scan-loop architecture;
+- preserve causal semantics and provider abstraction;
+- do not yet assume a free provider is sufficient for 24/7 low-latency Top-100;
+- verify provider rate limits, latency, WebSocket availability, historical access, commercial terms and reliability before locking the production provider.
