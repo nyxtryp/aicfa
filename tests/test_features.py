@@ -70,6 +70,13 @@ def test_feature_columns_and_shape():
         "setup_direction",
         "setup_reference_price",
         "setup_invalidation_price",
+        "market_state_structure_direction",
+        "market_state_setup_active",
+        "market_state_setup_conflicted",
+        "market_state_setup_direction",
+        "market_state_smc_ready",
+        "market_state_context_availability_mask",
+        "market_state_changed",
     ]:
         assert column in result.columns
 
