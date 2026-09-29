@@ -49,11 +49,13 @@ def build_derivatives(
     *,
     baseline_window: int = 24,
 ) -> pd.DataFrame:
-    """Map point-in-time funding/OI observations onto a base candle timeline.
+    """Map causal funding/OI observations onto a base candle timeline.
 
-    A derivative observation is visible only on a base row with the exact
-    same timestamp. This prevents an observation from being treated as if it
-    were continuously known between exchange updates.
+    Funding is treated as a point-in-time observation: a funding value is
+    visible only at its own timestamp. Open interest is a continuously sampled
+    state: the latest known OI observation is carried forward until a newer
+    observation arrives. Both behaviors use only timestamps at or before the
+    base candle and therefore remain causal.
     """
     if baseline_window < 2:
         raise ValueError("baseline_window must be >= 2")
@@ -69,7 +71,8 @@ def build_derivatives(
 
     d = _validate(derivatives)
 
-    # Changes are computed in derivative-observation order before alignment.
+    # Derivative-observation features are computed before alignment so that
+    # each delta/z-score uses only the derivative history available then.
     funding_delta = d["funding_rate"].diff()
     funding_pct = d["funding_rate"].shift(1).abs().replace(0, np.nan)
     funding_change_pct = funding_delta / funding_pct
@@ -84,9 +87,21 @@ def build_derivatives(
     d2["open_interest_change_pct"] = oi_pct.replace([np.inf, -np.inf], np.nan)
     d2["open_interest_zscore"] = _zscore_against_past(d2["open_interest"], baseline_window)
 
-    # Point-in-time alignment: do not forward-fill an older derivative
-    # observation into intervening base candles.
-    aligned = b[["timestamp", "close"]].merge(d2, on="timestamp", how="left", sort=True)
+    # Funding is point-in-time. OI is the latest known state and can be
+    # carried forward causally between observations.
+    funding = d2[["timestamp", "funding_rate", "funding_rate_delta",
+                   "funding_rate_change_pct", "funding_rate_zscore"]]
+    oi = d2[["timestamp", "open_interest", "open_interest_delta",
+             "open_interest_change_pct", "open_interest_zscore"]]
+
+    aligned = b[["timestamp", "close"]].merge(funding, on="timestamp", how="left", sort=True)
+    aligned = pd.merge_asof(
+        aligned.sort_values("timestamp"),
+        oi.sort_values("timestamp"),
+        on="timestamp",
+        direction="backward",
+        allow_exact_matches=True,
+    )
 
     # Price/OI relationship is descriptive only and uses the base candle
     # return known at that exact timestamp.
@@ -104,6 +119,13 @@ def build_derivatives(
         # Keep optional liquidation observations causal when the historical
         # source provides them. No liquidation fields are invented otherwise.
         for col in optional:
+            aligned[col] = pd.merge_asof(
+                aligned[["timestamp"]].sort_values("timestamp"),
+                d[["timestamp", col]].sort_values("timestamp"),
+                on="timestamp",
+                direction="backward",
+                allow_exact_matches=True,
+            )[col]
             aligned[col] = pd.to_numeric(aligned[col], errors="coerce")
             if (aligned[col].dropna() < 0).any():
                 raise ValueError(f"{col} must be non-negative")
