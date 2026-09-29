@@ -2097,3 +2097,28 @@ Implemented:
 Verification status: **PENDING FrostDeploy/server verification.**
 
 Next after green: combine scenario hypotheses with richer Knowledge Base confirmation/invalidation semantics and evidence quality into structured setup analysis.
+
+
+## 2026-09-29 — Setup Analysis implementation started
+
+### `e2fc9a5172c6036443282105b2ee10d7589241e8`
+**Add structured setup analysis layer**
+
+Added `src/aicfa/setup_analysis.py`.
+
+Implemented:
+- structured `SetupAssessment` and `SetupCandidate` contracts;
+- READY / NEED_MORE_EVIDENCE / WAIT decisions;
+- preservation of multiple scenario candidates;
+- contextual setup-zone extraction from observed visual concepts;
+- Knowledge Base confirmation/invalidation enrichment;
+- conditional entry requirements, invalidation conditions and target objectives;
+- optional price-location propagation only when actually present in visual evidence;
+- no fabricated numeric levels;
+- no order execution or automatic trade placement.
+
+The layer requires contradiction-free evidence, a supported scenario and at least two supporting observed concepts plus a visible contextual zone before forming a candidate.
+
+Verification status: **PENDING FrostDeploy/server verification.**
+
+Next: add Setup Analysis contract tests, document the layer, deploy, and run the mandatory full pytest suite.
