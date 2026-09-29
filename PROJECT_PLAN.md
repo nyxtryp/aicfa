@@ -642,3 +642,15 @@ After each commit, immediately update:
 - next task.
 
 Before each new implementation step, read this document and continue from the checkpoint rather than reconstructing the project from chat history.
+
+
+## 2026-09-29 — Displacement Engine
+
+Implementation commits:
+- `18aa8bdf8479c2094c4c8cc3ab5d7870606a29ac` — Add causal displacement engine.
+- `c147fec530f8abca4426147f2593e13393813618` — Add displacement engine tests.
+- `37f4db3b5b6ba47b1aaceab35238219197e77449` — Expose displacement features.
+
+Implemented: range expansion, body expansion, close efficiency, strictly past-only relative volume, impulsive close direction, directional displacement, multi-factor displacement events, and displacement+BOS relationships. Tests cover causality, directionality, multi-factor requirements, and validation.
+
+Server verification is pending. The next concrete action is the full FrostDeploy pytest run against this implementation. If green, proceed to FVG / Imbalance.
