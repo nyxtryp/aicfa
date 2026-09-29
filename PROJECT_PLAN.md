@@ -420,14 +420,73 @@ Current limitation: CVD, absorption, liquidity walls, order-book changes, and ma
 
 ---
 
+## 2026-09-29 — Order Book / Market Depth implementation started
+
+### `32e98ba98ba9c28ba6bfb65037f97becde541d8e`
+**Add causal order book and market depth features**
+
+Added `src/aicfa/order_book.py` with a source contract for completed order-book snapshots.
+
+Implemented descriptive features:
+- best bid / ask price and size;
+- mid price;
+- spread and spread percentage;
+- microprice;
+- top-of-book Bid/Ask imbalance;
+- bid/ask size deltas and change percentages;
+- spread, mid-price and microprice changes;
+- optional aggregate depth volume;
+- optional depth imbalance and depth changes.
+
+Causal semantics:
+- snapshot timestamps represent availability time;
+- base observations may use only snapshots already available at that time;
+- source deltas are calculated in source observation order;
+- no future snapshot may change an already available result.
+
+The implementation deliberately does not infer liquidity walls or absorption from aggregate depth alone.
+
+### `5aa450ef029d8aa2a3304e735a95d327399a506b`
+**Test causal order book and market depth features**
+
+Added tests for:
+- causal snapshot alignment;
+- Bid/Ask imbalance and microprice;
+- optional aggregate depth;
+- future-change invariance;
+- crossed-market and negative-size validation;
+- required source fields;
+- zero-size ratio handling;
+- source-order deltas.
+
+### `530a803386031668ef3bda8e56e45d131d26ea1a`
+**Define causal order book source contract**
+
+Documented the source contract and availability-time semantics in `docs/AICFA_TZ.md`.
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step:
+1. deploy these commits to FrostDeploy;
+2. run the mandatory full pytest suite;
+3. fix any real failures;
+4. rerun until green;
+5. only then mark Order Book / Market Depth accepted.
+
+Current limitations:
+- level-by-level liquidity walls are not implemented;
+- order-book add/cancel flow is not implemented;
+- absorption is not implemented;
+- CVD remains deferred until its source/reset semantics are defined.
+
 # 10. Immediate next work
 
-1. Continue remaining derivatives/market-state inputs:
-   - remaining source-backed derivatives variants;
-   - later taker flow/order flow;
-   - later order book / market depth.
-2. Keep derivatives descriptive and causal; no premature signals.
-3. Then continue market-state completeness before ML.
+1. Verify the current Order Book / Market Depth implementation on FrostDeploy.
+2. After acceptance, continue with level-by-level order-book changes, liquidity walls and absorption where reliable source contracts exist.
+3. Keep all market-microstructure features descriptive and causal; no premature signals.
+4. Then continue market-state completeness before ML.
 
 ML training remains postponed.
 
@@ -482,4 +541,4 @@ Latest full-suite result:
 
 **Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, spot/futures relationship, and Taker Flow / Order Flow are implemented, deployed and verified green.
 
-**Next task:** continue to Order Book / Market Depth, including Bid/Ask imbalance, order-book changes, liquidity walls, and absorption where the source contract is reliable. Preserve strict causality and the pre-ML development boundary.
+**Next task:** verify the current Order Book / Market Depth implementation on FrostDeploy. It is not yet marked green. Preserve strict causality and the pre-ML development boundary.
