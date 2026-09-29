@@ -388,6 +388,38 @@ Never claim green status without the current deployed release output.
 
 ---
 
+## 2026-09-29 — Taker Flow / Order Flow verification
+
+### Verification attempt — 2026-09-29
+
+FrostDeploy release: `2026-09-29T08-13-25-97c16f6`
+
+Full suite:
+```
+107 passed, 2843 warnings in 30.78s
+```
+
+The current Taker Flow / Order Flow implementation is now **accepted and green**.
+
+Verified coverage includes:
+- causal alignment of completed taker-flow intervals;
+- taker buy volume;
+- taker sell volume or causal derivation from total volume;
+- net taker volume / delta;
+- taker imbalance;
+- buy/sell shares;
+- change percentage;
+- strictly-past z-score;
+- rejection of inconsistent and negative volume inputs;
+- zero-total handling;
+- future-change invariance.
+
+Known non-blocking warnings remain: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype FutureWarning, and immutable FrostDeploy pytest-cache permission warnings.
+
+Current limitation: CVD, absorption, liquidity walls, order-book changes, and market depth are not implemented yet because their source contracts and historical-availability semantics must be defined before implementation.
+
+---
+
 # 10. Immediate next work
 
 1. Continue remaining derivatives/market-state inputs:
@@ -440,14 +472,14 @@ Never claim deployment/test verification without actual server output.
 # 13. Current checkpoint
 
 Latest implementation:
-`578457cffacec916dd566b72337f48eacb52ce72`
+`97c16f66e5d436651fb803ecedbe72fee52c0103`
 
 Latest verified FrostDeploy release:
-`2026-09-29T08-04-34-578457c`
+`2026-09-29T08-13-25-97c16f6`
 
 Latest full-suite result:
-`99 passed, 2843 warnings in 31.63s`
+`107 passed, 2843 warnings in 30.78s`
 
-**Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, and the spot/futures relationship are implemented, deployed and verified green.
+**Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, spot/futures relationship, and Taker Flow / Order Flow are implemented, deployed and verified green.
 
-**Next task:** verify the current Taker Flow / Order Flow implementation on FrostDeploy. It is not yet marked green. After verification, continue to Order Book / Market Depth. Preserve strict causality and the pre-ML development boundary.
+**Next task:** continue to Order Book / Market Depth, including Bid/Ask imbalance, order-book changes, liquidity walls, and absorption where the source contract is reliable. Preserve strict causality and the pre-ML development boundary.
