@@ -2000,3 +2000,29 @@ These warnings do not block the Knowledge Base stage and are not being mixed int
 ### Next implementation step
 
 Build the **Visual Evidence contract**: a causal, structured representation of user-supplied chart screenshots that can be consumed by the existing Knowledge Base and analytical rules. Screenshot evidence remains inference-time input, not training data, and the user must not manually label BOS/FVG/liquidity/OB concepts.
+
+
+## 2026-09-29 — Visual Evidence contract implementation
+
+### `a3893958ec97b6e0a95467f82caa8546d941ba64`
+**Add structured visual evidence contract**
+
+Added `src/aicfa/visual_evidence.py` as the first runtime contract for screenshot-based analysis.
+
+Implemented:
+- immutable `VisualObservation` records tied to Knowledge Base concept IDs;
+- explicit observed / possible / not_visible states;
+- bounded confidence and required visible evidence;
+- screenshot-only provenance, separate from live market-provider data;
+- asset/timeframe context and optional capture timestamp;
+- explicit missing-context and contradiction fields;
+- multi-timeframe `VisualEvidenceSet` with duplicate protection;
+- no LONG/SHORT decision generation and no screenshot-training dependency.
+
+This is the evidence boundary between future chart vision and the existing analytical Knowledge Base. The vision layer will produce these observations; users do not manually label market concepts.
+
+### Verification status
+
+**PENDING FrostDeploy/server verification.**
+
+Next: add contract tests, document the screenshot evidence path, then deploy and run the mandatory full pytest suite before accepting the stage.
