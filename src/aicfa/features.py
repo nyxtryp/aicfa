@@ -78,6 +78,12 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     out["sweep_high_reject"] = ((h > prev_high) & (c < prev_high)).astype("int8")
     out["sweep_low_reclaim"] = ((l < prev_low) & (c > prev_low)).astype("int8")
 
+    # Causal market structure. Swings are emitted only after right-side confirmation.
+    from .structure import build_structure
+    structure = build_structure(x)
+    for column in ["swing_high","swing_low","hh","hl","lh","ll","bos_up","bos_down","choch_up","choch_down","mss_up","mss_down","swing_high_price","swing_low_price","structure_direction"]:
+        out[column] = structure[column].to_numpy()
+
     # Trend proxies from causal rolling return and close-vs-mean location.
     for n in (15, 60):
         out[f"return_{n}"] = c.pct_change(n)
