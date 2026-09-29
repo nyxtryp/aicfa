@@ -606,9 +606,9 @@ This file is the persistent handoff/memory for future chats.
 
 # 12. Current checkpoint
 
-**Latest implementation commits:** `5ef0952a80ffecd7e9d9129fe9cf402507b21f80`, `cb392b6b85b08daa5c373ae62cdc59ba3b509fd7`, `95708f427120eb92d884a6c8f05846c55afe4a81`, `6f5caadbc8d5d87f14c02caf907667c92992847b`, `9479ce89d55a712a8938ee13980d4b549437fca`, `25437f0ec230364c2f9eaebb471b0c349bd39bad`, `5e237c9a29f7e8111539189177a98b708fdbc14b`.
+**Latest implementation commits:** `5ef0952a80ffecd7e9d9129fe9cf402507b21f80`, `cb392b6b85b08daa5c373ae62cdc59ba3b509fd7`, `95708f427120eb92d884a6c8f05846c55afe4a81`, `6f5caadbc8d5d87f14c02caf907667c92992847b`, `9479ce89d55a712a8938ee13980d4b549437fca`, `25437f0ec230364c2f9eaebb471b0c349bd39bad`, `5e237c9a29f7e8111539189177a98b708fdbc14b`, `e65a99d1a909ab7dfd35d681ab0b8344187a926f`.
 
-**Current layer:** Multi-Timeframe Structure — implementation complete, explicit AICFA timeframe-grid coverage added, server verification pending.
+**Current layer:** Multi-Timeframe Structure — implementation complete and fully verified.
 
 **Current state:**
 - Market Structure: first causal implementation complete, refinement pending.
@@ -618,7 +618,7 @@ This file is the persistent handoff/memory for future chats.
 - Order Blocks: implemented, integrated into the feature engine, and verified green on FrostDeploy.
 - Premium / Discount: structural dealing-range implementation added and verified green on FrostDeploy (`50 passed, 142 warnings`).
 - Unified SMC: causal unified state representation implemented and integrated; server verification complete.
-- Multi-timeframe: causal standalone implementation complete; explicit coverage now includes the required grid **1m, 5m, 15m, 1h, 4h, 1d, 1w**.
+- Multi-timeframe: causal standalone implementation complete; explicit coverage includes the required grid **1m, 5m, 15m, 1h, 4h, 1d, 1w**; full server verification is green.
 - Scenario Engine: not started.
 - ML dataset/model: not started.
 - Experience DB: not started.
@@ -629,9 +629,24 @@ This file is the persistent handoff/memory for future chats.
 **MTF test coverage update:**
 Commit `5e237c9a29f7e8111539189177a98b708fdbc14b` adds a test that constructs the complete AICFA timeframe grid and asserts that all seven timeframe-specific feature namespaces are emitted, including **1m**.
 
-**Server verification:** PENDING after the new test commit.
+**Server verification:** **PASS** — FrostDeploy release `2026-09-29T05-27-14-e65a99d`.
 
-**Immediate action:** run the complete FrostDeploy pytest suite against the current MTF implementation. If green, accept MTF and proceed to integrating the verified MTF representation into `build_features()` before Scenario Engine.
+Result:
+```
+59 passed, 250 warnings in 5.16s
+```
+
+Warnings are non-blocking:
+- pandas deprecation in `tests/test_dataset.py`;
+- pandas DataFrame fragmentation PerformanceWarnings in `src/aicfa/features.py`;
+- NumPy timedelta deprecation in `src/aicfa/labels.py`;
+- NumPy timedelta deprecations in `src/aicfa/multi_timeframe.py`;
+- pandas FutureWarning in the Premium/Discount test fixture;
+- pytest cache permission warning in the immutable FrostDeploy release.
+
+The MTF layer is accepted. The warnings are deferred to a dedicated cleanup/optimization pass and do not block the next analytical layer.
+
+**Next concrete action:** integrate the verified MTF representation into `build_features()`, with dedicated feature-integration tests and causal/future-change coverage, before starting Scenario Engine.
 
 # 13. Rule for this document
 
@@ -657,7 +672,7 @@ Implementation commits:
 
 Implemented: range expansion, body expansion, close efficiency, strictly past-only relative volume, impulsive close direction, directional displacement, multi-factor displacement events, and displacement+BOS relationships. Tests cover causality, directionality, multi-factor requirements, and validation.
 
-Server verification is pending. The next concrete action is the full FrostDeploy pytest run against this implementation. If green, proceed to FVG / Imbalance.
+Server verification: pending. The next concrete action is the full FrostDeploy pytest run against this implementation. If green, proceed to FVG / Imbalance.
 
 ---
 
@@ -703,7 +718,7 @@ Implemented:
 - bullish/bearish gap bounds;
 - focused causality and validation tests.
 
-Server verification: **pending**.
+Server verification: pending.
 
 **Next concrete action:** run the complete FrostDeploy pytest suite against the FVG implementation. If green, accept the layer and continue to Order Blocks. If failures occur, fix only the actual failures and re-verify.
 
@@ -766,7 +781,7 @@ Implemented:
 Known design limitation:
 The first implementation tracks one latest active bullish and one latest active bearish OB lifecycle. Multiple simultaneous historical OB pools are not yet modeled. That is a later refinement after the unified causal foundation is verified.
 
-Server verification: **pending**.
+Server verification: pending.
 
 **Next concrete action:** run the complete FrostDeploy pytest suite against the Order Block implementation.
 
@@ -907,6 +922,7 @@ Implementation commits:
 - `9479ce89d55a712a8938ee13980d4b549437fca6` — Add causal multi-timeframe structure engine.
 - `25437f0ec230364c2f9eaebb471b0c349bd39bad` — Add multi-timeframe structure tests.
 - `5e237c9a29f7e8111539189177a98b708fdbc14b` — Test complete AICFA timeframe grid including 1m.
+- `e65a99d1a909ab7dfd35d681ab0b8344187a926f` — Record complete AICFA timeframe grid coverage.
 
 Implemented a dedicated causal MTF layer that consumes independently aggregated OHLCV frames, exposes higher-timeframe structure only after the source candle closes, preserves the existing Market Structure confirmation delay, uses backward as-of alignment, and keeps each timeframe in separate `mtf_<timeframe>_*` columns. It validates OHLCV and does not implicitly resample lower-timeframe data.
 
@@ -923,8 +939,21 @@ The test asserts that each timeframe gets its own structure namespace and that t
 
 Tests also cover: no state before higher-timeframe close; causal confirmation timing; future-change invariance; multiple timeframes; invalid inputs.
 
-Server verification: **PENDING** after the latest test commit.
+Server verification: **PASS** — FrostDeploy release `2026-09-29T05-27-14-e65a99d`.
 
-Known limitation: automatic exchange-data resampling/storage orchestration is deferred to the data pipeline. MTF is not yet injected into `build_features()`; integration follows green standalone verification.
+Result:
+```
+59 passed, 250 warnings in 5.16s
+```
 
-**Next concrete action:** run the complete FrostDeploy pytest suite. If green, accept MTF and integrate it into the feature pipeline before Scenario Engine.
+Warnings are non-blocking:
+- pandas deprecation in `tests/test_dataset.py`;
+- pandas DataFrame fragmentation PerformanceWarnings in `src/aicfa/features.py`;
+- NumPy timedelta deprecation in `src/aicfa/labels.py`;
+- NumPy timedelta deprecations in `src/aicfa/multi_timeframe.py`;
+- pandas FutureWarning in the Premium/Discount test fixture;
+- pytest cache permission warning in the immutable FrostDeploy release.
+
+The MTF layer is accepted. The warnings are deferred to a dedicated cleanup/optimization pass and do not block the next analytical layer.
+
+**Next concrete task:** integrate the verified MTF representation into `build_features()`, with dedicated feature-integration tests and causal/future-change coverage, before starting Scenario Engine.
