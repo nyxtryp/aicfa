@@ -197,7 +197,13 @@ def build_features(
     scenarios=build_scenarios(out)
     for column in scenarios.columns:
         if column.startswith("scenario_"): out[column]=scenarios[column].to_numpy()
-\n    from .setup_detection import build_setup_candidates\n    setup_candidates = build_setup_candidates(out)\n    for column in setup_candidates.columns:\n        if column.startswith("setup_"):\n            out[column] = setup_candidates[column].to_numpy()\n
+
+    from .setup_detection import build_setup_candidates
+    setup_candidates = build_setup_candidates(out)
+    for column in setup_candidates.columns:
+        if column.startswith("setup_"):
+            out[column] = setup_candidates[column].to_numpy()
+
     for n in (15,60):
         out[f"return_{n}"]=c.pct_change(n)
         mean_n=c.rolling(n,min_periods=n).mean()
