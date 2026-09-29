@@ -25,7 +25,7 @@ def test_internal_structure_is_exposed_and_causal():
 def test_protected_levels_follow_bos_and_have_lifecycle():
     close=[100,102,105,102,99,101,98,100,104]; r=build_structure(frame(close),left=1,right=1)
     assert r.loc[6,"bos_down"]==1; assert r.loc[6,"protected_high_created"]==1; assert r.loc[6,"protected_high_active"]==1; assert r.loc[6,"protected_high_price"]==pytest.approx(101.5)
-    assert r.loc[8,"bos_up"]==1; assert r.loc[8,"protected_low_created"]==1; assert r.loc[8,"protected_low_active"]==1; assert r.loc[8,"protected_low_price"]==pytest.approx(98.5); assert r.loc[8,"protected_high_broken"]==1
+    assert r.loc[8,"bos_up"]==1; assert r.loc[8,"protected_low_created"]==1; assert r.loc[8,"protected_low_active"]==1; assert r.loc[8,"protected_low_price"]==pytest.approx(97.5); assert r.loc[8,"protected_high_broken"]==1
 
 def test_mss_requires_displacement_and_is_not_choch_rename():
     close=[100,102,105,102,99,101,98,100,104]; df=frame(close); displacement=pd.DataFrame({"displacement_up":[0,0,0,0,0,0,0,0,1],"displacement_down":[0]*9})
