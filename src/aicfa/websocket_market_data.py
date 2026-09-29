@@ -132,6 +132,7 @@ class BinanceWebSocketMarketDataTransport:
         sleeper: Callable[[float], None] = time.sleep,
         state_store: LocalMarketStateStore | None = None,
         idle_timeout_seconds: float | None = None,
+        observation_timeout_seconds: float | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         if not keys:
@@ -144,6 +145,11 @@ class BinanceWebSocketMarketDataTransport:
             raise ValueError("reconnect_backoff_seconds must be non-negative")
         if idle_timeout_seconds is not None and idle_timeout_seconds <= 0:
             raise ValueError("idle_timeout_seconds must be positive")
+        if (
+            observation_timeout_seconds is not None
+            and observation_timeout_seconds <= 0
+        ):
+            raise ValueError("observation_timeout_seconds must be positive")
         self.keys = tuple(keys)
         self.timeout_seconds = float(timeout_seconds)
         self.max_reconnects = int(max_reconnects)
@@ -163,6 +169,17 @@ class BinanceWebSocketMarketDataTransport:
             )
         else:
             self._idle_timeout_seconds = float(idle_timeout_seconds)
+        if observation_timeout_seconds is None:
+            fixed_durations = [
+                timeframe_ms(key.timeframe) / 1000.0
+                for key in self.keys
+                if key.timeframe != "1M"
+            ]
+            self._observation_timeout_seconds = (
+                2.0 * max(fixed_durations) if fixed_durations else None
+            )
+        else:
+            self._observation_timeout_seconds = float(observation_timeout_seconds)
 
     def _subscribe(self, connection: WebSocketConnection) -> None:
         params = [_stream_name(key) for key in self.keys]
@@ -188,6 +205,11 @@ class BinanceWebSocketMarketDataTransport:
                     if self._idle_timeout_seconds is not None
                     else None
                 )
+                observation_deadline = (
+                    self._clock() + self._observation_timeout_seconds
+                    if self._observation_timeout_seconds is not None
+                    else None
+                )
                 while max_observations is None or observations < max_observations:
                     try:
                         raw = connection.recv()
@@ -196,10 +218,15 @@ class BinanceWebSocketMarketDataTransport:
                         # transport accepts only closed candles, so it can legitimately
                         # wait across a socket timeout for the next candle close.
                         # But continuous timeouts must remain bounded.
+                        now = self._clock()
                         if (
-                            idle_deadline is not None
-                            and self._clock() >= idle_deadline
+                            observation_deadline is not None
+                            and now >= observation_deadline
                         ):
+                            raise ConnectionError(
+                                "Binance WebSocket observation timeout exceeded"
+                            ) from exc
+                        if idle_deadline is not None and now >= idle_deadline:
                             raise ConnectionError(
                                 "Binance WebSocket idle timeout exceeded"
                             ) from exc
@@ -225,6 +252,10 @@ class BinanceWebSocketMarketDataTransport:
                                 observed_at_ms=observation.observed_at_ms,
                             )
                         observations += 1
+                        if observation_deadline is not None:
+                            observation_deadline = (
+                                self._clock() + self._observation_timeout_seconds
+                            )
                         yield observation
                         break
             except (OSError, TimeoutError, ConnectionError, WebSocketTransportError) as exc:
