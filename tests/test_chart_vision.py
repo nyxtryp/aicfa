@@ -79,7 +79,7 @@ def test_vision_does_not_infer_direction():
 def test_build_evidence_set_preserves_multi_timeframe_inputs():
     evidence = build_evidence_set(
         (
-            (_request("4h"), _output("market_structure.range")),
+            (_request("4h"), _output("premium_discount.dealing_range")),
             (_request("1h"), _output("market_structure.bos")),
             (_request("15m"), _output("liquidity.sweep")),
         )
@@ -105,3 +105,4 @@ def test_missing_context_and_conflicts_are_preserved():
     assert evidence.missing_context == ("higher timeframe",)
     assert evidence.conflicts == ("visible rejection conflicts with continuation",)
     assert evidence.observations[0].state == "possible"
+}
