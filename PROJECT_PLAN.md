@@ -463,3 +463,25 @@ All assistant and operator actions relevant to AICFA development must be recorde
 - Measure inference latency and observe RAM/CPU usage.
 - Compare visual recognition of chart structure, HH/HL/LH/LL, BOS/CHoCH, liquidity/sweep, FVG/imbalance, Order Block, Premium/Discount, uncertainty and hallucinations.
 - Do not change AICFA code or declare the model suitable before the benchmark result is reviewed.
+
+
+## 2026-09-29 — Granite 3.2 Vision 2B benchmark: resource observation
+
+### Operator observation during live inference
+- User ran the Granite 3.2 Vision benchmark against the same historical `/tmp/btc.png` chart.
+- At the observed point, `llama-server` (PID 412797) had approximately **2.4 GiB RSS / 83.3% of RAM**.
+- System RAM: **2.85 GiB total**, only **136 MiB free**, with about **1.06 GiB swap in use**.
+- CPU showed **80.2% iowait**, and `kswapd0` was active, indicating substantial memory pressure/swapping.
+- Granite inference is therefore materially resource-constrained on the current 1 vCPU / 3 GB RAM server.
+- This is an intermediate resource measurement only; the final model decision must also use the actual Granite response and measured end-to-end latency.
+- Do not start another model test concurrently and do not declare Granite suitable from resource usage alone.
+
+### Next exact step
+Wait for the current Granite request to finish and record:
+1. exact inference time;
+2. full model response;
+3. chart/SMC recognition quality;
+4. whether the output can be converted and validated by AICFA's existing visual-evidence boundary;
+5. final peak RAM/swap observation if available.
+
+Then decide whether Granite is rejected or retained for a deeper AICFA validation test.
