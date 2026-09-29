@@ -495,6 +495,54 @@ entry context
 
 ## 7.10 Order Flow / Market Microstructure
 
+Первая реализация начинается с taker flow как наиболее формализуемого слоя order flow.
+
+Текущий source contract:
+
+- `taker_buy_volume`;
+- `taker_sell_volume` либо `total_volume`, из которого sell volume может быть выведен;
+- `timestamp` означает **время доступности полностью завершённого интервала**, а не его open time;
+- для exchange kline с open/close timestamps в feature layer должен использоваться close/availability timestamp, чтобы не допустить look-ahead.
+
+Первый feature layer:
+
+- taker buy volume;
+- taker sell volume;
+- taker net volume = buy - sell;
+- taker imbalance = net / (buy + sell);
+- taker buy share;
+- taker sell share;
+- delta;
+- change%;
+- z-score against strictly past observations.
+
+Causal rule:
+
+~~~text
+completed interval
+      ↓
+availability / close timestamp
+      ↓
+features(T)
+      ↓
+base candle at T or later
+~~~
+
+Нельзя использовать полный объём завершённого интервала на его open timestamp.
+
+Для Binance futures официальная документация указывает taker buy volume в kline/continuous-kline данных и отдельный taker buy/sell volume endpoint; отдельный taker buy/sell volume endpoint ограничен последними 30 днями, поэтому он не должен быть единственным историческим источником для годового training dataset. Для исторического слоя предпочтителен источник, позволяющий получить completed kline data с корректным availability timestamp.
+
+Пока не реализуются:
+
+- CVD;
+- absorption;
+- liquidity walls;
+- order-book changes;
+- market depth.
+
+Они требуют отдельного source contract и проверки исторической доступности.
+
+
 Позднее, при наличии исторических источников:
 
 - Order Book;
