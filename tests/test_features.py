@@ -62,6 +62,14 @@ def test_feature_columns_and_shape():
         "wyckoff_sign_of_strength",
         "wyckoff_sign_of_weakness",
         "wyckoff_state",
+        "setup_candidate_active",
+        "setup_candidate_up",
+        "setup_candidate_down",
+        "setup_candidate_conflicted",
+        "setup_primary_family",
+        "setup_direction",
+        "setup_reference_price",
+        "setup_invalidation_price",
     ]:
         assert column in result.columns
 
