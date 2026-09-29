@@ -814,3 +814,42 @@ Latest verified full-suite result remains:
 **Next task:** server verification of the current Wyckoff implementation. If
 green, continue with the next market-state representation layer; do not mark
 Wyckoff accepted before actual FrostDeploy test output.
+
+
+## 2026-09-29 — Architecture direction: autonomous 24/7 market scanner
+
+### New project requirement
+
+AICFA должна развиваться не только как AI, отвечающий на скриншоты/вопросы, но и как автономная 24/7 Market Scanner + Setup Event Engine.
+
+Цель:
+- централизованно анализировать заданный Universe of Assets;
+- в дальнейшем поддерживать Top-N ликвидных активов, включая Top 100, и пользовательские watchlists;
+- постоянно пересчитывать текущие market features/state;
+- обнаруживать setup candidates независимо от пользовательского запроса;
+- формировать события created / strengthened / invalidated / expired / outcome;
+- отправлять релевантные уведомления подписанным пользователям;
+- рассчитывать рынок один раз и раздавать результаты множеству пользователей, а не запускать отдельный scanner на каждого.
+
+### Latency modes
+
+- Scalping: требует low-latency streaming/WebSocket или сопоставимого realtime source. Polling раз в минуту может быть достаточен для некоторых минутных состояний, но не является полноценным источником для низколатентного scalp execution.
+- Intraday: регулярное обновление текущего состояния.
+- Swing: более редкие обновления на старших таймфреймах.
+- Position: HTF monitoring.
+
+### Important architectural boundary
+
+Scanner/analysis и trade execution — отдельные подсистемы. Базовый AICFA должен работать без доступа к торговому аккаунту. В будущем допускается отдельный opt-in execution adapter через биржу/брокера/торговый терминал после paper trading, backtest, risk controls и отдельной валидации.
+
+### Scaling
+
+Market features и setup events вычисляются централизованно. Пользователи получают уже рассчитанные события через subscription/notification layer. Архитектура должна быть пригодна для большого количества подключённых пользователей без N-кратного повторения одного и того же анализа.
+
+### Data provider
+
+Market Data Engine должен использовать абстракцию provider. Бесплатные API допустимы для прототипа/периодического мониторинга, но не считаются гарантированным источником для 24/7 low-latency Top-100 коммерческой нагрузки до проверки rate limits, latency, websocket, historical access, commercial terms и reliability.
+
+### Status
+
+Зафиксировано как архитектурное направление/требование. Реализация scanner начинается после достаточной полноты market-state representation и не должна преждевременно заменять текущий causal feature-engineering этап.
