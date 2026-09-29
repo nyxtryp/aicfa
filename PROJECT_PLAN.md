@@ -1372,3 +1372,48 @@ This layer is intentionally separate from provider transport. Binance REST, futu
 3. Extend provider transport with retry/reconnect semantics and WebSocket behind the existing provider-agnostic contract.
 4. Connect fresh/stale status to centralized scanner and Setup Event lifecycle.
 
+## 2026-09-29 — Real Binance BTC/USDT REST smoke test
+
+### Server verification
+
+FrostDeploy release:
+`2026-09-29T12-43-03-a3c008f`
+
+Mandatory full suite:
+```
+184 passed, 4863 warnings in 40.70s
+```
+
+Real server-side Binance REST smoke test was then executed as `fd-aicfa` against the deployed release.
+
+Verified successfully:
+- Binance Spot BTC/USDT `1m` endpoint returned 5 real OHLCV candles;
+- Binance USDⓈ-M Futures BTC/USDT `1m` endpoint returned 5 real OHLCV candles;
+- both responses contained valid timestamp/open/high/low/close/volume data;
+- the latest returned candle timestamp was identical across Spot/Futures;
+- the adapter successfully normalized the responses into AICFA's canonical OHLCV DataFrame.
+
+Observed latest closes during the smoke test:
+- Spot: `84306.01`
+- Futures: `84252.3`
+
+These values are only the smoke-test observation and are not stored as a permanent market fact.
+
+### Status
+
+**Binance REST BTC/USDT prototype: GREEN for current server-side connectivity and response parsing.**
+
+This does not yet mean Binance is permanently selected as AICFA's production provider.
+
+### Next task
+
+Implement provider-agnostic live transport reliability:
+1. bounded REST retry/recovery behavior;
+2. explicit transport failure classification;
+3. WebSocket incremental market-data transport;
+4. reconnect/resubscribe behavior;
+5. feed confirmed observations into the existing LocalMarketStateStore;
+6. keep stale-state semantics and the analytical core independent of provider availability.
+
+No live transport implementation should fabricate missing market observations.
+
