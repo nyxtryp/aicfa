@@ -132,6 +132,12 @@ def build_features(
                     "order_block_bearish_low","order_block_bearish_high"]:
         out[column]=order_blocks[column].to_numpy()
 
+    from .price_action import build_price_action
+    price_action = build_price_action(x)
+    for column in price_action.columns:
+        if column.startswith("pa_"):
+            out[column] = price_action[column].to_numpy()
+
     from .volume_volatility import build_volume_volatility
     volume_volatility = build_volume_volatility(x)
     for column in [
