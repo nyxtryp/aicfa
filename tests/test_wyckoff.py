@@ -61,7 +61,7 @@ def test_wyckoff_levels_are_strictly_prior():
 def test_wyckoff_spring_and_upthrust_are_observable_candidates():
     base = frame(40)
     # Establish a range, then penetrate/reclaim its lower boundary.
-    base.loc[30, ["open", "high", "low", "close"]] = [100.0, 101.0, 96.0, 100.5]
+    base.loc[30, ["open", "high", "low", "close"]] = [102.5, 103.0, 96.0, 102.5]
     spring = build_wyckoff(base, range_lookback=5)
     assert spring.loc[30, "wyckoff_spring"] == 1
 
