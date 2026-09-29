@@ -405,7 +405,7 @@ Adjusted only the test data so it contains actual confirmed HH/HL/LH/LL swing po
 
 **Production impact:** only the low-reclaim boundary changed; no unrelated engine logic was changed.
 
-**Post-fix server verification:** pending. The server must rerun the full pytest command after these commits.
+**Post-fix server verification:** PASS — FrostDeploy ran the full suite after the fixes: `26 passed, 12 warnings in 4.46s`.
 
 Warnings remain non-blocking: pandas deprecation, NumPy timedelta deprecations, and pytest cache permission warnings in immutable FrostDeploy releases.
 
@@ -609,7 +609,7 @@ This file is the persistent handoff/memory for future chats.
 
 **Last code commits:** `d7a04d0ac22e0bed23dcb00a3198474676bdea27` and `57a180b2f8cde42ec815bb06b506b4c528221804`
 
-**Current layer:** Liquidity — failure fixes applied, post-fix server verification pending
+**Current layer:** Liquidity — verified green on FrostDeploy
 
 **Current state:**
 - Market Structure: first causal implementation complete, refinement pending.
@@ -626,7 +626,7 @@ This file is the persistent handoff/memory for future chats.
 - Paper Trading: not started.
 - Top-100 assets: explicitly postponed.
 
-**Immediate action:** rerun the full pytest suite on FrostDeploy after the two fix commits. Proceed to Displacement only after the current foundation is green.
+**Immediate action:** begin the Displacement Engine. The current foundation is green on FrostDeploy.
 
 ---
 
