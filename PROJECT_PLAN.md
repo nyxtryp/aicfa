@@ -1168,3 +1168,15 @@ The verified layer now covers causal external/internal HH/HL/LH/LL, BOS/CHoCH, p
 - displacement-aware MSS up/down.
 
 Add focused integration tests for column presence, value propagation, and causal future-change invariance. Do not add a score, signal, confirmation counter, or ML logic. After this layer is green, continue the planned Liquidity refinement.
+
+
+### Unified SMC refinement implementation
+
+Commit:
+- 045f7480aebb7b19bfe72bb02952d49a4c9a661d — Expose refined Market Structure in Unified SMC.
+
+Unified SMC now carries the refined Market Structure namespace into canonical `smc_*` fields: internal swing classifications, internal BOS/CHoCH and direction, displacement-aware MSS, and protected high/low prices plus created/active/broken lifecycle observations. When Unified SMC builds its own structure, it now passes the causal displacement frame into Market Structure so MSS remains genuinely displacement-aware rather than becoming a CHoCH alias.
+
+No score, signal, confirmation counter, or ML logic was added.
+
+Server verification: pending.
