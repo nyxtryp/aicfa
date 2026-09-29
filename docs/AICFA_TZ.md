@@ -1919,3 +1919,42 @@ AICFA должна полностью работать как аналитиче
 
 Бесплатный API может быть достаточен для прототипа, периодического мониторинга и некоторых не-latency-sensitive режимов, но нельзя заранее считать бесплатный источник достаточным для 24/7 Top-100 low-latency scanning или массового коммерческого сервиса. Лимиты, задержка, websocket availability, historical access, commercial-use terms и reliability должны проверяться отдельно для каждого provider.
 \n\n# 15. Setup Detection Engine\n\nAICFA должен иметь отдельный causal Setup Detection Engine между Feature/Market-State слоями и будущими Risk/Decision подсистемами.\n\n~~~text\nMarket Features / State\n  ↓\nSetup Detection\n  ↓\nSetup Candidate Events\n  ↓\nHistorical Outcome Labels / Validation\n  ↓\nRisk / Decision\n~~~\n\nSetup Detection не является торговым сигналом. Он формирует воспроизводимые кандидаты на основе уже наблюдаемых событий и контекста. До статистической проверки нельзя присваивать setup probability, confidence score или гарантированный исход.\n\nПервый набор семейств: liquidity reversal, structure continuation, breakout retest, failed breakout, Wyckoff Spring/Upthrust и expansion. Для каждого семейства существуют up/down признаки. Если на одном timestamp одновременно присутствуют противоположные направления, состояние маркируется conflicted и направление не принуждается.\n\nFVG, Order Block, Premium/Discount, absorption, CVD, taker flow и derivatives используются как отдельный context layer, а не как сумма подтверждений или индикаторный score.\n\nSetup reference/invalidation price может использовать только уже наблюдавшийся уровень. Это контекстная граница, а не future target.\n\nUnavailable optional data не заменяется синтетическими значениями. Семейство setup, требующее отсутствующего источника, не должно искусственно активироваться.\n\nSetup candidates в дальнейшем должны получать отдельные future outcome labels в Label Engine и проходить chronological statistical validation. Только после этого допускаются scoring/probability и Decision Engine.\n
+
+# 15. Canonical Market State Representation
+
+AICFA должен иметь отдельный causal Market State слой между Feature/Scenario/Setup Detection и будущим Setup Event Engine.
+
+```text
+Market Features
+  ↓
+Scenario / Setup Detection
+  ↓
+Canonical Market State
+  ↓
+Setup Event Engine
+  ↓
+Historical Outcome Labels / Validation
+  ↓
+Risk / Decision
+```
+
+Market State не является сигналом, score, probability или Decision Engine. Его задача — собрать уже рассчитанные наблюдаемые состояния в стабильное машинно-читаемое представление для live scanner и последующего event lifecycle.
+
+Каноническое состояние должно сохранять как минимум:
+- направление структуры;
+- активность/направление/семейство текущего scenario;
+- активность setup candidate;
+- up/down/conflicted состояние setup;
+- нейтральное направление при конфликте;
+- primary setup family только при единственной непротиворечивой семье;
+- готовность SMC state;
+- premium/discount context;
+- volatility/volume regime;
+- Wyckoff state;
+- доступность опциональных CVD, taker flow, absorption и order-book источников.
+
+Отсутствующий источник маркируется unavailable и не заменяется нулевым или синтетическим значением. Availability mask является только битовой маской доступности источников, а не confidence score.
+
+`market_state_changed` предназначен как детерминированный вход будущего Setup Event Engine. Сам по себе он не означает created/strengthened/invalidated/expired: эти lifecycle-события будут реализованы отдельно.
+
+Все поля Market State должны оставаться causal: будущее не может переписать состояние предыдущей строки. Future outcome labels остаются отдельным Label Engine.
