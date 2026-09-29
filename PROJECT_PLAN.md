@@ -1125,3 +1125,15 @@ Known limitations:
 - Unified SMC currently exposes the first-generation structure namespace and should be extended to carry the new protected/internal/MSS observations after this structure layer is verified.
 
 **Next concrete action:** run the full FrostDeploy pytest suite. If green, extend Unified SMC with protected/internal/MSS observations and add integration/causality tests, then continue Liquidity refinement.
+
+
+### Verification correction — protected-high fixture
+
+Commit:
+- 3c512c21b642db11956e8dd6bc30d34b7f7ab6c2 — Correct protected high lifecycle fixture.
+
+The server run exposed a test-fixture expectation error, not an implementation failure: with the current causal rule, a bearish BOS protects the latest confirmed external swing high known at that row. In this fixture that level is 101.5, so the test was corrected from 105.5 to 101.5. The implementation was not changed.
+
+Server status after this test-only correction: **pending rerun**.
+
+Next concrete action: rerun the mandatory FrostDeploy suite. If green, accept the Market Structure refinement and extend Unified SMC with the new protected/internal/MSS observations.
