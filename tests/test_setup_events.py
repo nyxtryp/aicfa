@@ -19,6 +19,19 @@ def state():
     })
 
 
+def replacement_state():
+    ts = pd.date_range("2026-01-02", periods=4, freq="min", tz="UTC")
+    return pd.DataFrame({
+        "timestamp": ts.astype("int64") // 10**6,
+        "market_state_setup_active": [0, 1, 1, 1],
+        "market_state_setup_direction": [0, 1, -1, -1],
+        "market_state_setup_conflicted": [0, 0, 0, 0],
+        "market_state_setup_family": ["", "liquidity_reversal", "failed_breakout",
+                                      "failed_breakout"],
+        "market_state_changed": [1, 1, 1, 0],
+    })
+
+
 def test_created_then_strengthened_and_repeated_state():
     out = build_setup_events(state())
 
@@ -36,14 +49,28 @@ def test_invalidation_and_expiration_are_distinct():
     assert out.loc[4, "setup_event_type"] == "expired"
 
 
-def test_replacement_creates_new_event():
+def test_new_setup_after_expiration_is_created_only():
     out = build_setup_events(state())
 
     assert out.loc[5, "setup_event_type"] == "created"
     assert out.loc[5, "setup_event_created"] == 1
-    assert out.loc[5, "setup_event_invalidated"] == 1
+    assert out.loc[5, "setup_event_invalidated"] == 0
     assert out.loc[5, "setup_event_family"] == "failed_breakout"
     assert out.loc[5, "setup_event_direction"] == -1
+
+
+def test_replacement_creates_new_event_and_invalidates_previous_identity():
+    out = build_setup_events(replacement_state())
+
+    assert out.loc[1, "setup_event_type"] == "created"
+    assert out.loc[1, "setup_event_created"] == 1
+
+    assert out.loc[2, "setup_event_type"] == "created"
+    assert out.loc[2, "setup_event_created"] == 1
+    assert out.loc[2, "setup_event_invalidated"] == 1
+    assert out.loc[2, "setup_event_expired"] == 0
+    assert out.loc[2, "setup_event_family"] == "failed_breakout"
+    assert out.loc[2, "setup_event_direction"] == -1
 
 
 def test_conflicted_setup_has_no_directional_event():
