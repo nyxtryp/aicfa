@@ -31,6 +31,10 @@ def test_feature_columns_and_shape():
         "dealing_range_position",
         "breakout_up",
         "sweep_high_reject",
+        "smc_structure_direction",
+        "smc_displacement_direction",
+        "smc_premium_discount",
+        "smc_state_ready",
         "return_60",
     ]:
         assert column in result.columns
