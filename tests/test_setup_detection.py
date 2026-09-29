@@ -39,8 +39,12 @@ def test_conflicting_candidates_are_not_forced_into_one_direction():
     frame["smc_sweep_low_reclaim"] = 0
     frame["smc_sweep_high_reclaim"] = 0
     frame["smc_structure_shift"] = 0
-    frame.loc[4, ["smc_sweep_low_reclaim", "smc_structure_shift"]] = [1, 1]
-    frame.loc[4, ["smc_sweep_high_reclaim", "smc_structure_shift"]] = [1, -1]
+    frame["pa_bullish_rejection"] = 0
+    frame["pa_bearish_rejection"] = 0
+    frame.loc[4, "smc_sweep_low_reclaim"] = 1
+    frame.loc[4, "smc_sweep_high_reclaim"] = 1
+    frame.loc[4, "pa_bullish_rejection"] = 1
+    frame.loc[4, "pa_bearish_rejection"] = 1
 
     result = build_setup_candidates(frame)
 
