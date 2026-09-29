@@ -84,7 +84,7 @@ def test_fvg_requires_current_displacement_when_requested():
     # Current candle creates a gap but is not displacement.
     df.loc[20, ["open", "high", "low", "close", "volume"]] = [100, 101, 100.8, 100.9, 10]
     df.loc[21, ["open", "high", "low", "close", "volume"]] = [100.9, 102, 100.8, 101.5, 10]
-    df.loc[22, ["open", "high", "low", "close", "volume"]] = [103, 104, 103, 103.8, 10]
+    df.loc[22, ["open", "high", "low", "close", "volume"]] = [103, 104, 102.9, 103.8, 10]
     r = build_fvg(df, require_displacement=True)
     assert r.loc[22, "fvg_bullish"] == 0
 
