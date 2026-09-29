@@ -18,6 +18,17 @@ from .data_reliability import LocalMarketStateStore
 from .market_data import MarketKey, validate_ohlcv
 
 
+def default_websocket_connector(url: str, *, timeout: float) -> WebSocketConnection:
+    """Create a real WebSocket connection using the optional runtime client."""
+    try:
+        import websocket
+    except ImportError as exc:
+        raise WebSocketTransportError(
+            "websocket-client is required for live Binance WebSocket transport"
+        ) from exc
+    return websocket.create_connection(url, timeout=timeout)
+
+
 class WebSocketConnection(Protocol):
     def send(self, message: str) -> None: ...
     def recv(self) -> str: ...
@@ -96,7 +107,7 @@ class BinanceWebSocketMarketDataTransport:
         self,
         *,
         keys: tuple[MarketKey, ...],
-        connector: WebSocketConnector,
+        connector: WebSocketConnector = default_websocket_connector,
         timeout_seconds: float = 10.0,
         max_reconnects: int = 2,
         reconnect_backoff_seconds: float = 0.25,
