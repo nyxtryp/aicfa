@@ -421,3 +421,31 @@ The project plan is the source of truth for **what we are building, why, current
 - exact next step.
 
 Never rely on the chat history alone for project state.
+
+
+## 2026-09-29 — Real local vision benchmark: MiniCPM-V 4.6 rejected
+
+### Operator actions and environment
+- Verified `/tmp/btc.png`: PNG, 1131×817, RGB, 48 KB.
+- The image is a historical BTC/USDT 30-minute Binance/TradingView chart from 2025-07-08 and is used only as a vision benchmark, not as current market data.
+- Installed Ollama locally; version `0.34.4`; endpoint `127.0.0.1:11434`.
+- Hardware during the test: 2.8 GiB RAM, 1 vCPU, no GPU, 2.0 GiB swap.
+- Pulled `minicpm-v4.6` and processed the screenshot through the Ollama vision API with a Russian evidence-focused prompt.
+- During inference `llama-server` reached about 1.9 GiB RSS and about 95–100% CPU on the single vCPU; swap was used.
+- Inference completed in 299.5 seconds.
+- The inference process was then stopped; memory returned to about 523 MiB used / 1.9 GiB free.
+- Removed `minicpm-v4.6` with `ollama rm minicpm-v4.6`; `ollama list` is now empty.
+
+### Benchmark result
+MiniCPM-V 4.6 identified Bitcoin / TetherUS, but was insufficient for AICFA visual market-structure work: timeframe interpretation was wrong/ambiguous; HH/HL/LH/LL, BOS/CHoCH, FVG/imbalance and Order Block were not reliably identified; volume was incorrectly treated as liquidity evidence; and the response mixed Russian with Chinese/English despite the Russian-only instruction.
+
+### Decision
+**MiniCPM-V 4.6 is rejected as the active AICFA vision candidate.** The combination of about 5 minute latency, about 1.9 GiB resident memory on a 2.8 GiB RAM server, and insufficient SMC/chart-structure recognition does not meet the AICFA perception requirements. The model was removed. No AICFA architecture change was made.
+
+### Next exact step
+Proceed strictly to candidate 2: **Granite 3.2 Vision 2B**. Use the same `/tmp/btc.png` benchmark image and an equivalent evidence-focused prompt. Record latency, peak RAM, candle/chart reading, HH/HL/LH/LL, BOS/CHoCH, liquidity/sweep, FVG/imbalance, Order Block, Premium/Discount where visible, uncertainty/hallucinations, structured-output quality and AICFA validation compatibility.
+
+Do not activate any model in production until a candidate passes a real chart test and the full AICFA pytest suite remains green after any integration change. Do not install a larger model merely because it is larger.
+
+### Control rule reaffirmed
+All assistant and operator actions relevant to AICFA development must be recorded in this `PROJECT_PLAN.md`. The plan is the persistent source of truth; chat history alone is not sufficient. Before the next implementation/model step, read this plan first.
