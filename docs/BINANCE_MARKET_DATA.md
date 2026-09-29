@@ -47,3 +47,17 @@ It is **not yet declared the permanent production provider**. Before that decisi
 AICFA must verify operational limits, latency, reconnect behavior, historical
 coverage, regional/network accessibility, commercial/usage terms and the needs
 of the future Top-100 scanner.
+
+## REST recovery and failure handling
+
+The Binance adapter now applies bounded recovery before surfacing a transport failure:
+
+- network/timeout errors are retryable;
+- HTTP 429 and 5xx responses are retryable;
+- HTTP 4xx responses other than 429 are treated as non-recoverable;
+- retries use exponential backoff;
+- the retry count and initial backoff are configurable;
+- after the retry budget is exhausted, the adapter raises an explicit BinanceTransportError with a retryable classification;
+- the adapter never fabricates OHLCV data after a failed request.
+
+This transport layer does not own stale-state decisions. The existing LocalMarketStateStore remains the boundary that preserves the last confirmed state and exposes FRESH/STALE/UNAVAILABLE.
