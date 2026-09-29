@@ -105,4 +105,4 @@ def test_missing_context_and_conflicts_are_preserved():
     assert evidence.missing_context == ("higher timeframe",)
     assert evidence.conflicts == ("visible rejection conflicts with continuation",)
     assert evidence.observations[0].state == "possible"
-}
+)
