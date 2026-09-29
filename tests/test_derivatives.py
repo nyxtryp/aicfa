@@ -120,6 +120,40 @@ def test_derivatives_reject_negative_futures_volume():
         build_derivatives(base, d, baseline_window=2)
 
 
+def test_derivatives_spot_futures_relationship_is_causal():
+    base = base_frame()
+    d = derivatives_frame()
+    d["spot_price"] = [100.0, 101.0, 102.0, 103.0, 104.0, 105.0]
+    d["futures_price"] = [100.2, 101.4, 101.7, 103.5, 104.8, 105.2]
+
+    out = build_derivatives(base, d, baseline_window=2)
+
+    assert out.loc[0, "spot_price"] == 100.0
+    assert pd.isna(out.loc[1, "futures_spot_spread"])
+    assert np.isclose(out.loc[2, "futures_spot_spread"], 0.4)
+    assert np.isclose(out.loc[2, "futures_spot_spread_pct"], 101.7 / 102.0 - 1.0)
+    assert out.loc[3, "futures_spot_spread"] == 0.7
+    assert "futures_spot_spread_delta" in out
+    assert "futures_spot_spread_zscore" in out
+
+    altered = d.copy()
+    altered.loc[altered["timestamp"] >= pd.Timestamp("2026-01-01T00:08:00Z"), "spot_price"] *= 2
+    altered.loc[altered["timestamp"] >= pd.Timestamp("2026-01-01T00:08:00Z"), "futures_price"] *= 3
+    changed = build_derivatives(base, altered, baseline_window=2)
+    pd.testing.assert_frame_equal(out.iloc[:8], changed.iloc[:8], check_dtype=False)
+
+
+def test_derivatives_reject_nonpositive_spot_futures_prices():
+    base = base_frame()
+    d = derivatives_frame()
+    d["spot_price"] = 100.0
+    d["futures_price"] = 100.0
+    d.loc[1, "spot_price"] = 0.0
+
+    with pytest.raises(ValueError):
+        build_derivatives(base, d, baseline_window=2)
+
+
 def test_derivatives_positioning_basis_features_are_causal():
     base = base_frame()
     d = derivatives_frame()
@@ -132,8 +166,6 @@ def test_derivatives_positioning_basis_features_are_causal():
     assert out.loc[3, "long_short_ratio_global"] == 1.2
     assert out.loc[3, "long_short_ratio_top_trader"] == 1.1
     assert out.loc[3, "basis"] == 0.002
-    # Basis is a latest-known state, so the first observation remains visible
-    # on intervening base candles until a newer basis observation arrives.
     assert out.loc[1, "basis"] == 0.001
     assert "long_short_ratio_global_zscore" in out
     assert "basis_delta" in out
