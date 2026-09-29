@@ -1690,3 +1690,44 @@ Added a separate confirmed-observation deadline. Open kline updates still reset 
 
 ### Next step
 Run the full FrostDeploy pytest suite. If green, rerun the real Binance Spot + Futures BTC/USDT WebSocket smoke with an explicit confirmed-candle timeout appropriate for 1m. Do not mark WebSocket GREEN until both sides complete successfully.
+
+
+## 2026-09-29 — WebSocket watchdog test clock-sampling fix
+
+### Server verification finding
+
+The first server verification of the confirmed-candle watchdog release produced:
+```
+2 failed, 196 passed, 4864 warnings in 44.26s
+```
+
+Failures:
+- `tests/test_websocket_market_data.py::test_transport_bounds_continuous_read_timeouts`
+- `tests/test_websocket_market_data.py::test_transport_bounds_wait_for_confirmed_candle`
+
+Both failed with `RuntimeError: generator raised StopIteration`.
+
+### Root cause
+
+The tests use deterministic iterator-backed clocks. The transport sampled the injected clock multiple times during one receive cycle: once for deadline initialization, again for idle-deadline reset on a received open-kline message, and again for timeout evaluation. The test clock was intentionally sized for the required state transitions, so the extra sample exhausted the iterator and PEP 479 surfaced it as `RuntimeError: generator raised StopIteration`.
+
+### Forward-only fix
+
+Commit:
+- `18aa80d21c2b4f24a4d5a75143de511f6e546864` — **Fix WebSocket watchdog clock sampling**
+
+The transport now:
+- samples the clock once when a connection starts and uses that timestamp for both watchdog deadlines;
+- samples once when a stream message is received before resetting the idle watchdog;
+- keeps timeout evaluation based on its existing single time sample;
+- preserves the actual watchdog semantics; this is a deterministic-test/clock-sampling correction, not a relaxation of timeout bounds.
+
+### Verification status
+
+**PENDING server verification.**
+
+Next:
+1. wait for FrostDeploy deployment;
+2. rerun the full pytest suite;
+3. if green, run real Binance Spot + Futures BTC/USDT WebSocket smoke with explicit confirmed-candle timeout;
+4. only then mark WebSocket transport GREEN.
