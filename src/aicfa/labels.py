@@ -1,7 +1,15 @@
-"""Causal-to-past feature labels built from future market outcomes.
+"""Research-grade causal labels for AICFA.
 
-Labels intentionally look forward from each candle. They are targets for
-training/evaluation and must never be fed into the feature set.
+The module separates path statistics from trade-event labels.
+
+Features are causal. Labels are allowed to use future market data and must
+never be included in model inputs.
+
+The event labels follow a volatility-scaled triple-barrier design:
+profit-taking, stop-loss, and a maximum holding period. Horizontal barriers
+are expressed as multiples of a causal realized-volatility target. When both
+horizontal barriers are touched in the same OHLC bar, the intrabar order is
+unknown; the event is marked ambiguous instead of inventing a winner.
 """
 
 from __future__ import annotations
@@ -9,172 +17,262 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-
 EPS = 1e-12
+
+
+def _validate_input(df: pd.DataFrame) -> pd.DataFrame:
+    required = ["timestamp", "open", "high", "low", "close"]
+    missing = [column for column in required if column not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+
+    x = (
+        df[required]
+        .copy()
+        .sort_values("timestamp")
+        .drop_duplicates("timestamp")
+        .reset_index(drop=True)
+    )
+
+    for column in required[1:]:
+        x[column] = x[column].astype(float)
+
+    if (x["high"] < x[["open", "close"]].max(axis=1)).any():
+        raise ValueError("Invalid OHLC: high is below open/close")
+    if (x["low"] > x[["open", "close"]].min(axis=1)).any():
+        raise ValueError("Invalid OHLC: low is above open/close")
+    if (x["low"] <= 0).any() or (x["close"] <= 0).any():
+        raise ValueError("Prices must be positive")
+
+    return x
+
+
+def _realized_volatility(close: pd.Series, span: int) -> pd.Series:
+    """Causal EWMA standard deviation of log returns."""
+    log_return = np.log(close.clip(lower=EPS)).diff()
+    return log_return.ewm(span=span, min_periods=span, adjust=False).std(bias=False)
+
+
+def _path_metrics(
+    close: pd.Series,
+    high: pd.Series,
+    low: pd.Series,
+    target_vol: pd.Series,
+    horizon: int,
+    out: pd.DataFrame,
+) -> None:
+    future_close = close.shift(-horizon)
+    complete = future_close.notna()
+
+    future_log_return = np.log(
+        future_close.clip(lower=EPS) / close.clip(lower=EPS)
+    )
+
+    future_high = pd.concat(
+        [high.shift(-i) for i in range(1, horizon + 1)],
+        axis=1,
+    ).max(axis=1)
+    future_low = pd.concat(
+        [low.shift(-i) for i in range(1, horizon + 1)],
+        axis=1,
+    ).min(axis=1)
+
+    mfe_long = np.log(future_high.clip(lower=EPS) / close.clip(lower=EPS))
+    mfe_short = np.log(close.clip(lower=EPS) / future_low.clip(lower=EPS))
+    mae_long = np.log(close.clip(lower=EPS) / future_low.clip(lower=EPS))
+    mae_short = np.log(future_high.clip(lower=EPS) / close.clip(lower=EPS))
+
+    out[f"future_return_{horizon}"] = (
+        future_close / close.clip(lower=EPS) - 1.0
+    )
+    out[f"future_log_return_{horizon}"] = future_log_return
+    out[f"future_mfe_long_{horizon}"] = mfe_long.clip(lower=0.0)
+    out[f"future_mfe_short_{horizon}"] = mfe_short.clip(lower=0.0)
+    out[f"future_mae_long_{horizon}"] = mae_long.clip(lower=0.0)
+    out[f"future_mae_short_{horizon}"] = mae_short.clip(lower=0.0)
+
+    safe_vol = target_vol.replace(0.0, np.nan)
+    out[f"future_mfe_long_r_{horizon}"] = (
+        out[f"future_mfe_long_{horizon}"] / safe_vol
+    )
+    out[f"future_mfe_short_r_{horizon}"] = (
+        out[f"future_mfe_short_{horizon}"] / safe_vol
+    )
+    out[f"future_mae_long_r_{horizon}"] = (
+        out[f"future_mae_long_{horizon}"] / safe_vol
+    )
+    out[f"future_mae_short_r_{horizon}"] = (
+        out[f"future_mae_short_{horizon}"] / safe_vol
+    )
+    out[f"target_vol_{horizon}"] = target_vol
+
+    time_to_mfe_long = np.full(len(close), np.nan, dtype=float)
+    time_to_mfe_short = np.full(len(close), np.nan, dtype=float)
+
+    high_values = high.to_numpy(dtype=float)
+    low_values = low.to_numpy(dtype=float)
+
+    for i in range(len(close) - horizon):
+        if not complete.iloc[i]:
+            continue
+        highs = high_values[i + 1 : i + horizon + 1]
+        lows = low_values[i + 1 : i + horizon + 1]
+        time_to_mfe_long[i] = float(np.nanargmax(highs) + 1)
+        time_to_mfe_short[i] = float(np.nanargmin(lows) + 1)
+
+    out[f"time_to_mfe_long_{horizon}"] = time_to_mfe_long
+    out[f"time_to_mfe_short_{horizon}"] = time_to_mfe_short
+
+
+def _triple_barrier(
+    close: pd.Series,
+    high: pd.Series,
+    low: pd.Series,
+    target_vol: pd.Series,
+    horizon: int,
+    pt_mult: float,
+    sl_mult: float,
+    out: pd.DataFrame,
+) -> None:
+    """Create path-aware event labels with explicit OHLC ambiguity handling."""
+
+    n = len(close)
+    close_values = close.to_numpy(dtype=float)
+    high_values = high.to_numpy(dtype=float)
+    low_values = low.to_numpy(dtype=float)
+    vol_values = target_vol.to_numpy(dtype=float)
+
+    event_outcome = np.full(n, np.nan, dtype=float)
+    event_touch = np.full(n, np.nan, dtype=float)
+    event_return = np.full(n, np.nan, dtype=float)
+    event_log_return = np.full(n, np.nan, dtype=float)
+    event_end_offset = np.full(n, np.nan, dtype=float)
+    event_target = np.full(n, np.nan, dtype=float)
+    event_ambiguous = np.full(n, np.nan, dtype=float)
+
+    for i in range(n - horizon):
+        vol = vol_values[i]
+        if not np.isfinite(vol) or vol <= 0:
+            continue
+
+        entry = close_values[i]
+        upper = np.exp(pt_mult * vol) * entry
+        lower = np.exp(-sl_mult * vol) * entry
+
+        resolved = False
+
+        for offset in range(1, horizon + 1):
+            j = i + offset
+            hit_upper = high_values[j] >= upper
+            hit_lower = low_values[j] <= lower
+
+            if hit_upper and hit_lower:
+                event_ambiguous[i] = 1.0
+                event_end_offset[i] = float(offset)
+                event_target[i] = vol
+                resolved = True
+                break
+
+            if hit_upper:
+                event_outcome[i] = 1.0
+                event_touch[i] = 1.0
+                event_return[i] = upper / entry - 1.0
+                event_log_return[i] = pt_mult * vol
+                event_end_offset[i] = float(offset)
+                event_target[i] = vol
+                event_ambiguous[i] = 0.0
+                resolved = True
+                break
+
+            if hit_lower:
+                event_outcome[i] = -1.0
+                event_touch[i] = -1.0
+                event_return[i] = lower / entry - 1.0
+                event_log_return[i] = -sl_mult * vol
+                event_end_offset[i] = float(offset)
+                event_target[i] = vol
+                event_ambiguous[i] = 0.0
+                resolved = True
+                break
+
+        if resolved:
+            continue
+
+        j = i + horizon
+        final_log_return = np.log(close_values[j] / entry)
+        event_log_return[i] = final_log_return
+        event_return[i] = np.exp(final_log_return) - 1.0
+        event_outcome[i] = float(np.sign(final_log_return))
+        event_touch[i] = 0.0
+        event_end_offset[i] = float(horizon)
+        event_target[i] = vol
+        event_ambiguous[i] = 0.0
+
+    out[f"event_outcome_{horizon}"] = event_outcome
+    out[f"event_touch_{horizon}"] = event_touch
+    out[f"event_return_{horizon}"] = event_return
+    out[f"event_log_return_{horizon}"] = event_log_return
+    out[f"event_end_offset_{horizon}"] = event_end_offset
+    out[f"event_target_vol_{horizon}"] = event_target
+    out[f"event_ambiguous_{horizon}"] = event_ambiguous
 
 
 def build_labels(
     df: pd.DataFrame,
     horizons: tuple[int, ...] = (5, 20, 60),
-    barrier_atr: float = 1.0,
+    volatility_span: int = 64,
+    pt_mult: float = 2.0,
+    sl_mult: float = 1.0,
 ) -> pd.DataFrame:
-    """Build future-outcome labels from OHLC candles."""
-    required = ["timestamp", "open", "high", "low", "close"]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise ValueError(f"Missing required columns: {missing}")
+    """Build causal-to-past feature labels from future market outcomes.
 
-    x = df[required].copy()
-    x = x.sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+    The output contains two distinct target families:
+
+    1. Path targets: future return, MFE/MAE and time-to-MFE.
+    2. Event targets: volatility-scaled triple-barrier outcomes.
+
+    The barrier multipliers are configuration parameters for research. They
+    are not claimed to be optimal trading parameters.
+    """
 
     if not horizons or any(h <= 0 for h in horizons):
         raise ValueError("horizons must contain positive integers")
-    if barrier_atr <= 0:
-        raise ValueError("barrier_atr must be positive")
+    if len(set(horizons)) != len(horizons):
+        raise ValueError("horizons must be unique")
+    if volatility_span < 2:
+        raise ValueError("volatility_span must be at least 2")
+    if pt_mult <= 0 or sl_mult <= 0:
+        raise ValueError("pt_mult and sl_mult must be positive")
 
-    c = x["close"].astype(float)
-    h = x["high"].astype(float)
-    l = x["low"].astype(float)
-
-    prev_close = c.shift(1)
-    true_range = pd.concat(
-        [
-            h - l,
-            (h - prev_close).abs(),
-            (l - prev_close).abs(),
-        ],
-        axis=1,
-    ).max(axis=1)
-    atr = true_range.rolling(14, min_periods=14).mean()
+    x = _validate_input(df)
+    close = x["close"]
+    high = x["high"]
+    low = x["low"]
+    target_vol = _realized_volatility(close, volatility_span)
 
     out = x.copy()
 
     for horizon in horizons:
-        future_close = c.shift(-horizon)
-        complete = future_close.notna()
-
-        out[f"future_return_{horizon}"] = future_close / c.clip(lower=EPS) - 1.0
-
-        future_high_frame = pd.concat(
-            [h.shift(-i) for i in range(1, horizon + 1)],
-            axis=1,
-        )
-        future_low_frame = pd.concat(
-            [l.shift(-i) for i in range(1, horizon + 1)],
-            axis=1,
+        _path_metrics(close, high, low, target_vol, horizon, out)
+        _triple_barrier(
+            close,
+            high,
+            low,
+            target_vol,
+            horizon,
+            pt_mult,
+            sl_mult,
+            out,
         )
 
-        future_high = future_high_frame.max(axis=1)
-        future_low = future_low_frame.min(axis=1)
-
-        out[f"future_mfe_long_{horizon}"] = (
-            future_high / c.clip(lower=EPS) - 1.0
-        ).clip(lower=0.0)
-        out[f"future_mfe_short_{horizon}"] = (
-            1.0 - future_low / c.clip(lower=EPS)
-        ).clip(lower=0.0)
-        out[f"future_mae_long_{horizon}"] = (
-            1.0 - future_low / c.clip(lower=EPS)
-        ).clip(lower=0.0)
-        out[f"future_mae_short_{horizon}"] = (
-            future_high / c.clip(lower=EPS) - 1.0
-        ).clip(lower=0.0)
-
-        mfe_long_time = np.full(len(x), np.nan, dtype=float)
-        mfe_short_time = np.full(len(x), np.nan, dtype=float)
-        for i in range(len(x) - horizon):
-            if not complete.iloc[i]:
-                continue
-            highs = h.iloc[i + 1 : i + horizon + 1].to_numpy(dtype=float)
-            lows = l.iloc[i + 1 : i + horizon + 1].to_numpy(dtype=float)
-            mfe_long_time[i] = float(np.nanargmax(highs) + 1)
-            mfe_short_time[i] = float(np.nanargmin(lows) + 1)
-
-        out[f"time_to_mfe_long_{horizon}"] = mfe_long_time
-        out[f"time_to_mfe_short_{horizon}"] = mfe_short_time
-
-        long_tp = c + barrier_atr * atr
-        long_sl = c - barrier_atr * atr
-
-        triple = np.full(len(x), np.nan, dtype=float)
-        censored_time = float(horizon + 1)
-        time_long_tp = np.full(len(x), np.nan, dtype=float)
-        time_long_sl = np.full(len(x), np.nan, dtype=float)
-        time_short_tp = np.full(len(x), np.nan, dtype=float)
-        time_short_sl = np.full(len(x), np.nan, dtype=float)
-
-        for i in range(len(x) - horizon):
-            if not complete.iloc[i]:
-                continue
-
-            if pd.isna(atr.iloc[i]):
-                time_long_tp[i] = censored_time
-                time_long_sl[i] = censored_time
-                time_short_tp[i] = censored_time
-                time_short_sl[i] = censored_time
-                continue
-
-            time_long_tp[i] = censored_time
-            time_long_sl[i] = censored_time
-            time_short_tp[i] = censored_time
-            time_short_sl[i] = censored_time
-
-            tp_long = long_tp.iloc[i]
-            sl_long = long_sl.iloc[i]
-
-            result = 0.0
-            for offset, j in enumerate(
-                range(i + 1, i + horizon + 1), start=1
-            ):
-                hit_upper = h.iloc[j] >= tp_long
-                hit_lower = l.iloc[j] <= sl_long
-
-                # Upper = long TP + short SL.
-                # Lower = long SL + short TP.
-                # Both in one OHLC candle are ambiguous intrabar.
-                if hit_upper and hit_lower:
-                    time_long_tp[i] = offset
-                    time_short_sl[i] = offset
-                    time_long_sl[i] = offset
-                    time_short_tp[i] = offset
-                    result = 0.0
-                    break
-
-                if hit_upper:
-                    time_long_tp[i] = offset
-                    time_short_sl[i] = offset
-                    result = 1.0
-                    break
-
-                if hit_lower:
-                    time_long_sl[i] = offset
-                    time_short_tp[i] = offset
-                    result = -1.0
-                    break
-
-            triple[i] = result
-
-        out[f"time_to_long_tp_{horizon}"] = time_long_tp
-        out[f"time_to_long_sl_{horizon}"] = time_long_sl
-        out[f"time_to_short_tp_{horizon}"] = time_short_tp
-        out[f"time_to_short_sl_{horizon}"] = time_short_sl
-        out[f"triple_barrier_{horizon}"] = triple
-
-        label_columns = (
-            f"future_return_{horizon}",
-            f"future_mfe_long_{horizon}",
-            f"future_mfe_short_{horizon}",
-            f"future_mae_long_{horizon}",
-            f"future_mae_short_{horizon}",
-            f"time_to_mfe_long_{horizon}",
-            f"time_to_mfe_short_{horizon}",
-            f"time_to_long_tp_{horizon}",
-            f"time_to_long_sl_{horizon}",
-            f"time_to_short_tp_{horizon}",
-            f"time_to_short_sl_{horizon}",
-            f"triple_barrier_{horizon}",
-        )
+        future_complete = close.shift(-horizon).notna()
+        label_columns = [
+            column
+            for column in out.columns
+            if column.endswith(f"_{horizon}")
+            or column.endswith(f"_{horizon}_r")
+        ]
         for column in label_columns:
-            out.loc[~complete, column] = np.nan
+            out.loc[~future_complete, column] = np.nan
 
     return out
