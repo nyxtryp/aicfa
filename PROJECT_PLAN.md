@@ -1137,3 +1137,15 @@ The server run exposed a test-fixture expectation error, not an implementation f
 Server status after this test-only correction: **pending rerun**.
 
 Next concrete action: rerun the mandatory FrostDeploy suite. If green, accept the Market Structure refinement and extend Unified SMC with the new protected/internal/MSS observations.
+
+
+### Verification correction — protected-low fixture
+
+Commit:
+- a5b0fa466eacc66256c3e0387dc2d2668a7e2122 — Correct protected low lifecycle fixture.
+
+The next FrostDeploy run exposed the symmetric fixture expectation error on the bullish BOS row: with the current causal rule, a bullish BOS protects the latest confirmed external swing low known at that row. In this fixture that level is 97.5, not 98.5. Only the test expectation was corrected; production Market Structure logic was not changed.
+
+Server status after this test-only correction: **pending rerun**.
+
+Next concrete action: rerun the mandatory FrostDeploy suite. If green, accept the Market Structure refinement and extend Unified SMC with protected/internal/MSS observations and integration/causality tests.
