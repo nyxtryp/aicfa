@@ -1233,3 +1233,96 @@ Binance is currently the **first concrete prototype provider**, not yet the perm
 ### Next task
 
 Server-verify the Binance adapter. If green, perform a real BTC/USDT provider smoke test and then extend the transport toward WebSocket/incremental live operation without changing the causal Feature Engine contract.
+
+## 2026-09-29 — Data Reliability / Freshness architecture decision
+
+### Architectural decision
+
+External market-data providers are **replaceable inputs, not dependencies of AICFA intelligence**.
+
+Binance is currently only the first concrete BTC/USDT prototype adapter. AICFA analysis must not stop merely because one REST API or WebSocket is unavailable.
+
+Target flow:
+
+```
+External Providers
+  ├─ REST/API
+  ├─ WebSocket
+  ├─ future Provider B/C
+  └─ historical/local sources
+          ↓
+Market Data Layer
+          ↓
+Local Latest Confirmed Market State
+          ↓
+AICFA Analysis Core
+          ↓
+Features → Canonical State → Setup Events
+```
+
+### Required Data Reliability / Freshness layer
+
+Before treating live transport as production-ready, implement a dedicated reliability boundary that:
+
+- stores the latest confirmed market state/data locally;
+- tracks `last_update`, data age and explicit freshness status;
+- distinguishes at least `FRESH`, `STALE`, and unavailable/no-confirmed-state conditions;
+- continues analysis from the latest confirmed local state when an external provider fails;
+- never fabricates candles, trades, order-book states or other market observations;
+- never presents stale data as current;
+- exposes freshness/staleness explicitly to downstream Setup/Decision logic;
+- allows later provider failover without changing the analytical core.
+
+When data becomes stale, AICFA may continue descriptive analysis of the last confirmed state, but downstream decision logic must be able to enter WAIT / no-action behavior or otherwise account for stale data. A stale state is not a new market observation.
+
+### Knowledge Base vs Historical Experience
+
+Do **not** continuously dump live candles into the Knowledge Base.
+
+Keep these stores conceptually separate:
+
+**Knowledge Base**
+- definitions and rules;
+- SMC / Price Action / Wyckoff concepts;
+- market-regime concepts;
+- methodology;
+- source/version/relationship metadata.
+
+**Historical / Experience / Outcome data**
+- historical market states;
+- detected setups;
+- setup lifecycle;
+- what happened after each setup;
+- future outcome labels generated only in a separate causal/historical validation pipeline;
+- regime/context and statistical results.
+
+Live data therefore feeds the current market state and later produces historical experience/outcomes. It does not need to mutate the conceptual Knowledge Base on every update.
+
+### Updated forward roadmap
+
+1. Server-verify Binance prototype.
+2. Real BTC/USDT smoke test.
+3. Implement Data Reliability / Freshness + Local Latest Confirmed State.
+4. Add REST recovery and WebSocket/live incremental transport behind the provider-agnostic contract.
+5. Connect live transport to the centralized scanner and current Setup Event Engine.
+6. Persist historical market situations and completed setup outcomes in a separate Experience/Outcome store.
+7. Build structured Knowledge Base separately from market-event history.
+8. Historical similarity / Active Information Gathering.
+9. Dataset construction and first ML baseline.
+10. PyTorch models and chronological evaluation.
+11. Backtest with fees/slippage/funding.
+12. Paper trading.
+13. Production API/platform and later optional execution adapter.
+
+Top-100 expansion remains postponed until BTC/USDT core and the live reliability architecture are stable.
+
+### Control rule for future chat continuity
+
+`PROJECT_PLAN.md` is the persistent control memory for this project. Before every new implementation stage, read it first. After every meaningful commit, append the SHA, exact change, tests/verification, limitations and next step. Never mark a stage green without actual current FrostDeploy/server verification.
+
+Current state at this checkpoint:
+- provider-agnostic Live Market Data / Scanner foundation: **GREEN**;
+- Binance REST OHLCV prototype: **implemented, server verification pending**;
+- Data Reliability / Freshness layer: **architecture fixed, implementation pending**;
+- Knowledge Base: **planned, intentionally separate from live market history/experience**.
+
