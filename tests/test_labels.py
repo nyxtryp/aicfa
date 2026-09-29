@@ -85,8 +85,12 @@ def test_event_outcomes_are_valid_codes() -> None:
 
 def test_ambiguous_ohlc_bar_is_not_assigned_a_winner() -> None:
     df = make_ohlc(20)
-    df.loc[1, "high"] = df.loc[0, "close"] * 1.2
-    df.loc[1, "low"] = df.loc[0, "close"] * 0.8
+
+    # With volatility_span=2 the first finite causal volatility target is
+    # available at index 2. Create the ambiguous bar immediately after it.
+    anchor = 2
+    df.loc[anchor + 1, "high"] = df.loc[anchor, "close"] * 1.2
+    df.loc[anchor + 1, "low"] = df.loc[anchor, "close"] * 0.8
 
     labels = build_labels(
         df,
@@ -96,8 +100,8 @@ def test_ambiguous_ohlc_bar_is_not_assigned_a_winner() -> None:
         sl_mult=1.0,
     )
 
-    assert labels.loc[0, "event_ambiguous_5"] == 1.0
-    assert np.isnan(labels.loc[0, "event_outcome_5"])
+    assert labels.loc[anchor, "event_ambiguous_5"] == 1.0
+    assert np.isnan(labels.loc[anchor, "event_outcome_5"])
 
 
 def test_no_infinite_numeric_labels() -> None:
