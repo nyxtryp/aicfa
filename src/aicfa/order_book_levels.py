@@ -133,13 +133,30 @@ def build_liquidity_walls(
 
     x = _validate(levels)
     changes = build_level_changes(x, persistence_snapshots=min_persistence)
+
+    # Wall detection must inspect every visible level, including levels whose
+    # size did not change between snapshots. Persistence is therefore computed
+    # from the complete snapshot sequence rather than from change rows alone.
+    x = x.sort_values(["side", "price", "timestamp"]).reset_index(drop=True)
+    x["visible"] = x["size"].gt(0)
+    x["persistence_count"] = (
+        x["visible"].astype(int)
+        .groupby([x["side"], x["price"]])
+        .transform(
+            lambda s: s.rolling(
+                min_persistence, min_periods=min_persistence
+            ).sum()
+        )
+        .fillna(0)
+    )
+
     thresholds = (
         x.groupby(["timestamp", "side"])["size"]
         .quantile(quantile)
         .rename("wall_size_threshold")
         .reset_index()
     )
-    out = changes.merge(thresholds, on=["timestamp", "side"], how="left")
+    out = x.merge(thresholds, on=["timestamp", "side"], how="left")
     out["liquidity_wall"] = (
         out["size"].ge(out["wall_size_threshold"])
         & out["persistence_count"].ge(min_persistence)
