@@ -159,7 +159,7 @@ Verified on FrostDeploy release `2026-09-29T06-27-33-b022845`:
 
 ## 2026-09-29 — Derivatives positioning expansion
 
-### `f533715a883d757f99c15b8777830e096c7313d5`
+### `666edd4f7beacbff3d9dbb8c3f2fbbf12c1f8f2b`
 **Add causal derivatives positioning features**
 
 Expanded `src/aicfa/derivatives.py` with optional historical derivatives fields:
@@ -220,24 +220,26 @@ Failure:
 
 The failure was in the test expectation, not in the causal alignment implementation: the test expected `basis` to be empty on an intervening base candle, while the documented semantics treat basis as a latest-known state, just like positioning and OI. The first basis observation therefore remains visible until a newer observation arrives.
 
-The fix is limited to the test expectation; no production derivative logic is changed.
+The fix was limited to the test expectation; no production derivative logic was changed.
 
-### `f533715a883d757f99c15b8777830e096c7313d5`
+### `9d6b221662c5ea11d2b6ab87f972feaeb833fde5`
 **Fix derivatives basis state test semantics**
 
 Changed only the incorrect test expectation so an already-observed basis value remains visible on intervening base candles under the latest-known-state semantics. Production derivative logic was unchanged.
 
 ### Final FrostDeploy verification — 2026-09-29
-Deployed release: `2026-09-29T07-38-38-f533715`
+Deployed release: `2026-09-29T07-27-19-9d6b221`
 
 Full suite:
-```text
+```
 93 passed, 2843 warnings in 31.04s
 ```
 
 The derivatives positioning/basis expansion is now **accepted and green**.
 
 Known non-blocking warnings remain: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and pytest-cache permission warnings in immutable releases.
+
+---
 
 ## 2026-09-29 — Liquidation imbalance
 
@@ -260,7 +262,7 @@ Semantics:
 
 Added tests for event timestamps, zero-volume handling and future-change invariance.
 
-The first verification exposed incorrect test fixture timestamp expectations. The production calculation was correct; the test was corrected in subsequent commits `f01a7a3` and `1b211757`.
+The first verification exposed incorrect test fixture timestamp expectations. The production calculation was correct; the test was corrected in subsequent commits.
 
 ### `f533715a883d757f99c15b8777830e096c7313d5`
 **Correct liquidation imbalance test value**
@@ -271,7 +273,7 @@ Corrected the event at `00:02`: long liquidation 6 and short liquidation 2 produ
 Deployed release: `2026-09-29T07-38-38-f533715`
 
 Full suite:
-```text
+```
 95 passed, 2843 warnings in 31.15s
 ```
 
@@ -281,9 +283,71 @@ Known non-blocking warnings remain unchanged: pandas/NumPy deprecations, DataFra
 
 ---
 
+## 2026-09-29 — Futures volume
+
+### `4f998cf8aef4333634d795cfe3e6ad80ba6129eb`
+**Add causal futures volume features**
+
+Added optional `futures_volume` to the derivatives layer.
+
+Derived features:
+- `futures_volume_delta`
+- `futures_volume_change_pct`
+- `futures_volume_zscore`
+
+Semantics:
+- futures volume is treated as an **event/interval observation**;
+- values are aligned only at their own source timestamps;
+- intervening base candles remain empty rather than receiving invented carry-forward volume;
+- derived changes/z-scores are computed in source-observation order using a strictly past baseline;
+- negative futures volume is rejected;
+- no futures-volume feature creates a trade signal.
+
+### `5ff0df7a9d34a9500bb6c548f2071aed17d01019`
+**Test causal futures volume features**
+
+Added tests for:
+- event-based timestamp alignment;
+- intervening base-candle NaN behavior;
+- derived fields;
+- future-change invariance;
+- negative-value rejection.
+
+### Verification attempt — 2026-09-29
+
+FrostDeploy release `2026-09-29T07-41-29-5ff0df7`:
+```
+96 passed, 1 failed, 2844 warnings in 32.65s
+```
+
+Failure:
+`tests/test_derivatives.py::test_derivatives_futures_volume_is_event_based_and_causal`.
+
+The production code calculated the three derived futures-volume fields, but the event-alignment step initially propagated only the raw `futures_volume` column into the final output. The test correctly exposed the missing propagation of the derived event fields.
+
+### `13c1df136bbe58c5b3d882a67290f90235e004a9`
+**Fix futures volume derived event feature alignment**
+
+Fixed the event alignment so `futures_volume`, `futures_volume_delta`, `futures_volume_change_pct`, and `futures_volume_zscore` are transferred together at exact source timestamps. No carry-forward or future leakage was introduced.
+
+### Final FrostDeploy verification — 2026-09-29
+
+Deployed release: `2026-09-29T07-43-01-13c1df1`
+
+Full suite:
+```
+97 passed, 2843 warnings in 30.68s
+```
+
+The futures-volume feature is now **accepted and green**.
+
+The remaining warnings are known non-blocking warnings: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and immutable FrostDeploy pytest-cache permission warnings.
+
+---
+
 # 7. Existing completed analytical layers
 
-The following layers were implemented and previously verified green:
+The following layers were implemented and verified green:
 
 - Market Structure — causal/refined.
 - Liquidity — causal/refined.
@@ -295,7 +359,7 @@ The following layers were implemented and previously verified green:
 - Multi-Timeframe — explicit 1m/5m/15m/1h/4h/1d/1w causal mapping.
 - Volume/Volatility — causal regimes.
 - Scenario Engine — descriptive scenario families, not decisions.
-- Derivatives — funding/OI/liquidations/positioning/basis/liquidation imbalance accepted.
+- Derivatives — funding/OI/liquidations/positioning/basis/liquidation imbalance/futures volume accepted.
 
 ---
 
@@ -328,10 +392,11 @@ Never claim green status without the current deployed release output.
 
 1. Continue remaining derivatives/market-state inputs:
    - remaining source-backed derivatives variants;
+   - spot/futures relationship features where the source schema provides both sides;
    - later taker flow/order flow;
    - later order book / market depth.
-5. Keep derivatives descriptive and causal; no premature signals.
-6. Then continue market-state completeness before ML.
+2. Keep derivatives descriptive and causal; no premature signals.
+3. Then continue market-state completeness before ML.
 
 ML training remains postponed.
 
@@ -376,17 +441,14 @@ Never claim deployment/test verification without actual server output.
 # 13. Current checkpoint
 
 Latest implementation:
-`666edd4f7beacbff3d9dbb8c3f2fbbf12c1f8f2b`
-
-Latest test correction:
-`9d6b221662c5ea11d2b6ab87f972feaeb833fde5`
+`13c1df136bbe58c5b3d882a67290f90235e004a9`
 
 Latest verified FrostDeploy release:
-`2026-09-29T07-27-19-9d6b221`
+`2026-09-29T07-43-01-13c1df1`
 
 Latest full-suite result:
-`95 passed, 2843 warnings in 31.15s`
+`97 passed, 2843 warnings in 30.68s`
 
-**Current status:** Derivatives positioning/basis expansion and causal liquidation imbalance are implemented, deployed and verified green.
+**Current status:** Derivatives positioning/basis, causal liquidation imbalance, and futures volume are implemented, deployed and verified green.
 
-**Next task:** continue remaining derivatives/market-state inputs while preserving strict causality and the pre-ML development boundary.
+**Next task:** continue remaining source-backed derivatives/market-state inputs, starting with a clearly defined spot/futures relationship only where the source schema provides both sides; then later taker flow/order flow and market depth. Preserve strict causality and the pre-ML development boundary.
