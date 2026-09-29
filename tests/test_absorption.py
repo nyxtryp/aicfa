@@ -29,7 +29,7 @@ def _levels():
     rows = []
     for t in ts:
         rows += [
-            {"timestamp": t, "side": "ask", "price": 100.01, "size": 100.0},
+            {"timestamp": t, "side": "ask", "price": 100.01, "size": 100.0 + 10.0 * (t.minute - 1)},
             {"timestamp": t, "side": "ask", "price": 100.02, "size": 10.0},
             {"timestamp": t, "side": "bid", "price": 99.99, "size": 10.0},
         ]
