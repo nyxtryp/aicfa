@@ -150,7 +150,7 @@ def _triple_barrier(
     event_end_offset = np.full(n, np.nan, dtype=float)
     event_target = np.full(n, np.nan, dtype=float)
     event_ambiguous = np.full(n, np.nan, dtype=float)
-    label_end_timestamp = np.full(n, pd.NaT, dtype="datetime64[ns]")
+    label_end_timestamp = np.full(n, np.datetime64("NaT"), dtype="datetime64[ns]")
 
     for i in range(n - horizon):
         vol = vol_values[i]
