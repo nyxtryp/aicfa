@@ -120,6 +120,20 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     ]:
         out[column] = fvg[column].to_numpy()
 
+    # Causal Order Block engine. Recognition is emitted on the displacement
+    # candle; the source candle is never backdated as an event.
+    from .order_blocks import build_order_blocks
+    order_blocks = build_order_blocks(x)
+    for column in [
+        "order_block_bullish", "order_block_bearish", "order_block",
+        "order_block_mitigated", "order_block_invalidated", "order_block_active",
+        "breaker_bullish", "breaker_bearish", "breaker",
+        "order_block_displacement_bullish", "order_block_displacement_bearish",
+        "order_block_bullish_low", "order_block_bullish_high",
+        "order_block_bearish_low", "order_block_bearish_high",
+    ]:
+        out[column] = order_blocks[column].to_numpy()
+
     # Trend proxies from causal rolling return and close-vs-mean location.
     for n in (15, 60):
         out[f"return_{n}"] = c.pct_change(n)
