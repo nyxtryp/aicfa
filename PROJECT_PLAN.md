@@ -93,19 +93,29 @@ Experience / Dataset / Model improvement
 
 ---
 
-# 4. Trading modes
+# 4. Product operating model
 
-### Scalping
-1M / 5M / 15M + microstructure, liquidity, displacement, volume, volatility, derivatives.
+AICFA is **user-driven**, not an autonomous market-scanning signal bot.
 
-### Intraday
-5M / 15M / 1H / 4H + structure, liquidity, derivatives and execution context.
+The primary interaction is:
 
-### Swing
-1H / 4H / 1D + higher-timeframe structure, liquidity, derivatives and risk.
+1. User asks AICFA for an urgent/current entry or analysis, for example: "find me an entry in any asset".
+2. If the live market-data connection is available, AICFA uses its current network market data and its own analytical knowledge to search the relevant assets and produce a setup/analysis.
+3. If required live data is unavailable, AICFA asks the user for chart screenshots for the relevant asset and timeframes.
+4. AICFA analyzes the supplied visual evidence with its own market knowledge and rules and produces the requested setup/analysis.
+5. The result is tied to the evidence actually available. No live data is fabricated.
 
-### Position
-1D / 1W + macro structure, cycles, major liquidity and volatility regimes.
+### Explicit product exclusions
+
+- **Scalping as a dedicated product mode is removed.**
+- **Autonomous continuous setup scanning is removed.**
+- AICFA does **not** continuously analyze Top-50/Top-100 assets looking for setups for no specific user request.
+- AICFA does **not** run a separate market-analysis pipeline per customer.
+- There is no requirement to maintain expensive realtime streams for every asset solely so that an autonomous scanner can generate alerts.
+- A user request may target any asset; the asset is not fixed to BTC.
+- The analytical core remains asset/timeframe aware and can use multiple timeframes when the user asks for an entry.
+
+The historical analytical concepts previously described as Scalping/Intraday/Swing/Position remain knowledge/features of the analytical core where useful, but they are **not separate autonomous product modes or scheduled scanners**.
 
 ---
 
@@ -579,20 +589,21 @@ ML training remains postponed.
 
 After the analytical representation is mature:
 
-- Knowledge Base;
-- Experience DB;
-- historical similarity;
-- Active Information Gathering;
+- Knowledge Base as the primary durable intelligence layer;
+- user-driven Active Information Gathering;
+- screenshot/vision analysis as an independent evidence path;
+- on-demand current-market analysis using available live connections;
+- historical similarity / experience only where it materially improves an answer;
 - historical situation datasets;
 - first ML baseline;
 - PyTorch model(s);
 - chronological evaluation;
-- backtesting with fees/slippage/funding;
-- paper trading;
 - platform/API;
-- vision.
+- later optional execution adapter only if explicitly required.
 
-Top-100 asset expansion remains postponed until the BTC core is stable.
+Autonomous continuous setup scanning and a dedicated Scalping product mode are **not roadmap items**.
+
+Top-100 expansion is no longer a product requirement by itself; asset selection should follow the user's current request and available evidence.
 
 ---
 
@@ -1426,8 +1437,8 @@ AICFA's analytical core must remain usable when live market-data providers are u
 - Live provider failure means no new live observations are accepted.
 - AICFA must not fabricate price, volume, structure, liquidity, or other market data.
 - The latest confirmed local market state may remain available as `STALE` for descriptive/reference analysis.
-- Automatic live setup creation must stop while required live data is unavailable/stale; decision flow supports `WAIT`.
-- Screenshot/chart analysis remains independently available because it operates on user-supplied visual evidence plus AICFA's own analytical knowledge.
+- AICFA must not produce a current live setup from stale/unavailable provider data.
+- For a current user request, screenshot/chart analysis remains independently available because it operates on user-supplied visual evidence plus AICFA's own analytical knowledge.
 - Screenshot analysis must not be represented as live provider data unless the screenshot itself contains the relevant evidence.
 - Live data transport and screenshot analysis are separate input paths into the same analytical knowledge/rule core.
 
@@ -1731,3 +1742,122 @@ Next:
 2. rerun the full pytest suite;
 3. if green, run real Binance Spot + Futures BTC/USDT WebSocket smoke with explicit confirmed-candle timeout;
 4. only then mark WebSocket transport GREEN.
+
+
+## 2026-09-29 — Product direction reset: knowledge-first, user-driven analysis
+
+This section **supersedes earlier roadmap language that treated Scalping as a dedicated product mode or autonomous setup scanning as a planned always-on function**.
+
+### Product decision
+
+AICFA is not an always-on signal bot.
+
+The product behavior is:
+
+**User request → gather the best available evidence → AICFA analyzes it with its own knowledge → return the requested setup/analysis.**
+
+Example:
+- User: "Find me an entry in any asset urgently."
+- If live network data is available, AICFA can use the connected market-data sources to inspect relevant assets and identify a current setup.
+- If live network data is unavailable, AICFA asks for screenshots of the relevant charts/timeframes and analyzes those screenshots using its own market knowledge and causal rules.
+- The answer must clearly distinguish live network evidence from user-supplied screenshot evidence.
+
+### No autonomous scanner
+
+AICFA will not continuously scan Top-50/Top-100 and create setup events merely because market data is connected.
+
+Therefore:
+- no continuous per-minute setup search across the whole universe;
+- no setup-alert engine whose primary purpose is generating autonomous signals;
+- no separate realtime analysis workload per user;
+- no requirement to keep every asset at maximum microstructure resolution continuously.
+
+A live connection exists to provide **current evidence when AICFA needs it**, not because AICFA must constantly manufacture setups.
+
+### Live connections: purpose
+
+Live market connections remain important, but their purpose is narrower and more useful:
+
+- obtain current market evidence on demand;
+- inspect an asset the user requests;
+- inspect a set of assets when the user asks AICFA to find an opportunity across assets;
+- support current-data analysis when screenshots are unavailable;
+- optionally maintain minimal state/cache needed for reliable current analysis.
+
+The project does **not** assume that storing a huge market history is itself the intelligence of AICFA. Historical data can be useful for validation and learning, but the durable intelligence is the **Knowledge Base + analytical rules + verified relationships + later specialized models**.
+
+### Knowledge-first principle
+
+The user explicitly prioritizes:
+
+**AICFA needs knowledge first.**
+
+The Knowledge Base therefore becomes a first-class product foundation:
+- market concepts and definitions;
+- causal relationships;
+- SMC and market-structure semantics;
+- liquidity behavior;
+- price action;
+- volume/volatility;
+- derivatives;
+- order flow and microstructure;
+- scenario interpretation;
+- risk/invalidation concepts;
+- evidence/provenance for important rules;
+- limitations and counterexamples.
+
+Historical market data is supporting evidence, not a substitute for knowledge.
+
+Screenshot analysis is also not a separate intelligence. It is an evidence-ingestion path into the same AICFA analytical brain.
+
+### Consequence for current live-data work
+
+Existing Binance REST/WebSocket work is retained as infrastructure because current user requests may require live evidence.
+
+However, the next live-data architecture must optimize for:
+- on-demand access;
+- bounded resource usage;
+- provider recovery;
+- current-state correctness;
+- explicit freshness;
+- no fabricated observations.
+
+It must **not** be extended merely to support an autonomous setup scanner.
+
+### Consequence for Setup Event Engine
+
+The existing Setup Event Engine remains part of the analytical machinery and can be used when AICFA is evaluating a specific user request.
+
+It is **not** a requirement to generate autonomous setup events continuously for every asset.
+
+### Current product flow
+
+```
+USER REQUEST
+    ↓
+What evidence is available?
+    ├── LIVE NETWORK DATA
+    │      ↓
+    │   current market state
+    │      ↓
+    │   AICFA analytical brain
+    │
+    └── NO LIVE DATA
+           ↓
+       ask for chart screenshots/timeframes
+           ↓
+       visual evidence → structured evidence
+           ↓
+       AICFA analytical brain
+
+                 ↓
+          setup / entry analysis
+                 ↓
+       explanation + invalidation + WAIT when evidence is insufficient
+```
+
+### Status
+
+**Accepted product direction as of 2026-09-29.**
+
+Future implementation work must follow this direction unless the user explicitly changes it.
