@@ -14,7 +14,7 @@ This file is the persistent project memory and control log. It must be updated a
 The analytical core is being built causally from the canonical finest timeframe upward:
 **1m → 5m → 15m → 1h → 4h → 1d → 1w**.
 
-Completed and verified layers include Market Structure, Liquidity, Displacement, FVG, Order Blocks, Premium/Discount, Unified SMC, Multi-Timeframe, Volume/Volatility, Scenario Engine, and the first Derivatives layer.
+Completed and verified layers include Market Structure, Liquidity, Displacement, FVG, Order Blocks, Premium/Discount, Unified SMC, Multi-Timeframe, Volume/Volatility, Scenario Engine, and the expanded Derivatives layer.
 
 The project remains **pre-ML**. Do not jump to model training until the market-state representation is sufficiently complete and verified.
 
@@ -222,6 +222,23 @@ The failure was in the test expectation, not in the causal alignment implementat
 
 The fix is limited to the test expectation; no production derivative logic is changed.
 
+### `9d6b221662c5ea11d2b6ab87f972feaeb833fde5`
+**Fix derivatives basis state test semantics**
+
+Changed only the incorrect test expectation so an already-observed basis value remains visible on intervening base candles under the latest-known-state semantics. Production derivative logic was unchanged.
+
+### Final FrostDeploy verification — 2026-09-29
+Deployed release: `2026-09-29T07-27-19-9d6b221`
+
+Full suite:
+```text
+93 passed, 2843 warnings in 31.04s
+```
+
+The derivatives positioning/basis expansion is now **accepted and green**.
+
+Known non-blocking warnings remain: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and pytest-cache permission warnings in immutable releases.
+
 ---
 
 # 7. Existing completed analytical layers
@@ -238,7 +255,7 @@ The following layers were implemented and previously verified green:
 - Multi-Timeframe — explicit 1m/5m/15m/1h/4h/1d/1w causal mapping.
 - Volume/Volatility — causal regimes.
 - Scenario Engine — descriptive scenario families, not decisions.
-- Derivatives — funding/OI/liquidations accepted; positioning/basis expansion pending verification.
+- Derivatives — funding/OI/liquidations/positioning/basis accepted.
 
 ---
 
@@ -269,10 +286,7 @@ Never claim green status without the current deployed release output.
 
 # 10. Immediate next work
 
-1. Deploy the test-only semantic correction.
-2. Rerun the complete FrostDeploy suite.
-3. If green, record the exact release and test count here.
-4. Continue remaining derivatives/market-state inputs:
+1. Continue remaining derivatives/market-state inputs:
    - broader positioning;
    - basis variants where source data supports them;
    - later taker flow/order flow;
@@ -325,12 +339,15 @@ Never claim deployment/test verification without actual server output.
 Latest implementation:
 `666edd4f7beacbff3d9dbb8c3f2fbbf12c1f8f2b`
 
-Latest tests before correction:
-`91a0b4c94d6373e8db7495ed15522ababe834b80`
+Latest test correction:
+`9d6b221662c5ea11d2b6ab87f972feaeb833fde5`
 
-Latest documentation:
-this commit.
+Latest verified FrostDeploy release:
+`2026-09-29T07-27-19-9d6b221`
 
-**Current task:** deploy the test-only basis alignment expectation correction and rerun the full FrostDeploy suite.
+Latest full-suite result:
+`93 passed, 2843 warnings in 31.04s`
 
-**Important:** The positioning expansion is implemented but NOT YET ACCEPTED until the full server suite is green.
+**Current status:** Derivatives positioning/basis expansion is implemented, deployed and verified green.
+
+**Next task:** continue remaining derivatives/market-state inputs while preserving strict causality and the pre-ML development boundary.
