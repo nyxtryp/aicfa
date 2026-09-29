@@ -19,6 +19,7 @@ class VisualObservation:
     evidence: tuple[str, ...]
     notes: str = ""
     price_location: str | None = None
+    direction: str | None = None
 
     def __post_init__(self) -> None:
         if not self.concept_id.strip():
@@ -29,6 +30,8 @@ class VisualObservation:
             raise ValueError("confidence must be between 0 and 1")
         if not self.evidence:
             raise ValueError("visual observation requires evidence")
+        if self.direction not in {None, "long", "short"}:
+            raise ValueError("direction must be long, short, or None")
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,7 @@ def observation(
     evidence: Iterable[str],
     notes: str = "",
     price_location: str | None = None,
+    direction: str | None = None,
 ) -> VisualObservation:
     """Build one normalized observation from the future vision layer."""
 
@@ -105,4 +109,5 @@ def observation(
         evidence=tuple(evidence),
         notes=notes,
         price_location=price_location,
+        direction=direction,
     )
