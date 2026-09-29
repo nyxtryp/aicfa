@@ -196,3 +196,43 @@ Known non-blocking warnings currently include pandas/NumPy deprecations, DataFra
 Previously verified analytical stages remain accepted as recorded in Git history and prior plan entries, including Market Structure, Liquidity, Displacement, FVG, Order Blocks, Premium/Discount, Unified SMC, Multi-Timeframe, Volume/Volatility, Derivatives, Taker Flow/Order Flow, Order Book/Market Depth, Liquidity Walls, Absorption, CVD, Price Action, Wyckoff, Setup Detection, Canonical Market State, Setup Event Engine, Knowledge Base, Visual Evidence, Evidence Reasoning, Scenario Reasoning and Setup Analysis.
 
 The current control point is the **GREEN Decision Layer verification above**.
+
+
+## 2026-09-29 — Chart Vision inference boundary implementation started
+
+### Commits
+- `5dd7ca8d3fa05d371b3ccc911893d39b55638a12` — add chart vision inference boundary;
+- `6fa38127fe769534acb05f71a51b6af9f419fc16` — test chart vision inference boundary;
+- `1aa5699c0154024507fc9534fe5e0a8b36f94746` — document chart vision inference boundary.
+
+### Implemented
+
+Added `src/aicfa/chart_vision.py` with:
+- `ChartVisionRequest` for screenshot bytes + asset/timeframe context;
+- `ChartVisionOutput` for structured visual observations, missing context and conflicts;
+- `ChartVisionAnalyzer` protocol as the adapter boundary for the future actual vision implementation;
+- Knowledge Base validation for every emitted concept;
+- conversion into the canonical `VisualEvidence` / `VisualEvidenceSet` contracts.
+
+Important boundaries:
+- no manual user labeling;
+- no direction inference;
+- no confidence inflation;
+- no fabricated unseen history;
+- no conversion of possible evidence into observed evidence;
+- no trade signal generation;
+- screenshot provenance remains `user_screenshot`.
+
+The actual image-recognition model/provider is intentionally **not** faked or hard-coded in this stage. The contract is ready for a real vision implementation.
+
+### Verification status
+
+**PENDING FrostDeploy/server verification.**
+
+Required next step:
+1. wait for FrostDeploy deployment of the current main branch;
+2. run the mandatory full pytest suite;
+3. fix only actual failures;
+4. rerun until green;
+5. only then accept the Chart Vision inference boundary.
+
