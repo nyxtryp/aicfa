@@ -85,10 +85,23 @@ def build_features(
 
     from .liquidity import build_liquidity
     liquidity=build_liquidity(x)
-    for column in ["equal_high","equal_low","buy_side_liquidity","sell_side_liquidity",
-                    "sweep_high","sweep_low","sweep_high_reclaim","sweep_low_reclaim",
-                    "buy_side_liquidity_price","sell_side_liquidity_price",
-                    "sweep_high_level","sweep_low_level"]:
+    for column in [
+        "equal_high","equal_low","buy_side_liquidity","sell_side_liquidity",
+        "sweep_high","sweep_low","sweep_high_reclaim","sweep_low_reclaim",
+        "buy_side_liquidity_price","sell_side_liquidity_price",
+        "sweep_high_level","sweep_low_level",
+        "previous_high","previous_low","internal_previous_high","internal_previous_low",
+        "active_buy_liquidity_pools","active_sell_liquidity_pools",
+        "active_external_buy_pools","active_external_sell_pools",
+        "active_internal_buy_pools","active_internal_sell_pools",
+        "active_buy_liquidity_price","active_sell_liquidity_price",
+        "external_buy_side_liquidity","external_sell_side_liquidity",
+        "internal_buy_side_liquidity","internal_sell_side_liquidity",
+        "liquidity_breakout_high","liquidity_breakout_low",
+        "liquidity_pool_created_high","liquidity_pool_created_low",
+        "liquidity_pool_swept_high","liquidity_pool_swept_low",
+        "liquidity_pool_invalidated_high","liquidity_pool_invalidated_low",
+    ]:
         out[column]=liquidity[column].to_numpy()
 
     from .displacement import build_displacement
@@ -125,6 +138,18 @@ def build_features(
     for column in ["smc_structure_direction","smc_structure_event","smc_structure_shift",
                     "smc_liquidity_event","smc_sweep_low_reclaim","smc_sweep_high_reclaim",
                     "smc_buy_side_liquidity","smc_sell_side_liquidity",
+                    "smc_external_buy_side_liquidity","smc_external_sell_side_liquidity",
+                    "smc_internal_buy_side_liquidity","smc_internal_sell_side_liquidity",
+                    "smc_previous_high","smc_previous_low",
+                    "smc_internal_previous_high","smc_internal_previous_low",
+                    "smc_active_buy_liquidity_pools","smc_active_sell_liquidity_pools",
+                    "smc_active_external_buy_pools","smc_active_external_sell_pools",
+                    "smc_active_internal_buy_pools","smc_active_internal_sell_pools",
+                    "smc_active_buy_liquidity_price","smc_active_sell_liquidity_price",
+                    "smc_liquidity_breakout_high","smc_liquidity_breakout_low",
+                    "smc_liquidity_pool_created_high","smc_liquidity_pool_created_low",
+                    "smc_liquidity_pool_swept_high","smc_liquidity_pool_swept_low",
+                    "smc_liquidity_pool_invalidated_high","smc_liquidity_pool_invalidated_low",
                     "smc_displacement_direction","smc_displacement_bos_up",
                     "smc_displacement_bos_down","smc_fvg_event","smc_fvg_lifecycle",
                     "smc_fvg_active","smc_order_block_event","smc_order_block_lifecycle",
