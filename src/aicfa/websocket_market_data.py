@@ -21,7 +21,7 @@ except ImportError:  # pragma: no cover - runtime dependency is pinned in requir
         pass
 
 from .data_reliability import LocalMarketStateStore
-from .market_data import MarketKey, validate_ohlcv
+from .market_data import MarketKey, timeframe_ms, validate_ohlcv
 
 
 class WebSocketConnection(Protocol):
@@ -131,6 +131,8 @@ class BinanceWebSocketMarketDataTransport:
         reconnect_backoff_seconds: float = 0.25,
         sleeper: Callable[[float], None] = time.sleep,
         state_store: LocalMarketStateStore | None = None,
+        idle_timeout_seconds: float | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         if not keys:
             raise ValueError("keys must not be empty")
@@ -140,6 +142,8 @@ class BinanceWebSocketMarketDataTransport:
             raise ValueError("max_reconnects must be non-negative")
         if reconnect_backoff_seconds < 0:
             raise ValueError("reconnect_backoff_seconds must be non-negative")
+        if idle_timeout_seconds is not None and idle_timeout_seconds <= 0:
+            raise ValueError("idle_timeout_seconds must be positive")
         self.keys = tuple(keys)
         self.timeout_seconds = float(timeout_seconds)
         self.max_reconnects = int(max_reconnects)
@@ -147,6 +151,18 @@ class BinanceWebSocketMarketDataTransport:
         self._connector = connector
         self._sleeper = sleeper
         self._state_store = state_store
+        self._clock = clock
+        if idle_timeout_seconds is None:
+            fixed_durations = [
+                timeframe_ms(key.timeframe) / 1000.0
+                for key in self.keys
+                if key.timeframe != "1M"
+            ]
+            self._idle_timeout_seconds = (
+                2.0 * max(fixed_durations) if fixed_durations else None
+            )
+        else:
+            self._idle_timeout_seconds = float(idle_timeout_seconds)
 
     def _subscribe(self, connection: WebSocketConnection) -> None:
         params = [_stream_name(key) for key in self.keys]
@@ -167,6 +183,11 @@ class BinanceWebSocketMarketDataTransport:
                 )
                 self._subscribe(connection)
                 reconnects = 0
+                idle_deadline = (
+                    self._clock() + self._idle_timeout_seconds
+                    if self._idle_timeout_seconds is not None
+                    else None
+                )
                 while max_observations is None or observations < max_observations:
                     try:
                         raw = connection.recv()
