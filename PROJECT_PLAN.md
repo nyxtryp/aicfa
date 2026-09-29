@@ -1999,188 +1999,20 @@ Next step after green verification: build the scenario reasoning layer that comb
 
 FrostDeploy release: `2026-09-29T15-42-00-c01cbbf`
 
+## 2026-09-29 — Setup Analysis server verification
+
+FrostDeploy release: `2026-09-29T16-10-39-eda149c`
+
 Mandatory full-project verification on the deployed release:
 
 ```
-203 passed, 4863 warnings in 42.78s
+229 passed, 4863 warnings in 39.33s
 ```
 
-The expanded Knowledge Base stage is now **GREEN / accepted**.
+The Setup Analysis stage is now **GREEN / accepted**.
 
-Verified on the current deployed release:
-- full pytest suite passes;
-- expanded Knowledge Base registry and contract tests pass;
-- required AICFA timeframe-grid test including 1m passes;
-- no test failures remain.
-
-Observed warnings are non-blocking and remain known technical debt:
-- pandas DataFrame fragmentation PerformanceWarning in Multi-Timeframe output construction;
-- pandas FutureWarning from the Premium/Discount test fixture dtype assignment;
-- pytest-cache permission warnings caused by immutable FrostDeploy release directories.
-
-These warnings do not block the Knowledge Base stage and are not being mixed into the analytical feature work.
+The preceding test correction commit `212803ff1f84e20106c4b51d29c279e27116dbae` was verified successfully. The remaining warnings are known non-blocking pytest-cache permission warnings in immutable FrostDeploy releases plus the existing pandas/deprecation warnings.
 
 ### Next implementation step
 
-Build the **Visual Evidence contract**: a causal, structured representation of user-supplied chart screenshots that can be consumed by the existing Knowledge Base and analytical rules. Screenshot evidence remains inference-time input, not training data, and the user must not manually label BOS/FVG/liquidity/OB concepts.
-
-
-## 2026-09-29 — Visual Evidence contract implementation
-
-### `a3893958ec97b6e0a95467f82caa8546d941ba64`
-**Add structured visual evidence contract**
-
-Added `src/aicfa/visual_evidence.py` as the first runtime contract for screenshot-based analysis.
-
-Implemented:
-- immutable `VisualObservation` records tied to Knowledge Base concept IDs;
-- explicit observed / possible / not_visible states;
-- bounded confidence and required visible evidence;
-- screenshot-only provenance, separate from live market-provider data;
-- asset/timeframe context and optional capture timestamp;
-- explicit missing-context and contradiction fields;
-- multi-timeframe `VisualEvidenceSet` with duplicate protection;
-- no LONG/SHORT decision generation and no screenshot-training dependency.
-
-This is the evidence boundary between future chart vision and the existing analytical Knowledge Base. The vision layer will produce these observations; users do not manually label market concepts.
-
-### Verification status
-
-**PENDING FrostDeploy/server verification.**
-
-Next: add contract tests, document the screenshot evidence path, then deploy and run the mandatory full pytest suite before accepting the stage.
-
-
-### `1130c440209dca03abd5a7850bc1bb11b1083770`
-**Test visual evidence contract**
-
-Added contract tests for immutable observations, confidence/evidence validation, screenshot provenance, duplicate protection, multi-timeframe bundles, and separation from live-provider state.
-
-Verification remains pending on the deployed FrostDeploy release.
-
-
-### `356d465c66b1907c0dd72b44fb2d7e8a53fc50fe`
-**Document screenshot visual evidence contract**
-
-Added `docs/VISUAL_EVIDENCE.md` describing the runtime path from user screenshots through vision into the Knowledge Base, including no-manual-labeling, no-fabricated-history, screenshot/live separation, multi-timeframe evidence and no-signal-generation boundaries.
-
-### Verification status
-
-**PENDING FrostDeploy/server verification.**
-
-The Visual Evidence contract implementation is complete for this stage. Required next verification:
-
-```bash
-sudo -u fd-aicfa bash -lc '
-cd "$(readlink -f /srv/frostdeploy/aicfa/current)"
-PYTHONPATH=src .venv/bin/python -m pytest -q
-'
-```
-
-After the deployed suite is green, the next implementation stage is the **AICFA evidence/reasoning layer**: map visual/live observations to Knowledge Base relationships, preserve contradictions and determine when more evidence is required before producing setup analysis or WAIT.
-
-## 2026-09-29 — Scenario Reasoning implementation
-
-Commits:
-- `a2e6ab0356c0bb088cd9ba42d044bdd370b051b7` — add Scenario Reasoning layer;
-- `8af787ca2faa5959b729397c9f7e9a2d5e018040` — test Scenario Reasoning;
-- `b151633a045a0d5de4592c882d79dc5535be28c2` — document Scenario Reasoning.
-
-Implemented:
-- continuation, reversal, range and breakout-failure hypothesis families;
-- preservation of multiple plausible scenarios;
-- confirmation and invalidation requirements per hypothesis;
-- propagation of evidence insufficiency and contradictions;
-- no automatic direction, entry, stop or execution fields;
-- dynamic multi-timeframe input without a fixed four-timeframe chain.
-
-Verification status: **PENDING FrostDeploy/server verification.**
-
-Next after green: combine scenario hypotheses with richer Knowledge Base confirmation/invalidation semantics and evidence quality into structured setup analysis.
-
-
-## 2026-09-29 — Setup Analysis implementation started
-
-### `e2fc9a5172c6036443282105b2ee10d7589241e8`
-**Add structured setup analysis layer**
-
-Added `src/aicfa/setup_analysis.py`.
-
-Implemented:
-- structured `SetupAssessment` and `SetupCandidate` contracts;
-- READY / NEED_MORE_EVIDENCE / WAIT decisions;
-- preservation of multiple scenario candidates;
-- contextual setup-zone extraction from observed visual concepts;
-- Knowledge Base confirmation/invalidation enrichment;
-- conditional entry requirements, invalidation conditions and target objectives;
-- optional price-location propagation only when actually present in visual evidence;
-- no fabricated numeric levels;
-- no order execution or automatic trade placement.
-
-The layer requires contradiction-free evidence, a supported scenario and at least two supporting observed concepts plus a visible contextual zone before forming a candidate.
-
-Verification status: **PENDING FrostDeploy/server verification.**
-
-Next: add Setup Analysis contract tests, document the layer, deploy, and run the mandatory full pytest suite.
-
-
-### `29263479df43b9a34cf707789e42686fb26925d3`
-**Test setup analysis layer**
-
-Added `tests/test_setup_analysis.py` covering:
-- conditional continuation setup formation;
-- zone and price-location propagation;
-- no fabricated numeric levels;
-- insufficient supporting evidence;
-- missing contextual zone;
-- contradiction propagation to WAIT;
-- preservation of multiple plausible setup candidates;
-- absence of execution/order fields.
-
-Verification remains **PENDING FrostDeploy/server verification**.
-
-
-### `99c9ae859ff17d6f70dd228e29a18491811c952e`
-**Document setup analysis layer**
-
-Added `docs/SETUP_ANALYSIS.md` covering:
-- READY / NEED_MORE_EVIDENCE / WAIT semantics;
-- setup candidate contents;
-- formation requirements;
-- Knowledge Base confirmation/invalidation integration;
-- preservation of multiple scenarios;
-- no fabricated numeric levels;
-- no execution/order placement;
-- screenshot/live evidence flow.
-
-Verification remains **PENDING FrostDeploy/server verification**.
-
-### Next verification
-
-Deploy the current main branch through FrostDeploy and run:
-
-```bash
-sudo -u fd-aicfa bash -lc '
-cd "$(readlink -f /srv/frostdeploy/aicfa/current)"
-PYTHONPATH=src .venv/bin/python -m pytest -q
-'
-```
-
-Do not mark Setup Analysis GREEN until the current deployed release passes the full suite.
-
-
-### `212803ff1f84e20106c4b51d29c279e27116dbae`
-**Fix setup scenario test coverage**
-
-The first deployed Setup Analysis test run exposed one test fixture issue:
-the multiple-scenario fixture supported continuation with only one continuation
-concept (`market_structure.bos`), while Setup Analysis intentionally requires
-at least two supporting concepts for a READY candidate.
-
-Updated the fixture to include `displacement`, so continuation now satisfies
-the documented threshold while reversal and breakout-failure remain supported.
-
-Previous server result:
-`1 failed, 228 passed, 4864 warnings in 41.55s`.
-
-Verification status remains **PENDING** after this forward-only test correction.
+Proceed to the next analytical decision layer, preserving evidence quality, scenario uncertainty, explicit invalidation and WAIT/NO TRADE semantics. Do not add order execution or autonomous continuous scanning.
