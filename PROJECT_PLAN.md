@@ -535,12 +535,41 @@ Required next step:
 
 Absorption is intentionally deferred until synchronized trade/taker flow + order-book changes + price-response semantics are defined.
 
+
+## 2026-09-29 — Level-by-level Order Book / Liquidity Walls verification
+
+FrostDeploy release: `2026-09-29T08-34-31-a9154a8`
+
+Full suite:
+```
+123 passed, 2843 warnings in 31.56s
+```
+
+The level-by-level Order Book / Liquidity Walls stage is now **accepted and green**.
+
+Verified coverage includes:
+- per-level additions;
+- per-level cancellations/removals;
+- displayed size deltas;
+- aggregate bid/ask displayed-flow changes;
+- persistence across unchanged snapshots;
+- same-side relative wall threshold;
+- liquidity-wall classification;
+- future-change invariance;
+- validation of invalid sides and negative sizes.
+
+Known non-blocking warnings remain unchanged: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and immutable FrostDeploy pytest-cache permission warnings.
+
+Current limitation:
+- liquidity walls remain descriptive displayed-liquidity features;
+- no execution/absorption is inferred from a wall alone;
+- absorption requires synchronized trade/taker flow, order-book changes and a defined price-response interval.
+
 # 10. Immediate next work
 
-1. Verify the current level-by-level Order Book / Liquidity Walls implementation on FrostDeploy.
-2. After acceptance, define and implement absorption from synchronized trade/taker flow + book changes + price response.
-3. Keep all market-microstructure features descriptive and causal; no premature signals.
-4. Then continue market-state completeness before ML.
+1. Define and implement causal Absorption from synchronized Taker Flow + level-by-level book changes + price response.
+2. Keep all market-microstructure features descriptive and causal; no premature signals.
+3. Then continue market-state completeness before ML.
 
 ML training remains postponed.
 
@@ -591,8 +620,8 @@ Latest verified FrostDeploy release:
 `2026-09-29T08-13-25-97c16f6`
 
 Latest full-suite result:
-`107 passed, 2843 warnings in 30.78s`
+`123 passed, 2843 warnings in 31.56s`
 
-**Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, spot/futures relationship, and Taker Flow / Order Flow are implemented, deployed and verified green.
+**Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, spot/futures relationship, Taker Flow / Order Flow, Order Book / Market Depth, and level-by-level Order Book / Liquidity Walls are implemented, deployed and verified green.
 
-**Next task:** verify the current level-by-level Order Book / Liquidity Walls implementation on FrostDeploy. It is not yet marked green. Preserve strict causality and the pre-ML development boundary.
+**Next task:** define and implement causal Absorption using synchronized Taker Flow, level-by-level book changes and price response. Preserve strict causality and the pre-ML development boundary.
