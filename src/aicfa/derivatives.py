@@ -138,11 +138,20 @@ def build_derivatives(
     # Futures volume and liquidations are event observations: only the event at its own timestamp
     # is retained, rather than inventing repeated liquidation volume.
     for col in sorted(_OPTIONAL_NONNEGATIVE & set(d.columns)):
-        liq = d[["timestamp", col]].copy()
-        aligned = aligned.merge(liq, on="timestamp", how="left", sort=True, suffixes=("", "__liq"))
-        if f"{col}__liq" in aligned:
-            aligned[col] = aligned[f"{col}__liq"]
-            aligned = aligned.drop(columns=[f"{col}__liq"])
+        event_columns = ["timestamp", col]
+        if col == "futures_volume":
+            event_columns += [
+                f"{col}_delta",
+                f"{col}_change_pct",
+                f"{col}_zscore",
+            ]
+        event = d[event_columns]
+        aligned = aligned.merge(event, on="timestamp", how="left", sort=True, suffixes=("", "__event"))
+        for event_col in event_columns[1:]:
+            suffixed = f"{event_col}__event"
+            if suffixed in aligned:
+                aligned[event_col] = aligned[suffixed]
+                aligned = aligned.drop(columns=[suffixed])
 
     # When both directional liquidation streams are supplied, expose their
     # contemporaneous imbalance as an event feature. It is bounded to [-1, 1]
