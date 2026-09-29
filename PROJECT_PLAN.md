@@ -1473,3 +1473,73 @@ REST recovery does not decide whether market state is stale. `LocalMarketStateSt
 ### Next step
 Run the full FrostDeploy pytest suite. If green, perform a real failure/recovery smoke test where practical. Then proceed to provider-agnostic WebSocket incremental transport with reconnect/resubscribe, while feeding confirmed observations into the existing local-state boundary.
 
+
+
+## 2026-09-29 — Binance REST recovery server verification
+
+### FrostDeploy verification
+
+Current deployed release:
+`2026-09-29T12-55-13-788da16`
+
+Full suite:
+```
+190 passed, 4863 warnings in 40.49s
+```
+
+The warnings are non-blocking in the current FrostDeploy environment, including pytest cache permission warnings caused by immutable release directories.
+
+### Status
+
+**Binance REST recovery / failure handling: GREEN.**
+
+The deployed implementation and its tests are verified on the current server.
+
+### Next implementation stage
+
+Proceed to provider-agnostic WebSocket incremental transport with reconnect/resubscribe, then connect it to the centralized scanner and freshness/setup lifecycle.
+
+## 2026-09-29 — Binance incremental WebSocket transport
+
+### Commits
+- `ebd1c6dc8ef79a68c37594da3797edd739525d38` — Add Binance incremental WebSocket transport
+- `cd05bba3d6aa8660065470494dfb4a827bda0c89` — Test Binance incremental WebSocket transport
+- `9496dac57fe0c3f4251d0260d372010a1e346f26` — Validate Binance WebSocket stream identity
+- `8a85a2a414885eae9ff0f67e1141b88087c2c2d9` — Add runtime Binance WebSocket connector
+- `b169a22358d7a2c35a45b1c0723e68182de83fc4` — Add WebSocket client dependency
+- `965af52f732cd5172256174b60b492a93fccef7a` — Document Binance incremental WebSocket transport
+
+### Implemented
+
+Added `src/aicfa/websocket_market_data.py` with:
+- provider-agnostic WebSocket connection/connector contracts;
+- Binance Spot and USDⓈ-M Futures kline endpoints;
+- Binance `SUBSCRIBE` messages;
+- closed-candle-only confirmation semantics;
+- symbol/timeframe stream validation;
+- malformed/incomplete message rejection;
+- bounded exponential reconnect;
+- automatic resubscription after reconnect;
+- optional direct updates into `LocalMarketStateStore`;
+- explicit reconnect exhaustion without fabricated observations;
+- runtime `websocket-client` connector.
+
+Added tests for parsing, closed/open candle behavior, malformed messages, subscription, reconnect/resubscribe, local-state updates, and exhausted reconnect budget.
+
+### Verification status
+
+**WebSocket implementation deployed to GitHub main; current FrostDeploy/server verification is PENDING.**
+
+The implementation is not marked GREEN until the current release passes the full suite and a real server-side Binance Spot/Futures WebSocket smoke test confirms connection, closed BTC/USDT candle reception, reconnect behavior, and local-state update.
+
+### Boundary
+
+This stage transports kline observations only. Funding, open interest, liquidations, order book and other derivatives/microstructure streams remain separate transport work. Freshness remains owned by `LocalMarketStateStore`; the WebSocket layer does not create observations when the provider is unavailable.
+
+### Next step
+
+1. Run full FrostDeploy pytest suite on the new release.
+2. Run real BTC/USDT Spot and Futures WebSocket smoke test.
+3. If green, connect live transport to the centralized scanner and Setup Event lifecycle.
+4. Then begin persistent historical situations / Experience-Outcome storage.
+5. Screenshot/Vision remains a planned first-class input path sharing the analytical core; it is not dependent on live provider availability.
