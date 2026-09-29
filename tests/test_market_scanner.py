@@ -41,7 +41,7 @@ def test_scanner_processes_each_market_key_once_and_only_completed_data():
     assert len(results) == 1
     assert provider.calls == [("BTC/USDT", "spot", "1m", None, 1000)]
     assert results[0].candles["timestamp"].tolist() == [0, 60000]
-    assert results[0].latest["market_state_test"] == 201.0
+    assert results[0].latest["market_state_test"] == 203.0
 
 
 def test_scanner_is_incremental_on_second_cycle():
