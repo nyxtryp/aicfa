@@ -623,6 +623,38 @@ AICFA должен анализировать:
 
 Свечные паттерны не должны рассматриваться вне контекста.
 
+# 9.1 Price Action
+
+AICFA uses a deterministic Price Action layer to formalize candle behaviour
+and interactions with previously observed price levels.
+
+Required source fields:
+- `timestamp` — availability time of the completed candle;
+- `open`;
+- `high`;
+- `low`;
+- `close`.
+
+The layer provides descriptive features for:
+- candle body and wick proportions;
+- close location;
+- bullish/bearish rejection classifications;
+- prior support/resistance levels;
+- breakouts and failed breakouts;
+- breakout retests;
+- short candle-sequence continuation/reversal;
+- range expansion/compression;
+- consolidation.
+
+Prior levels are calculated strictly from candles before the current observation.
+No future candle may alter an earlier Price Action result.
+
+These features are descriptive hypotheses, not trade signals. Their thresholds
+must be historically evaluated before any predictive interpretation.
+
+Price Action complements SMC, liquidity, structure, volume, derivatives and
+market microstructure; it does not replace them.
+
 # 10. Wyckoff
 
 Учитывать:
