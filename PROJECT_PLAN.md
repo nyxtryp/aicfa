@@ -254,7 +254,24 @@ The previous correction accidentally left the test with an extra closing parenth
 No production Chart Vision code was changed. The next verification must use the FrostDeploy release containing `f518af2...` and the mandatory full pytest suite.
 
 Required next step:
-1. wait for FrostDeploy deployment of commit `4438518b2fcf4924c14f143e66dc2f1d65f50ce4`;
+1. wait for FrostDeploy deployment of the corrected test commits;
 2. run the mandatory full pytest suite;
 3. if green, accept the Chart Vision inference boundary;
 4. only then proceed to attaching a real vision implementation.
+
+### Final server verification
+
+FrostDeploy release: `2026-09-29T16-38-00-f8af81f`
+
+Mandatory full-project verification:
+```
+243 passed, 4863 warnings in 47.56s
+```
+
+The remaining pytest-cache permission warning is the known non-blocking immutable-release warning. No test failures remain.
+
+**Chart Vision inference boundary is GREEN / accepted.** The boundary is verified without implementing or pretending to implement an actual image-recognition provider.
+
+### Next implementation step
+
+Proceed to the real chart-vision provider/adapter stage. Keep it provider-agnostic and cost-conscious: the analytical AICFA core remains the intelligence layer, while the vision component only converts user screenshots into structured visual evidence. Do not assume OpenAI API usage or any other paid external model unless explicitly chosen and verified.
