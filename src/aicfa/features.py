@@ -84,6 +84,17 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     for column in ["swing_high","swing_low","hh","hl","lh","ll","bos_up","bos_down","choch_up","choch_down","mss_up","mss_down","swing_high_price","swing_low_price","structure_direction"]:
         out[column] = structure[column].to_numpy()
 
+    # Causal liquidity pools and sweep/reclaim events.
+    from .liquidity import build_liquidity
+    liquidity = build_liquidity(x)
+    for column in [
+        "equal_high", "equal_low", "buy_side_liquidity", "sell_side_liquidity",
+        "sweep_high", "sweep_low", "sweep_high_reclaim", "sweep_low_reclaim",
+        "buy_side_liquidity_price", "sell_side_liquidity_price",
+        "sweep_high_level", "sweep_low_level",
+    ]:
+        out[column] = liquidity[column].to_numpy()
+
     # Trend proxies from causal rolling return and close-vs-mean location.
     for n in (15, 60):
         out[f"return_{n}"] = c.pct_change(n)
