@@ -9,4 +9,6 @@ def test_symbol_slug():
 
 def test_raw_path_shape():
     root = Path(__file__).resolve().parents[1]
-    assert root.name == "aicfa"
+    # Local checkouts use the repository name; FrostDeploy runs tests from
+    # immutable timestamped release directories under /releases/.
+    assert root.name == "aicfa" or root.parent.name == "releases"
