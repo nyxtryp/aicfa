@@ -699,3 +699,15 @@ Implemented:
 Server verification: **pending**.
 
 **Next concrete action:** run the complete FrostDeploy pytest suite against the FVG implementation. If green, accept the layer and continue to Order Blocks. If failures occur, fix only the actual failures and re-verify.
+
+
+## 2026-09-29 — FVG test fixture correction
+
+The first FrostDeploy verification exposed five FVG test failures caused by invalid OHLC fixtures in `tests/test_fvg.py` (some test candles had `low > open`). The FVG validation itself correctly rejected those malformed candles.
+
+Commit:
+- `a0424090ddd5eb04f7d3b573f11b68a41325baf3` — Fix invalid OHLC fixtures in FVG tests.
+
+No FVG engine logic was weakened or changed. The fixtures were corrected to valid OHLC while preserving the intended FVG scenarios.
+
+**Next concrete action:** rerun the complete FrostDeploy pytest suite.
