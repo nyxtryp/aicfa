@@ -191,11 +191,29 @@ class BinanceWebSocketMarketDataTransport:
                 while max_observations is None or observations < max_observations:
                     try:
                         raw = connection.recv()
-                    except (TimeoutError, WebSocketTimeoutException):
+                    except (TimeoutError, WebSocketTimeoutException) as exc:
                         # A read timeout does not mean the WebSocket is dead. The
                         # transport accepts only closed candles, so it can legitimately
                         # wait across a socket timeout for the next candle close.
+                        # But continuous timeouts must remain bounded.
+                        if (
+                            idle_deadline is not None
+                            and self._clock() >= idle_deadline
+                        ):
+                            raise ConnectionError(
+                                "Binance WebSocket idle timeout exceeded"
+                            ) from exc
                         continue
+
+                    # Any successfully received stream message proves that the
+                    # connection is active. Open kline updates are deliberately
+                    # ignored as market observations, but they still reset the
+                    # transport-level idle watchdog.
+                    if idle_deadline is not None:
+                        idle_deadline = (
+                            self._clock() + self._idle_timeout_seconds
+                        )
+
                     for key in self.keys:
                         observation = parse_binance_kline_message(raw, key)
                         if observation is None:
