@@ -1654,3 +1654,19 @@ Next:
 3. rerun real Binance Spot + Futures BTC/USDT WebSocket smoke;
 4. if both pass, mark WebSocket transport GREEN;
 5. then connect live WebSocket observations to the centralized scanner and Setup Event lifecycle.
+
+## 2026-09-29 — WebSocket idle-watchdog enforcement fix
+
+### Commit
+- `479da79575656cf6ea119750572835a53cb62ab1` — **Fix WebSocket idle watchdog enforcement**
+
+### Change
+The bounded-idle watchdog now actually enforces its deadline when repeated `TimeoutError` / `WebSocketTimeoutException` reads occur. Previously the timeout branch could continue indefinitely, causing `test_transport_bounds_continuous_read_timeouts` to hang despite an idle deadline being configured.
+
+A successfully received WebSocket message resets the idle deadline. Continuous timeouts beyond the idle budget raise a connection failure and enter the existing bounded reconnect path. No market observations are fabricated.
+
+### Verification status
+**PENDING server verification.** The previous server run reached this test and remained at 95% for more than 17 minutes.
+
+### Next step
+Wait for FrostDeploy deployment, run the mandatory full pytest suite, then rerun the real Binance Spot + Futures BTC/USDT WebSocket smoke test if the suite passes.
