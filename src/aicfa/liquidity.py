@@ -127,7 +127,7 @@ def build_liquidity(
             if lows[confirmation] < active_sell_level:
                 out.at[confirmation, "sweep_low"] = 1
                 out.at[confirmation, "sweep_low_level"] = active_sell_level
-                if closes[confirmation] > active_sell_level:
+                if closes[confirmation] >= active_sell_level:
                     out.at[confirmation, "sweep_low_reclaim"] = 1
                     swept_sell_level = active_sell_level
 
