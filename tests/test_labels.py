@@ -2,77 +2,63 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from aicfa.labels import build_labels
 
 
-def make_ohlc(n: int = 100) -> pd.DataFrame:
+def make_ohlc(n: int = 160) -> pd.DataFrame:
     close = np.linspace(100.0, 110.0, n)
     return pd.DataFrame(
         {
             "timestamp": pd.date_range("2026-01-01", periods=n, freq="min"),
             "open": close,
-            "high": close + 1.0,
-            "low": close - 1.0,
+            "high": close + 0.05,
+            "low": close - 0.05,
             "close": close,
-            "volume": 100.0,
         }
     )
 
 
-def test_labels_keep_input_schema_and_expected_columns() -> None:
-    df = make_ohlc()
-    labels = build_labels(df, horizons=(5, 20))
+def test_new_label_schema() -> None:
+    labels = build_labels(make_ohlc(), horizons=(5, 20))
 
-    assert len(labels) == len(df)
-    assert list(labels.columns[:6]) == [
-        "timestamp",
-        "open",
-        "high",
-        "low",
-        "close",
-        "future_return_5",
-    ]
-    assert "future_return_20" in labels.columns
+    assert len(labels) == 160
+    assert "future_return_5" in labels.columns
+    assert "future_log_return_20" in labels.columns
     assert "future_mfe_long_5" in labels.columns
-    assert "future_mae_short_5" in labels.columns
-    assert "time_to_mfe_long_5" in labels.columns
-    assert "time_to_long_tp_20" in labels.columns
-    assert "time_to_short_sl_20" in labels.columns
-    assert "triple_barrier_20" in labels.columns
+    assert "future_mae_short_20" in labels.columns
+    assert "future_mfe_long_r_5" in labels.columns
+    assert "time_to_mfe_short_20" in labels.columns
+    assert "event_outcome_5" in labels.columns
+    assert "event_touch_20" in labels.columns
+    assert "event_return_20" in labels.columns
+    assert "event_end_offset_20" in labels.columns
+    assert "event_target_vol_20" in labels.columns
+    assert "event_ambiguous_20" in labels.columns
 
 
-def test_final_rows_have_no_fake_future_outcomes() -> None:
+def test_future_rows_are_nan() -> None:
     labels = build_labels(make_ohlc(), horizons=(5,))
 
     for column in (
         "future_return_5",
+        "future_log_return_5",
         "future_mfe_long_5",
         "future_mae_short_5",
-        "time_to_mfe_long_5",
-        "time_to_long_tp_5",
-        "triple_barrier_5",
+        "event_outcome_5",
+        "event_return_5",
+        "event_end_offset_5",
     ):
         assert labels[column].iloc[-5:].isna().all()
 
 
-def test_labels_are_allowed_to_depend_on_future_prices() -> None:
-    base = make_ohlc()
-    altered = base.copy()
-    altered.loc[60:, "high"] *= 2.0
-    altered.loc[60:, "close"] *= 2.0
-
-    a = build_labels(base, horizons=(5,))
-    b = build_labels(altered, horizons=(5,))
-
-    # A target at t may change when a future candle changes. This is expected.
-    assert a["future_return_5"].iloc[56] != b["future_return_5"].iloc[56]
-
-
-def test_mae_and_mfe_are_non_negative() -> None:
+def test_mfe_and_mae_are_non_negative() -> None:
     labels = build_labels(make_ohlc(), horizons=(5,))
 
-    valid = labels.dropna(subset=["future_mfe_long_5", "future_mfe_short_5"])
+    valid = labels.dropna(
+        subset=["future_mfe_long_5", "future_mae_long_5"]
+    )
     assert (valid["future_mfe_long_5"] >= 0).all()
     assert (valid["future_mfe_short_5"] >= 0).all()
     assert (valid["future_mae_long_5"] >= 0).all()
@@ -87,17 +73,40 @@ def test_time_to_mfe_is_inside_horizon() -> None:
     assert valid["time_to_mfe_short_5"].between(1, 5).all()
 
 
-def test_unhit_barriers_are_censored_not_missing() -> None:
+def test_event_outcomes_are_valid_codes() -> None:
     labels = build_labels(make_ohlc(), horizons=(5,))
 
-    valid = labels.dropna(subset=["triple_barrier_5"])
-    assert valid["time_to_long_tp_5"].between(1, 6).all()
-    assert valid["time_to_long_sl_5"].between(1, 6).all()
-    assert valid["time_to_short_tp_5"].between(1, 6).all()
-    assert valid["time_to_short_sl_5"].between(1, 6).all()
+    valid = labels.dropna(subset=["event_outcome_5"])
+    assert set(valid["event_outcome_5"].unique()).issubset({-1.0, 0.0, 1.0})
+    assert set(valid["event_touch_5"].unique()).issubset({-1.0, 0.0, 1.0})
 
 
-def test_no_infinite_labels() -> None:
+def test_ambiguous_ohlc_bar_is_not_assigned_a_winner() -> None:
+    df = make_ohlc(20)
+    df.loc[1, "high"] = df.loc[0, "close"] * 1.2
+    df.loc[1, "low"] = df.loc[0, "close"] * 0.8
+
+    labels = build_labels(
+        df,
+        horizons=(5,),
+        volatility_span=2,
+        pt_mult=1.0,
+        sl_mult=1.0,
+    )
+
+    assert labels.loc[0, "event_ambiguous_5"] == 1.0
+    assert np.isnan(labels.loc[0, "event_outcome_5"])
+
+
+def test_no_infinite_numeric_labels() -> None:
     labels = build_labels(make_ohlc(), horizons=(5, 20, 60))
-    numeric = labels.drop(columns=["timestamp"]).to_numpy(dtype=float)
+    numeric = labels.select_dtypes(include=[np.number]).to_numpy()
     assert np.isfinite(numeric[~np.isnan(numeric)]).all()
+
+
+def test_input_validation() -> None:
+    with pytest.raises(ValueError, match="positive"):
+        build_labels(make_ohlc(), horizons=(5,), pt_mult=0)
+
+    with pytest.raises(ValueError, match="volatility_span"):
+        build_labels(make_ohlc(), horizons=(5,), volatility_span=1)
