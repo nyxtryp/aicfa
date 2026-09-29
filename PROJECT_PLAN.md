@@ -1670,3 +1670,23 @@ A successfully received WebSocket message resets the idle deadline. Continuous t
 
 ### Next step
 Wait for FrostDeploy deployment, run the mandatory full pytest suite, then rerun the real Binance Spot + Futures BTC/USDT WebSocket smoke test if the suite passes.
+
+
+## 2026-09-29 — WebSocket confirmed-candle wait bound
+
+### Problem found in real smoke
+The Spot side produced a real closed BTC/USDT 1m candle, while the Futures side could remain waiting after the user stopped the combined smoke run. The transport-level idle watchdog is intentionally reset by healthy open-kline messages, so it proves socket activity but does not guarantee that a confirmed closed candle will arrive within the expected candle interval.
+
+### Forward-only fix
+Commits:
+- `e33826684741e36251fe9192a166190aeff1ce82` — Bound WebSocket wait for confirmed candles
+- `9d66b8e82bbd9abb765de47a3ba951a993812873` — Test bounded wait for confirmed WebSocket candle
+- `728d1be53dbd5ad1ffb19d7cff42e3fdf717f280` — Document bounded confirmed-candle wait
+
+Added a separate confirmed-observation deadline. Open kline updates still reset the transport idle watchdog, but they do not reset the confirmed-candle deadline. The default confirmed-candle budget is two fixed candle periods; it is injectable for tests and controlled smoke runs. If the budget expires without a closed candle, the existing bounded reconnect path is entered. No market observation is fabricated.
+
+### Verification status
+**PENDING server verification.** The code/test/documentation commits are on GitHub main and must be verified on the next FrostDeploy release with the full pytest suite.
+
+### Next step
+Run the full FrostDeploy pytest suite. If green, rerun the real Binance Spot + Futures BTC/USDT WebSocket smoke with an explicit confirmed-candle timeout appropriate for 1m. Do not mark WebSocket GREEN until both sides complete successfully.
