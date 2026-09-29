@@ -606,16 +606,16 @@ This file is the persistent handoff/memory for future chats.
 
 # 12. Current checkpoint
 
-**Latest implementation commits:** `7b14e092c5897c53f5268bdd4088830c72e39bbd`, `3cbff2f68ac9cb5f27561438985947fcbc501b93`, `4f35f0427d9ad71c2f4577b961c13e6df12af6e4`, and `16dcab97627b5739a6ec89cb033d157b9dc9bd16`
+**Latest implementation commits:** `7b14e092c5897c53f5268bdd4088830c72e39bbd`, `3cbff2f68ac9cb5f27561438985947fcbc501b93`, `4f35f0427d9ad71c2f4577b961c13e6df12af6e4`, `16dcab97627b5739a6ec89cb033d157b9dc9bd16`, and `d4e82cb4b55802dd10c2419208c348ec48de74c1`
 
-**Current layer:** Order Blocks — implementation complete, server verification pending
+**Current layer:** Order Blocks — implementation complete, server verification complete
 
 **Current state:**
 - Market Structure: first causal implementation complete, refinement pending.
 - Liquidity: first causal implementation complete, server verification complete.
 - Displacement: first causal implementation complete, server verification complete.
 - FVG: implemented and verified green on FrostDeploy.
-- Order Blocks: implemented and integrated into the feature engine; verification pending.
+- Order Blocks: implemented, integrated into the feature engine, and verified green on FrostDeploy.
 - Unified SMC: not started.
 - Multi-timeframe: not started.
 - Scenario Engine: not started.
@@ -625,7 +625,7 @@ This file is the persistent handoff/memory for future chats.
 - Paper Trading: not started.
 - Top-100 assets: explicitly postponed.
 
-**Immediate action:** run the complete FrostDeploy pytest suite against the Order Block implementation. If green, accept the layer and proceed to Premium / Discount refinement. If failures occur, fix only the actual failures and re-verify.
+**Immediate action:** accept the verified Order Block layer and proceed to Premium / Discount refinement. Before implementation, re-read this document and preserve the causal/no-lookahead design rules.
 
 # 13. Rule for this document
 
@@ -756,3 +756,38 @@ The first implementation tracks one latest active bullish and one latest active 
 Server verification: **pending**.
 
 **Next concrete action:** run the complete FrostDeploy pytest suite against the Order Block implementation.
+
+
+## 2026-09-29 — Order Block verification and test fixture correction
+
+The first complete FrostDeploy verification of the Order Block layer exposed one failure in `tests/test_order_blocks.py::test_bearish_order_block_is_recognized_on_displacement_candle`. The bearish test fixture contained an invalid OHLC candle (`low` above `open/close`). The Order Block validator correctly rejected the malformed fixture.
+
+Commit:
+- `a53e59cdd8cf287389060d1edf49ee77b0146fca` — Fix invalid bearish Order Block test OHLC.
+  
+The subsequent verification exposed that the first candle in the same fixture was also malformed (`low=99` while `close=98`). This was again a test-data issue; production Order Block logic was not changed.
+
+Commit:
+- `d4e82cb4b55802dd10c2419208c348ec48de74c1` — Fix remaining invalid bearish Order Block fixture.
+
+Final FrostDeploy verification was run against release `2026-09-29T04-53-44-d4e82cb` using the mandatory command.
+
+Result:
+```
+46 passed, 96 warnings in 3.15s
+```
+
+Verification status: **PASS**.
+
+The remaining warnings are non-blocking:
+- pandas deprecation warning in `tests/test_dataset.py`;
+- pandas DataFrame fragmentation PerformanceWarnings in `src/aicfa/features.py`;
+- NumPy timedelta deprecation warning in `src/aicfa/labels.py`;
+- pytest cache permission warning in the immutable FrostDeploy release directory.
+
+No production Order Block changes were required to obtain the green suite. The Order Block layer is accepted.
+
+Known limitation remains:
+The current Order Block engine tracks one latest active bullish and one latest active bearish lifecycle. Multiple simultaneous historical OB pools are deferred to a later refinement.
+
+**Next concrete task:** Premium / Discount refinement using structural/dealing ranges rather than only generic rolling ranges.
