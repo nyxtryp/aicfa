@@ -433,7 +433,7 @@ Do NOT jump to ML yet.
 Order:
 
 ### Step 1 — Verify current branch
-Run the complete test suite after Liquidity commits.
+Run the complete test suite after each new implementation layer.
 
 ### Step 2 — Fix only real failures
 Do not change unrelated production code.
@@ -607,14 +607,14 @@ This file is the persistent handoff/memory for future chats.
 
 # 12. Current checkpoint
 
-**Last code commits:** `d7a04d0ac22e0bed23dcb00a3198474676bdea27` and `57a180b2f8cde42ec815bb06b506b4c528221804`
+**Last verified code commits:** `18aa8bdf8479c2094c4c8cc3ab5d7870606a29ac`, `c147fec530f8abca4426147f2593e13393813618`, and `37f4db3b5b6ba47b1aaceab35238219197e77449`
 
-**Current layer:** Liquidity — verified green on FrostDeploy
+**Current layer:** Displacement — verified green on FrostDeploy
 
 **Current state:**
 - Market Structure: first causal implementation complete, refinement pending.
-- Liquidity: first causal implementation complete, server verification pending.
-- Displacement: not started.
+- Liquidity: first causal implementation complete, server verification complete.
+- Displacement: first causal implementation complete, server verification complete.
 - FVG: not started.
 - Order Blocks: not started.
 - Unified SMC: not started.
@@ -626,7 +626,7 @@ This file is the persistent handoff/memory for future chats.
 - Paper Trading: not started.
 - Top-100 assets: explicitly postponed.
 
-**Immediate action:** begin the Displacement Engine. The current foundation is green on FrostDeploy.
+**Immediate action:** begin the FVG / Imbalance Engine. Displacement is now verified green on FrostDeploy.
 
 ---
 
@@ -654,3 +654,23 @@ Implementation commits:
 Implemented: range expansion, body expansion, close efficiency, strictly past-only relative volume, impulsive close direction, directional displacement, multi-factor displacement events, and displacement+BOS relationships. Tests cover causality, directionality, multi-factor requirements, and validation.
 
 Server verification is pending. The next concrete action is the full FrostDeploy pytest run against this implementation. If green, proceed to FVG / Imbalance.
+
+## 2026-09-29 — Displacement server verification
+
+Full FrostDeploy test suite was run against release `2026-09-29T04-39-36-a2834ab` using the mandatory command.
+
+Result:
+```
+32 passed, 12 warnings in 3.10s
+```
+
+Verification status: **PASS**.
+
+The 12 warnings are non-blocking and unchanged in scope:
+- pandas deprecation warning in `tests/test_dataset.py`;
+- NumPy timedelta deprecation warnings in `src/aicfa/labels.py`;
+- pytest cache permission warning caused by the immutable FrostDeploy release directory.
+
+No production fixes were required after the Displacement implementation. The Displacement layer is therefore accepted as the current verified foundation for the next layer.
+
+**Next concrete task:** implement the causal FVG / Imbalance Engine, with bullish/bearish FVG detection, size, displacement relationship, mitigation/fill state, and invalidation, followed by focused tests and full FrostDeploy verification.
