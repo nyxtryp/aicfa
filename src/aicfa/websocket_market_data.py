@@ -18,28 +18,6 @@ from .data_reliability import LocalMarketStateStore
 from .market_data import MarketKey, validate_ohlcv
 
 
-def default_websocket_connector(url: str, *, timeout: float) -> WebSocketConnection:
-    """Create a real WebSocket connection using the optional runtime client."""
-    try:
-        import websocket
-    except ImportError as exc:
-        raise WebSocketTransportError(
-            "websocket-client is required for live Binance WebSocket transport"
-        ) from exc
-    return websocket.create_connection(url, timeout=timeout)
-
-
-def default_websocket_connector(url: str, *, timeout: float) -> WebSocketConnection:
-    """Create a real WebSocket connection using the optional runtime client."""
-    try:
-        import websocket
-    except ImportError as exc:
-        raise WebSocketTransportError(
-            "websocket-client is required for live Binance WebSocket transport"
-        ) from exc
-    return websocket.create_connection(url, timeout=timeout)
-
-
 class WebSocketConnection(Protocol):
     def send(self, message: str) -> None: ...
     def recv(self) -> str: ...
@@ -52,6 +30,17 @@ class WebSocketConnector(Protocol):
 
 class WebSocketTransportError(RuntimeError):
     """WebSocket transport failure with explicit retryability."""
+
+
+def default_websocket_connector(url: str, *, timeout: float) -> WebSocketConnection:
+    """Create a real WebSocket connection using the runtime client."""
+    try:
+        import websocket
+    except ImportError as exc:
+        raise WebSocketTransportError(
+            "websocket-client is required for live Binance WebSocket transport"
+        ) from exc
+    return websocket.create_connection(url, timeout=timeout)
 
 
 @dataclass(frozen=True)
@@ -78,25 +67,37 @@ def _url_for(key: MarketKey) -> str:
     raise ValueError("market_type must be spot or futures")
 
 
-def parse_binance_kline_message(message: str, key: MarketKey) -> WebSocketObservation | None:
-    """Parse one Binance kline event; ignore non-closed candles."""
+def parse_binance_kline_message(
+    message: str, key: MarketKey
+) -> WebSocketObservation | None:
+    """Parse one Binance kline event; ignore valid events for other streams."""
     try:
         payload = json.loads(message)
     except (TypeError, json.JSONDecodeError) as exc:
         raise WebSocketTransportError("Invalid Binance WebSocket JSON") from exc
 
+    if not isinstance(payload, dict):
+        raise WebSocketTransportError("Invalid Binance WebSocket payload")
+
     kline = payload.get("k")
+    if kline is None:
+        return None
     if not isinstance(kline, dict):
-        return None
+        raise WebSocketTransportError("Invalid Binance kline payload")
+
+    identity_fields = ("s", "i", "x")
+    if any(field not in kline for field in identity_fields):
+        raise WebSocketTransportError("Incomplete Binance kline identity")
+
     expected_symbol = key.symbol.replace("/", "").replace("-", "").upper()
-    if str(kline.get("s", payload.get("s", ""))).upper() != expected_symbol:
+    if str(kline["s"]).upper() != expected_symbol:
         return None
-    if str(kline.get("i", "")).lower() != key.timeframe.lower():
+    if str(kline["i"]).lower() != key.timeframe.lower():
         return None
-    if kline.get("x") is not True:
+    if kline["x"] is not True:
         return None
 
-    required = ("t", "o", "h", "l", "c", "v")
+    required = ("t", "T", "o", "h", "l", "c", "v")
     if any(field not in kline for field in required):
         raise WebSocketTransportError("Incomplete Binance kline event")
 
