@@ -9,6 +9,8 @@ AICFA now has a provider-agnostic incremental WebSocket transport with a concret
 - subscription uses Binance `SUBSCRIBE`;
 - only **closed** kline events are accepted as confirmed observations;
 - a WebSocket read timeout is treated as an idle/read wait, not automatically as a dead connection; the transport keeps the connection and continues reading for the next closed candle;
+- the wait for a **confirmed closed candle** is separately bounded, so a stream cannot remain alive indefinitely on open kline updates without producing a confirmed observation;
+- the confirmed-candle wait budget defaults to two fixed candle periods and can be injected for deterministic tests/smoke runs;
 - open/incomplete candles are ignored;
 - malformed or incomplete events fail explicitly;
 - stream identity is checked against symbol and timeframe;
