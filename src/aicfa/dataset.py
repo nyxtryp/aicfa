@@ -9,7 +9,7 @@ import pandas as pd
 RAW_COLUMNS = {"open", "high", "low", "close", "volume"}
 
 TASK_TARGETS = {
-    "direction": ("event_outcome_",),
+    "direction": ("event_outcome_", "label_end_timestamp_"),
     "event": (
         "event_outcome_", "event_touch_", "event_return_", "event_log_return_",
         "event_end_offset_", "event_target_vol_", "event_ambiguous_",
