@@ -8,6 +8,7 @@ AICFA now has a provider-agnostic incremental WebSocket transport with a concret
 - USDⓈ-M Futures endpoint: `wss://fstream.binance.com/ws`
 - subscription uses Binance `SUBSCRIBE`;
 - only **closed** kline events are accepted as confirmed observations;
+- a WebSocket read timeout is treated as an idle/read wait, not automatically as a dead connection; the transport keeps the connection and continues reading for the next closed candle;
 - open/incomplete candles are ignored;
 - malformed or incomplete events fail explicitly;
 - stream identity is checked against symbol and timeframe;
