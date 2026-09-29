@@ -1180,3 +1180,13 @@ Unified SMC now carries the refined Market Structure namespace into canonical `s
 No score, signal, confirmation counter, or ML logic was added.
 
 Server verification: pending.
+
+
+### Unified SMC refinement tests
+
+Commit:
+- 468f8aaf2d0661a00f73ba64925096d779cd25e0 — Test refined Unified SMC structure integration.
+
+Added tests for canonical refined columns, propagation of internal structure/MSS/protected-level values, and future-change invariance of the unified representation. Server verification remains pending; the mandatory FrostDeploy suite must be run against the deployed release before accepting this layer.
+
+**Next concrete action:** run the full FrostDeploy pytest suite. If green, record the verification and proceed to the planned Liquidity refinement.
