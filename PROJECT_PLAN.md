@@ -891,3 +891,37 @@ Required next step:
 ### Next after verification
 
 Implement the causal Setup Event Engine lifecycle: created / strengthened / invalidated / expired / outcome, without future labels in the live state. This will become the event boundary used later by the autonomous 24/7 Market Scanner.
+
+
+## 2026-09-29 — Setup Event Engine implementation
+
+Implemented the causal Setup Event Engine and integrated it after Canonical Market State.
+
+Pipeline:
+`Features → Scenario/Setup Detection → Canonical Market State → Setup Event Engine → 24/7 Scanner`
+
+Implemented lifecycle fields:
+- created;
+- strengthened/updated;
+- invalidated;
+- expired;
+- stable setup identity from family + resolved direction;
+- explicit neutral handling for conflicted candidates;
+- empty live `setup_event_outcome`, with historical outcomes reserved for a separate label/validation pipeline.
+
+Commits:
+- `9fcbe8de1eabc279fb268ace480fffe3a21ef55a` — setup event lifecycle
+- `2f312aef5e303b2219feba1fe298ebf329a95076` — setup event tests
+- `6138493c20819d38847181c955892fe8ee3f422d` — Feature Engine integration
+- `4e16c4fea4ca887ed51f318274ecef1da9faeacb` — setup event documentation
+- `c2bb4411d7a136e79228d6759dc08246442a9281` — integration coverage
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step: deploy current main to FrostDeploy and run the mandatory full pytest suite. Do not mark Setup Event Engine accepted before actual server output.
+
+### Next after verification
+
+Move to the provider-agnostic live Market Data / Scanner foundation: source contracts, incremental current-data updates, asset/timeframe universe and centralized scan loop. Free APIs remain provisional until rate limits, latency, WebSocket availability and commercial/reliability constraints are verified.
