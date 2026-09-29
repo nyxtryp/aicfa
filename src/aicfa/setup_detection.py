@@ -139,17 +139,38 @@ def build_setup_candidates(df: pd.DataFrame) -> pd.DataFrame:
     out["setup_candidate_conflicted"] = (any_up & any_down).astype("int8")
     out["setup_candidate_active"] = (any_up | any_down).astype("int8")
 
-    family_names = [
-        "liquidity_reversal", "structure_continuation", "breakout_retest",
-        "failed_breakout", "wyckoff", "expansion",
+    family_definitions = [
+        (
+            "liquidity_reversal",
+            ["setup_liquidity_reversal_up", "setup_liquidity_reversal_down"],
+        ),
+        (
+            "structure_continuation",
+            ["setup_structure_continuation_up", "setup_structure_continuation_down"],
+        ),
+        (
+            "breakout_retest",
+            ["setup_breakout_retest_up", "setup_breakout_retest_down"],
+        ),
+        (
+            "failed_breakout",
+            ["setup_failed_breakout_up", "setup_failed_breakout_down"],
+        ),
+        (
+            "wyckoff",
+            ["setup_wyckoff_spring", "setup_wyckoff_upthrust"],
+        ),
+        (
+            "expansion",
+            ["setup_expansion_up", "setup_expansion_down"],
+        ),
     ]
     family_matrix = np.column_stack([
-        out[f"setup_{name}_up"].to_numpy(bool)
-        | out[f"setup_{name}_down"].to_numpy(bool)
-        for name in family_names
+        out[columns[0]].to_numpy(bool) | out[columns[1]].to_numpy(bool)
+        for _, columns in family_definitions
     ])
     family_count = family_matrix.sum(axis=1)
-    labels = np.array(family_names, dtype=object)
+    labels = np.array([name for name, _ in family_definitions], dtype=object)
     out["setup_primary_family"] = np.where(
         family_count == 1, labels[family_matrix.argmax(axis=1)], ""
     )
