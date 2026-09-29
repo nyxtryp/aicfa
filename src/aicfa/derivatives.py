@@ -138,6 +138,18 @@ def build_derivatives(
             aligned[col] = aligned[f"{col}__liq"]
             aligned = aligned.drop(columns=[f"{col}__liq"])
 
+    # When both directional liquidation streams are supplied, expose their
+    # contemporaneous imbalance as an event feature. It is bounded to [-1, 1]
+    # and remains empty when one side is unavailable; no values are carried
+    # forward between liquidation events.
+    if {"long_liquidation_volume", "short_liquidation_volume"} <= set(d.columns):
+        long_liq = aligned["long_liquidation_volume"]
+        short_liq = aligned["short_liquidation_volume"]
+        total_liq = long_liq + short_liq
+        aligned["liquidation_imbalance"] = (
+            (long_liq - short_liq) / total_liq.replace(0, np.nan)
+        )
+
     aligned["price_return"] = aligned["close"].pct_change()
     oi_delta_now = aligned["open_interest_delta"]
     ret = aligned["price_return"]
@@ -155,5 +167,7 @@ def build_derivatives(
     for col in sorted((_OPTIONAL_RATIO | _OPTIONAL_SIGNED) & set(d.columns)):
         out_cols += [col, f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
     out_cols += sorted(_OPTIONAL_NONNEGATIVE & set(d.columns))
+    if "liquidation_imbalance" in aligned:
+        out_cols.append("liquidation_imbalance")
 
     return aligned[out_cols]
