@@ -29,6 +29,17 @@ def default_websocket_connector(url: str, *, timeout: float) -> WebSocketConnect
     return websocket.create_connection(url, timeout=timeout)
 
 
+def default_websocket_connector(url: str, *, timeout: float) -> WebSocketConnection:
+    """Create a real WebSocket connection using the optional runtime client."""
+    try:
+        import websocket
+    except ImportError as exc:
+        raise WebSocketTransportError(
+            "websocket-client is required for live Binance WebSocket transport"
+        ) from exc
+    return websocket.create_connection(url, timeout=timeout)
+
+
 class WebSocketConnection(Protocol):
     def send(self, message: str) -> None: ...
     def recv(self) -> str: ...
