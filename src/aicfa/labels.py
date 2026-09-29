@@ -125,6 +125,7 @@ def _path_metrics(
 
 
 def _triple_barrier(
+    timestamp: pd.Series,
     close: pd.Series,
     high: pd.Series,
     low: pd.Series,
@@ -149,6 +150,7 @@ def _triple_barrier(
     event_end_offset = np.full(n, np.nan, dtype=float)
     event_target = np.full(n, np.nan, dtype=float)
     event_ambiguous = np.full(n, np.nan, dtype=float)
+    label_end_timestamp = np.full(n, pd.NaT, dtype="datetime64[ns]")
 
     for i in range(n - horizon):
         vol = vol_values[i]
@@ -170,6 +172,7 @@ def _triple_barrier(
                 event_ambiguous[i] = 1.0
                 event_end_offset[i] = float(offset)
                 event_target[i] = vol
+                label_end_timestamp[i] = timestamp.iloc[j].to_datetime64()
                 resolved = True
                 break
 
@@ -181,6 +184,7 @@ def _triple_barrier(
                 event_end_offset[i] = float(offset)
                 event_target[i] = vol
                 event_ambiguous[i] = 0.0
+                label_end_timestamp[i] = timestamp.iloc[j].to_datetime64()
                 resolved = True
                 break
 
@@ -192,6 +196,7 @@ def _triple_barrier(
                 event_end_offset[i] = float(offset)
                 event_target[i] = vol
                 event_ambiguous[i] = 0.0
+                label_end_timestamp[i] = timestamp.iloc[j].to_datetime64()
                 resolved = True
                 break
 
@@ -207,6 +212,7 @@ def _triple_barrier(
         event_end_offset[i] = float(horizon)
         event_target[i] = vol
         event_ambiguous[i] = 0.0
+        label_end_timestamp[i] = timestamp.iloc[j].to_datetime64()
 
     out[f"event_outcome_{horizon}"] = event_outcome
     out[f"event_touch_{horizon}"] = event_touch
@@ -215,6 +221,9 @@ def _triple_barrier(
     out[f"event_end_offset_{horizon}"] = event_end_offset
     out[f"event_target_vol_{horizon}"] = event_target
     out[f"event_ambiguous_{horizon}"] = event_ambiguous
+    out[f"label_end_timestamp_{horizon}"] = pd.to_datetime(
+        label_end_timestamp, utc=True
+    )
 
 
 def build_labels(
@@ -249,12 +258,15 @@ def build_labels(
     high = x["high"]
     low = x["low"]
     target_vol = _realized_volatility(close, volatility_span)
+    timestamps = pd.to_datetime(x["timestamp"], utc=True)
 
     out = x.copy()
 
     for horizon in horizons:
         _path_metrics(close, high, low, target_vol, horizon, out)
+        out[f"label_end_timestamp_{horizon}"] = timestamps.shift(-horizon)
         _triple_barrier(
+            timestamps,
             close,
             high,
             low,
