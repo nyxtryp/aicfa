@@ -854,3 +854,40 @@ Market Data Engine должен использовать абстракцию pr
 
 Зафиксировано как архитектурное направление/требование. Реализация scanner начинается после достаточной полноты market-state representation и не должна преждевременно заменять текущий causal feature-engineering этап.
 \n\n## 2026-09-29 — Setup Detection Engine implementation\n\n### New causal analytical layer\n\nImplemented `src/aicfa/setup_detection.py` and integrated it into the main Feature Engine.\n\nInitial setup families:\n- liquidity reversal up/down;\n- structure continuation up/down;\n- breakout retest up/down;\n- failed breakout up/down;\n- Wyckoff Spring/Upthrust;\n- expansion up/down.\n\nThe engine also exposes separate contextual fields for available FVG, Order Block, Premium/Discount, absorption, CVD, taker-flow and derivatives state. No additive confirmation score is used.\n\nOpposite-direction candidates on the same timestamp are marked `setup_candidate_conflicted`; direction is set to neutral rather than forced.\n\nThe engine is causal and descriptive. It does not create future labels, probabilities, confidence scores or trade instructions.\n\n### Commits\n\n- `98777dd7bea6058c33cc7adb4c0189eed1d082bf` — setup engine\n- `c1d4c96a0f80176b7420d7e03e85fe86172a80cb` — setup tests\n- `20b9d7983f3e37da88de2392120ae7bbbf98db64` — setup documentation\n- `1db0286c6b9738bdabbe755c037842997c93b989` — Feature Engine integration\n- `bbb42d8a5523e2c53b60461875c97088b22a5bb3` — integration test\n- `492380a23b741e83a1b70acfcc918f60d65e73ee` — positive flow context fix\n\n### Verification status\n\n**Not yet server-verified.**\n\nRequired next step: deploy the current main branch to FrostDeploy and run the mandatory full pytest suite. Do not mark Setup Detection green before actual server output.\n\n### Next after verification\n\nIf green, extend setup coverage with additional causal market-state combinations and then build the Setup Event lifecycle (created / updated / invalidated / expired / outcome) before the live 24/7 scanner. Historical future outcome labels remain a separate pipeline.\n
+
+## 2026-09-29 — Canonical Market State implementation
+
+### New causal representation layer
+
+Implemented `src/aicfa/market_state.py` and integrated it into the main Feature Engine after Scenario and Setup Detection.
+
+Purpose:
+- convert already-built features/scenarios/setup candidates into a stable machine-readable current-state representation;
+- preserve structure, scenario, setup, SMC readiness, premium/discount, volume/volatility and Wyckoff context;
+- explicitly expose optional CVD, taker-flow, absorption and order-book source availability;
+- provide deterministic `market_state_changed` input for the future Setup Event Engine.
+
+The layer does not create scores, probabilities, rankings, trade signals or future outcome labels. Conflicted setup candidates remain neutral. Missing optional sources remain unavailable and are never synthesized.
+
+Commits:
+- `9ffaf3781f08fb82e8c9ac9ecb18fdf26dffa506` — canonical market-state implementation
+- `4d7b3ac8085b45bf678f61180e063b8a776c7ea1` — market-state tests
+- `9a54368d54258539c2be8c2f58d0e22bcfc89a24` — Feature Engine integration
+- `61a18285651159e1a48f8e403811f2f4e6e70` — Feature Engine integration coverage
+- `953b2ee8d646ec4b16697e3bf6fdd2ebe3f2ecbc` — market-state documentation
+- `19d8cb3a021b4f62dc3ddf1cc008072294085d54` — TZ update
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step:
+1. deploy current main to FrostDeploy;
+2. run the mandatory full pytest suite;
+3. fix any actual failures;
+4. rerun until green;
+5. only then mark Market State accepted.
+
+### Next after verification
+
+Implement the causal Setup Event Engine lifecycle: created / strengthened / invalidated / expired / outcome, without future labels in the live state. This will become the event boundary used later by the autonomous 24/7 Market Scanner.
