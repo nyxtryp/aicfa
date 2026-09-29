@@ -24,6 +24,7 @@ _OPTIONAL_RATIO = {
     "long_short_ratio_top_trader",
 }
 _OPTIONAL_SIGNED = {"basis", "basis_pct"}
+_OPTIONAL_PRICE = {"spot_price", "futures_price"}
 
 
 def _validate(df: pd.DataFrame) -> pd.DataFrame:
@@ -36,7 +37,13 @@ def _validate(df: pd.DataFrame) -> pd.DataFrame:
     x = x.sort_values("timestamp").drop_duplicates("timestamp", keep="last").reset_index(drop=True)
 
     numeric = _REQUIRED - {"timestamp"}
-    for col in numeric | (_OPTIONAL_NONNEGATIVE & set(x.columns)) | (_OPTIONAL_RATIO & set(x.columns)) | (_OPTIONAL_SIGNED & set(x.columns)):
+    for col in (
+        numeric
+        | (_OPTIONAL_NONNEGATIVE & set(x.columns))
+        | (_OPTIONAL_RATIO & set(x.columns))
+        | (_OPTIONAL_SIGNED & set(x.columns))
+        | (_OPTIONAL_PRICE & set(x.columns))
+    ):
         x[col] = pd.to_numeric(x[col], errors="coerce")
 
     if x[["funding_rate", "open_interest"]].isna().any().any():
@@ -48,6 +55,9 @@ def _validate(df: pd.DataFrame) -> pd.DataFrame:
         if x[col].dropna().lt(0).any():
             raise ValueError(f"{col} must be non-negative")
     for col in _OPTIONAL_RATIO & set(x.columns):
+        if x[col].dropna().le(0).any():
+            raise ValueError(f"{col} must be positive")
+    for col in _OPTIONAL_PRICE & set(x.columns):
         if x[col].dropna().le(0).any():
             raise ValueError(f"{col} must be positive")
 
@@ -78,8 +88,8 @@ def build_derivatives(
     """Map causal funding/OI and optional positioning data onto base candles.
 
     Funding is point-in-time. OI is a state and is carried forward from the
-    latest known observation. Optional positioning fields use the same causal
-    carry-forward semantics because they describe the latest known state.
+    latest known observation. Optional positioning, basis and spot/futures
+    prices use the same causal latest-known-state semantics.
     """
     if baseline_window < 2:
         raise ValueError("baseline_window must be >= 2")
@@ -99,6 +109,8 @@ def build_derivatives(
     _add_observation_features(d, "open_interest", baseline_window)
     for col in sorted((_OPTIONAL_RATIO | _OPTIONAL_SIGNED) & set(d.columns)):
         _add_observation_features(d, col, baseline_window)
+    for col in sorted(_OPTIONAL_PRICE & set(d.columns)):
+        _add_observation_features(d, col, baseline_window)
     for col in sorted(_OPTIONAL_NONNEGATIVE & set(d.columns)):
         d[f"{col}_delta"] = d[col].diff()
         if col == "futures_volume":
@@ -107,24 +119,37 @@ def build_derivatives(
             ).replace([np.inf, -np.inf], np.nan)
             d[f"{col}_zscore"] = _zscore_against_past(d[col], baseline_window)
 
+    # Spot/futures relationship is calculated only when both source prices
+    # are present at the same derivative observation. Both prices and the
+    # resulting relationship are then treated as latest-known state.
+    if {"spot_price", "futures_price"} <= set(d.columns):
+        d["futures_spot_spread"] = d["futures_price"] - d["spot_price"]
+        d["futures_spot_spread_pct"] = (
+            d["futures_spot_spread"] / d["spot_price"]
+        ).replace([np.inf, -np.inf], np.nan)
+        _add_observation_features(d, "futures_spot_spread", baseline_window)
+        _add_observation_features(d, "futures_spot_spread_pct", baseline_window)
+
     # Funding is point-in-time; state/positioning fields carry forward only
     # from observations at or before the base timestamp.
     point_in_time = ["funding_rate", "funding_rate_delta", "funding_rate_change_pct", "funding_rate_zscore"]
     funding = d[["timestamp"] + point_in_time]
     state_columns = ["open_interest", "open_interest_delta", "open_interest_change_pct", "open_interest_zscore"]
-    state_columns += [
-        col for col in sorted((_OPTIONAL_RATIO | _OPTIONAL_SIGNED) & set(d.columns)
-        ) for _ in [0]
-    ]
-    for col in state_columns:
-        # Keep the base state column plus derived values for optional metrics.
-        if col in d.columns:
-            state_columns.extend([f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"])
-            break
-    # Rebuild deterministically to avoid mutating a list while iterating.
-    state_columns = ["open_interest", "open_interest_delta", "open_interest_change_pct", "open_interest_zscore"]
     for col in sorted((_OPTIONAL_RATIO | _OPTIONAL_SIGNED) & set(d.columns)):
         state_columns += [col, f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
+    for col in sorted(_OPTIONAL_PRICE & set(d.columns)):
+        state_columns += [col, f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
+    if {"futures_spot_spread", "futures_spot_spread_pct"} <= set(d.columns):
+        state_columns += [
+            "futures_spot_spread",
+            "futures_spot_spread_delta",
+            "futures_spot_spread_change_pct",
+            "futures_spot_spread_zscore",
+            "futures_spot_spread_pct",
+            "futures_spot_spread_pct_delta",
+            "futures_spot_spread_pct_change_pct",
+            "futures_spot_spread_pct_zscore",
+        ]
 
     aligned = b[["timestamp", "close"]].merge(funding, on="timestamp", how="left", sort=True)
     aligned = pd.merge_asof(
@@ -153,10 +178,6 @@ def build_derivatives(
                 aligned[event_col] = aligned[suffixed]
                 aligned = aligned.drop(columns=[suffixed])
 
-    # When both directional liquidation streams are supplied, expose their
-    # contemporaneous imbalance as an event feature. It is bounded to [-1, 1]
-    # and remains empty when one side is unavailable; no values are carried
-    # forward between liquidation events.
     if {"long_liquidation_volume", "short_liquidation_volume"} <= set(d.columns):
         long_liq = aligned["long_liquidation_volume"]
         short_liq = aligned["short_liquidation_volume"]
@@ -181,6 +202,19 @@ def build_derivatives(
     ]
     for col in sorted((_OPTIONAL_RATIO | _OPTIONAL_SIGNED) & set(d.columns)):
         out_cols += [col, f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
+    for col in sorted(_OPTIONAL_PRICE & set(d.columns)):
+        out_cols += [col, f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
+    if {"futures_spot_spread", "futures_spot_spread_pct"} <= set(d.columns):
+        out_cols += [
+            "futures_spot_spread",
+            "futures_spot_spread_delta",
+            "futures_spot_spread_change_pct",
+            "futures_spot_spread_zscore",
+            "futures_spot_spread_pct",
+            "futures_spot_spread_pct_delta",
+            "futures_spot_spread_pct_change_pct",
+            "futures_spot_spread_pct_zscore",
+        ]
     for col in sorted(_OPTIONAL_NONNEGATIVE & set(d.columns)):
         out_cols.append(col)
         if col == "futures_volume":
