@@ -38,19 +38,56 @@ def test_high_sweep_and_reclaim_is_causal():
     assert r.loc[7, "buy_side_liquidity"] == 1
     assert r.loc[9, "sweep_high"] == 1
     assert r.loc[9, "sweep_high_reclaim"] == 1
+    assert r.loc[9, "liquidity_pool_swept_high"] == 1
+    assert r.loc[9, "active_buy_liquidity_pools"] == 0
 
 
 def test_low_sweep_and_reclaim_is_causal():
     highs = [101, 103, 105, 103, 101, 103, 105, 103, 101, 102, 104]
     lows = [99, 97, 95, 97, 99, 97, 95, 97, 99, 94, 96]
-    closes = [100, 98, 96, 98, 100, 98, 96, 98, 100, 95, 98]
+    closes = [100, 98, 96, 98, 100, 102, 96, 98, 100, 95, 98]
     r = build_liquidity(frame(highs, lows, closes), swing_left=1, swing_right=1, equal_tolerance=0.001)
     assert r.loc[7, "sell_side_liquidity"] == 1
     assert r.loc[9, "sweep_low"] == 1
     assert r.loc[9, "sweep_low_reclaim"] == 1
 
 
-def test_no_future_lookahead():
+def test_breakout_invalidates_pool_without_marking_sweep():
+    highs = [101, 103, 106, 103, 101, 103, 106, 103, 101, 108, 110]
+    lows = [99, 101, 104, 101, 99, 101, 104, 101, 99, 105, 107]
+    closes = [100, 102, 105, 102, 100, 102, 105, 102, 100, 107, 109]
+    r = build_liquidity(frame(highs, lows, closes), swing_left=1, swing_right=1, equal_tolerance=0.001)
+    assert r.loc[7, "buy_side_liquidity"] == 1
+    assert r.loc[9, "liquidity_breakout_high"] == 1
+    assert r.loc[9, "liquidity_pool_invalidated_high"] == 1
+    assert r.loc[9, "sweep_high"] == 0
+    assert r.loc[9, "active_buy_liquidity_pools"] == 0
+
+
+def test_multiple_active_pools_are_retained():
+    highs = [101, 104, 106, 104, 101, 104, 106.01, 104, 101, 103, 105, 103, 101, 104, 106.01, 104, 101]
+    lows = [99, 101, 103, 101, 99, 101, 103, 101, 99, 100, 102, 100, 99, 100, 103, 101, 99]
+    closes = [(h + l) / 2 for h, l in zip(highs, lows)]
+    r = build_liquidity(frame(highs, lows, closes), swing_left=1, swing_right=1, equal_tolerance=0.002)
+    assert r["active_buy_liquidity_pools"].max() >= 2
+
+
+def test_internal_and_external_liquidity_are_separated():
+    highs = [101, 104, 106, 104, 102, 105, 107, 105, 103, 106, 108, 106, 104]
+    lows = [99, 101, 103, 101, 100, 102, 104, 102, 101, 103, 105, 103, 102]
+    closes = [(h + l) / 2 for h, l in zip(highs, lows)]
+    r = build_liquidity(
+        frame(highs, lows, closes),
+        swing_left=2, swing_right=2,
+        internal_left=1, internal_right=1,
+        equal_tolerance=0.01,
+    )
+    assert r["internal_previous_high"].notna().any()
+    assert r["internal_previous_low"].notna().any()
+    assert (r["active_internal_buy_pools"] + r["active_internal_sell_pools"]).max() >= 0
+
+
+def test_previous_levels_are_causal():
     n = 80
     base_close = 100 + np.sin(np.arange(n) / 2)
     base = frame(base_close + 1, base_close - 1, base_close)
@@ -66,3 +103,5 @@ def test_invalid_parameters():
         build_liquidity(frame([2, 3, 2], [0, 1, 0]), swing_left=0)
     with pytest.raises(ValueError):
         build_liquidity(frame([2, 3, 2], [0, 1, 0]), equal_tolerance=-1)
+    with pytest.raises(ValueError):
+        build_liquidity(frame([2, 3, 2], [0, 1, 0]), internal_left=0)
