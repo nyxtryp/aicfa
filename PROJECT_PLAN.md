@@ -1089,3 +1089,39 @@ Known limitations remain:
 - overlapping scenario flags are preserved rather than forced into a single verdict.
 
 **Next concrete action:** continue the analytical core without jumping to ML. The next planned work is refinement of the existing causal market representation (Market Structure/Liquidity/SMC semantics) before labels/datasets, unless a dedicated Scenario/MTF refinement is needed from further tests.
+
+
+---
+
+## 2026-09-29 — Market Structure refinement
+
+Implementation commits:
+- 8bd791744d6f14dc04e4c878219f62a8ca0b8c96 — Refine causal market structure semantics.
+- 2b8f0d5389b5359af25e6b5038e63fcd2bcd6502 — Test refined market structure semantics.
+
+Implemented in src/aicfa/structure.py:
+- shared causal swing-layer helper for external and internal structure;
+- configurable internal structure with default 1/1 swing sensitivity;
+- explicit internal HH/HL/LH/LL, BOS and CHoCH namespaces;
+- protected-high/protected-low prices and lifecycle state;
+- protected-level creation tied to confirmed external BOS;
+- later-close invalidation of protected levels;
+- MSS is no longer a CHoCH alias: it is emitted only when a supplied causal displacement frame has matching directional displacement on the CHoCH row;
+- without displacement, MSS remains zero by design.
+
+Tests added/expanded in tests/test_structure.py:
+- internal structure namespace and causality;
+- protected level creation/lifecycle;
+- MSS requires displacement;
+- displacement input validation;
+- existing swing classification and future-change invariance retained.
+
+Server verification: **pending**. The mandatory FrostDeploy suite must be run against the deployed main branch before accepting this refinement.
+
+Known limitations:
+- protected levels are currently a mechanical hypothesis and require statistical validation against BTC history;
+- internal/external structure are sensitivity layers, not yet a full multi-pool structural graph;
+- Liquidity still needs previous-high/low pools, multiple active pools, internal/external liquidity and pool lifecycle refinement;
+- Unified SMC currently exposes the first-generation structure namespace and should be extended to carry the new protected/internal/MSS observations after this structure layer is verified.
+
+**Next concrete action:** run the full FrostDeploy pytest suite. If green, extend Unified SMC with protected/internal/MSS observations and add integration/causality tests, then continue Liquidity refinement.
