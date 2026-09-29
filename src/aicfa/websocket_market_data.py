@@ -200,13 +200,14 @@ class BinanceWebSocketMarketDataTransport:
                 )
                 self._subscribe(connection)
                 reconnects = 0
+                started_at = self._clock()
                 idle_deadline = (
-                    self._clock() + self._idle_timeout_seconds
+                    started_at + self._idle_timeout_seconds
                     if self._idle_timeout_seconds is not None
                     else None
                 )
                 observation_deadline = (
-                    self._clock() + self._observation_timeout_seconds
+                    started_at + self._observation_timeout_seconds
                     if self._observation_timeout_seconds is not None
                     else None
                 )
@@ -237,9 +238,8 @@ class BinanceWebSocketMarketDataTransport:
                     # ignored as market observations, but they still reset the
                     # transport-level idle watchdog.
                     if idle_deadline is not None:
-                        idle_deadline = (
-                            self._clock() + self._idle_timeout_seconds
-                        )
+                        received_at = self._clock()
+                        idle_deadline = received_at + self._idle_timeout_seconds
 
                     for key in self.keys:
                         observation = parse_binance_kline_message(raw, key)
