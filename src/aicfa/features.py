@@ -13,10 +13,20 @@ import pandas as pd
 EPS = 1e-12
 
 
-def build_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_features(
+    df: pd.DataFrame,
+    *,
+    multi_timeframe_frames: dict[str, pd.DataFrame] | None = None,
+) -> pd.DataFrame:
     """Build causal market-state features from OHLCV candles.
 
     Required columns: timestamp, open, high, low, close, volume.
+
+    ``multi_timeframe_frames`` contains independently aggregated higher-timeframe
+    OHLCV frames keyed by timeframe (for example ``5m``, ``15m``, ``1h``).
+    The 1m base frame is the canonical lowest timeframe; no resampling is
+    performed here. Higher-timeframe state is exposed only after each source
+    candle has closed.
     """
     required = ["timestamp", "open", "high", "low", "close", "volume"]
     missing = [c for c in required if c not in df.columns]
@@ -183,6 +193,17 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
         "smc_premium", "smc_discount", "smc_equilibrium", "smc_state_ready",
     ]:
         out[column] = unified_smc[column].to_numpy()
+
+    # Verified causal multi-timeframe structure. The standalone MTF engine
+    # consumes independently aggregated frames and never resamples the base
+    # frame implicitly. The base frame itself is the 1m canonical timeframe.
+    if multi_timeframe_frames is not None:
+        from .multi_timeframe import build_multi_timeframe_structure
+
+        mtf = build_multi_timeframe_structure(x, multi_timeframe_frames)
+        for column in mtf.columns:
+            if column.startswith("mtf_"):
+                out[column] = mtf[column].to_numpy()
 
     # Trend proxies from causal rolling return and close-vs-mean location.
     for n in (15, 60):
