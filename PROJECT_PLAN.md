@@ -2026,3 +2026,11 @@ This is the evidence boundary between future chart vision and the existing analy
 **PENDING FrostDeploy/server verification.**
 
 Next: add contract tests, document the screenshot evidence path, then deploy and run the mandatory full pytest suite before accepting the stage.
+
+
+### `1130c440209dca03abd5a7850bc1bb11b1083770`
+**Test visual evidence contract**
+
+Added contract tests for immutable observations, confidence/evidence validation, screenshot provenance, duplicate protection, multi-timeframe bundles, and separation from live-provider state.
+
+Verification remains pending on the deployed FrostDeploy release.
