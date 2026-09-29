@@ -1,8 +1,8 @@
 """Causal derivatives observations for AICFA.
 
 The engine aligns derivative observations to a base OHLCV timeline using only
-observations known at or before each base timestamp. It deliberately exposes
-descriptive market-state features rather than trading signals.
+observations known at the corresponding base timestamp. It deliberately
+exposes descriptive market-state features rather than trading signals.
 """
 
 from __future__ import annotations
@@ -49,11 +49,11 @@ def build_derivatives(
     *,
     baseline_window: int = 24,
 ) -> pd.DataFrame:
-    """Map causal funding/OI observations onto a base candle timeline.
+    """Map point-in-time funding/OI observations onto a base candle timeline.
 
-    Derivative observations are treated as point-in-time observations. A base
-    candle may only see the latest derivative observation whose timestamp is
-    <= the candle timestamp. No forward fill from future observations occurs.
+    A derivative observation is visible only on a base row with the exact
+    same timestamp. This prevents an observation from being treated as if it
+    were continuously known between exchange updates.
     """
     if baseline_window < 2:
         raise ValueError("baseline_window must be >= 2")
@@ -69,18 +69,10 @@ def build_derivatives(
 
     d = _validate(derivatives)
 
-    aligned = pd.merge_asof(
-        b[["timestamp", "close"]],
-        d,
-        on="timestamp",
-        direction="backward",
-        allow_exact_matches=True,
-    )
-
     # Changes are computed in derivative-observation order before alignment.
     funding_delta = d["funding_rate"].diff()
-    funding_pct = d["funding_rate"].replace(0, np.nan)
-    funding_change_pct = funding_delta / funding_pct.shift(0).abs()
+    funding_pct = d["funding_rate"].shift(1).abs().replace(0, np.nan)
+    funding_change_pct = funding_delta / funding_pct
     oi_delta = d["open_interest"].diff()
     oi_pct = d["open_interest"].pct_change()
 
@@ -92,33 +84,28 @@ def build_derivatives(
     d2["open_interest_change_pct"] = oi_pct.replace([np.inf, -np.inf], np.nan)
     d2["open_interest_zscore"] = _zscore_against_past(d2["open_interest"], baseline_window)
 
-    # Price/OI relationship is descriptive only and uses the current aligned
-    # derivative observation plus the base candle return known at that candle.
-    price_return = b["close"].pct_change()
-    base_with_ret = b[["timestamp"]].copy()
-    base_with_ret["price_return"] = price_return
-    aligned2 = pd.merge_asof(
-        base_with_ret,
-        d2,
-        on="timestamp",
-        direction="backward",
-        allow_exact_matches=True,
-    )
+    # Point-in-time alignment: do not forward-fill an older derivative
+    # observation into intervening base candles.
+    aligned = b[["timestamp", "close"]].merge(d2, on="timestamp", how="left", sort=True)
 
-    oi_delta_now = aligned2["open_interest_delta"]
-    ret = aligned2["price_return"]
-    aligned2["oi_price_up_up"] = ((oi_delta_now > 0) & (ret > 0)).astype(int)
-    aligned2["oi_price_up_down"] = ((oi_delta_now > 0) & (ret < 0)).astype(int)
-    aligned2["oi_price_down_up"] = ((oi_delta_now < 0) & (ret > 0)).astype(int)
-    aligned2["oi_price_down_down"] = ((oi_delta_now < 0) & (ret < 0)).astype(int)
+    # Price/OI relationship is descriptive only and uses the base candle
+    # return known at that exact timestamp.
+    aligned["price_return"] = aligned["close"].pct_change()
+    oi_delta_now = aligned["open_interest_delta"]
+    ret = aligned["price_return"]
+    has_oi = oi_delta_now.notna()
+    aligned["oi_price_up_up"] = np.where(has_oi, ((oi_delta_now > 0) & (ret > 0)).astype(int), np.nan)
+    aligned["oi_price_up_down"] = np.where(has_oi, ((oi_delta_now > 0) & (ret < 0)).astype(int), np.nan)
+    aligned["oi_price_down_up"] = np.where(has_oi, ((oi_delta_now < 0) & (ret > 0)).astype(int), np.nan)
+    aligned["oi_price_down_down"] = np.where(has_oi, ((oi_delta_now < 0) & (ret < 0)).astype(int), np.nan)
 
     optional = [c for c in ("liquidation_volume", "long_liquidation_volume", "short_liquidation_volume") if c in d.columns]
     if optional:
         # Keep optional liquidation observations causal when the historical
         # source provides them. No liquidation fields are invented otherwise.
         for col in optional:
-            aligned2[col] = pd.to_numeric(aligned2[col], errors="coerce")
-            if (aligned2[col].dropna() < 0).any():
+            aligned[col] = pd.to_numeric(aligned[col], errors="coerce")
+            if (aligned[col].dropna() < 0).any():
                 raise ValueError(f"{col} must be non-negative")
 
     out_cols = [
@@ -136,4 +123,4 @@ def build_derivatives(
         "oi_price_down_down",
     ] + optional
 
-    return aligned2[out_cols]
+    return aligned[out_cols]
