@@ -42,15 +42,15 @@ def build_unified_smc(
     if (x["volume"] < 0).any():
         raise ValueError("Invalid volume: negative values are not allowed")
 
-    if structure is None:
-        from .structure import build_structure
-        structure = build_structure(x)
-    if liquidity is None:
-        from .liquidity import build_liquidity
-        liquidity = build_liquidity(x)
     if displacement is None:
         from .displacement import build_displacement
         displacement = build_displacement(x)
+    if structure is None:
+        from .structure import build_structure
+        structure = build_structure(x, displacement=displacement)
+    if liquidity is None:
+        from .liquidity import build_liquidity
+        liquidity = build_liquidity(x)
     if fvg is None:
         from .fvg import build_fvg
         fvg = build_fvg(x)
@@ -85,6 +85,42 @@ def build_unified_smc(
         [1, -1],
         default=0,
     ).astype("int8")
+
+    # Refined Market Structure: preserve external and internal observations
+    # separately so downstream layers can choose the required sensitivity.
+    for source, target in [
+        ("internal_swing_high", "smc_internal_swing_high"),
+        ("internal_swing_low", "smc_internal_swing_low"),
+        ("internal_hh", "smc_internal_hh"),
+        ("internal_hl", "smc_internal_hl"),
+        ("internal_lh", "smc_internal_lh"),
+        ("internal_ll", "smc_internal_ll"),
+        ("internal_bos_up", "smc_internal_bos_up"),
+        ("internal_bos_down", "smc_internal_bos_down"),
+        ("internal_choch_up", "smc_internal_choch_up"),
+        ("internal_choch_down", "smc_internal_choch_down"),
+        ("internal_structure_direction", "smc_internal_structure_direction"),
+    ]:
+        copy_column(structure, source, target)
+
+    # MSS is distinct from CHoCH: it is only populated by the causal
+    # displacement-aware structure engine.
+    copy_column(structure, "mss_up", "smc_mss_up")
+    copy_column(structure, "mss_down", "smc_mss_down")
+
+    # Protected levels are structural state, not trade signals.
+    for source, target in [
+        ("protected_high_price", "smc_protected_high_price"),
+        ("protected_low_price", "smc_protected_low_price"),
+        ("protected_high_active", "smc_protected_high_active"),
+        ("protected_low_active", "smc_protected_low_active"),
+        ("protected_high_created", "smc_protected_high_created"),
+        ("protected_low_created", "smc_protected_low_created"),
+        ("protected_high_broken", "smc_protected_high_broken"),
+        ("protected_low_broken", "smc_protected_low_broken"),
+    ]:
+        default = np.nan if source.endswith("_price") else 0.0
+        copy_column(structure, source, target, default)
 
     # Liquidity: a high sweep is represented as a buy-side sweep event (-1),
     # a low sweep as a sell-side sweep event (+1). Reclaim is retained as a
