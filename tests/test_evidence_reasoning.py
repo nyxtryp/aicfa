@@ -75,7 +75,7 @@ def test_material_conflict_favors_wait():
 
 def test_relationships_come_from_knowledge_base():
     relationships = related_concepts("liquidity.sweep")
-    assert "market_structure.bos" in relationships
+    assert "market_structure.choch" in relationships
     definition, linked = explain_observation("liquidity.sweep")
     assert "liquidity" in definition.lower()
     assert linked == relationships
