@@ -606,16 +606,16 @@ This file is the persistent handoff/memory for future chats.
 
 # 12. Current checkpoint
 
-**Last verified code commits:** `18aa8bdf8479c2094c4c8cc3ab5d7870606a29ac`, `c147fec530f8abca4426147f2593e13393813618`, and `37f4db3b5b6ba47b1aaceab35238219197e77449`
+**Latest implementation commits:** `7b14e092c5897c53f5268bdd4088830c72e39bbd`, `3cbff2f68ac9cb5f27561438985947fcbc501b93`, `4f35f0427d9ad71c2f4577b961c13e6df12af6e4`, and `16dcab97627b5739a6ec89cb033d157b9dc9bd16`
 
-**Current layer:** Displacement — verified green on FrostDeploy
+**Current layer:** Order Blocks — implementation complete, server verification pending
 
 **Current state:**
 - Market Structure: first causal implementation complete, refinement pending.
 - Liquidity: first causal implementation complete, server verification complete.
 - Displacement: first causal implementation complete, server verification complete.
-- FVG: not started.
-- Order Blocks: not started.
+- FVG: implemented and verified green on FrostDeploy.
+- Order Blocks: implemented and integrated into the feature engine; verification pending.
 - Unified SMC: not started.
 - Multi-timeframe: not started.
 - Scenario Engine: not started.
@@ -625,9 +625,7 @@ This file is the persistent handoff/memory for future chats.
 - Paper Trading: not started.
 - Top-100 assets: explicitly postponed.
 
-**Immediate action:** begin the FVG / Imbalance Engine. Displacement is now verified green on FrostDeploy.
-
----
+**Immediate action:** run the complete FrostDeploy pytest suite against the Order Block implementation. If green, accept the layer and proceed to Premium / Discount refinement. If failures occur, fix only the actual failures and re-verify.
 
 # 13. Rule for this document
 
@@ -730,3 +728,31 @@ Commit:
 Only that test fixture was changed, setting row 20 low to `99.8` so the OHLC relationship is valid while preserving the intended non-displacement scenario. Production FVG logic was not changed.
 
 **Next concrete action:** rerun the complete FrostDeploy pytest suite. If green, record FVG as verified and begin Order Block Engine.
+
+
+## 2026-09-29 — Order Block Engine implementation
+
+Implementation commits:
+- `7b14e092c5897c53f5268bdd4088830c72e39bbd` — Add causal Order Block engine.
+- `3cbff2f68ac9cb5f27561438985947fcbc501b93` — Define causal Order Block lifecycle semantics.
+- `4f35f0427d9ad71c2f4577b961c13e6df12af6e4` — Add Order Block engine tests.
+- `16dcab97627b5739a6ec89cb033d157b9dc9bd16` — Expose causal Order Block features.
+
+Implemented:
+- bullish OB from the immediately preceding bearish candle plus bullish displacement;
+- bearish OB from the immediately preceding bullish candle plus bearish displacement;
+- full source-candle high/low as the zone;
+- recognition only on the displacement candle, never backdated;
+- causal mitigation;
+- causal invalidation;
+- later-only breaker transition;
+- displacement-gated creation;
+- focused tests for direction, lifecycle, displacement requirement, causality, and validation;
+- integration into `build_features()`.
+
+Known design limitation:
+The first implementation tracks one latest active bullish and one latest active bearish OB lifecycle. Multiple simultaneous historical OB pools are not yet modeled. That is a later refinement after the unified causal foundation is verified.
+
+Server verification: **pending**.
+
+**Next concrete action:** run the complete FrostDeploy pytest suite against the Order Block implementation.
