@@ -131,6 +131,16 @@ def build_features(
                     "order_block_bearish_low","order_block_bearish_high"]:
         out[column]=order_blocks[column].to_numpy()
 
+    from .volume_volatility import build_volume_volatility
+    volume_volatility = build_volume_volatility(x)
+    for column in [
+        "realized_volatility","true_range","atr","atr_pct","range_zscore",
+        "volume_zscore","relative_volume_causal","volatility_ratio",
+        "volatility_expansion","volatility_compression","volume_expansion",
+        "volume_dry_up","volatility_regime","volume_regime",
+    ]:
+        out[column] = volume_volatility[column].to_numpy()
+
     from .unified_smc import build_unified_smc
     unified_smc=build_unified_smc(x,structure=structure,liquidity=liquidity,
         displacement=displacement,fvg=fvg,order_blocks=order_blocks,
