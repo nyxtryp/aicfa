@@ -625,3 +625,57 @@ Latest full-suite result:
 **Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, spot/futures relationship, Taker Flow / Order Flow, Order Book / Market Depth, and level-by-level Order Book / Liquidity Walls are implemented, deployed and verified green.
 
 **Next task:** define and implement causal Absorption using synchronized Taker Flow, level-by-level book changes and price response. Preserve strict causality and the pre-ML development boundary.
+
+
+## 2026-09-29 — Causal Absorption implementation started
+
+### `e88a8e0a8c6f881208a9fe92777c73de23c9e7e1`
+**Add causal absorption feature layer**
+
+Added `src/aicfa/absorption.py`.
+
+The layer combines, over an explicit backward window:
+- taker buy/sell flow;
+- opposing-side level-by-level displayed liquidity;
+- level persistence;
+- displayed replenishment/cancellation;
+- contemporaneous price response.
+
+The implementation never reads observations after event time T.
+
+### `8286f9cd6e548c85b2fde220bc73d080944882cd`
+**Test causal absorption features**
+
+Added tests covering:
+- synchronized aggressive flow + liquidity + replenishment;
+- rejection of wall-only absorption without replenishment;
+- future-change invariance;
+- parameter validation.
+
+### `efe3789f54606ffb145700dd679f40819ac9698e`
+**Document absorption source contract and causality**
+
+Added `docs/ABSORPTION.md` with the source contract, causal window,
+conditions and limitations.
+
+### `fc6723565727b59eadba3b6ccca732a030d44599`
+**Fix absorption replenishment fixture**
+
+Adjusted only the test fixture so the positive case contains displayed
+replenishment across snapshots.
+
+### Verification status
+
+**Not yet server-verified.**
+
+Required next step:
+1. deploy current commits to FrostDeploy;
+2. run the mandatory full pytest suite;
+3. fix any real failures;
+4. rerun until green;
+5. only then mark Absorption accepted.
+
+Important limitation: this is an absorption **candidate** based on synchronized
+market aggregates. A displayed level is not proof of execution. Future price
+movement remains a separate outcome/label and is never used by the live feature.
+
