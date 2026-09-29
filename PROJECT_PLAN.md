@@ -606,9 +606,9 @@ This file is the persistent handoff/memory for future chats.
 
 # 12. Current checkpoint
 
-**Latest implementation commits:** `7b14e092c5897c53f5268bdd4088830c72e39bbd`, `3cbff2f68ac9cb5f27561438985947fcbc501b93`, `4f35f0427d9ad71c2f4577b961c13e6df12af6e4`, `16dcab97627b5739a6ec89cb033d157b9dc9bd16`, and `d4e82cb4b55802dd10c2419208c348ec48de74c1`
+**Latest implementation commits:** `5ef0952a80ffecd7e9d9129fe9cf402507b21f80`, `cb392b6b85b08daa5c373ae62cdc59ba3b509fd7`, `95708f427120eb92d884a6c8f05846c55afe4a81`, and `6f5caadbc8d5d87f14c02caf907667c92992847b`
 
-**Current layer:** Premium / Discount — implementation complete, server verification pending
+**Current layer:** Unified SMC State — implementation complete, server verification pending
 
 **Current state:**
 - Market Structure: first causal implementation complete, refinement pending.
@@ -616,8 +616,8 @@ This file is the persistent handoff/memory for future chats.
 - Displacement: first causal implementation complete, server verification complete.
 - FVG: implemented and verified green on FrostDeploy.
 - Order Blocks: implemented, integrated into the feature engine, and verified green on FrostDeploy.
-- Premium / Discount: structural dealing-range implementation added and integrated; server verification pending.
-- Unified SMC: not started.
+- Premium / Discount: structural dealing-range implementation added and verified green on FrostDeploy (`50 passed, 142 warnings`).
+- Unified SMC: causal unified state representation implemented and integrated; server verification pending.
 - Multi-timeframe: not started.
 - Scenario Engine: not started.
 - ML dataset/model: not started.
@@ -626,7 +626,7 @@ This file is the persistent handoff/memory for future chats.
 - Paper Trading: not started.
 - Top-100 assets: explicitly postponed.
 
-**Immediate action:** run the complete FrostDeploy pytest suite against the Premium / Discount implementation. If green, accept the layer and proceed to Unified SMC state. If failures occur, fix only the actual failures and re-verify.
+**Immediate action:** run the complete FrostDeploy pytest suite against the Unified SMC implementation. If green, accept the layer and proceed to Multi-Timeframe Structure. If failures occur, fix only the actual failures and re-verify.
 
 # 13. Rule for this document
 
@@ -821,3 +821,61 @@ Known limitation:
 The current range is the latest confirmed swing-high/swing-low pair. More advanced dealing-range selection/protected-range semantics will be refined later alongside Market Structure and Unified SMC.
 
 **Next concrete action:** run the complete FrostDeploy pytest suite against the Premium / Discount implementation. If green, accept the layer and proceed to Unified SMC state.
+
+
+## 2026-09-29 — Premium / Discount server verification
+
+Full FrostDeploy test suite was run against release `2026-09-29T04-56-35-35f7d72` using the mandatory command.
+
+Result:
+```
+50 passed, 142 warnings in 3.71s
+```
+
+Verification status: **PASS**.
+
+Warnings remain non-blocking:
+- pandas deprecation warning in `tests/test_dataset.py`;
+- pandas DataFrame fragmentation PerformanceWarnings in `src/aicfa/features.py`;
+- NumPy timedelta deprecation warning in `src/aicfa/labels.py`;
+- pandas FutureWarning in the Premium/Discount future-change test fixture;
+- pytest cache permission warning in the immutable FrostDeploy release directory.
+
+No production fixes were required after the Premium / Discount implementation. The structural Premium / Discount layer is accepted.
+
+Known limitation remains:
+The active range is currently the latest confirmed swing-high/swing-low pair. More advanced protected-range semantics remain deferred to later Market Structure refinement.
+
+**Next concrete task:** implement and verify Unified SMC State.
+
+## 2026-09-29 — Unified SMC State implementation
+
+Implementation commits:
+- `5ef0952a80ffecd7e9d9129fe9cf402507b21f80` — Add causal unified SMC state engine.
+- `cb392b6b85b08daa5c373ae62cdc59ba3b509fd7` — Add unified SMC state tests.
+- `95708f427120eb92d884a6c8f05846c55afe4a81` — Integrate unified SMC state features.
+- `6f5caadbc8d5d87f14c02caf907667c92992847b` — Cover unified SMC features in feature integration test.
+
+Implemented:
+- canonical `smc_*` representation combining Market Structure, Liquidity, Displacement, FVG, Order Blocks, and structural Premium/Discount;
+- separate structure direction, break event, and CHoCH/structure-shift event;
+- normalized liquidity sweep/reclaim observations;
+- displacement direction and displacement+BOS relationships;
+- FVG creation direction, lifecycle, and active state;
+- Order Block creation direction, lifecycle, active state, and breaker observations;
+- structural Premium/Discount position and state;
+- `smc_state_ready` indicating that a confirmed structural dealing range exists;
+- explicit avoidance of a generic `smc_score` / `smc_signal` confirmation-count verdict.
+
+Causality rule:
+Unified SMC does not introduce future information or backdate events. It only normalizes outputs from the already-causal component engines.
+
+Design rule:
+SMC components remain observations/features to test statistically. The unified layer does not convert them into an automatic LONG/SHORT/BUY/SELL decision.
+
+Known limitation:
+FVG and Order Block lifecycle direction is currently represented separately from aggregate active/lifecycle flags because their first-generation engines expose aggregate lifecycle state. More detailed multi-pool object tracking is deferred to later refinement.
+
+Server verification: **pending**.
+
+**Next concrete action:** run the complete FrostDeploy pytest suite against the Unified SMC implementation. If green, accept the layer and proceed to Multi-Timeframe Structure.
