@@ -14,7 +14,7 @@ This file is the persistent project memory and control log. It must be updated a
 The analytical core is being built causally from the canonical finest timeframe upward:
 **1m → 5m → 15m → 1h → 4h → 1d → 1w**.
 
-Completed and verified layers include Market Structure, Liquidity, Displacement, FVG, Order Blocks, Premium/Discount, Unified SMC, Multi-Timeframe, Volume/Volatility, Scenario Engine, and the expanded Derivatives layer.
+Completed and verified layers include Market Structure, Liquidity, Displacement, FVG, Order Blocks, Premium/Discount, Unified SMC, Multi-Timeframe, Volume/Volatility, Scenario Engine, and the expanded Derivatives layer, including the spot/futures relationship.
 
 The project remains **pre-ML**. Do not jump to model training until the market-state representation is sufficiently complete and verified.
 
@@ -359,7 +359,7 @@ The following layers were implemented and verified green:
 - Multi-Timeframe — explicit 1m/5m/15m/1h/4h/1d/1w causal mapping.
 - Volume/Volatility — causal regimes.
 - Scenario Engine — descriptive scenario families, not decisions.
-- Derivatives — funding/OI/liquidations/positioning/basis/liquidation imbalance/futures volume accepted.
+- Derivatives — funding/OI/liquidations/positioning/basis/liquidation imbalance/futures volume/spot-futures relationship accepted.
 
 ---
 
@@ -392,7 +392,6 @@ Never claim green status without the current deployed release output.
 
 1. Continue remaining derivatives/market-state inputs:
    - remaining source-backed derivatives variants;
-   - spot/futures relationship features where the source schema provides both sides;
    - later taker flow/order flow;
    - later order book / market depth.
 2. Keep derivatives descriptive and causal; no premature signals.
@@ -441,14 +440,14 @@ Never claim deployment/test verification without actual server output.
 # 13. Current checkpoint
 
 Latest implementation:
-`13c1df136bbe58c5b3d882a67290f90235e004a9`
+`578457cffacec916dd566b72337f48eacb52ce72`
 
 Latest verified FrostDeploy release:
-`2026-09-29T07-43-01-13c1df1`
+`2026-09-29T08-04-34-578457c`
 
 Latest full-suite result:
-`97 passed, 2843 warnings in 30.68s`
+`99 passed, 2843 warnings in 31.63s`
 
-**Current status:** Derivatives positioning/basis, causal liquidation imbalance, and futures volume are implemented, deployed and verified green.
+**Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, and the spot/futures relationship are implemented, deployed and verified green.
 
-**Next task:** continue remaining source-backed derivatives/market-state inputs, starting with a clearly defined spot/futures relationship only where the source schema provides both sides; then later taker flow/order flow and market depth. Preserve strict causality and the pre-ML development boundary.
+**Next task:** continue remaining source-backed derivatives/market-state inputs, starting with later taker flow/order flow and then market depth. Preserve strict causality and the pre-ML development boundary.
