@@ -352,3 +352,72 @@ nvidia-smi || true
 ```
 
 Then proceed with the local model installation/test. Do not expose Ollama port 11434 publicly; AICFA should use the local endpoint `127.0.0.1:11434`.
+
+
+## 2026-09-29 — Local Chart Vision model shortlist revised
+
+The previous baseline `qwen3-vl:4b` is **no longer the default first candidate**. Current model selection must be evidence-driven and tested on the actual AICFA server rather than decided from model size or generic benchmarks.
+
+### Current test order
+
+1. **MiniCPM-V 4.6 1B** — first candidate because the server currently has only 3 GB RAM and this is the lightest practical candidate in the shortlist.
+2. **Granite 3.2 Vision 2B** — second candidate; specifically interesting for AICFA because its documented use cases include charts, plots, diagrams and other visual structures.
+3. **Qwen3.5 2B** — third candidate; newer multimodal family and a useful general comparison point.
+4. **Qwen3-VL 2B** — fallback comparison candidate.
+5. **Qwen3-VL 4B / Qwen3.5 4B** — only after smaller models are tested and server resources are increased if necessary.
+
+### Selection rule
+
+Do **not** install a larger model merely because it is larger. The winner for AICFA must be selected from actual BTC/USDT chart tests using the same screenshots and the same structured-output contract.
+
+Evaluate each candidate on:
+- visible candle/chart reading;
+- HH / HL / LH / LL;
+- BOS / CHoCH;
+- liquidity sweep;
+- FVG / imbalance;
+- Order Block;
+- Premium / Discount;
+- explicit direction only when visually supported;
+- uncertainty / `possible` vs `observed`;
+- hallucination rate;
+- valid structured JSON;
+- AICFA Knowledge Base validation;
+- inference latency on the current CPU;
+- peak RAM usage;
+- multi-timeframe consistency.
+
+The vision model is only the **perception layer**. AICFA Knowledge Base, evidence reasoning, scenario reasoning, setup analysis and Decision Layer remain authoritative.
+
+### Hardware rule
+
+Current server baseline:
+- RAM: 3 GB;
+- CPU: 1 vCPU;
+- GPU: none currently.
+
+Do not assume that RAM alone solves inference performance. CPU inference speed and peak memory must be measured. If a 2B/4B candidate requires more headroom, increase RAM based on measured requirements rather than an arbitrary target.
+
+### First real model test
+
+Before changing the architecture:
+1. inspect `free -h`, `nproc`, `ollama --version`, `nvidia-smi || true`;
+2. install/verify Ollama locally;
+3. test the smallest viable candidate first;
+4. process the same real BTC/USDT chart screenshot;
+5. pass the result through the existing AICFA vision/evidence validation;
+6. record latency, memory and output quality;
+7. compare the next candidate only if needed.
+
+No candidate becomes production-active until it passes the real chart test and the full AICFA test suite remains green.
+
+### Persistent workflow rule
+
+The project plan is the source of truth for **what we are building, why, current architecture, completed stages, exact commits, deployment verification, model decisions, known limitations, and the next step**. After every meaningful implementation/model/documentation commit, update this file with:
+- commit SHA;
+- what changed;
+- verification/deployment result;
+- limitations or unresolved issues;
+- exact next step.
+
+Never rely on the chat history alone for project state.
