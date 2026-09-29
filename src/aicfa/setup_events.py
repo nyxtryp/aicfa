@@ -55,11 +55,12 @@ def build_setup_events(state: pd.DataFrame) -> pd.DataFrame:
 
     previous_identity = identity.shift(1).fillna("")
     previous_active = previous_identity.ne("")
-    identity_changed = valid_identity & identity.ne(previous_identity)
 
-    # A new identity is created both when there was no previous setup and
-    # when an existing setup is replaced by a different identity.
-    created = identity_changed
+    # A new identity is created when there was no previous live identity or
+    # when the current identity replaces a different live identity.
+    created = valid_identity & (
+        previous_identity.eq("") | identity.ne(previous_identity)
+    )
     same_identity = valid_identity & identity.eq(previous_identity)
     strengthened = same_identity & _num(x, "market_state_changed").ne(0)
 
@@ -71,8 +72,7 @@ def build_setup_events(state: pd.DataFrame) -> pd.DataFrame:
 
     # Replacement carries both lifecycle flags: invalidated for the previous
     # identity and created for the new identity. The event type describes the
-    # new/current lifecycle event, so creation takes precedence over
-    # invalidation on a replacement row.
+    # new/current lifecycle event, so creation takes precedence.
     event = pd.Series("", index=x.index, dtype=object)
     event.loc[invalidated] = "invalidated"
     event.loc[expired] = "expired"
