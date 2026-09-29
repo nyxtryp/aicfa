@@ -1149,3 +1149,22 @@ The next FrostDeploy run exposed the symmetric fixture expectation error on the 
 Server status after this test-only correction: **pending rerun**.
 
 Next concrete action: rerun the mandatory FrostDeploy suite. If green, accept the Market Structure refinement and extend Unified SMC with protected/internal/MSS observations and integration/causality tests.
+
+
+## 2026-09-29 — Market Structure refinement verified / Unified SMC refinement
+
+Server verification for the refined Market Structure layer is now green on FrostDeploy release `2026-09-29T06-04-45-0e08c89`:
+
+```
+72 passed, 1281 warnings in 20.32s
+```
+
+The verified layer now covers causal external/internal HH/HL/LH/LL, BOS/CHoCH, protected high/low lifecycle, displacement-aware MSS, validation, and future-change invariance. The protected-level fixture corrections were test-only; production Market Structure logic was not changed by those corrections.
+
+**Next implementation step:** refine Unified SMC so it carries the new Market Structure observations into the canonical `smc_*` namespace:
+- internal HH/HL/LH/LL;
+- internal BOS/CHoCH and internal structure direction;
+- protected high/low prices and lifecycle;
+- displacement-aware MSS up/down.
+
+Add focused integration tests for column presence, value propagation, and causal future-change invariance. Do not add a score, signal, confirmation counter, or ML logic. After this layer is green, continue the planned Liquidity refinement.
