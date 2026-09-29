@@ -991,3 +991,75 @@ Proceed to the **provider-agnostic Live Market Data / Scanner foundation**:
 - preserve causal semantics and provider abstraction;
 - do not yet assume a free provider is sufficient for 24/7 low-latency Top-100;
 - verify provider rate limits, latency, WebSocket availability, historical access, commercial terms and reliability before locking the production provider.
+
+
+## 2026-09-29 — Provider-agnostic Live Market Data / Scanner foundation
+
+### Commits
+
+- `0a64f467acfe47bdd5eb5617eaf2a9813ab6e9e6` — add provider-agnostic live market data contract
+- `7531f1b5d4c8c7f7d665d4eab26e49ba062403b9` — add centralized live market scanner foundation
+- `438a2678ab02069fa1700ebc6fade19d7c677535` — test live market data contracts
+- `a7c990ca1e5ecbf86bdaa3b71855dae84b7a0de8` — test centralized market scanner
+- `d27e3350a3330f1217ab268720d884dcf78743ae` — document live market data scanner foundation
+
+### Implemented
+
+Added `src/aicfa/market_data.py`:
+- explicit canonical timeframes `1m/5m/15m/1h/4h/1d/1w/1M`;
+- `MarketKey` containing exchange, symbol, market type and timeframe;
+- provider-agnostic `MarketDataProvider` contract;
+- OHLCV validation;
+- deterministic deduplication/sorting;
+- idempotent incremental merge;
+- completed-candle filtering based on candle-open timestamp plus interval duration;
+- incremental cursor calculation;
+- explicit deferral of variable-calendar `1M` completion to provider-specific semantics.
+
+Added `src/aicfa/market_scanner.py`:
+- centralized scanner over a configured asset/timeframe universe;
+- one provider fetch per market key per scan cycle;
+- incremental `since_ms`;
+- completed-candle-only Feature Engine input;
+- causal feature rebuild from retained local history;
+- latest current feature state returned as `ScanResult`;
+- no per-user scanning or notification logic.
+
+Added:
+- `tests/test_market_data.py`;
+- `tests/test_market_scanner.py`;
+- `docs/LIVE_MARKET_DATA.md`.
+
+### Verification status
+
+**Not yet server-verified.**
+
+The new tests cover:
+- OHLCV validation;
+- duplicate handling;
+- completion filtering;
+- incremental cursor;
+- provider-independent scanner calls;
+- centralized one-pass-per-market-key behavior;
+- incremental second scan;
+- duplicate universe rejection.
+
+The full mandatory FrostDeploy suite must be run after deployment before this stage can be marked green.
+
+### Current limitations
+
+- no concrete exchange/provider adapter is locked;
+- no WebSocket transport;
+- no retry/backoff or rate-limit scheduler;
+- no persistent live raw-data store;
+- no Top-100 discovery;
+- no subscriptions/notifications;
+- derivatives/order-book live transport is not connected;
+- `1M` completion remains provider-specific.
+
+### Next task
+
+Before locking a production provider, verify its actual rate limits, latency,
+WebSocket support, historical access, reliability and commercial terms.
+Then implement the first concrete BTC/USDT provider adapter against the
+provider-agnostic contract and verify the scanner on FrostDeploy.
