@@ -275,3 +275,32 @@ The remaining pytest-cache permission warning is the known non-blocking immutabl
 ### Next implementation step
 
 Proceed to the real chart-vision provider/adapter stage. Keep it provider-agnostic and cost-conscious: the analytical AICFA core remains the intelligence layer, while the vision component only converts user screenshots into structured visual evidence. Do not assume OpenAI API usage or any other paid external model unless explicitly chosen and verified.
+
+
+## 2026-09-29 — Self-hosted chart vision adapter started
+
+### Commits
+- `f5daa87bc06935edbb049d2d0830a9e2255b61f0` — add `OllamaChartVisionAnalyzer` provider adapter;
+- `e1d0c4b9bf53470fbb305e573df7a0a66c8836df` — add provider parsing/validation tests;
+- `aba507fc29a7b2e0349ba431b960788bcf1302e8` — document the self-hosted adapter.
+
+### Implemented
+- Optional Ollama multimodal HTTP adapter using Python standard library only;
+- screenshot sent as base64 image input;
+- strict evidence-only prompt with asset/timeframe context;
+- structured JSON parsing into canonical `VisualObservation` records;
+- Knowledge Base validation remains mandatory before provider output enters the analytical graph;
+- explicit direction is preserved only when supplied by the vision provider;
+- provider is opt-in and does not download or select a model;
+- no paid API is required by the adapter.
+
+### Verification status
+**PENDING FrostDeploy/server verification.**
+
+The adapter is intentionally not activated as a production service yet. A capable multimodal model must be installed and served separately (for example through a self-hosted Ollama endpoint). The current AICFA server hardware must not be assumed sufficient for a vision model without testing.
+
+Required next step:
+1. wait for FrostDeploy deployment of the adapter commits;
+2. run the mandatory full pytest suite;
+3. if green, accept the adapter code;
+4. separately test a real local/self-hosted vision model before making it the active provider.
