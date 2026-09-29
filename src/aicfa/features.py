@@ -63,12 +63,37 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     out["impulse_score_15"] = out["body_pct_range"].abs() * out["range_expansion_15"]
     out["compression_15"] = out["range_pct"] / out["range_mean_60"].clip(lower=EPS)
 
-    # Past-only rolling dealing range: no centered windows and no future pivots.
+    # Past-only rolling range retained as a generic context feature.
     dr_high = h.rolling(60, min_periods=60).max()
     dr_low = l.rolling(60, min_periods=60).min()
     dr_width = (dr_high - dr_low).clip(lower=EPS)
-    out["dealing_range_position"] = (c - dr_low) / dr_width
-    out["premium_discount"] = out["dealing_range_position"] * 2.0 - 1.0
+    out["rolling_dealing_range_high"] = dr_high
+    out["rolling_dealing_range_low"] = dr_low
+    out["rolling_dealing_range_position"] = (c - dr_low) / dr_width
+    out["rolling_premium_discount"] = out["rolling_dealing_range_position"] * 2.0 - 1.0
+
+    # Structural Premium/Discount is based on confirmed swing high/low,
+    # not merely on a generic rolling price window.
+    from .premium_discount import build_premium_discount
+    premium_discount = build_premium_discount(x)
+    for column in [
+        "structural_dealing_range_high",
+        "structural_dealing_range_low",
+        "structural_equilibrium",
+        "structural_dealing_range_position",
+        "structural_premium_discount",
+        "premium",
+        "discount",
+        "equilibrium",
+    ]:
+        out[column] = premium_discount[column].to_numpy()
+
+    # Primary dealing-range fields now use the structural range.
+    out["dealing_range_high"] = out["structural_dealing_range_high"]
+    out["dealing_range_low"] = out["structural_dealing_range_low"]
+    out["dealing_range_equilibrium"] = out["structural_equilibrium"]
+    out["dealing_range_position"] = out["structural_dealing_range_position"]
+    out["premium_discount"] = out["structural_premium_discount"]
 
     # Simple causal breakout / sweep proxies.
     prev_high = h.shift(1).rolling(30, min_periods=30).max()
