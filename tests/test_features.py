@@ -41,6 +41,12 @@ def test_feature_columns_and_shape():
         "smc_liquidity_pool_swept_high",
         "smc_premium_discount",
         "smc_state_ready",
+        "realized_volatility",
+        "atr",
+        "volume_zscore",
+        "volatility_ratio",
+        "volatility_regime",
+        "volume_regime",
         "return_60",
     ]:
         assert column in result.columns
@@ -135,5 +141,17 @@ def test_feature_integration_exposes_refined_liquidity():
         "smc_previous_high", "smc_previous_low",
         "smc_active_buy_liquidity_pools", "smc_active_sell_liquidity_pools",
         "smc_liquidity_breakout_high", "smc_liquidity_pool_swept_high",
+    ]:
+        assert column in result.columns
+
+
+def test_feature_integration_exposes_volume_volatility_regimes():
+    result = build_features(sample_frame(180))
+    for column in [
+        "realized_volatility", "true_range", "atr", "atr_pct",
+        "range_zscore", "volume_zscore", "relative_volume_causal",
+        "volatility_ratio", "volatility_expansion",
+        "volatility_compression", "volume_expansion", "volume_dry_up",
+        "volatility_regime", "volume_regime",
     ]:
         assert column in result.columns
