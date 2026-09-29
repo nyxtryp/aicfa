@@ -159,7 +159,7 @@ Verified on FrostDeploy release `2026-09-29T06-27-33-b022845`:
 
 ## 2026-09-29 — Derivatives positioning expansion
 
-### `666edd4f7beacbff3d9dbb8c3f2fbbf12c1f8f2b`
+### `f533715a883d757f99c15b8777830e096c7313d5`
 **Add causal derivatives positioning features**
 
 Expanded `src/aicfa/derivatives.py` with optional historical derivatives fields:
@@ -222,13 +222,13 @@ The failure was in the test expectation, not in the causal alignment implementat
 
 The fix is limited to the test expectation; no production derivative logic is changed.
 
-### `9d6b221662c5ea11d2b6ab87f972feaeb833fde5`
+### `f533715a883d757f99c15b8777830e096c7313d5`
 **Fix derivatives basis state test semantics**
 
 Changed only the incorrect test expectation so an already-observed basis value remains visible on intervening base candles under the latest-known-state semantics. Production derivative logic was unchanged.
 
 ### Final FrostDeploy verification — 2026-09-29
-Deployed release: `2026-09-29T07-27-19-9d6b221`
+Deployed release: `2026-09-29T07-38-38-f533715`
 
 Full suite:
 ```text
@@ -238,6 +238,46 @@ Full suite:
 The derivatives positioning/basis expansion is now **accepted and green**.
 
 Known non-blocking warnings remain: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and pytest-cache permission warnings in immutable releases.
+
+## 2026-09-29 — Liquidation imbalance
+
+### `72bedcc0f67ad02aaab05e190618f43219c582`
+**Add causal liquidation imbalance feature**
+
+Added `liquidation_imbalance` when both directional liquidation streams are supplied:
+
+`(long_liquidation_volume - short_liquidation_volume) / (long_liquidation_volume + short_liquidation_volume)`
+
+Semantics:
+- bounded to [-1, 1] when total liquidation volume is positive;
+- NaN when total event volume is zero;
+- event-based only, never forward-filled;
+- emitted only when both long and short liquidation streams are available;
+- remains causal under future changes.
+
+### `38f3ea46f633c85c0ce8beb21bbd86596bcb827f`
+**Test causal liquidation imbalance**
+
+Added tests for event timestamps, zero-volume handling and future-change invariance.
+
+The first verification exposed incorrect test fixture timestamp expectations. The production calculation was correct; the test was corrected in subsequent commits `f01a7a3` and `1b211757`.
+
+### `f533715a883d757f99c15b8777830e096c7313d5`
+**Correct liquidation imbalance test value**
+
+Corrected the event at `00:02`: long liquidation 6 and short liquidation 2 produce `(6-2)/(6+2) = 0.5`, not `0.4`. Production code was unchanged.
+
+### Final FrostDeploy verification — 2026-09-29
+Deployed release: `2026-09-29T07-38-38-f533715`
+
+Full suite:
+```text
+95 passed, 2843 warnings in 31.15s
+```
+
+The causal liquidation imbalance feature is now **accepted and green**.
+
+Known non-blocking warnings remain unchanged: pandas/NumPy deprecations, DataFrame fragmentation, Premium/Discount fixture dtype warning, and pytest-cache permission warnings in immutable releases.
 
 ---
 
@@ -255,7 +295,7 @@ The following layers were implemented and previously verified green:
 - Multi-Timeframe — explicit 1m/5m/15m/1h/4h/1d/1w causal mapping.
 - Volume/Volatility — causal regimes.
 - Scenario Engine — descriptive scenario families, not decisions.
-- Derivatives — funding/OI/liquidations/positioning/basis accepted.
+- Derivatives — funding/OI/liquidations/positioning/basis/liquidation imbalance accepted.
 
 ---
 
@@ -287,8 +327,7 @@ Never claim green status without the current deployed release output.
 # 10. Immediate next work
 
 1. Continue remaining derivatives/market-state inputs:
-   - broader positioning;
-   - basis variants where source data supports them;
+   - remaining source-backed derivatives variants;
    - later taker flow/order flow;
    - later order book / market depth.
 5. Keep derivatives descriptive and causal; no premature signals.
@@ -346,8 +385,8 @@ Latest verified FrostDeploy release:
 `2026-09-29T07-27-19-9d6b221`
 
 Latest full-suite result:
-`93 passed, 2843 warnings in 31.04s`
+`95 passed, 2843 warnings in 31.15s`
 
-**Current status:** Derivatives positioning/basis expansion is implemented, deployed and verified green.
+**Current status:** Derivatives positioning/basis expansion and causal liquidation imbalance are implemented, deployed and verified green.
 
 **Next task:** continue remaining derivatives/market-state inputs while preserving strict causality and the pre-ML development boundary.
