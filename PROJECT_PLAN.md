@@ -1099,3 +1099,18 @@ Both fixes are test-only. FrostDeploy will automatically deploy these commits fr
 
 Run the mandatory full pytest suite against the new automatically deployed release. Do not mark Live Market Data / Scanner foundation green until the new server output is clean.
 
+
+
+## 2026-09-29 — Live Market Data / Scanner second verification attempt
+
+FrostDeploy release `2026-09-29T11-52-19-70af0aa` produced:
+```
+1 failed, 173 passed, 4864 warnings in 41.95s
+```
+
+The remaining failure was again test-fixture-only: `test_merge_is_idempotent_and_keeps_newest_duplicate` set `close=101.75` while that fixture row had `high=101.0`, so the production OHLCV validator correctly rejected the invalid candle. No production scanner/data code was changed.
+
+Fix commit:
+- `70667b74a2746e960b23a1362d4a92331ef380ad` — `Fix duplicate OHLCV fixture bounds`; changed the test duplicate close to `100.75`, preserving the intended duplicate-replacement assertion while keeping the candle valid.
+
+Status remains **not green** until the next FrostDeploy full-suite run passes.
