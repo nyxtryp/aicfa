@@ -1861,3 +1861,41 @@ What evidence is available?
 **Accepted product direction as of 2026-09-29.**
 
 Future implementation work must follow this direction unless the user explicitly changes it.
+
+### Clarification — screenshots are inference-time evidence, not training data
+
+This is an explicit correction to the product model and supersedes any earlier wording that made screenshot datasets, screenshot training, or historical candle databases a prerequisite for AICFA analysis.
+
+- AICFA does **not** need a prebuilt historical candle database as a core intelligence layer.
+- AICFA does **not** need to learn/train on user screenshots before it can analyze them.
+- A user-supplied chart screenshot is an **inference-time input/evidence**.
+- AICFA must visually read the screenshot itself and apply its existing Knowledge Base and analytical rules to it.
+- If the visible history/context is insufficient, AICFA must determine what is missing and explicitly ask the user for additional screenshot(s), asset context, or timeframe(s).
+- For example, AICFA may request 4H for context, 1H for structure, 15M for the setup zone, and 5M for entry confirmation when those views are needed. It must not fabricate unseen history.
+- Multi-timeframe screenshots are correlated by AICFA itself; the user does not label BOS, FVG, liquidity, OB, or other concepts manually.
+- The desired path is:
+
+```
+USER REQUEST
+    ↓
+AICFA determines required evidence
+    ↓
+current screenshot(s) / requested additional screenshot(s)
+    ↓
+Vision: read the chart
+    ↓
+structured visual market evidence
+    ↓
+Knowledge Base + analytical rules
+    ↓
+setup / entry / WAIT
+```
+
+### Historical candle data policy
+
+The previously implemented historical/live candle infrastructure is **supporting infrastructure, not the product's intelligence foundation**. Do not continue expanding a large historical candle database, historical scanner, or candle-driven training pipeline unless the user explicitly reintroduces that requirement.
+
+If historical context is needed for a specific analysis, AICFA should prefer asking the user for the relevant chart history/timeframe screenshots rather than assuming a permanently maintained historical candle database is required.
+
+Existing market-data code may remain available as optional infrastructure for on-demand current evidence and future explicitly requested uses. It must not drive the roadmap or justify autonomous scanning.
+
