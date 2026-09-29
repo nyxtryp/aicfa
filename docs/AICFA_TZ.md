@@ -1835,3 +1835,86 @@ prerequisite for the core AICFA market representation. If microstructure data
 is unavailable, the remaining causal layers continue to operate.
 
 No Wyckoff feature is a standalone LONG/SHORT decision or trade signal.
+
+
+# 14. Autonomous 24/7 Market Scanner and User Monitoring
+
+AICFA должна поддерживать автономный режим постоянного анализа рынка независимо от того, загрузил ли пользователь скриншот или задал вопрос.
+
+## 14.1 Market Universe
+
+Система должна уметь непрерывно мониторить заданный Universe of Assets, включая в дальнейшем Top-N ликвидных активов, пользовательские watchlists и отдельные symbols. Top-100 не является жёстким архитектурным ограничением.
+
+Анализ каждого актива выполняется централизованно один раз на уровне Market Engine, после чего результаты могут обслуживать большое количество пользователей. Нельзя запускать отдельный полный market scan на каждого пользователя.
+
+## 14.2 Live scanning
+
+Поток:
+
+~~~text
+Exchange/API/WebSocket
+  ↓
+Market Data Engine
+  ↓
+Current Features
+  ↓
+Multi-Timeframe Market State
+  ↓
+Setup Detection / Scenario Engine
+  ↓
+Setup Events
+  ↓
+User subscriptions / notifications
+~~~
+
+Для обычных режимов мониторинга допустим периодический REST polling, если частота и лимиты источника позволяют. Для низколатентного скальпинга требуется streaming/WebSocket либо другой источник с сопоставимой задержкой; минутный polling не считается достаточным универсальным источником для scalp execution.
+
+Данные должны нормализоваться через абстракцию Data Provider, чтобы смена API/биржи не требовала переписывать Feature Engine.
+
+## 14.3 Setup Event Engine
+
+AICFA должна фиксировать жизненный цикл обнаруженной ситуации: setup candidate created; setup strengthened/updated; setup invalidated; setup expired; outcome recorded после завершения события.
+
+Setup является результатом совокупности наблюдаемых признаков и контекста, а не одиночного индикатора. До исторической статистической валидации нельзя представлять его как гарантированный результат или безусловную торговую рекомендацию.
+
+## 14.4 Personal monitoring
+
+Пользователь может подписаться на весь поддерживаемый Universe, Top-N universe, конкретные symbols, конкретные таймфреймы и типы setup/scenario. Одно централизованно рассчитанное событие должно доставляться множеству подписанных пользователей без повторного вычисления market features.
+
+## 14.5 Scalp / Intraday / Swing / Position
+
+Режим пользователя является параметром анализа и частоты обновления:
+- Scalping — low-latency market data и частое обновление состояния; для execution-oriented режима нужен streaming источник, а не только минутный polling;
+- Intraday — преимущественно intraday timeframes и регулярное обновление;
+- Swing — более высокие timeframes и менее частые обновления;
+- Position — HTF context и ещё менее частые обновления.
+
+Режим не должен ограничивать способность AICFA находить другие релевантные setup candidates, если пользователь разрешил их мониторинг.
+
+## 14.6 Alerts
+
+Уведомления должны быть событийными, а не генерироваться повторно на каждом обновлении без изменения состояния. Должны поддерживаться дедупликация, cooldown/rate limiting и история отправленных событий.
+
+## 14.7 Execution boundary
+
+Автономный scanner и торговое исполнение являются разными подсистемами.
+
+~~~text
+AICFA Setup
+  ↓
+Risk / Decision Engine
+  ↓
+Paper Trading
+  ↓
+Validated Execution Adapter
+  ↓
+Exchange / Broker / Trading Terminal
+~~~
+
+Автоматическое открытие сделок не должно считаться частью базового scanner. Любой live execution требует отдельного режима, явного opt-in пользователя, отдельного контроля риска, защиты от duplicate orders, проверки баланса/позиции, stop-loss/position limits и аварийного отключения.
+
+AICFA должна полностью работать как аналитический scanner и assistant без права на торговое исполнение.
+
+## 14.8 Data-source economics
+
+Бесплатный API может быть достаточен для прототипа, периодического мониторинга и некоторых не-latency-sensitive режимов, но нельзя заранее считать бесплатный источник достаточным для 24/7 Top-100 low-latency scanning или массового коммерческого сервиса. Лимиты, задержка, websocket availability, historical access, commercial-use terms и reliability должны проверяться отдельно для каждого provider.
