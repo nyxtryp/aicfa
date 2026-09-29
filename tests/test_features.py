@@ -33,6 +33,12 @@ def test_feature_columns_and_shape():
         "sweep_high_reject",
         "smc_structure_direction",
         "smc_displacement_direction",
+        "smc_previous_high",
+        "smc_previous_low",
+        "smc_active_buy_liquidity_pools",
+        "smc_active_sell_liquidity_pools",
+        "smc_liquidity_breakout_high",
+        "smc_liquidity_pool_swept_high",
         "smc_premium_discount",
         "smc_state_ready",
         "return_60",
@@ -112,3 +118,22 @@ def test_feature_build_without_mtf_remains_supported():
     result = build_features(base)
     assert len(result) == len(base)
     assert not any(column.startswith("mtf_") for column in result.columns)
+
+
+def test_feature_integration_exposes_refined_liquidity():
+    result = build_features(sample_frame(180))
+    for column in [
+        "previous_high", "previous_low",
+        "internal_previous_high", "internal_previous_low",
+        "active_buy_liquidity_pools", "active_sell_liquidity_pools",
+        "active_external_buy_pools", "active_external_sell_pools",
+        "active_internal_buy_pools", "active_internal_sell_pools",
+        "liquidity_breakout_high", "liquidity_breakout_low",
+        "liquidity_pool_created_high", "liquidity_pool_created_low",
+        "liquidity_pool_swept_high", "liquidity_pool_swept_low",
+        "liquidity_pool_invalidated_high", "liquidity_pool_invalidated_low",
+        "smc_previous_high", "smc_previous_low",
+        "smc_active_buy_liquidity_pools", "smc_active_sell_liquidity_pools",
+        "smc_liquidity_breakout_high", "smc_liquidity_pool_swept_high",
+    ]:
+        assert column in result.columns
