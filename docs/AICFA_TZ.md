@@ -1666,3 +1666,38 @@ This stage does not yet implement:
 - CVD.
 
 Those require explicit source contracts and historical availability semantics before implementation.
+
+
+# Level-by-level Order Book / Liquidity Walls — 2026-09-29
+
+For deeper market-microstructure analysis, AICFA accepts complete order-book
+snapshots normalized into one row per visible level:
+
+- timestamp — availability time of the complete snapshot;
+- side — bid or ask;
+- price — level price;
+- size — displayed quantity at that level.
+
+Derived level-change fields:
+- previous size;
+- size delta;
+- added size;
+- cancelled size;
+- level added;
+- level removed.
+
+A level disappearing from a complete snapshot is treated as a displayed
+cancellation/removal for descriptive accounting. This does not assert why the
+level disappeared economically.
+
+Liquidity-wall detection is deliberately conservative:
+- compare displayed size with the same-side visible levels in the same snapshot;
+- require persistence across a configurable number of consecutive snapshots;
+- expose wall status and size multiple only;
+- never convert a wall into a LONG/SHORT signal.
+
+This layer does not yet claim that a large displayed level will be executed.
+Displayed liquidity can be added, reduced, cancelled or replaced.
+
+Absorption remains deferred. A defensible absorption feature requires synchronized
+trade/taker flow, book-level changes and a defined price-response interval.
