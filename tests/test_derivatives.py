@@ -88,6 +88,38 @@ def test_derivatives_liquidation_imbalance_handles_zero_event_volume():
     assert pd.isna(out.loc[0, "liquidation_imbalance"])
 
 
+def test_derivatives_futures_volume_is_event_based_and_causal():
+    base = base_frame()
+    d = derivatives_frame()
+    d["futures_volume"] = [100.0, 120.0, 90.0, 150.0, 80.0, 200.0]
+
+    out = build_derivatives(base, d, baseline_window=2)
+
+    assert out.loc[0, "futures_volume"] == 100.0
+    assert pd.isna(out.loc[1, "futures_volume"])
+    assert out.loc[2, "futures_volume"] == 120.0
+    assert pd.isna(out.loc[3, "futures_volume"])
+    assert out.loc[4, "futures_volume"] == 90.0
+    assert "futures_volume_delta" in out
+    assert "futures_volume_change_pct" in out
+    assert "futures_volume_zscore" in out
+
+    altered = d.copy()
+    altered.loc[altered["timestamp"] >= pd.Timestamp("2026-01-01T00:08:00Z"), "futures_volume"] *= 10
+    changed = build_derivatives(base, altered, baseline_window=2)
+    pd.testing.assert_frame_equal(out.iloc[:8], changed.iloc[:8], check_dtype=False)
+
+
+def test_derivatives_reject_negative_futures_volume():
+    base = base_frame()
+    d = derivatives_frame()
+    d["futures_volume"] = [100.0] * len(d)
+    d.loc[2, "futures_volume"] = -1.0
+
+    with pytest.raises(ValueError):
+        build_derivatives(base, d, baseline_window=2)
+
+
 def test_derivatives_positioning_basis_features_are_causal():
     base = base_frame()
     d = derivatives_frame()
