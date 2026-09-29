@@ -450,4 +450,4 @@ Latest full-suite result:
 
 **Current status:** Derivatives positioning/basis, causal liquidation imbalance, futures volume, and the spot/futures relationship are implemented, deployed and verified green.
 
-**Next task:** continue remaining source-backed derivatives/market-state inputs, starting with later taker flow/order flow and then market depth. Preserve strict causality and the pre-ML development boundary.
+**Next task:** verify the current Taker Flow / Order Flow implementation on FrostDeploy. It is not yet marked green. After verification, continue to Order Book / Market Depth. Preserve strict causality and the pre-ML development boundary.
