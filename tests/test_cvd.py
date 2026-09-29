@@ -52,6 +52,10 @@ def test_cvd_rejects_negative_flow():
 
 
 def test_cvd_future_rows_do_not_backfill_earlier_state():
-    d=flow_frame(); d.loc[3,"taker_buy_volume"]=9999.0
-    out=build_cvd(base_frame(),d)
-    assert np.isclose(out.loc[5,"cvd"],9979.0)
+    d=flow_frame()
+    original=build_cvd(base_frame(),d)
+    d.loc[3,"taker_buy_volume"]=9999.0
+    altered=build_cvd(base_frame(),d)
+    # The modified source row becomes available at 00:06:30, after base row 5.
+    # Earlier CVD must remain exactly unchanged.
+    pd.testing.assert_frame_equal(original.iloc[:6], altered.iloc[:6], check_dtype=False)
