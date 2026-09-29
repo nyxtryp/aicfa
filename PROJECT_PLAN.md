@@ -297,7 +297,6 @@ Current equal-high/equal-low detection compares sequential confirmed swings. It 
 
 ### `cb0d9298a20ec3db367a4bd70ff94241461044cc`
 **Add causal market structure engine**
-
 Added `src/aicfa/structure.py`.
 
 Implemented:
@@ -497,7 +496,6 @@ Combine:
 - premium/discount
 
 into a causal market-state representation.
-
 ### Step 10 — Multi-timeframe
 Only after the single-timeframe components are reliable:
 - 1M
@@ -896,8 +894,7 @@ Implemented:
 - FVG creation direction, lifecycle, and active state;
 - Order Block creation direction, lifecycle, active state, and breaker observations;
 - structural Premium/Discount position and state;
-- `smc_state_ready` indicating that a confirmed structural dealing range exists;
-- explicit avoidance of a generic `smc_score` / `smc_signal` confirmation-count verdict.
+- `smc_state_ready` indicating that a confirmed structural dealing range exists;- explicit avoidance of a generic `smc_score` / `smc_signal` confirmation-count verdict.
 
 Causality rule:
 Unified SMC does not introduce future information or backdate events. It only normalizes outputs from the already-causal component engines.
@@ -1190,3 +1187,33 @@ Commit:
 Added tests for canonical refined columns, propagation of internal structure/MSS/protected-level values, and future-change invariance of the unified representation. Server verification remains pending; the mandatory FrostDeploy suite must be run against the deployed release before accepting this layer.
 
 **Next concrete action:** run the full FrostDeploy pytest suite. If green, record the verification and proceed to the planned Liquidity refinement.
+
+## 2026-09-29 — Unified SMC refinement verified
+
+FrostDeploy verification was run against release `2026-09-29T06-09-09-a5a69ac` using the mandatory full-suite command.
+
+Result:
+```
+74 passed, 1281 warnings in 21.92s
+```
+
+Verification status: **PASS**.
+
+Verified:
+- refined Unified SMC canonical columns for internal HH/HL/LH/LL;
+- internal BOS/CHoCH and internal structure direction;
+- protected high/low prices and created/active/broken lifecycle;
+- displacement-aware MSS propagation;
+- causal future-change invariance of the refined unified representation;
+- full existing regression suite remains green.
+
+The 1281 warnings remain non-blocking and are deferred to the dedicated cleanup/optimization pass. The visible warnings include pandas/NumPy deprecations, DataFrame fragmentation warnings in the feature/MTF construction, a Premium/Discount fixture dtype warning, and the immutable-release pytest cache permission warning.
+
+The refined Unified SMC layer is **accepted**.
+
+Known limitations remain:
+- FVG and Order Block lifecycle direction is still first-generation aggregate state;
+- multiple simultaneous historical liquidity/OB pools are not yet modeled;
+- no score, signal, confirmation counter, or ML logic has been added.
+
+**Next concrete task:** refine Liquidity with previous highs/lows, multiple active liquidity pools, internal/external liquidity, pool lifecycle, sweep-vs-breakout distinction, and invalidation. After that, rerun the full FrostDeploy suite before accepting the Liquidity refinement.
