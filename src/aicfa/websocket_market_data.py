@@ -66,6 +66,11 @@ def parse_binance_kline_message(message: str, key: MarketKey) -> WebSocketObserv
     kline = payload.get("k")
     if not isinstance(kline, dict):
         return None
+    expected_symbol = key.symbol.replace("/", "").replace("-", "").upper()
+    if str(kline.get("s", payload.get("s", ""))).upper() != expected_symbol:
+        return None
+    if str(kline.get("i", "")).lower() != key.timeframe.lower():
+        return None
     if kline.get("x") is not True:
         return None
 
