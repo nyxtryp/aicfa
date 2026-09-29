@@ -16,6 +16,7 @@ def build_features(
     df: pd.DataFrame,
     *,
     multi_timeframe_frames: dict[str, pd.DataFrame] | None = None,
+    derivatives_frame: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build causal market-state features from OHLCV candles."""
     required = ["timestamp", "open", "high", "low", "close", "volume"]
@@ -140,6 +141,12 @@ def build_features(
         "volume_dry_up","volatility_regime","volume_regime",
     ]:
         out[column] = volume_volatility[column].to_numpy()
+
+    if derivatives_frame is not None:
+        from .derivatives import build_derivatives
+        derivatives = build_derivatives(x, derivatives_frame)
+        for column in derivatives.columns:
+            out[column] = derivatives[column].to_numpy()
 
     from .unified_smc import build_unified_smc
     unified_smc=build_unified_smc(x,structure=structure,liquidity=liquidity,
