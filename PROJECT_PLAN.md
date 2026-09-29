@@ -2016,3 +2016,31 @@ The preceding test correction commit `212803ff1f84e20106c4b51d29c279e27116dbae` 
 ### Next implementation step
 
 Proceed to the next analytical decision layer, preserving evidence quality, scenario uncertainty, explicit invalidation and WAIT/NO TRADE semantics. Do not add order execution or autonomous continuous scanning.
+
+## 2026-09-29 — Evidence-gated Decision Layer implementation started
+
+### Commits
+- `e875b33e61dfc1eecb9fefc3131a669afab0d73e` — add evidence-gated Decision Layer;
+- `18b6e7f8ef2dfb5d2356a916797c44a328b592b0` — add explicit directional evidence to VisualObservation;
+- `7fed4d8a83c44c3eca151b6ce7be5ecb546e6ff6` — test Decision Layer;
+- `bfaf5bed4d0668fe40b37adc3539d8d5f3037209` — document Decision Layer.
+
+Implemented:
+- final analytical actions LONG / SHORT / WAIT / NO_TRADE;
+- explicit directional evidence contract on visual observations;
+- no direction inference from concept names alone;
+- contradictory LONG/SHORT evidence forces WAIT;
+- READY setup without explicit direction remains WAIT;
+- preservation of setup conditions, invalidation and targets;
+- no order placement, quantity, leverage or execution.
+
+This is intentionally an evidence gate, not an autonomous signal generator. Direction must eventually be supplied by the chart-vision inference layer as explicit evidence; the Decision Layer does not guess it from BOS/FVG/OB names.
+
+Verification status: **PENDING FrostDeploy/server verification**.
+
+Required next step:
+1. wait for FrostDeploy deployment of the current main branch;
+2. run the mandatory full pytest suite;
+3. fix only actual failures;
+4. rerun until green;
+5. only then accept the Decision Layer.
