@@ -1934,3 +1934,40 @@ The implementation and tests are committed to main. FrostDeploy full-suite verif
 ### Next implementation step
 
 Expand the Knowledge Base to the full project specification, including the remaining SMC concepts, structure states, liquidity variants, FVG/IFVG, order-block lifecycle, volume/volatility, derivatives/microstructure semantics, Wyckoff/Price Action relationships, scenario/risk semantics and contradictory-evidence handling. Then build the visual-evidence contract that will map user screenshots into this knowledge layer.
+
+
+## 2026-09-29 — Knowledge Base full-spec expansion
+
+### `12bd00e495f8cb5e7b2156f9474729bb5002c181`
+**Expand Knowledge Base to full analytical specification**
+
+Expanded the Knowledge Base registry from the initial 10 concepts to a full descriptive v1 coverage across:
+- market structure: HH/HL/LH/LL, BOS, CHoCH, MSS, internal/external structure, protected swings, range, expansion and consolidation;
+- liquidity: equal levels, previous extremes, internal/external liquidity, inducement, pools and breakout-vs-sweep distinction;
+- imbalance: FVG, IFVG, mitigation and displacement relationship;
+- order blocks: bullish/bearish OB, lifecycle, mitigation and breaker behavior;
+- premium/discount: dealing range, equilibrium and location;
+- price action: rejection, breakout, retest, continuation, reversal, support/resistance and compression;
+- Wyckoff: Spring, Upthrust, trading range, SOS, SOW, markup/markdown;
+- volume/volatility: expansion, contraction, price/volume relationship and volatility regime;
+- derivatives: funding, OI, price/OI, liquidations, long/short positioning, basis and liquidation imbalance;
+- microstructure: taker flow, CVD, absorption, displayed liquidity walls and depth imbalance;
+- scenario: continuation, reversal, range, breakout failure, evidence quality and contradictory evidence;
+- risk: entry condition, target, invalidation and explicit WAIT/insufficient-evidence state.
+
+The registry remains immutable and descriptive. It does not create LONG/SHORT signals, does not require historical candles, and does not treat screenshots as training data.
+
+Added contract tests covering the expanded domains and representative concepts.
+
+### Verification status
+
+**PENDING FrostDeploy/server verification.**
+
+The implementation is on GitHub main. The stage is not GREEN until the current FrostDeploy release passes the mandatory full pytest suite.
+
+### Next step
+
+1. Run the full FrostDeploy pytest suite on the new release.
+2. Fix only actual failures.
+3. Rerun until green.
+4. Then build the Visual Evidence contract so user screenshots are mapped into structured evidence consumed by this Knowledge Base.
