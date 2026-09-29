@@ -876,6 +876,8 @@ SMC components remain observations/features to test statistically. The unified l
 Known limitation:
 FVG and Order Block lifecycle direction is currently represented separately from aggregate active/lifecycle flags because their first-generation engines expose aggregate lifecycle state. More detailed multi-pool object tracking is deferred to later refinement.
 
-Server verification: **pending**.
+Server verification: **PASS** — FrostDeploy release `2026-09-29T05-15-03-e4994fb`, `53 passed, 217 warnings in 4.41s`.
 
-**Next concrete action:** run the complete FrostDeploy pytest suite against the Unified SMC implementation. If green, accept the layer and proceed to Multi-Timeframe Structure.
+The Unified SMC layer is accepted. Warnings are non-blocking and are retained for a later dedicated cleanup/optimization pass.
+
+**Next concrete action:** implement Multi-Timeframe Structure.
