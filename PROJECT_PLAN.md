@@ -264,8 +264,7 @@ Important limitation:
 Current structure also needs later refinement:
 - internal/external structure
 - protected highs/lows
-- robust level lifecycle
-- better BOS/CHoCH semantics
+- robust BOS/CHoCH semantics
 - configurable sensitivity by timeframe
 - careful treatment of same-row swing confirmation and break detection
 
@@ -343,6 +342,7 @@ Adjusted test so it works both in a normal repository checkout and FrostDeploy i
 Adjusted the test fixture/anchor only. Production label logic was not changed.
 
 ### Server verification
+
 17 tests passed:
 ```
 17 passed, 12 warnings
@@ -387,6 +387,7 @@ Added tests for:
 Connected liquidity output to `src/aicfa/features.py`.
 
 ### Server verification after initial Liquidity integration
+
 The FrostDeploy suite was run against the current release and found two failures:
 - `tests/test_liquidity.py::test_low_sweep_and_reclaim_is_causal` — the fixture closes exactly at the sell-side liquidity level on reclaim; production logic used a strict `>` boundary.
 - `tests/test_structure.py::test_hh_hl_lh_ll` — the fixture did not actually contain a confirmed HL/LL sequence under the configured one-candle swing rule.
@@ -655,6 +656,7 @@ Implemented: range expansion, body expansion, close efficiency, strictly past-on
 
 Server verification is pending. The next concrete action is the full FrostDeploy pytest run against this implementation. If green, proceed to FVG / Imbalance.
 
+
 ## 2026-09-29 — Displacement server verification
 
 Full FrostDeploy test suite was run against release `2026-09-29T04-39-36-a2834ab` using the mandatory command.
@@ -712,8 +714,21 @@ No FVG engine logic was weakened or changed. The fixtures were corrected to vali
 
 **Next concrete action:** rerun the complete FrostDeploy pytest suite.
 
+
 ## 2026-09-29 — FVG fixture follow-up
 
 The next server verification found one remaining invalid OHLC fixture in the displacement-gated FVG test. Commit `09bc639f6ddb69fecaf666c423b3fb754157012e` corrected only that fixture; FVG engine logic remains unchanged.
 
 **Next concrete action:** rerun the complete FrostDeploy pytest suite.
+
+
+## 2026-09-29 — Final FVG displacement fixture correction
+
+The subsequent FrostDeploy traceback showed that row 20 of `test_fvg_requires_current_displacement_when_requested` was still malformed: its `low=100.8` was above `open=100`. This was a test-data error, not an FVG engine failure.
+
+Commit:
+- `9db454289be817f5369614b8fadb23be52817b89` — Fix invalid FVG displacement fixture.
+
+Only that test fixture was changed, setting row 20 low to `99.8` so the OHLC relationship is valid while preserving the intended non-displacement scenario. Production FVG logic was not changed.
+
+**Next concrete action:** rerun the complete FrostDeploy pytest suite. If green, record FVG as verified and begin Order Block Engine.
