@@ -8,7 +8,9 @@ remain separate stages.
 from __future__ import annotations
 
 import json
+import time
 from typing import Callable
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -21,6 +23,14 @@ _SPOT_BASE_URL = "https://data-api.binance.vision/api/v3/klines"
 _FUTURES_BASE_URL = "https://fapi.binance.com/fapi/v1/klines"
 _COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
 
+class BinanceTransportError(RuntimeError):
+    """Provider transport failure classified as retryable or terminal."""
+
+    def __init__(self, message: str, *, retryable: bool) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+
+
 class BinanceMarketDataProvider:
     """Public Binance REST OHLCV provider.
 
@@ -30,11 +40,26 @@ class BinanceMarketDataProvider:
 
     exchange = "binance"
 
-    def __init__(self, *, timeout_seconds: float = 10.0, opener: Callable[..., object] = urlopen) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_seconds: float = 10.0,
+        max_retries: int = 2,
+        retry_backoff_seconds: float = 0.25,
+        opener: Callable[..., object] = urlopen,
+        sleeper: Callable[[float], None] = time.sleep,
+    ) -> None:
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+        if retry_backoff_seconds < 0:
+            raise ValueError("retry_backoff_seconds must be non-negative")
         self.timeout_seconds = float(timeout_seconds)
+        self.max_retries = int(max_retries)
+        self.retry_backoff_seconds = float(retry_backoff_seconds)
         self._opener = opener
+        self._sleeper = sleeper
 
     @staticmethod
     def _normalize_symbol(symbol: str) -> str:
@@ -76,8 +101,25 @@ class BinanceMarketDataProvider:
             headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"},
             method="GET",
         )
-        with self._opener(request, timeout=self.timeout_seconds) as response:
-            payload = json.load(response)
+        attempts = self.max_retries + 1
+        for attempt in range(attempts):
+            try:
+                with self._opener(request, timeout=self.timeout_seconds) as response:
+                    payload = json.load(response)
+                break
+            except HTTPError as exc:
+                retryable = exc.code == 429 or 500 <= exc.code < 600
+                if not retryable or attempt == attempts - 1:
+                    raise BinanceTransportError(
+                        f"Binance HTTP error {exc.code}", retryable=retryable
+                    ) from exc
+            except (URLError, TimeoutError, ConnectionError, OSError) as exc:
+                if attempt == attempts - 1:
+                    raise BinanceTransportError(
+                        "Binance network/timeout error", retryable=True
+                    ) from exc
+            if self.retry_backoff_seconds:
+                self._sleeper(self.retry_backoff_seconds * (2**attempt))
 
         if not isinstance(payload, list):
             raise ValueError("Binance klines response must be a list")
