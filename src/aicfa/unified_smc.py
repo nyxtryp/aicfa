@@ -132,8 +132,38 @@ def build_unified_smc(
     ).astype("int8")
     copy_column(liquidity, "sweep_low_reclaim", "smc_sweep_low_reclaim")
     copy_column(liquidity, "sweep_high_reclaim", "smc_sweep_high_reclaim")
-    copy_column(liquidity, "buy_side_liquidity", "smc_buy_side_liquidity")
-    copy_column(liquidity, "sell_side_liquidity", "smc_sell_side_liquidity")
+    for source, target in [
+        ("buy_side_liquidity", "smc_buy_side_liquidity"),
+        ("sell_side_liquidity", "smc_sell_side_liquidity"),
+        ("external_buy_side_liquidity", "smc_external_buy_side_liquidity"),
+        ("external_sell_side_liquidity", "smc_external_sell_side_liquidity"),
+        ("internal_buy_side_liquidity", "smc_internal_buy_side_liquidity"),
+        ("internal_sell_side_liquidity", "smc_internal_sell_side_liquidity"),
+        ("previous_high", "smc_previous_high"),
+        ("previous_low", "smc_previous_low"),
+        ("internal_previous_high", "smc_internal_previous_high"),
+        ("internal_previous_low", "smc_internal_previous_low"),
+        ("active_buy_liquidity_pools", "smc_active_buy_liquidity_pools"),
+        ("active_sell_liquidity_pools", "smc_active_sell_liquidity_pools"),
+        ("active_external_buy_pools", "smc_active_external_buy_pools"),
+        ("active_external_sell_pools", "smc_active_external_sell_pools"),
+        ("active_internal_buy_pools", "smc_active_internal_buy_pools"),
+        ("active_internal_sell_pools", "smc_active_internal_sell_pools"),
+        ("active_buy_liquidity_price", "smc_active_buy_liquidity_price"),
+        ("active_sell_liquidity_price", "smc_active_sell_liquidity_price"),
+        ("liquidity_breakout_high", "smc_liquidity_breakout_high"),
+        ("liquidity_breakout_low", "smc_liquidity_breakout_low"),
+        ("liquidity_pool_created_high", "smc_liquidity_pool_created_high"),
+        ("liquidity_pool_created_low", "smc_liquidity_pool_created_low"),
+        ("liquidity_pool_swept_high", "smc_liquidity_pool_swept_high"),
+        ("liquidity_pool_swept_low", "smc_liquidity_pool_swept_low"),
+        ("liquidity_pool_invalidated_high", "smc_liquidity_pool_invalidated_high"),
+        ("liquidity_pool_invalidated_low", "smc_liquidity_pool_invalidated_low"),
+    ]:
+        default = np.nan if source.endswith("_price") or source in {
+            "previous_high", "previous_low", "internal_previous_high", "internal_previous_low"
+        } else 0.0
+        copy_column(liquidity, source, target, default)
 
     # Displacement is an event direction, not a prediction.
     out["smc_displacement_direction"] = np.select(
