@@ -506,3 +506,27 @@ Then decide whether Granite is rejected or retained for a deeper AICFA validatio
 3. Record the final resource state.
 4. Remove `granite3.2-vision` if the user wants to keep the current low-resource server configuration.
 5. Before trying another model, decide whether to test a smaller candidate or increase RAM/vCPU based on these measured constraints.
+
+
+## 2026-09-30 — Server resources increased for Granite re-test
+
+### Operator action
+- User stopped the server, increased resources, and started it again.
+- Current RAM: **4.8 GiB total**, ~4.0 GiB free, ~4.3 GiB available.
+- Current CPU: **2 vCPU**.
+- Swap: **2.0 GiB total, 0 B used** after restart.
+- Ollama remains installed and healthy: **0.34.4**.
+- No AICFA code or architecture changes were made.
+
+### Benchmark status
+The previous Granite 3.2 Vision 2B timeout occurred on the old 1 vCPU / ~3 GiB RAM configuration. The new hardware provides substantially more RAM and CPU, so the Granite benchmark should be repeated before rejecting the model.
+
+### Next exact step
+Repeat the same Granite 3.2 Vision 2B benchmark, using the same /tmp/btc.png and equivalent prompt, and measure:
+- end-to-end inference time;
+- peak RAM and swap;
+- CPU/iowait;
+- actual chart/SMC recognition quality;
+- structured-output quality and AICFA validation compatibility.
+
+Do not change AICFA code during this hardware comparison.
