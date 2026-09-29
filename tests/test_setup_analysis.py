@@ -93,6 +93,7 @@ def test_contradictory_evidence_forces_wait():
 def test_multiple_plausible_setups_are_preserved():
     _, scenarios, result = _pipeline(
         _obs("market_structure.bos"),
+        _obs("displacement"),
         _obs("liquidity.sweep"),
         _obs("price_action.rejection"),
         _obs("imbalance.fvg"),
