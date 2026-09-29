@@ -1701,3 +1701,40 @@ Displayed liquidity can be added, reduced, cancelled or replaced.
 
 Absorption remains deferred. A defensible absorption feature requires synchronized
 trade/taker flow, book-level changes and a defined price-response interval.
+
+
+## Absorption — causal source contract
+
+Absorption is implemented as a descriptive **candidate event**, not a trading signal.
+
+Required synchronized inputs:
+- completed price observations: `timestamp, open, high, low, close`;
+- completed taker flow: `timestamp, taker_buy_volume, taker_sell_volume`;
+- complete level-by-level book snapshots: `timestamp, side, price, size`.
+
+All timestamps represent source availability time. For event time T the
+configured observation window is strictly backward: `(T-W, T]`. No source
+observation after T may affect the result.
+
+A candidate requires:
+- dominant aggressive taker flow;
+- nearby opposing-side displayed liquidity;
+- relative size of the candidate level versus the visible same-side book;
+- persistence of the candidate level;
+- displayed replenishment relative to cancellations;
+- limited contemporaneous close-to-open price response and directional
+efficiency.
+
+The result is explicitly descriptive. A displayed level does not prove that
+an execution occurred there. Without synchronized trade-price-level data and
+matching-engine execution information, the implementation must not claim
+economic absorption as fact.
+
+Future price movement is not part of the live feature. If later research
+evaluates whether absorption candidates predict subsequent movement, that
+forward movement belongs to a separate outcome/label dataset.
+
+Exchange-source note: Binance documents futures market streams including
+`aggTrade` and `depth`, and futures order-book data exposes price/quantity
+levels. The collector must preserve source event/availability timestamps
+before synchronization.
