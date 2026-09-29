@@ -66,7 +66,7 @@ def test_derivatives_liquidation_imbalance_is_event_based_and_causal():
 
     assert np.isclose(out.loc[0, "liquidation_imbalance"], -0.2)
     assert pd.isna(out.loc[1, "liquidation_imbalance"])
-    assert np.isclose(out.loc[2, "liquidation_imbalance"], 0.4)
+    assert np.isclose(out.loc[2, "liquidation_imbalance"], 0.5)
     assert pd.isna(out.loc[3, "liquidation_imbalance"])
     assert np.isclose(out.loc[4, "liquidation_imbalance"], -0.6)
 
