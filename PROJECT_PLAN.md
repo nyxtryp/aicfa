@@ -1472,3 +1472,65 @@ No AICFA source code or analytical layer was changed.
 ### Next exact step
 
 Do not install another random/community model. If local Text AI is reconsidered, research official model provenance first and test it specifically as a closed-world verbalizer with no authority over AICFA facts or decisions.
+
+
+## 2026-09-30 — Qwen3-1.7B Q8_0 benchmark rejected and model removed
+
+### Operator result
+
+Official Qwen GGUF candidate installed for isolated testing:
+`hf.co/Qwen/Qwen3-1.7B-GGUF:Q8_0`
+
+Installation succeeded, with the model download reported as approximately 1.8 GB. The candidate was then tested on the current CPU-only server.
+
+### Benchmark
+
+Test instruction:
+`Ответь строго одним словом: CAT. Не переводи, не объясняй, не добавляй никакого другого текста.`
+
+Actual output:
+```
+Thinking...
+...model reasoned about possible meanings of CAT...
+{ "category":"category" }
+```
+
+Measured runtime:
+- total duration: **4m39.65s**;
+- load duration: **2m13.51s**;
+- prompt eval: **0.42 tok/s**;
+- generation eval: **3.70 tok/s**;
+- generated output: **155 tokens**.
+
+The model did not follow the trivial one-word closed-world instruction. It also consumed nearly the full available RAM on the current approximately 4.8 GiB server, making this Q8 configuration unsuitable for parallel operation with AICFA.
+
+### Decision
+
+**Qwen3-1.7B Q8_0 is REJECTED for the current server/configuration.**
+
+This rejection is specific to the tested Q8_0 configuration and AICFA's required instruction-following/latency constraints. It is not a general claim that the Qwen3 model family is unusable.
+
+### Removal
+
+Operator executed:
+```
+ollama stop hf.co/Qwen/Qwen3-1.7B-GGUF:Q8_0
+ollama rm hf.co/Qwen/Qwen3-1.7B-GGUF:Q8_0
+ollama list
+```
+
+Actual result:
+```
+deleted 'hf.co/Qwen/Qwen3-1.7B-GGUF:Q8_0'
+NAME    ID    SIZE    MODIFIED
+```
+
+The Ollama model list is empty. No Qwen model remains installed.
+
+### Status
+
+**CLOSED / REJECTED / REMOVED.** No AICFA source code or analytical layer was changed.
+
+### Next exact step
+
+Do not reinstall Qwen3 Q8_0. Continue the local Text AI search only after screening official candidates for actual RAM usage, CPU latency, Russian/English instruction following, structured JSON reliability and closed-world behavior. Prefer a configuration that leaves enough RAM for AICFA to run in parallel. Do not download the next candidate until it passes this resource/role screen.
