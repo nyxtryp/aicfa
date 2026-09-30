@@ -1317,3 +1317,24 @@ Swap: 2.0Gi total, 151Mi used, 1.9Gi free
 
 ### Next exact step
 Run the fixed AICFA terminology + structured JSON benchmark against NEXUS-Finance and measure latency/memory/output reliability before any integration.
+
+
+## 2026-09-30 — NEXUS-Finance benchmark #1: FAIL
+
+### Verification result
+
+The fixed AICFA prompt was run against `FableForge-AI/nexus-finance:latest`. The model did not return the required JSON and instead produced a long repetitive generation, repeatedly restating/transforming the supplied 5m/15m/1h + FVG context. It also introduced unsupported interpretations such as changing the supplied evidence hierarchy and describing a “Bearish Displacement” strategy that was not requested.
+
+Observed failure mode:
+- no JSON `decision`/`reason` output;
+- repetitive generation / apparent generation loop;
+- unsupported market-structure reinterpretation;
+- therefore unsuitable for the AICFA interface in the tested configuration.
+
+### Status
+
+**FAIL / PENDING DECISION.** This benchmark is not an AICFA acceptance test pass. No production integration has been made.
+
+### Next step
+
+Before removing NEXUS, run one minimal diagnostic with a very small output cap and a simple non-analytical JSON task. This isolates whether the failure is caused by the model/configuration's generation behavior or by the AICFA prompt/domain reasoning task. If it still loops or fails JSON, remove the model and record rejection.
