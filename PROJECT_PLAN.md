@@ -1519,3 +1519,63 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - The DataFrame fragmentation warning is existing non-blocking technical debt; it did not cause the run to fail.
 - Status: **LIVE PIPELINE VERIFIED / PRODUCT PENDING**. The WAIT result is honest and authoritative, but the evidence/context representation is not yet sufficient for reliable setup detection.
 - Exact next step: inspect the live per-timeframe feature/state rows and distinguish **recent event evidence** from **persistent current context**. Extend MarketEvidence construction so current setup context can retain causally valid recent events within a bounded lookback and persistent zones/state, without future leakage or fabricated observations. Keep Decision Layer authoritative.
+
+
+## 2026-10-01 — Free multi-source market-data architecture started
+
+### Research completed
+Fresh public documentation review was performed before implementation.
+
+Confirmed useful free/public sources:
+- CoinLore: public API, no API key, 14,992+ coins and 300+ exchanges, live market data, exchange markets and 365-day daily OHLCV; CoinLore states there is no strict rate limit and recommends about 1 request/second.
+- Binance: public market-data endpoints; rate limits are IP/request-weight based and published through exchange/API metadata and response headers. Public market data is available without an API key.
+- Bybit: public market data including order book, kline, trades and funding; WebSocket is recommended for market-data use and is not counted against the REST rate limits according to Bybit's developer page.
+- Bitget: public market endpoints currently document 20 requests/sec/IP for instruments, tickers, order book, fills and candles; WebSocket market streams are available.
+- Gate: public spot endpoints document 900 requests/sec/IP and WebSocket connections up to 300/IP.
+- Kraken: public market-data endpoints are rate limited; Kraken states that around 1 request/sec or less remains within the normal public Spot REST limits.
+- CoinGecko Demo: free, 10,000 calls/month and 100 calls/minute, with data freshness from 60 seconds; therefore useful as a broad fallback/metadata source, not as the primary high-frequency feed.
+- KuCoin and MEXC remain candidates for additional exchange fallback adapters, but their actual capabilities must be verified from their current public API contracts before being marked production-capable.
+
+Sources used for this checkpoint: CoinLore official API documentation; Binance official REST API documentation; Bybit official developer/API documentation; Bitget official API documentation; Gate official API v4 documentation; Kraken official API rate-limit documentation; CoinGecko official API pricing/documentation.
+
+### Architecture decision
+AICFA will use a request-scoped multi-source registry with deterministic capability-aware fallback.
+
+Rules:
+1. No permanent market-history buffer or background accumulation.
+2. Each user FindSetup request obtains temporary market data, analyzes it, returns the result, then discards the temporary dataset.
+3. Providers are selected by capability, not merely by exchange name.
+4. A source that cannot provide a required capability is skipped for that request.
+5. Source priority is deterministic and can be changed centrally.
+6. Broad aggregators such as CoinLore/CoinGecko are fallback/discovery sources, not substitutes for exchange microstructure data.
+7. No paid API is required for this architecture.
+8. The analytical core remains source-agnostic; provider adapters only transport/normalize data.
+9. The system must not silently mix incompatible markets. Any future multi-source merge must carry explicit source metadata and compatibility checks.
+
+### Implementation started
+Added src/aicfa/market_source_registry.py.
+
+The registry currently models these capabilities: symbols, ohlcv, trades, order_book, funding, open_interest, liquidations, mark_price.
+
+Initial public-source priority registry: binance → bybit → bitget → kraken → kucoin → gate → mexc → coinlore → coingecko.
+
+Added deterministic capability filtering and fallback-chain selection.
+
+Commits:
+- 020ba9d5bb2be1008f6a127290d2ed10ef0bc954 — registry implementation.
+- b5725389383f4b7aa572c2f55ed2112a6944e903 — registry tests.
+
+### Verification status
+Not yet deployed or executed on FrostDeploy after these commits.
+
+Status: IMPLEMENTED / PENDING DEPLOYED VERIFICATION.
+
+### Important limitation
+The registry is only the policy layer. It does not yet contain real Bybit/Bitget/Kraken/etc. transport adapters, and the capability declarations for some candidates are provisional until their adapters and endpoint-specific behavior are implemented/tested. Do not claim those sources are production-connected yet.
+
+### Exact next step
+1. Deploy/test the registry.
+2. Verify the registry on FrostDeploy.
+3. Implement the first real fallback adapter after Binance, prioritizing Bybit because its public market-data coverage includes the realtime data categories AICFA needs.
+4. Add request-scoped source selection and transport failure fallback.
+5. Then add further exchange adapters one by one, recording each result in this plan.
