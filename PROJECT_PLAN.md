@@ -1411,3 +1411,20 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - Test commit: `cd948ef54d92059b0e2578bc070052c1fb79ab0e`.
 - Status: IMPLEMENTED / PENDING deployed verification.
 - Exact next step: deploy this commit and run the complete pytest suite on the resulting FrostDeploy release. If GREEN, then test the actual user-facing command path with a real Binance-resolved asset and verify unsupported assets fail explicitly.
+
+
+## 2026-09-30 — FindSetup resolver regression fixed
+- Verification of `d7611fb` integration initially failed: 268 passed, 3 failed.
+- Causes:
+  - two legacy FakeProvider tests did not inject a resolver after the new resolver boundary;
+  - the new integration returned a canonical pair through `FindSetup`, while the test exposed the resolver's pair representation mismatch;
+  - the non-Binance provider resolver requirement was unnecessarily strict for injected test providers.
+- Fix:
+  - Binance remains provider-backed and resolves real user assets;
+  - FindSetup canonicalizes the resolver result before use;
+  - non-Binance injected providers retain a deterministic normalization fallback;
+  - regression tests updated to make the resolver boundary explicit where needed.
+- Fix implementation commit: `a9bb3affb923fc5bea30532da69abd1c2e4bd232`.
+- Test commit: `4abbb4169bd81c023eded53f0a8b5077dbfdfc63`.
+- Status: FIXED / PENDING deployed verification.
+- Exact next step: deploy and rerun the complete pytest suite. Do not proceed to live Binance validation until the deployed suite is GREEN.
