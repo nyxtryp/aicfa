@@ -696,3 +696,26 @@ Stop benchmarking external repositories. Build the first AICFA-native determinis
 6. output only into the existing visual-evidence boundary.
 
 The first native stage must be tested on synthetic chart images plus real public chart screenshots and must remain CPU-only and comfortably below the user's ~60-second interactive limit.
+
+
+## 2026-09-30 — AICFA-native deterministic Chart Vision stage started
+
+### Commits
+- 06c6d084a54f7530e5d334105eeb7a301df88c8b — add native deterministic chart structure extractor;
+- 5798d156ab2fe9e448c9119bdc009a1683898d84 — add OpenCV runtime dependency;
+- 7a254e6e0e406a18a0a186f50034a08495ef34d3 — add synthetic-image tests;
+- 2fc084683205735ca77f7315fa7257e1e58a8641 — fix deterministic swing-extrema comparison;
+- d1d9acc070dfe5877cf8d533e976a483144d10fd — document the native Chart Vision stage.
+
+### Implemented
+- Added CPU-only pixel-to-structure extraction in src/aicfa/chart_structure_cv.py.
+- The first stage decodes screenshots, segments saturated/high-value candle colors, restricts the price panel, builds a per-column high/low trace, interpolates small gaps, smooths the trace, detects local swing highs/lows, confirms later movement using a normalized image-height threshold, and labels HH/HL/LH/LL.
+- The output is an intermediate ChartStructure representation, deliberately separate from VisualEvidence semantics. It does not fabricate prices, infer trade direction, or emit BOS/CHoCH/FVG/OB/liquidity or orders.
+- Added deterministic synthetic-image tests.
+
+### Verification status
+**PENDING current FrostDeploy/server verification.**
+The implementation has not yet been accepted as GREEN. The next required check is the full current-release pytest suite on FrostDeploy. After that, the native extractor should be benchmarked against the public dark BTC/USDT chart and additional TradingView-style themes before expanding into BOS/CHoCH or SMC visual detectors.
+
+### Next exact step
+Run the mandatory full pytest suite on the current FrostDeploy release. If green, run focused Chart Structure CV tests/benchmarks and inspect extracted swings before adding the next visual structure layer.
