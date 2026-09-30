@@ -130,23 +130,35 @@ class BybitMarketDataProvider:
         if not normalized:
             raise ValueError("asset must not be empty")
         category = self._category(market_type)
-        payload = self._get(
-            "instruments-info",
-            {"category": category, "limit": 1000},
-        )
-        items = payload.get("result", {}).get("list", [])
-        symbols = {
-            str(item.get("symbol", "")).upper()
-            for item in items
-            if isinstance(item, dict)
-            and item.get("status") in {None, "Trading"}
-        }
-        if normalized in symbols:
-            return normalized
         requested = f"{normalized}{quote_asset.strip().upper()}"
-        if requested not in symbols:
-            raise ValueError(f"no Bybit {quote_asset.upper()} market found for asset: {normalized}")
-        return requested
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+
+        while True:
+            params: dict[str, object] = {"category": category, "limit": 1000}
+            if cursor:
+                params["cursor"] = cursor
+            payload = self._get("instruments-info", params)
+            result = payload.get("result", {})
+            items = result.get("list", [])
+            symbols = {
+                str(item.get("symbol", "")).upper()
+                for item in items
+                if isinstance(item, dict)
+                and item.get("status") in {None, "Trading"}
+            }
+            if normalized in symbols:
+                return normalized
+            if requested in symbols:
+                return requested
+
+            next_cursor = str(result.get("nextPageCursor") or "")
+            if not next_cursor or next_cursor in seen_cursors:
+                break
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+
+        raise ValueError(f"no Bybit {quote_asset.upper()} market found for asset: {normalized}")
 
     def fetch_ohlcv(
         self,
