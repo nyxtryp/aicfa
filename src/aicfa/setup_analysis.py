@@ -11,7 +11,7 @@ from enum import Enum
 from aicfa.evidence_reasoning import EvidenceDecision, EvidenceAssessment
 from aicfa.knowledge_base import get_knowledge
 from aicfa.scenario_reasoning import ScenarioAssessment, ScenarioHypothesis
-from aicfa.visual_evidence import VisualObservation
+from aicfa.market_evidence import MarketObservation
 
 
 class SetupDecision(str, Enum):
@@ -61,7 +61,7 @@ def _unique(values: list[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
 
-def _observed(observations: tuple[VisualObservation, ...]) -> tuple[VisualObservation, ...]:
+def _observed(observations: tuple[MarketObservation | object, ...]) -> tuple[VisualObservation, ...]:
     return tuple(
         item
         for item in observations
