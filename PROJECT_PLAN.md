@@ -1359,3 +1359,25 @@ Asset resolution is still not universal. A bare asset such as `DOGE` is normaliz
 
 ### Exact next step
 After deployed pytest passes, implement a deterministic Binance symbol resolver for user-named assets, including explicit pairs and bare base assets, with clear unsupported/unavailable errors. Then wire the resolver into FindSetup.
+
+
+## 2026-09-30 — FindSetup decision-chain deployment verification
+
+### Verification
+FrostDeploy release: `2026-09-30T16-44-06-bb8fbd8`
+
+Mandatory full pytest:
+`267 passed, 5937 warnings in 28.03s`
+
+The pytest-cache PermissionError under the immutable release directory remains a known non-blocking FrostDeploy warning.
+
+### Result
+**GREEN / ACCEPTED.**
+
+FindSetup integration is now verified on the deployed release:
+`OHLCV → Features → MarketEvidence → Evidence Reasoning → Scenario Reasoning → Setup Analysis → Decision Layer`
+
+The public FindSetup decision is derived from the authoritative DecisionAssessment.
+
+### Exact next step
+Implement deterministic provider-backed asset/symbol resolution for user commands, without hardcoded BTC/ETH/SOL-only routing and without guessing unsupported instruments.
