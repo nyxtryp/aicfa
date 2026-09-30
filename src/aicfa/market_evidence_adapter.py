@@ -103,3 +103,52 @@ def build_market_evidence(
         missing_context=tuple(missing),
         conflicts=conflicts,
     )
+
+
+def build_market_evidence_from_frames(
+    analyses: dict[str, pd.DataFrame],
+    *,
+    asset: str,
+    timeframes: tuple[str, ...] = ("1m", "5m", "15m", "1h", "4h", "1d", "1w"),
+) -> MarketEvidence:
+    """Build evidence from independently analyzed completed timeframe frames."""
+    if not analyses:
+        raise ValueError("analyses must not be empty")
+    if not timeframes:
+        raise ValueError("timeframes must not be empty")
+
+    observations: list[MarketObservation] = []
+    missing: list[str] = []
+
+    for timeframe in timeframes:
+        frame = analyses.get(timeframe)
+        if frame is None:
+            missing.append(f"{timeframe}:analysis_not_available")
+            continue
+        item = build_market_evidence(
+            frame,
+            asset=asset,
+            base_timeframe=timeframe,
+            timeframes=(timeframe,),
+        )
+        observations.extend(item.observations)
+        missing.extend(item.missing_context)
+
+    directions = {
+        item.direction
+        for item in observations
+        if item.direction in {"long", "short"}
+    }
+    conflicts = (
+        ("explicit long and short observations coexist",)
+        if directions == {"long", "short"}
+        else ()
+    )
+
+    return MarketEvidence(
+        asset=asset,
+        observations=tuple(observations),
+        timeframes=timeframes,
+        missing_context=tuple(missing),
+        conflicts=conflicts,
+    )
