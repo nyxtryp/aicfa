@@ -1,25 +1,16 @@
-"""Request-scoped market-data routing and short-lived shared snapshots.
-
-Market data is never persisted as history. The snapshot cache only shares a
-fresh request result for a maximum of TTL seconds, then discards it.
-"""
+"""Request-scoped market-data routing and short-lived shared snapshots."""
 from __future__ import annotations
-
 from dataclasses import dataclass
 import threading
 import time
 from typing import Sequence
-
 import pandas as pd
-
 from .market_data import MarketDataProvider
-
 
 @dataclass(frozen=True)
 class ProviderAttempt:
     provider: str
     error: str
-
 
 @dataclass(frozen=True)
 class MarketFetchResult:
@@ -28,25 +19,19 @@ class MarketFetchResult:
     frame: pd.DataFrame
     attempts: tuple[ProviderAttempt, ...] = ()
 
-
 @dataclass(frozen=True)
 class SnapshotKey:
     source: str
     market_type: str
     symbol: str
-    timeframe: str
     data_profile: str
-
 
 @dataclass(frozen=True)
 class _Snapshot:
     created_at: float
-    result: MarketFetchResult
-
+    results: dict[str, MarketFetchResult]
 
 class FallbackMarketDataProvider:
-    """Try public providers in deterministic priority order for one request."""
-
     def __init__(self, providers: Sequence[MarketDataProvider]) -> None:
         if not providers:
             raise ValueError("at least one market data provider is required")
@@ -73,8 +58,7 @@ class FallbackMarketDataProvider:
                     since_ms: int | None, limit: int) -> pd.DataFrame:
         return self.fetch_ohlcv_with_source(
             symbol=symbol, market_type=market_type, timeframe=timeframe,
-            since_ms=since_ms, limit=limit,
-        ).frame
+            since_ms=since_ms, limit=limit).frame
 
     def fetch_ohlcv_with_source(self, *, symbol: str, market_type: str,
                                 timeframe: str, since_ms: int | None,
@@ -84,28 +68,24 @@ class FallbackMarketDataProvider:
             try:
                 frame = provider.fetch_ohlcv(
                     symbol=symbol, market_type=market_type, timeframe=timeframe,
-                    since_ms=since_ms, limit=limit,
-                )
+                    since_ms=since_ms, limit=limit)
                 if frame is None or frame.empty:
                     raise ValueError("provider returned no OHLCV rows")
-                return MarketFetchResult(
-                    provider=provider_name(provider), symbol=symbol, frame=frame,
-                    attempts=tuple(attempts),
-                )
+                return MarketFetchResult(provider=provider_name(provider),
+                    symbol=symbol, frame=frame, attempts=tuple(attempts))
             except Exception as exc:
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
         raise RuntimeError(format_attempts("all market data providers failed", attempts))
 
+    def fetch_ohlcv_snapshot(self, *, symbol: str, market_type: str,
+                             timeframes: Sequence[str], since_ms: int | None,
+                             limit: int) -> dict[str, MarketFetchResult]:
+        return {tf: self.fetch_ohlcv_with_source(
+            symbol=symbol, market_type=market_type, timeframe=tf,
+            since_ms=since_ms, limit=limit) for tf in timeframes}
 
 class SharedSnapshotMarketDataProvider:
-    """Share identical fresh OHLCV snapshots for up to ttl_seconds.
-
-    The cache is process-local and temporary. It is not a history store:
-    expired entries are discarded and no candle history is accumulated.
-    A lock covers cache misses so identical concurrent requests do not
-    stampede the exchanges.
-    """
-
+    """One shared temporary snapshot containing all requested timeframes."""
     def __init__(self, provider: FallbackMarketDataProvider, *,
                  ttl_seconds: float = 60.0, clock=time.monotonic) -> None:
         if ttl_seconds <= 0:
@@ -116,69 +96,51 @@ class SharedSnapshotMarketDataProvider:
         self._lock = threading.Lock()
         self._snapshots: dict[SnapshotKey, _Snapshot] = {}
 
-    @property
-    def ttl_seconds(self) -> float:
-        return self._ttl_seconds
-
-    def fetch_ohlcv(self, *, symbol: str, market_type: str, timeframe: str,
-                    since_ms: int | None, limit: int,
-                    data_profile: str = "ohlcv") -> pd.DataFrame:
-        return self.fetch_ohlcv_with_source(
-            symbol=symbol, market_type=market_type, timeframe=timeframe,
-            since_ms=since_ms, limit=limit, data_profile=data_profile,
-        ).frame
-
-    def fetch_ohlcv_with_source(self, *, symbol: str, market_type: str,
-                                timeframe: str, since_ms: int | None,
-                                limit: int,
-                                data_profile: str = "ohlcv") -> MarketFetchResult:
+    def fetch_ohlcv_snapshot(self, *, symbol: str, market_type: str,
+                             timeframes: Sequence[str], since_ms: int | None,
+                             limit: int, data_profile: str = "ohlcv") -> dict[str, MarketFetchResult]:
+        normalized = tuple(timeframes)
+        if not normalized:
+            raise ValueError("at least one timeframe is required")
         key = SnapshotKey(
             source=self._source_key(), market_type=market_type, symbol=symbol,
-            timeframe=timeframe, data_profile=data_profile,
-        )
+            data_profile=data_profile + ":" + ",".join(normalized))
         now = self._clock()
         with self._lock:
             cached = self._snapshots.get(key)
             if cached is not None and now - cached.created_at < self._ttl_seconds:
-                return clone_result(cached.result)
-
-            result = self._provider.fetch_ohlcv_with_source(
-                symbol=symbol, market_type=market_type, timeframe=timeframe,
-                since_ms=since_ms, limit=limit,
-            )
+                return clone_snapshot(cached)
+            fetched = self._provider.fetch_ohlcv_snapshot(
+                symbol=symbol, market_type=market_type, timeframes=normalized,
+                since_ms=since_ms, limit=limit)
+            snapshot = _Snapshot(now, {tf: clone_result(result) for tf, result in fetched.items()})
             self._discard_expired(now)
-            self._snapshots[key] = _Snapshot(now, clone_result(result))
-            return clone_result(result)
-
-    def clear(self) -> None:
-        with self._lock:
-            self._snapshots.clear()
+            self._snapshots[key] = snapshot
+            return clone_snapshot(snapshot)
 
     def _source_key(self) -> str:
-        return "fallback:" + ",".join(
-            provider_name(p) for p in self._provider.providers
-        )
+        return "fallback:" + ",".join(provider_name(p) for p in self._provider.providers)
 
     def _discard_expired(self, now: float) -> None:
         for key, snapshot in list(self._snapshots.items()):
             if now - snapshot.created_at >= self._ttl_seconds:
                 del self._snapshots[key]
 
+    def clear(self) -> None:
+        with self._lock:
+            self._snapshots.clear()
 
 def clone_result(result: MarketFetchResult) -> MarketFetchResult:
-    return MarketFetchResult(
-        provider=result.provider, symbol=result.symbol,
-        frame=result.frame.copy(deep=True), attempts=result.attempts,
-    )
+    return MarketFetchResult(result.provider, result.symbol, result.frame.copy(deep=True), result.attempts)
 
+def clone_snapshot(snapshot: _Snapshot) -> dict[str, MarketFetchResult]:
+    return {tf: clone_result(result) for tf, result in snapshot.results.items()}
 
 def provider_name(provider: object) -> str:
     name = getattr(provider, "exchange", None)
     return str(name) if name else provider.__class__.__name__.lower()
 
-
 def format_attempts(prefix: str, attempts: Sequence[ProviderAttempt]) -> str:
     if not attempts:
         return prefix
-    detail = "; ".join(f"{item.provider}: {item.error}" for item in attempts)
-    return f"{prefix}: {detail}"
+    return f"{prefix}: " + "; ".join(f"{x.provider}: {x.error}" for x in attempts)
