@@ -10,6 +10,7 @@ from enum import Enum
 
 from aicfa.setup_analysis import SetupAssessment, SetupCandidate, SetupDecision
 from aicfa.market_evidence import MarketObservation
+from aicfa.visual_evidence import VisualObservation
 
 
 class DecisionAction(str, Enum):
