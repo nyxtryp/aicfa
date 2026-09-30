@@ -898,3 +898,96 @@ Fix the **price-panel/price-trace localization** before changing swing threshold
 6. rerun the same real BTC benchmark and inspect the swing sequence again.
 
 Do not tune HH/HL/LH/LL thresholds to hide the contamination. The trace itself must be corrected first.
+
+
+## 2026-09-30 — Architecture pivot: text AI becomes the user-facing reasoning layer; screenshot Vision removed from critical path
+
+### Decision
+
+The real BTC benchmark demonstrated that the current screenshot/pixel Chart Vision approach is not reliable enough to block the product on it. The project therefore pivots forward-only to a **text-first AICFA architecture**.
+
+The goal is to let the user ask AICFA questions in plain text, while AICFA itself obtains current market data and runs its deterministic analytical core. **Screenshots are no longer required for the main analytical path.** The current native Chart Vision implementation remains in the repository as an experimental/rejected path and is not allowed to block the core product.
+
+### Target architecture
+
+```
+User text
+   ↓
+Local Text AI / reasoning interface
+   ↓
+AICFA orchestration
+   ├── Market Data
+   │    ├── OHLCV
+   │    ├── trades
+   │    ├── order book
+   │    ├── funding
+   │    ├── open interest
+   │    ├── liquidations
+   │    └── volume / volatility / derived features
+   │
+   ├── Knowledge Base
+   │    ├── SMC / market structure
+   │    ├── liquidity
+   │    ├── FVG / Order Blocks
+   │    ├── volume / order flow
+   │    ├── derivatives
+   │    ├── Wyckoff / price action
+   │    └── multi-timeframe methodology
+   │
+   └── Existing AICFA analytical layers
+        ↓
+Evidence Reasoning
+        ↓
+Scenario Reasoning
+        ↓
+Setup Analysis
+        ↓
+Decision Layer
+        ↓
+Text response
+```
+
+### Boundary rules
+
+- The local text model is an **interface/reasoning layer**, not the source of truth for market numbers.
+- Current market facts must come from explicit market-data providers and AICFA calculations.
+- The Knowledge Base provides methodology and definitions; it does not replace live market data.
+- The deterministic AICFA analytical core remains responsible for structure, liquidity, SMC, derivatives, order flow, evidence and decision gating.
+- The text model must not invent unavailable data, fabricate indicators, or bypass the Decision Layer.
+- No execution, order placement, leverage or quantity logic is introduced.
+- The project remains CPU-only and cost-conscious.
+- Screenshot Chart Vision is no longer a prerequisite for producing an analytical answer. It may be revisited later as an optional evidence source, but it is not part of the critical path.
+
+### Current status
+
+- Existing analytical layers remain accepted, including the Decision Layer and Evidence/Scenario/Setup stack.
+- Latest accepted full-suite verification before this pivot: **249 passed, 4863 warnings in 23.83s**, FrostDeploy release `2026-09-30T09-20-05-76a69aa`.
+- Native Chart Vision remains **PENDING / REJECTED** for the current pixel-trace implementation because the real BTC benchmark produced 423 trace points and 56 unreliable swings with boundary contamination.
+- No BOS/CHoCH/FVG/OB visual semantics will be added as part of the rejected screenshot path.
+
+### New workstream: Local Text AI
+
+The next implementation phase is to select and benchmark a small local text model that can run on the current CPU-only server within practical interactive latency and memory limits.
+
+Selection criteria:
+1. local/offline-capable;
+2. CPU-friendly on the current server;
+3. supports Russian and English;
+4. strong instruction following/reasoning for structured analytical context;
+5. preferably supports tool/function calling or reliable structured JSON interaction;
+6. compatible with the project's existing Python architecture;
+7. no mandatory paid API.
+
+### Next exact step
+
+1. Inspect the current server/runtime resources and AICFA Python entry points relevant to orchestration.
+2. Identify 2–4 realistic local text-model candidates for the current CPU/RAM budget using current model documentation.
+3. Do **not** pull a model blindly.
+4. Select the smallest viable candidate based on memory, quantization, context size, tool/JSON support and expected CPU latency.
+5. Add a minimal provider adapter/interface without connecting it to Decision Layer yet.
+6. Download only the selected model and benchmark a fixed AICFA prompt/context.
+7. Record model, quantization, RAM/time, output quality and all verification results in this file before integrating further.
+
+### Status
+
+**PENDING — architecture pivot recorded; local text-model selection is the next implementation step.**
