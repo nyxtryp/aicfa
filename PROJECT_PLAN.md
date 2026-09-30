@@ -58,7 +58,7 @@ Accepted components include Market Structure, Liquidity, Displacement, FVG, Orde
 GitHub commit recording this event: a8a62b4cf8edfdbc8d6323b7c0cf39c5489085fd
 
 ### Exact next step
-1. Review current official local-model candidates suitable for the server.
+The current work is **not** a local-model-first task. The authoritative next step is the Knowledge + Data Requirement layer described in the latest chronological entry: AICFA knowledge must determine what data it needs for a setup. Local text-model selection remains optional and secondary until the analytical core is complete.
 2. Verify provenance/model card, parameter count, quantization size, context and intended task.
 3. Do not download until a candidate passes the resource/role screen.
 4. If selected, benchmark it isolated first.
@@ -1793,3 +1793,28 @@ What remains PENDING:
 
 ### Exact next step
 Implement a centralized **analysis-depth contract** derived from actual feature/SMC dependencies, with the above values as provisional upper bounds. Then test that fetching only those depths still produces the same required feature/event/context availability as the larger diagnostic window. After that, fix MarketEvidence to consume recent relevant events plus active lifecycle/state context instead of only the latest-row flags.
+
+## 2026-10-01 — Architecture correction: Knowledge + current data + reasoning
+
+This entry supersedes the provisional analysis-depth direction from the immediately preceding live BTC smoke entry.
+
+The intended AICFA architecture is explicitly:
+**AICFA knowledge + current market data + reasoning → setup / no setup.**
+
+SMC is not merely a list of feature detectors. AICFA must possess encoded domain knowledge that determines what it needs to establish for the requested setup: market structure, liquidity, displacement, FVG/imbalance, order blocks, premium/discount, MTF relationships, price action, Wyckoff, volume/volatility, order flow/microstructure and derivatives. The required data depth is therefore an output of the knowledge/reasoning process, not a fixed production constant chosen in advance.
+
+The previously listed values 1m=240, 5m=240, 15m=160, 1h=120, 4h=100, 1d=100, 1w=80 are **diagnostic/provisional only and are not accepted as the AICFA production contract**. Likewise, the 1000-candle live smoke was diagnostic only.
+
+Runtime rule remains: each user request fetches only the temporary data required for that analysis, uses request-scoped provider fallback, analyzes it, returns the result, and discards the temporary dataset. No permanent candle history or background buffer is required.
+
+Multi-source architecture remains required: AICFA must be able to try providers in deterministic priority order and fall back when a source cannot provide the requested asset/data capability. Current real OHLCV fallback is Binance → Bybit; broader trades/order book/funding/OI/liquidations/mark-price adapters remain pending.
+
+### Current status
+**PENDING / NOT GREEN for final FindSetup intelligence/context completeness.**
+
+### Exact next step
+1. Define/implement the **AICFA Knowledge + Data Requirement layer**: encode what SMC and the other analytical domains need to establish for a setup, without hard-coded arbitrary candle counts.
+2. Make that layer produce a request-scoped data requirement: required timeframes, data types and sufficient context, with the minimum depth determined from the actual analytical dependencies/events/states.
+3. Feed those requirements into the existing multi-source router so providers supply the required temporary data and fallback when capabilities are unavailable.
+4. Only then repair MarketEvidence so it consumes the causally relevant recent events and persistent current states required by the knowledge layer, rather than only latest-row flags.
+5. Verify on FrostDeploy and record exact output before marking any part GREEN.
