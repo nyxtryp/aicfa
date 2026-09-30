@@ -53,7 +53,7 @@ _SCENARIO_RULES = {
 }
 
 
-def _observed_concepts(observations: tuple[MarketObservation | object, ...]) -> set[str]:
+def _observed_concepts(observations: tuple) -> set[str]:
     return {
         item.concept_id
         for item in observations
