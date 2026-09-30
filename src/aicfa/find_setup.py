@@ -95,10 +95,11 @@ def find_setup(
     """Resolve the requested asset, fetch seven causal timeframes, and run AICFA."""
     provider = provider or BinanceMarketDataProvider()
     if resolver is None:
-        if not isinstance(provider, BinanceMarketDataProvider):
-            raise ValueError("resolver is required for a non-Binance provider")
-        resolver = lambda asset, market_type: provider.resolve_symbol(asset, market_type=market_type)
-    symbol = resolver(request.asset, request.market_type)
+        if isinstance(provider, BinanceMarketDataProvider):
+            resolver = lambda asset, market_type: provider.resolve_symbol(asset, market_type=market_type)
+        else:
+            resolver = lambda asset, market_type: normalize_asset(asset)
+    symbol = normalize_asset(resolver(request.asset, request.market_type))
     frames: dict[str, pd.DataFrame] = {}
 
     for timeframe in CAUSAL_TIMEFRAMES:
