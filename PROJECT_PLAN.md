@@ -1629,3 +1629,38 @@ No AICFA source code or analytical layer was changed.
 
 Research credible remaining local text-model candidates. Specifically investigate official DeepSeek-family models and other first-party Chinese model families before downloading anything. Do not use unverified/random community fine-tunes merely because they are small. Screen provenance, size, quantization, context, languages, structured output, CPU/RAM requirements and role fit first.
 
+
+
+## 2026-09-30 — InternLM2.5 1.8B Chat removed; experiment closed
+
+### Removal verification
+
+Operator executed:
+```
+ollama stop internlm2:1.8b-chat-v2.5-q4_K_M 2>/dev/null || true
+ollama rm internlm2:1.8b-chat-v2.5-q4_K_M
+ollama list
+free -h
+df -h /
+```
+
+Actual result:
+```
+deleted 'internlm2:1.8b-chat-v2.5-q4_K_M'
+NAME    ID    SIZE    MODIFIED
+               total        used        free      shared  buff/cache   available
+Mem:           4.8Gi       521Mi       4.2Gi       1.6Mi       387Mi       4.3Gi
+Swap:          2.0Gi       112Mi       1.9Gi
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        40G   12G   26G  32% /
+```
+
+### Status
+
+**CLOSED / REJECTED / REMOVED.**
+
+The model is no longer installed. Server resources are healthy after removal: 4.3 GiB RAM available, 1.9 GiB swap free, and 26 GiB disk available. No AICFA source code or analytical layer was changed.
+
+### Exact next step
+
+Do not repeat InternLM or the previously rejected candidates. Before any further local-model download, perform provenance/resource/role screening first. If no credible candidate meets the closed-world Russian verbalization requirement on the current 2 vCPU / 4.8 GiB RAM server, continue AICFA Core without a local model.
