@@ -1026,3 +1026,37 @@ The production FindSetup path uses Market Evidence, not VisualObservation. Visio
 
 ### Exact next step
 Connect Market Evidence to the existing Evidence/Scenario/Setup contracts without fabricating visual observations, then route FindSetup through the authoritative Decision Layer. Run the mandatory full pytest before accepting the step.
+
+
+## 2026-09-30 — Market Evidence connected through existing reasoning and Decision contracts
+
+### What was done
+Created the first real market-data path through the existing AICFA reasoning stack without converting market data into screenshot/vision observations.
+
+### Changes
+- Extended `MarketEvidence` with `missing_context` and `conflicts`.
+- Added `assess_market_evidence()` to the evidence-reasoning layer.
+- Allowed Scenario Reasoning, Setup Analysis and Decision Layer to consume the shared observation shape used by market evidence.
+- Added an end-to-end test proving deterministic market evidence can flow through Evidence → Scenario → Setup → authoritative Decision Layer and produce LONG only when explicit directional evidence exists.
+- Added a guard test proving structurally sufficient market evidence without explicit direction produces WAIT.
+- No screenshot/Vision dependency was added to the market path.
+
+### Commits
+- `72a171dc659c8c420751591adfc396eb8bc8efa8` — extend MarketEvidence context/conflicts
+- `5d3cebe026b233a94f7d839d86f65cd7bc10de9a` — add market evidence assessment
+- `cb466dbf1dafbab4f738fce8c4304421e17932ce` — shared observation typing in Scenario Reasoning
+- `8eced563ec2c328a3413f1633d585418d68a8509` — shared observation typing in Setup Analysis
+- `1a8d803dd4acdd644c3d602a922be55897bc69c6` — shared observation typing in Decision Layer
+- `e480375a8b0141083cc0e5b2e44b2863097cab8b` — end-to-end market evidence tests
+
+### Verification
+No FrostDeploy verification has been run after these commits yet. Therefore this implementation step is **PENDING** and must not be called GREEN.
+
+### Status
+**IMPLEMENTED / PENDING DEPLOYED VERIFICATION**.
+
+### Important result
+The authoritative `src/aicfa/decision.py` is now reachable by a dedicated market-data evidence path. The Decision Layer still requires explicit directional evidence and therefore does not derive LONG/SHORT merely from concept names.
+
+### Exact next step
+Deploy these commits to FrostDeploy and run the mandatory full pytest suite. If green, replace the temporary test-only market observations with a deterministic adapter from the actual `build_features()` / `market_state` output, then connect that adapter to `FindSetup`.
