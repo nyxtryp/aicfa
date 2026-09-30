@@ -18,7 +18,7 @@ from .decision import decide
 from .evidence_reasoning import assess_market_evidence
 from .features import build_features
 from .market_data import MarketDataProvider, completed_ohlcv
-from .market_data_router import FallbackMarketDataProvider
+from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarketDataProvider
 from .market_evidence_adapter import build_market_evidence_from_frames
 from .scenario_reasoning import assess_scenarios
 from .setup_analysis import analyze_setups
@@ -99,6 +99,8 @@ def find_setup(
         provider = FallbackMarketDataProvider(
             (BinanceMarketDataProvider(), BybitMarketDataProvider())
         )
+    if isinstance(provider, FallbackMarketDataProvider):
+        provider = SharedSnapshotMarketDataProvider(provider, ttl_seconds=60.0)
     if resolver is None:
         resolver = lambda asset, market_type: provider.resolve_symbol(
             asset, market_type=market_type
@@ -106,14 +108,14 @@ def find_setup(
     symbol = normalize_asset(resolver(request.asset, request.market_type))
     frames: dict[str, pd.DataFrame] = {}
 
-    for timeframe in CAUSAL_TIMEFRAMES:
-        frames[timeframe] = provider.fetch_ohlcv(
-            symbol=symbol,
-            market_type=request.market_type,
-            timeframe=timeframe,
-            since_ms=None,
-            limit=limit,
-        )
+    snapshot = provider.fetch_ohlcv_snapshot(
+        symbol=symbol,
+        market_type=request.market_type,
+        timeframes=CAUSAL_TIMEFRAMES,
+        since_ms=None,
+        limit=limit,
+    )
+    frames = {timeframe: result.frame for timeframe, result in snapshot.items()}
 
     base = completed_ohlcv(frames["1m"], timeframe="1m", now_ms=now_ms)
     if base.empty:
