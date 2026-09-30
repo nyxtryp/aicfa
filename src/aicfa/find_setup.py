@@ -108,14 +108,29 @@ def find_setup(
     symbol = normalize_asset(resolver(request.asset, request.market_type))
     frames: dict[str, pd.DataFrame] = {}
 
-    snapshot = provider.fetch_ohlcv_snapshot(
-        symbol=symbol,
-        market_type=request.market_type,
-        timeframes=CAUSAL_TIMEFRAMES,
-        since_ms=None,
-        limit=limit,
-    )
-    frames = {timeframe: result.frame for timeframe, result in snapshot.items()}
+    if isinstance(provider, SharedSnapshotMarketDataProvider):
+        snapshot = provider.fetch_ohlcv_snapshot(
+            symbol=symbol,
+            market_type=request.market_type,
+            timeframes=CAUSAL_TIMEFRAMES,
+            since_ms=None,
+            limit=limit,
+        )
+        frames = {timeframe: result.frame for timeframe, result in snapshot.items()}
+    else:
+        # Preserve the base MarketDataProvider contract for injected test/custom
+        # providers. Production fallback providers are wrapped above, so the
+        # real FindSetup path still uses one all-timeframe snapshot.
+        frames = {
+            timeframe: provider.fetch_ohlcv(
+                symbol=symbol,
+                market_type=request.market_type,
+                timeframe=timeframe,
+                since_ms=None,
+                limit=limit,
+            ).frame
+            for timeframe in CAUSAL_TIMEFRAMES
+        }
 
     base = completed_ohlcv(frames["1m"], timeframe="1m", now_ms=now_ms)
     if base.empty:
