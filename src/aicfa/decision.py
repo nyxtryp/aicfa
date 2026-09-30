@@ -44,7 +44,7 @@ class DecisionAssessment:
 
 
 def _directional_observations(
-    observations: tuple[MarketObservation | object, ...],
+    observations: tuple,
 ) -> tuple[VisualObservation, ...]:
     return tuple(
         item
