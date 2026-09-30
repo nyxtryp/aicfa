@@ -1088,3 +1088,42 @@ df -h /
 ```
 
 The model must not be run again on the current hardware. After the removal output is received, record the actual result here and commit this plan before selecting the next model strategy.
+
+
+## 2026-09-30 — Shirdel-Finance-E4B Q6_K removed
+
+Operator executed the planned removal:
+
+```
+ollama rm shirdel-finance
+deleted 'shirdel-finance'
+```
+
+Post-removal verification:
+
+```
+ollama list
+NAME    ID    SIZE    MODIFIED
+```
+
+The Ollama model list is empty; `shirdel-finance` is no longer installed.
+
+Resource state after removal:
+
+```
+Mem:  4.8Gi total, 585Mi used, 4.2Gi free, 4.2Gi available
+Swap: 2.0Gi total, 161Mi used, 1.8Gi free
+Disk: 40G total, 12G used, 26G available (32%)
+```
+
+### Status
+
+**Shirdel-Finance-E4B Q6_K experiment is CLOSED / REJECTED for the current hardware.**
+
+The model was removed cleanly. The server has substantial memory headroom again and disk usage dropped to 32%.
+
+No local text model is currently installed or production-active.
+
+### Next step
+
+Before installing another model, select a memory-safe candidate based on actual GGUF size, expected runtime RAM usage and CPU feasibility. Do not repeat the Q6_K experiment on this server.
