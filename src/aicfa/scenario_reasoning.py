@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from aicfa.evidence_reasoning import EvidenceDecision, EvidenceAssessment
-from aicfa.visual_evidence import VisualObservation
+from aicfa.market_evidence import MarketObservation
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ _SCENARIO_RULES = {
 }
 
 
-def _observed_concepts(observations: tuple[VisualObservation, ...]) -> set[str]:
+def _observed_concepts(observations: tuple[MarketObservation | object, ...]) -> set[str]:
     return {
         item.concept_id
         for item in observations
