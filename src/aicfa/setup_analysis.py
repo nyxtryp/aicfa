@@ -12,6 +12,7 @@ from aicfa.evidence_reasoning import EvidenceDecision, EvidenceAssessment
 from aicfa.knowledge_base import get_knowledge
 from aicfa.scenario_reasoning import ScenarioAssessment, ScenarioHypothesis
 from aicfa.market_evidence import MarketObservation
+from aicfa.visual_evidence import VisualObservation
 
 
 class SetupDecision(str, Enum):
