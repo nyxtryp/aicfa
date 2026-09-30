@@ -1104,3 +1104,34 @@ The reported FrostDeploy run is the latest actual verification and must not be t
 3. If collection and tests pass, record the exact deployed release/output as GREEN.
 4. Then continue with the planned deterministic adapter from actual `build_features()` / `market_state` output into `MarketObservation` / `MarketEvidence`.
 5. Do not install or test another local model.
+
+
+## 2026-09-30 — Market Evidence bridge collection fix verified
+
+### Operator verification
+FrostDeploy release:
+`2026-09-30T16-27-34-e60c9b9`
+
+Mandatory full-project pytest:
+```
+263 passed, 5579 warnings in 27.67s
+```
+
+The pytest-cache Permission denied warning remains the known non-blocking immutable-release warning.
+
+### Result
+**GREEN / accepted for this verification stage.**
+
+The previous collection-time `NameError: VisualObservation is not defined` is resolved. Existing VisualObservation-based tests and the new MarketEvidence pipeline now coexist without collection errors.
+
+### Relevant fix commits
+- `038793f4b09e0ade49dc95aa5fdfdf64ec753f74`
+- `624afea43723f4147e297a8d1a6ccec860f5ba32`
+- `328fbad0a85712817baed5da39f1b34dfe1ebf68`
+- plan record: `e60c9b9f17fd19a65d83074aa46e7856525bf742`
+
+### Important boundary
+This verifies the test suite and compatibility of the Market Evidence bridge. It does **not** yet prove that real market-data output is correctly converted into MarketObservation records or that FindSetup is product-ready.
+
+### Exact next step
+Implement a deterministic adapter from the existing `build_features()` / `market_state` output into `MarketObservation` / `MarketEvidence`. Then connect that adapter to FindSetup and remove its temporary local decision logic in favor of the authoritative Decision Layer.
