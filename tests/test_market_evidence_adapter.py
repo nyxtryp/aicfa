@@ -1,0 +1,57 @@
+import pandas as pd
+
+from aicfa.market_evidence_adapter import build_market_evidence
+
+
+def _analysis(**overrides):
+    row = {
+        "timestamp": 1,
+        "bos_up": 0,
+        "bos_down": 0,
+        "displacement_up": 0,
+        "displacement_down": 0,
+        "fvg_bullish": 0,
+        "fvg_bearish": 0,
+        "order_block_bullish": 0,
+        "order_block_bearish": 0,
+        "sweep_low": 0,
+        "sweep_high": 0,
+    }
+    row.update(overrides)
+    return pd.DataFrame([row])
+
+
+def test_adapter_emits_only_active_base_observations():
+    evidence = build_market_evidence(
+        _analysis(bos_up=1, fvg_bullish=1),
+        asset="BTC/USDT",
+    )
+
+    assert {(item.concept_id, item.timeframe, item.direction) for item in evidence.observations} == {
+        ("market_structure.bos", "1m", "long"),
+        ("imbalance.fvg", "1m", "long"),
+    }
+    assert "5m:no_active_supported_observation" in evidence.missing_context
+
+
+def test_adapter_reads_higher_timeframe_structure_from_mtf_columns():
+    evidence = build_market_evidence(
+        _analysis(**{"mtf_4h_bos_down": 1}),
+        asset="BTC/USDT",
+    )
+
+    assert any(
+        item.concept_id == "market_structure.bos"
+        and item.timeframe == "4h"
+        and item.direction == "short"
+        for item in evidence.observations
+    )
+
+
+def test_adapter_marks_conflicting_explicit_directions():
+    evidence = build_market_evidence(
+        _analysis(bos_up=1, displacement_down=1),
+        asset="BTC/USDT",
+    )
+
+    assert evidence.conflicts == ("explicit long and short observations coexist",)
