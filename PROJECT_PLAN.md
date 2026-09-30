@@ -1356,3 +1356,48 @@ The model did not return `CAT`. It generated a long unrelated and repetitive tex
 ### Next step
 
 Remove `FableForge-AI/nexus-finance:latest` from Ollama and verify that no model process remains. Then record removal and close the NEXUS experiment. Do not spend additional credits/time on prompt tuning for this candidate.
+
+
+## 2026-09-30 — Ministral 3B removed; benchmark closed
+
+### Verification result
+
+Official Mistral GGUF candidate:
+`hf.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF:Q4_K_M`
+
+Final closed-world AICFA WAIT explanation test:
+- preserved `decision` = `WAIT`;
+- returned the requested two-field JSON;
+- stayed below 1000 characters;
+- nevertheless added unsupported interpretations/facts, including claims about selling pressure, bullish FVG confirmation, and future stability/correction conditions;
+- generation: 141 tokens at approximately 4.02 tok/s;
+- total duration: approximately 52.6 seconds.
+
+### Decision
+
+**REJECTED** as a direct AICFA text reasoning/explanation model. The model is not sufficiently reliable at remaining inside the exact facts supplied by AICFA Core.
+
+### Removal
+
+Operator stopped and removed the model:
+```
+ollama stop hf.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF:Q4_K_M
+ollama rm hf.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF:Q4_K_M
+```
+
+Actual result:
+```
+deleted 'hf.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF:Q4_K_M'
+```
+
+`ollama list` is empty.
+
+### Status
+
+**CLOSED / REJECTED / REMOVED.**
+
+No AICFA source code or analytical layer was changed.
+
+### Next exact step
+
+Do not install another random/community model. If local Text AI is reconsidered, research official model provenance first and test it specifically as a closed-world verbalizer with no authority over AICFA facts or decisions.
