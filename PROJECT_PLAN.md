@@ -632,3 +632,28 @@ The most promising path is **not** "take one repository and call it AICFA vision
 The key engineering problem is now identified as **pixel-to-market-state extraction**, not image-to-chat generation. This is much better aligned with the sub-minute requirement and the existing AICFA architecture.
 
 No source code from these external repositories has been merged into AICFA yet.
+
+## 2026-09-30 — Deterministic CV benchmark: chart-vision-mcp rejected
+
+### Operator actions
+- User installed the required Debian package `tesseract-ocr` on the server for the temporary external benchmark.
+- User cloned `nessos666/chart-vision-mcp` under `/tmp/chart-vision-mcp` and installed its temporary Python dependencies.
+- User benchmarked the repository against the existing historical `/tmp/btc.png` BTC/USDT chart.
+- User removed the temporary repository and result file with:
+  `rm -rf /tmp/chart-vision-mcp /tmp/chart-vision-result.txt`.
+- No AICFA production files were changed by this benchmark.
+
+### Benchmark result
+- Runtime before failure: **0.351 seconds**.
+- The tool loaded the 1131×817 image and produced a rough bearish bias from aggregate red/green pixel counts.
+- It then failed in `detect_horizontal_lines()` with:
+```
+TypeError: cannot unpack non-iterable numpy.int32 object
+```
+- The source review confirmed that the implementation does not reconstruct candle-by-candle OHLC or reliably derive HH/HL/LH/LL, BOS/CHoCH, FVG or Order Blocks. Its "zones" are primarily color-area detection and its trend is based on pixel-color ratios.
+
+### Decision
+**`chart-vision-mcp` is rejected as an AICFA Chart Vision implementation.** Its sub-second runtime is useful evidence that deterministic CV can meet the latency target, but its current semantics are too shallow and the standalone analyzer has a runtime bug on this benchmark. It remains only a reference for low-level OpenCV techniques.
+
+### Next exact step
+Benchmark the second deterministic-CV candidate, **`Rudra-kakade/vision-market-structure-analyzer`**, against the same `/tmp/btc.png`. Measure runtime and inspect whether its price-trace/swing logic can reliably extract HH/HL/LH/LL. Keep all work outside AICFA until the benchmark demonstrates useful output.
