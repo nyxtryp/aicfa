@@ -93,6 +93,12 @@ DEFAULT_PUBLIC_SOURCES = (
         frozenset({
             MarketCapability.SYMBOLS,
             MarketCapability.OHLCV,
+            MarketCapability.TRADES,
+            MarketCapability.ORDER_BOOK,
+            MarketCapability.FUNDING,
+            MarketCapability.OPEN_INTEREST,
+            MarketCapability.LIQUIDATIONS,
+            MarketCapability.MARK_PRICE,
         }),
     ),
     SourceDescriptor(
