@@ -1,3 +1,74 @@
+## CURRENT PROJECT CONTROL STATE
+
+**Purpose:** This file is the persistent AICFA project diary and control document. A new ChatGPT session must be able to read it and continue the project without previous chat history.
+
+### What we are building
+AICFA (AI for Digital Financial Assets) is a specialized crypto/digital-financial-asset analysis system with its own deterministic analytical core, market representation, evidence/reasoning layers, scenario/setup analysis and decision logic. It is not a wrapper that delegates market analysis to a generic LLM.
+
+### Current product direction
+- BTC/USDT is the primary development asset.
+- User-driven analysis, not autonomous continuous market scanning.
+- Main path is text-first: user asks in plain language; AICFA obtains explicit market data and runs its own analytical core.
+- Screenshots/Chart Vision are experimental and are not on the critical path after the real-chart benchmark proved the current pixel extraction approach unreliable.
+- Final analytical states may be LONG / SHORT / WAIT / NO TRADE.
+- Decision Layer is authoritative for the final analytical state.
+- No autonomous trading, order placement, leverage/quantity execution logic.
+
+### Current architecture
+User text → optional local text/interface layer → AICFA orchestration → Market Data + Knowledge Base + deterministic analytical layers → Evidence Reasoning → Scenario Reasoning → Setup Analysis → Decision Layer → human-readable response.
+
+The local text model, if used, is only an interface/verbalization/reasoning assistant. It must never invent live market data, redefine AICFA terminology, replace deterministic calculations, or override the Decision Layer.
+
+### Core analytical chain
+Canonical causal timeframe direction: 1m → 5m → 15m → 1h → 4h → 1d → 1w.
+
+Accepted components include Market Structure, Liquidity, Displacement, FVG, Order Blocks, Premium/Discount, Unified SMC, Multi-Timeframe, Volume/Volatility, Derivatives, Order Flow/Microstructure, Knowledge Base, Visual Evidence, Evidence Reasoning, Scenario Reasoning, Setup Analysis and the evidence-gated Decision Layer.
+
+### Non-negotiable development rules
+1. Data before assumptions.
+2. Strict causality; no future leakage.
+3. Every important rule must be mechanically definable and testable.
+4. Never claim GREEN without current deployed verification.
+5. Do not install/test models blindly.
+6. Record model provenance, size/quantization, RAM, CPU latency and output-quality findings.
+7. Do not repeat rejected experiments.
+8. No paid API unless explicitly chosen.
+9. Respect CPU/RAM/storage limits.
+10. After every meaningful commit, update this file with commit SHA, what changed, verification/result, status, discovered issues and exact next step.
+11. This file is the source of truth for project continuity; chat history is not required to resume work.
+12. Work forward-only; no rollback unless explicitly requested.
+
+### Rejected approaches
+- Native screenshot pixel-trace Chart Vision implementation: rejected/pending for real-chart reliability; do not add visual BOS/CHoCH/FVG/OB semantics until trace localization is fixed.
+- MiniCPM-V 4.6: rejected after real BTC chart benchmark.
+- Granite 3.2 Vision 2B and other tested small VLM paths: rejected; see chronological history.
+- Shirdel-Finance-E4B Q6_K: rejected after OOM and removed.
+- SmolLM3 3B Q4_K_M: rejected for terminology/instruction reliability and latency; removed.
+- NEXUS-Finance 1.5B: rejected after domain and trivial instruction-following failures; removed.
+- Ministral 3 3B official GGUF: rejected as direct AICFA explanation model; final closed-world test still invented unsupported interpretations; removed.
+
+### Current local-model state
+**No local text model is installed or production-active.** Any next candidate must have documented/verified provenance before download. Do not return to random/community finance fine-tunes merely because they are small.
+
+### Current workstream
+**Local Text AI / interface architecture is unresolved.** The immediate question is whether a local model can safely act as a closed-world verbalizer/interface around deterministic AICFA output without inventing facts. If this cannot be demonstrated reliably, continue AICFA without a local model rather than weaken the analytical core.
+
+### Latest completed event
+2026-09-30 — Ministral 3B benchmark closed and model removed. Final closed-world test: 141 generated tokens, about 4.02 tok/s, about 52.6s total. It preserved WAIT, JSON and the requested size but added unsupported claims. Model removal was verified with an empty ollama list.
+GitHub commit recording this event: a8a62b4cf8edfdbc8d6323b7c0cf39c5489085fd
+
+### Exact next step
+1. Review current official local-model candidates suitable for the server.
+2. Verify provenance/model card, parameter count, quantization size, context and intended task.
+3. Do not download until a candidate passes the resource/role screen.
+4. If selected, benchmark it isolated first.
+5. Integrate only after safe closed-world behavior is demonstrated.
+6. After every resulting commit, immediately update this diary with commit SHA and outcome.
+
+### Continuity instruction
+Read CURRENT PROJECT CONTROL STATE first, then the latest chronological entries. Do not ask the user to reconstruct project history unless information is genuinely absent. Continue from Exact next step and preserve rejected approaches and constraints.
+
+---
 # AICFA — Project Control Plan
 
 **Project:** AICFA — AI for Digital Financial Assets  
