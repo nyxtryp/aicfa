@@ -1263,3 +1263,34 @@ Then run the fixed AICFA terminology/JSON benchmark and record actual latency, m
 ### Acceptance gate
 
 The candidate is accepted only if it is practically usable on the current server and reliably preserves AICFA terminology/structured output without fabricating unavailable market data. A failed benchmark means remove it and continue searching; it does not change the AICFA Core architecture.
+
+
+## 2026-09-30 — NEXUS-Finance installation completed
+
+### Operator result
+
+Installed the selected local text-model candidate with:
+```
+ollama pull FableForge-AI/nexus-finance
+```
+Result:
+```
+pulling 1ad377960a96: 100% 983 MB/986 MB
+verifying sha256 digest
+writing manifest
+success
+```
+
+The model download and manifest verification completed successfully. No production integration has been performed yet.
+
+### Status
+
+**PENDING — isolated runtime benchmark.**
+
+### Next exact step
+Run:
+```bash
+ollama list
+free -h
+```
+Then benchmark NEXUS-Finance against a fixed AICFA prompt covering BOS, CHoCH, FVG, liquidity sweep, Order Block, LONG/SHORT/WAIT and strict JSON output. Record latency, memory and terminology reliability before connecting the model to AICFA.
