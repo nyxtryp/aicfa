@@ -1490,3 +1490,12 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - Test commit: `c77e14bcebb0e1f1c64f4280bf8232b50c82df46`.
 - Status: IMPLEMENTED / PENDING deployed verification.
 - Exact next step: deploy and run full pytest; if GREEN, repeat live FindSetup BTC across seven timeframes and inspect evidence count, missing context, conflicts, and final Decision Layer action.
+
+
+## 2026-10-01 — Independent timeframe evidence verification
+- FrostDeploy release: `2026-09-30T17-09-41-2d52c1e`.
+- Verification: `271 passed, 8959 warnings in 31.35s`.
+- No test failures.
+- Known warnings remain non-blocking: pandas performance/deprecation warnings and immutable FrostDeploy pytest-cache PermissionError.
+- Status: GREEN / ACCEPTED for independent per-timeframe evidence implementation.
+- Exact next step: repeat the real user-facing `FindSetup BTC` flow on this release and inspect whether observations are now present across multiple causal timeframes and whether missing context has decreased.
