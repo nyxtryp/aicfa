@@ -13,10 +13,12 @@ from typing import Callable
 import pandas as pd
 
 from .binance_market_data import BinanceMarketDataProvider
+from .bybit_market_data import BybitMarketDataProvider
 from .decision import decide
 from .evidence_reasoning import assess_market_evidence
 from .features import build_features
 from .market_data import MarketDataProvider, completed_ohlcv
+from .market_data_router import FallbackMarketDataProvider
 from .market_evidence_adapter import build_market_evidence_from_frames
 from .scenario_reasoning import assess_scenarios
 from .setup_analysis import analyze_setups
@@ -93,12 +95,14 @@ def find_setup(
     resolver: Callable[[str, str], str] | None = None,
 ) -> FindSetupResult:
     """Resolve the requested asset, fetch seven causal timeframes, and run AICFA."""
-    provider = provider or BinanceMarketDataProvider()
+    if provider is None:
+        provider = FallbackMarketDataProvider(
+            (BinanceMarketDataProvider(), BybitMarketDataProvider())
+        )
     if resolver is None:
-        if isinstance(provider, BinanceMarketDataProvider):
-            resolver = lambda asset, market_type: provider.resolve_symbol(asset, market_type=market_type)
-        else:
-            resolver = lambda asset, market_type: normalize_asset(asset)
+        resolver = lambda asset, market_type: provider.resolve_symbol(
+            asset, market_type=market_type
+        )
     symbol = normalize_asset(resolver(request.asset, request.market_type))
     frames: dict[str, pd.DataFrame] = {}
 
