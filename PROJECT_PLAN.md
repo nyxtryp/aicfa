@@ -1651,3 +1651,18 @@ Record exact release ID and outputs here before adding the next realtime data ad
 - Status: IMPLEMENTED / PENDING FROSTDEPLOY VERIFICATION.
 - Discovered issue addressed: Bybit symbol resolution was previously limited to the first 1000 instruments, which could break the intended broad asset fallback.
 - Exact next step: deploy current main, run mandatory full pytest, then perform normal Binance BTC smoke and controlled Binance-failure -> Bybit fallback smoke before adding the next realtime data adapter.
+
+
+## 2026-10-01 — Bybit resolver pagination deployed and verified
+
+- FrostDeploy release: `2026-09-30T17-37-07-74602d0`.
+- Mandatory full-project verification completed on the deployed release.
+- Verification output: `287 passed, 8959 warnings in 34.46s`.
+- No test failures.
+- The pytest-cache `Permission denied` warning under the immutable FrostDeploy release directory remains a known non-blocking infrastructure warning.
+- The deployed release contains the Bybit `instruments-info` pagination fix, its regression tests, and the corresponding `PROJECT_PLAN.md` record.
+- Implementation commit: `04fc55f9d43543681d42f2c5591ea23d1db1f1e2`.
+- Test commit: `8a127f44caba03eb5db72ea2401fd2cb0b4d318c`.
+- Plan/deployment record commit: `74602d0d21607dc4159e189a956baa55cceca2bb`.
+- Status: **GREEN / ACCEPTED** for Bybit resolver pagination.
+- Exact next step: run the real BTC Binance path, then perform a controlled Binance failure test proving automatic fallback to Bybit. Record both results before implementing the next realtime data adapter or the 60-second shared snapshot cache.
