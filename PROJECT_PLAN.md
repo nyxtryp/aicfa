@@ -1436,3 +1436,12 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - Fix commit: `d388ca1de48597de2fbf59bfb60cce52a455907d`.
 - Status: FIXED / PENDING deployed verification.
 - Exact next step: deploy this one-line correction and rerun the full pytest suite. Only after zero failures proceed to live Binance validation.
+
+
+## 2026-10-01 — FindSetup resolver integration GREEN
+- FrostDeploy verification release: `2026-09-30T17-00-31-1eab26a`.
+- Verification output: `270 passed, 6295 warnings in 27.50s`.
+- The only relevant warning is the known immutable-release pytest-cache PermissionError; it does not fail tests.
+- The resolved symbol regression is verified fixed.
+- Status: GREEN / ACCEPTED.
+- Exact next step: perform a controlled live Binance validation of the user-facing asset resolution path, starting with a real supported asset such as BTC and verifying that `BTC` resolves to an active `BTC/USDT` market before the seven-timeframe fetch.
