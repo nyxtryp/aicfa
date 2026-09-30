@@ -1,4 +1,4 @@
-"""Evidence contract for deterministic market-data analysis.
+"""Evidence contracts for deterministic market-data analysis.
 
 Market observations are distinct from screenshot/vision observations. They are
 derived from AICFA market data and carry explicit direction only when a
@@ -47,6 +47,8 @@ class MarketEvidence:
     asset: str
     observations: tuple[MarketObservation, ...]
     timeframes: tuple[str, ...]
+    missing_context: tuple[str, ...] = ()
+    conflicts: tuple[str, ...] = ()
     source: str = "market_data"
 
     def __post_init__(self) -> None:
