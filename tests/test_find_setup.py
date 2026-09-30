@@ -1,0 +1,76 @@
+import numpy as np
+import pandas as pd
+import pytest
+
+from aicfa.find_setup import CAUSAL_TIMEFRAMES, FindSetupRequest, find_setup, normalize_asset, parse_find_setup
+
+
+def candles(n=120, start=0):
+    close = np.arange(n, dtype=float) + 100
+    return pd.DataFrame({
+        "timestamp": [start + i * 60_000 for i in range(n)],
+        "open": close - 0.5,
+        "high": close + 1,
+        "low": close - 1,
+        "close": close,
+        "volume": np.full(n, 10.0),
+    })
+
+
+class FakeProvider:
+    def __init__(self, direction="none"):
+        self.calls = []
+        self.direction = direction
+
+    def fetch_ohlcv(self, *, symbol, market_type, timeframe, since_ms, limit):
+        self.calls.append((symbol, market_type, timeframe, since_ms, limit))
+        return candles(limit)
+
+
+def test_normalize_asset_preserves_explicit_quote():
+    assert normalize_asset(" btc-usdt ") == "BTC/USDT"
+    assert normalize_asset("SOL/USDT") == "SOL/USDT"
+    assert normalize_asset("DOGE") == "DOGE"
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Найди сетап BTC/USDT", "BTC/USDT"),
+    ("найди сетап sol-usdt", "SOL/USDT"),
+    ("Find Setup DOGE/USDT", "DOGE/USDT"),
+])
+def test_parse_find_setup_extracts_asset(text, expected):
+    assert parse_find_setup(text).asset == expected
+
+
+def test_parse_find_setup_rejects_empty_request():
+    with pytest.raises(ValueError):
+        parse_find_setup("")
+
+
+def test_find_setup_fetches_exactly_seven_causal_timeframes():
+    provider = FakeProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert result.timeframes == CAUSAL_TIMEFRAMES
+    assert tuple(call[2] for call in provider.calls) == CAUSAL_TIMEFRAMES
+    assert all(call[0] == "BTC/USDT" for call in provider.calls)
+    assert all(call[1] == "spot" for call in provider.calls)
+    assert result.analysis["timestamp"].is_monotonic_increasing
+
+
+def test_find_setup_does_not_decide_from_an_open_latest_candle():
+    provider = FakeProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert result.analysis["timestamp"].max() < 120 * 60_000
+    assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
