@@ -1428,3 +1428,11 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - Test commit: `4abbb4169bd81c023eded53f0a8b5077dbfdfc63`.
 - Status: FIXED / PENDING deployed verification.
 - Exact next step: deploy and rerun the complete pytest suite. Do not proceed to live Binance validation until the deployed suite is GREEN.
+
+
+## 2026-10-01 — FindSetup resolver return-field regression fixed
+- Deployed verification after the previous fix: 269 passed, 1 failed.
+- Cause: the resolver correctly produced `DOGE/USDT` and that symbol was used for market-data/evidence processing, but `FindSetupResult.symbol` still returned the original user request (`DOGE`).
+- Fix commit: `d388ca1de48597de2fbf59bfb60cce52a455907d`.
+- Status: FIXED / PENDING deployed verification.
+- Exact next step: deploy this one-line correction and rerun the full pytest suite. Only after zero failures proceed to live Binance validation.
