@@ -848,3 +848,18 @@ The current failing result must not be marked GREEN. The previous `248 passed, 1
 3. if green, rerun the real `/tmp/btc.png` benchmark;
 4. inspect whether duplicate plateau swings are gone and whether HH/HL/LH/LL labels are correct;
 5. only after real-chart output is acceptable continue to the next visual structure layer.
+
+
+## 2026-09-30 — Chart Vision plateau representative fix
+
+- Verification result from deployed release before this fix: `248 passed, 1 failed, 4864 warnings in 24.33s`.
+- Failing test: `tests/test_chart_structure_cv.py::test_local_extrema_collapses_flat_plateau_to_one_swing`.
+- Observed failure: `assert [5] == [6]`.
+- Root cause: plateau candidates can be the two edge indices of one flat span (for example 5 and 7). The collapse logic selected the midpoint of the candidate-list positions, which returned candidate 5 instead of the numeric midpoint index 6.
+- Forward-only fix commit: `0572cddedbd29f386081ede9fcee182321719646`.
+- Code change: representative plateau index is now calculated as `(candidates[start] + candidates[end]) // 2`.
+- Status: **PENDING** until the new commit is deployed and the mandatory full pytest passes.
+- Next exact steps:
+  1. Wait for FrostDeploy release containing `0572cddedbd29f386081ede9fcee182321719646`.
+  2. Run mandatory full pytest on the deployed `current` release.
+  3. If GREEN, rerun native Chart Vision against the real BTC chart and inspect duplicate plateau swings plus HH/HL/LH/LL labels.
