@@ -719,3 +719,35 @@ The implementation has not yet been accepted as GREEN. The next required check i
 
 ### Next exact step
 Run the mandatory full pytest suite on the current FrostDeploy release. If green, run focused Chart Structure CV tests/benchmarks and inspect extracted swings before adding the next visual structure layer.
+
+
+## 2026-09-30 — Native Chart Vision test exposed fixed-spacing trace bug
+
+### Operator verification
+- User ran the mandatory full pytest suite on the current FrostDeploy release.
+- Result: **246 passed, 1 failed, 4864 warnings in 25.04s**.
+- Failing test:
+  `tests/test_chart_structure_cv.py::test_native_chart_structure_extracts_price_trace_and_swings`
+- Failure was `assert ()` at the swing assertion: the synthetic chart produced an empty structure trace/swings.
+
+### Root cause
+The first native `_column_trace()` implementation grouped colored columns using a hard-coded maximum x-gap of 3 pixels before interpolation. That assumption is invalid for charts where candle color segmentation leaves wider gaps between candle bodies/wicks. The synthetic test therefore split the candle sequence into isolated one-point runs and discarded them as too short.
+
+This is a test/implementation defect in the new native CV stage, not a reason to weaken the test or accept the stage as GREEN.
+
+### Forward fix commits
+- `a920d8ad4c988d906dc0e8833df714a4561c0c9e` — make chart trace grouping adaptive to observed candle spacing;
+- `8cb7c04110726ca962386fa7020af576b9a00bd6` — correct the adaptive-spacing implementation to derive spacing from the raw trace before grouping.
+
+The grouping now uses observed x-spacing instead of an image-specific fixed 3px threshold and selects the dominant chart span by horizontal coverage.
+
+### Verification status
+**PENDING FrostDeploy verification after the fix.**
+
+Do not mark the native Chart Vision stage GREEN yet.
+
+### Next exact step
+1. wait for deployment of `8cb7c041...`;
+2. rerun the mandatory full pytest suite;
+3. if green, benchmark `chart_structure_cv.py` on the real public BTC/USDT chart and inspect the extracted trace/swings;
+4. only after that consider BOS/CHoCH visual detection.
