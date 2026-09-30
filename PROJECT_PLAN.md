@@ -1063,3 +1063,28 @@ Do not integrate the model into the AICFA analytical core before an isolated run
 3. Measure model-load success, peak memory, CPU latency and structured-response quality.
 4. Test whether the model can reliably act as the text interface/reasoning layer without inventing live market data or bypassing AICFA's Decision Layer.
 5. Record the benchmark result here before any production integration.
+
+
+## 2026-09-30 — Shirdel-Finance-E4B removal: pending operator execution
+
+The Q6_K model is confirmed unsuitable for the current server memory budget after the OOM incident. The server was recovered successfully with zero failed systemd units.
+
+**Current status:** PENDING REMOVAL.
+
+### Exact operator action
+
+Run:
+
+```bash
+ollama rm shirdel-finance
+```
+
+Then verify:
+
+```bash
+ollama list
+free -h
+df -h /
+```
+
+The model must not be run again on the current hardware. After the removal output is received, record the actual result here and commit this plan before selecting the next model strategy.
