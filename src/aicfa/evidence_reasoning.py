@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from aicfa.knowledge_base import get_knowledge
+from aicfa.market_evidence import MarketEvidence, MarketObservation
 from aicfa.visual_evidence import VisualEvidenceSet, VisualObservation
 
 
@@ -16,7 +17,7 @@ class EvidenceAssessment:
     """Deterministic evidence assessment before scenario/setup reasoning."""
 
     decision: EvidenceDecision
-    observations: tuple[VisualObservation, ...]
+    observations: tuple
     supported_concepts: tuple[str, ...]
     possible_concepts: tuple[str, ...]
     missing_context: tuple[str, ...]
@@ -28,25 +29,15 @@ def _unique(values: list[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
 
-def assess_visual_evidence(
-    evidence: VisualEvidenceSet,
+def _assess_observations(
+    observations: tuple,
     *,
+    available_timeframes: tuple[str, ...],
+    missing_context: tuple[str, ...] = (),
+    conflicts: tuple[str, ...] = (),
     required_concepts: tuple[str, ...] = (),
     required_timeframes: tuple[str, ...] = (),
 ) -> EvidenceAssessment:
-    """Assess whether screenshot evidence is sufficient for the next reasoning step.
-
-    This function does not predict direction and does not create an entry.
-    It answers only: what is supported, what is uncertain, and whether more
-    evidence is required before downstream scenario reasoning.
-    """
-
-    observations = tuple(
-        observation
-        for item in evidence.items
-        for observation in item.observations
-    )
-
     supported = [
         item.concept_id
         for item in observations
@@ -58,22 +49,11 @@ def assess_visual_evidence(
         if item.state == "possible" or (item.state == "observed" and item.confidence < 0.5)
     ]
 
-    missing = list(
-        context
-        for item in evidence.items
-        for context in item.missing_context
-    )
-    conflicts = list(
-        conflict
-        for item in evidence.items
-        for conflict in item.conflicts
-    )
-
-    observed_timeframes = set(evidence.timeframes)
+    missing = list(missing_context)
     missing.extend(
         f"required timeframe: {timeframe}"
         for timeframe in required_timeframes
-        if timeframe not in observed_timeframes
+        if timeframe not in set(available_timeframes)
     )
 
     observed_concepts = set(supported)
@@ -85,11 +65,11 @@ def assess_visual_evidence(
 
     reasons: list[str] = []
     if possible:
-        reasons.append("some visual interpretations remain uncertain")
+        reasons.append("some evidence interpretations remain uncertain")
     if missing:
         reasons.append("required context is missing")
     if conflicts:
-        reasons.append("material visual evidence is contradictory")
+        reasons.append("material evidence is contradictory")
 
     if conflicts:
         decision = EvidenceDecision.WAIT
@@ -106,6 +86,55 @@ def assess_visual_evidence(
         missing_context=_unique(missing),
         conflicts=_unique(conflicts),
         reasons=_unique(reasons),
+    )
+
+
+def assess_visual_evidence(
+    evidence: VisualEvidenceSet,
+    *,
+    required_concepts: tuple[str, ...] = (),
+    required_timeframes: tuple[str, ...] = (),
+) -> EvidenceAssessment:
+    """Assess screenshot evidence without predicting direction."""
+
+    observations = tuple(
+        observation
+        for item in evidence.items
+        for observation in item.observations
+    )
+    return _assess_observations(
+        observations,
+        available_timeframes=evidence.timeframes,
+        missing_context=tuple(
+            context
+            for item in evidence.items
+            for context in item.missing_context
+        ),
+        conflicts=tuple(
+            conflict
+            for item in evidence.items
+            for conflict in item.conflicts
+        ),
+        required_concepts=required_concepts,
+        required_timeframes=required_timeframes,
+    )
+
+
+def assess_market_evidence(
+    evidence: MarketEvidence,
+    *,
+    required_concepts: tuple[str, ...] = (),
+    required_timeframes: tuple[str, ...] = (),
+) -> EvidenceAssessment:
+    """Assess deterministic market evidence without treating it as visual data."""
+
+    return _assess_observations(
+        evidence.observations,
+        available_timeframes=evidence.timeframes,
+        missing_context=evidence.missing_context,
+        conflicts=evidence.conflicts,
+        required_concepts=required_concepts,
+        required_timeframes=required_timeframes,
     )
 
 
