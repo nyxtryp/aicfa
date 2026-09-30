@@ -1666,3 +1666,20 @@ Record exact release ID and outputs here before adding the next realtime data ad
 - Plan/deployment record commit: `74602d0d21607dc4159e189a956baa55cceca2bb`.
 - Status: **GREEN / ACCEPTED** for Bybit resolver pagination.
 - Exact next step: run the real BTC Binance path, then perform a controlled Binance failure test proving automatic fallback to Bybit. Record both results before implementing the next realtime data adapter or the 60-second shared snapshot cache.
+
+
+## 2026-10-01 — Live Binance primary and Bybit fallback smoke verified
+
+- Real Binance Spot smoke succeeded for `BTC` → `BTCUSDT`.
+- Fresh 1m OHLCV window returned 10 rows from the current market; the earlier `since_ms=0` test was correctly identified as historical data and was not accepted as live validation.
+- Controlled fallback smoke then forced a Binance transport failure: `CONTROLLED_TEST_BINANCE_FAILURE`.
+- The real fallback router selected Bybit and successfully returned 10 real BTCUSDT Spot 1m OHLCV rows.
+- Actual router result:
+  - selected provider: `bybit`;
+  - symbol: `BTCUSDT`;
+  - rows: `10`;
+  - recorded attempt: Binance → `CONTROLLED_TEST_BINANCE_FAILURE`.
+- This verifies the intended request-scoped provider fallback behavior: Binance is tried first, and when it fails, the router continues to Bybit without fabricating or merging data.
+- Status: **GREEN / ACCEPTED** for the current Binance → Bybit OHLCV fallback path.
+- Scope limitation: this does not yet mean all registry capabilities are connected. Trades, order book, funding, open interest, liquidations and mark-price adapters remain to be implemented.
+- Exact next step: implement the **60-second shared request snapshot/cache** keyed by source/market/symbol/data profile, with no permanent market-history storage. After that, extend realtime data capabilities provider-by-provider.
