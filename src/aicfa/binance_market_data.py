@@ -77,10 +77,13 @@ class BinanceMarketDataProvider:
                 raise ValueError(f"unsupported Binance symbol: {requested}")
             return requested
 
+        symbols = self._exchange_symbols(market_type)
+        if normalized in symbols:
+            return normalized
+
         base = normalized
         quote = quote_asset.strip().upper()
         requested = f"{base}{quote}"
-        symbols = self._exchange_symbols(market_type)
         if requested not in symbols:
             raise ValueError(f"no Binance {quote} market found for asset: {base}")
         return requested
