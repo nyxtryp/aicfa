@@ -1458,3 +1458,13 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - Known non-blocking warning: immutable FrostDeploy release prevents pytest cache creation.
 - Status: GREEN / ACCEPTED.
 - Exact next step: deploy this hardening change, run full pytest, then run the live Binance FindSetup smoke test.
+
+
+## 2026-10-01 — Live Binance asset-resolution smoke test
+- FrostDeploy release: `2026-09-30T17-02-40-9d8f800`.
+- Real Binance validation succeeded: user asset `BTC` resolved to `BTCUSDT`.
+- Real Spot 1m OHLCV request succeeded with 1 row.
+- Observed live candle: timestamp `1790787840000`; open `84334.01000000`; high `84353.90000000`; low `84283.57000000`; close `84283.57000000`; volume `16.08461000`.
+- No fake provider or fixture was used.
+- Status: GREEN / ACCEPTED for live Binance resolver + 1m transport smoke test.
+- Exact next step: run the real user-facing `FindSetup BTC` flow across all seven causal timeframes and capture the complete AICFA result.
