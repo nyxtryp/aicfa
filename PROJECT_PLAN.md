@@ -813,3 +813,38 @@ No BOS/CHoCH or additional visual semantics are being added yet. The current goa
 3. if green, rerun the real /tmp/btc.png benchmark;
 4. inspect the resulting trace/swings for duplicate plateaus and correct HH/HL/LH/LL semantics;
 5. only after the real-chart output is acceptable proceed to the next visual structure layer.
+
+
+## 2026-09-30 — Native Chart Vision plateau regression: candidate grouping corrected
+
+### Operator verification
+- User ran the mandatory full FrostDeploy pytest suite after commits `68c8baa...`, `17fef157...` and `72f9a07...`.
+- Result: **248 passed, 1 failed, 4864 warnings in 24.04s**.
+- Failing test:
+  `tests/test_chart_structure_cv.py::test_local_extrema_collapses_flat_plateau_to_one_swing`
+- Failure:
+```
+assert [5, 7] == [6]
+```
+
+### Root cause
+The first plateau-collapse fix grouped only **consecutive candidate indices**. On a flat extremum such as `[12, 12, 12]`, the strict-side predicate correctly rejects the center pixel, leaving edge candidates `5` and `7`. Because those candidates are separated by one non-candidate index, the previous collapse logic treated them as two swings.
+
+This is an implementation defect in plateau grouping, not a reason to weaken the regression test.
+
+### Forward fix
+- `611d6e0cc192a77e6295f67582839b48cf45b769` — group plateau candidates across the full flat span when all values between the candidate edges equal the same extremal value, then select the midpoint as the single representative swing.
+
+The change remains local to deterministic extrema candidate normalization. It does not alter confirmation thresholds, fabricate structure, or add higher-level SMC semantics.
+
+### Verification status
+**PENDING FrostDeploy verification.**
+
+The current failing result must not be marked GREEN. The previous `248 passed, 1 failed` result is superseded by the forward fix but remains the latest actual server verification until the new deployment is tested.
+
+### Next exact step
+1. wait for FrostDeploy deployment containing `611d6e0...`;
+2. rerun the mandatory full pytest suite;
+3. if green, rerun the real `/tmp/btc.png` benchmark;
+4. inspect whether duplicate plateau swings are gone and whether HH/HL/LH/LL labels are correct;
+5. only after real-chart output is acceptable continue to the next visual structure layer.
