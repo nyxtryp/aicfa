@@ -1683,3 +1683,17 @@ Record exact release ID and outputs here before adding the next realtime data ad
 - Status: **GREEN / ACCEPTED** for the current Binance → Bybit OHLCV fallback path.
 - Scope limitation: this does not yet mean all registry capabilities are connected. Trades, order book, funding, open interest, liquidations and mark-price adapters remain to be implemented.
 - Exact next step: implement the **60-second shared request snapshot/cache** keyed by source/market/symbol/data profile, with no permanent market-history storage. After that, extend realtime data capabilities provider-by-provider.
+
+## 2026-10-01 — Seven-timeframe snapshot integration verified
+
+- Implemented the shared 60-second all-timeframe snapshot path for production FindSetup.
+- Snapshot scope is the complete requested causal set for one asset: 1m, 5m, 15m, 1h, 4h, 1d, 1w. It is request-scoped and process-local; no permanent market history is stored.
+- The initial FindSetup integration exposed a test-provider contract regression because FakeProvider did not implement `fetch_ohlcv_snapshot()`. Commit `c9ee044d8a6e0b0a859ca7bda9cfe42e721b5518` restored compatibility by using the snapshot API only for the production SharedSnapshotMarketDataProvider and retaining the base provider contract for injected providers.
+- A second compatibility issue was found because test FakeProvider returns a DataFrame directly while production providers return MarketFetchResult. Commit `da2684f4a3422931acf4c50cfb0cedaaa069d744` now accepts both return shapes.
+- FrostDeploy release used for verification: `2026-09-30T17-52-58-da2684f`.
+- Mandatory deployed verification output: `291 passed, 8959 warnings in 32.60s`.
+- The pytest-cache `Permission denied` warning in the immutable FrostDeploy release directory remains known and non-blocking.
+- Status: **GREEN / ACCEPTED** for FindSetup snapshot integration and provider-contract compatibility.
+- Discovered issue resolved: FindSetup must preserve the base MarketDataProvider contract for test/custom providers while production fallback providers use the shared all-timeframe snapshot.
+- Important scope limitation: the shared snapshot cache is currently process-local, not cross-worker/global. Do not describe it as a globally shared cache across multiple FrostDeploy workers.
+- Exact next step: run a real seven-timeframe BTC snapshot/FindSetup smoke and verify the all-TF request path on live market data. Then record that result before adding trades, order book, funding, open interest, liquidations and mark-price adapters.
