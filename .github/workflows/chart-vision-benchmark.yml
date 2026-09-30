@@ -1,0 +1,35 @@
+name: chart-vision-benchmark
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/chart-vision-benchmark.yml"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download chart
+        run: curl -L --fail --retry 3 -o /tmp/btc.png "https://storage.googleapis.com/citronai-images/chart-BTC-1769340590503.png"
+      - name: Clone candidate
+        run: git clone --depth 1 https://github.com/Rudra-kakade/vision-market-structure-analyzer.git /tmp/vision-market-structure-analyzer
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install opencv-python-headless numpy scipy
+      - name: Run benchmark
+        run: |
+          python - <<'PY'
+          import json, sys, time
+          sys.path.insert(0, "/tmp/vision-market-structure-analyzer")
+          from new_markings import run_markings_logic
+          t0 = time.perf_counter()
+          rect, out = run_markings_logic("/tmp/btc.png", 5, "/tmp/pivots.json", (0,0,512,512))
+          elapsed = time.perf_counter() - t0
+          with open("/tmp/pivots.json") as f:
+              pivots = json.load(f)
+          print("RUNTIME_SECONDS=%.4f" % elapsed)
+          print("ROI=%s" % (rect,))
+          print("PIVOT_COUNT=%d" % len(pivots))
+          for p in pivots:
+              print(json.dumps(p, ensure_ascii=False))
+          PY
