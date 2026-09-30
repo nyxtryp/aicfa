@@ -64,6 +64,7 @@ def test_find_setup_fetches_exactly_seven_causal_timeframes():
     result = find_setup(
         FindSetupRequest("BTC/USDT"),
         provider=provider,
+        resolver=lambda asset, market_type: asset,
         now_ms=120 * 60_000,
         limit=120,
     )
@@ -101,3 +102,35 @@ def test_find_setup_uses_authoritative_market_evidence_decision_chain():
     assert result.evidence.source == "market_data"
     assert result.decision == result.decision_assessment.action.value.upper().replace("_", " ")
     assert result.decision_assessment.reasons
+
+
+def test_find_setup_resolves_user_asset_before_market_data_fetch():
+    provider = FakeProvider()
+    seen = []
+
+    def resolver(asset, market_type):
+        seen.append((asset, market_type))
+        return "DOGE/USDT"
+
+    result = find_setup(
+        FindSetupRequest("DOGE"),
+        provider=provider,
+        resolver=resolver,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert seen == [("DOGE", "spot")]
+    assert result.symbol == "DOGE/USDT"
+    assert result.evidence.asset == "DOGE/USDT"
+    assert all(call[0] == "DOGE/USDT" for call in provider.calls)
+
+
+def test_find_setup_requires_resolver_for_non_binance_provider():
+    with pytest.raises(ValueError, match="resolver is required"):
+        find_setup(
+            FindSetupRequest("DOGE"),
+            provider=FakeProvider(),
+            now_ms=120 * 60_000,
+            limit=120,
+        )
