@@ -773,3 +773,43 @@ This changes only the candidate-extrema predicate; it does not weaken the downst
 
 ### Next exact step
 Rerun the mandatory full pytest suite after deployment. If green, benchmark the native extractor on the real BTC/USDT chart before adding further visual semantics.
+
+## 2026-09-30 — Native Chart Vision real-chart review: plateau deduplication and low-label correction
+
+### Review finding
+
+The first real BTC/USDT benchmark exposed a problem that the synthetic test did not cover: the plateau-extrema rule introduced by 41929bdc... correctly allowed flat extrema, but every pixel of a flat plateau could then become a separate swing candidate.
+
+Observed symptoms on the real chart included repeated adjacent swing points at nearly identical coordinates, for example multiple highs at the same y and consecutive x values, plus repeated lows over flat runs. This is not acceptable as a market-structure representation.
+
+The review also exposed an independent semantic bug in low-swing labeling: image y increases downward, so a larger low_y means a lower price and must be labeled LL, while a smaller low_y means a higher low and must be labeled HL. The previous implementation had these two labels reversed.
+
+### Forward fixes
+
+- 68c8baa047be3c2bdd385ab4702c571cd3de093e — collapse consecutive plateau extrema candidates to one representative swing and correct low-swing HH/HL/LH/LL-direction semantics.
+- 17fef157fee057fddfe868d755409c11bba8658d — add regression tests for plateau collapse and low-swing labels.
+- 72f9a07f6a5bc3203f6928c7bf6e6a6a30219d09 — correct the plateau regression-test expectations.
+
+### Verification status
+
+**PENDING FrostDeploy verification.**
+
+The fixes have been committed forward-only, but no new deployed-release pytest result has been recorded yet. The previous known full-suite result remains:
+
+```
+247 passed, 4863 warnings in 24.00s
+```
+
+That result belongs to the earlier plateau-extrema implementation and does not validate these new changes.
+
+### Important boundary
+
+No BOS/CHoCH or additional visual semantics are being added yet. The current goal is to make the pixel-derived trace and swing representation structurally sane on real charts before building higher-level visual market structure.
+
+### Next exact step
+
+1. wait for FrostDeploy deployment containing 72f9a07...;
+2. run the mandatory full pytest suite on the current release;
+3. if green, rerun the real /tmp/btc.png benchmark;
+4. inspect the resulting trace/swings for duplicate plateaus and correct HH/HL/LH/LL semantics;
+5. only after the real-chart output is acceptable proceed to the next visual structure layer.
