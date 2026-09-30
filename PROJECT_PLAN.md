@@ -1127,3 +1127,74 @@ No local text model is currently installed or production-active.
 ### Next step
 
 Before installing another model, select a memory-safe candidate based on actual GGUF size, expected runtime RAM usage and CPU feasibility. Do not repeat the Q6_K experiment on this server.
+
+
+## 2026-09-30 — Local Text AI benchmark: SmolLM3 3B Q4_K_M rejected
+
+### Operator actions
+- User pulled and tested `hf.co/ggml-org/SmolLM3-3B-GGUF:Q4_K_M`.
+- GGUF download completed successfully at approximately **1.9 GB**.
+- The model was run locally through Ollama on the current **2 vCPU / 4.8 GiB RAM / 2 GiB swap / CPU-only** server.
+- Peak observed working memory during the run was approximately **2.7 GiB RAM**; the server remained stable and no OOM occurred.
+- The model was tested first with an AICFA market-structure instruction and then with a minimal JSON-only instruction.
+
+### Runtime result
+AICFA reasoning test:
+- total duration: **2m37.53s**;
+- load duration: **~1.58 ms** on the cached second run;
+- prompt eval rate: **22.66 tokens/s**;
+- generation eval rate: **5.22 tokens/s**;
+- generated **768 tokens** despite the request for concise output.
+
+The model can produce a requested short JSON response, but it also generated a long hidden `<think>` section before the final answer.
+
+### Quality finding
+The model is not sufficiently reliable as a specialized AICFA reasoning/interface layer in this configuration:
+- it introduced unsupported conventional indicators and concepts such as RSI, MACD, moving averages, Bollinger Bands and HFT when the evidence did not contain them;
+- it misinterpreted AICFA terminology, including treating FVG as “Failure of Volume Gauge” and BOS as “Breakout of Strength”;
+- it expanded beyond the requested concise format during reasoning.
+
+The minimal JSON test eventually returned exactly:
+`{"decision":"WAIT","reason":"1h bearish, 5m retracement, no bullish BOS"}`
+but this does not compensate for the terminology and reasoning reliability issues.
+
+### Decision
+**SmolLM3 3B Q4_K_M is REJECTED as the AICFA local text model candidate.**
+
+It is technically runnable within the current RAM budget, but its CPU latency and domain/terminology reliability are not sufficient for the intended AICFA interface/reasoning role.
+
+### Operator result after removal
+User removed the model:
+```
+ollama rm hf.co/ggml-org/SmolLM3-3B-GGUF:Q4_K_M
+deleted 'hf.co/ggml-org/SmolLM3-3B-GGUF:Q4_K_M'
+```
+
+Post-removal state:
+```
+ollama list
+NAME    ID    SIZE    MODIFIED
+
+Mem:  4.8Gi total, 525Mi used, 4.1Gi free, 4.3Gi available
+Swap: 2.0Gi total, 153Mi used, 1.9Gi free
+Disk: 40G total, 12G used, 26G available (32%)
+```
+
+No local text model is currently installed or production-active.
+
+### Verification status
+**CLOSED / REJECTED.**
+
+This was an isolated model benchmark only. No AICFA source code, analytical layer, Decision Layer or production architecture was changed.
+
+### Next exact step
+Search current **finance/crypto/trading-specialized local text models** with a hard resource ceiling appropriate to the server:
+- preferably **≤3B parameters**;
+- preferably **Q4 GGUF ≤2 GB**;
+- actual finance/crypto/trading specialization, not generic finance sentiment only;
+- acceptable Russian/English instruction following;
+- structured JSON reliability;
+- practical CPU latency on 2 vCPU;
+- no blind downloads: inspect model architecture, quantization size, context and intended task first.
+
+Do not reinstall SmolLM3, Shirdel-Finance-E4B Q6_K, or the previously rejected local VLM candidates.
