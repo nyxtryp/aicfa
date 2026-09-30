@@ -74,57 +74,67 @@ def test_router_reports_all_failures():
         )
 
 
-def test_shared_snapshot_reuses_fresh_result():
+def test_shared_snapshot_reuses_all_timeframes():
     provider = FakeProvider("binance", frame=frame())
-    shared = SharedSnapshotMarketDataProvider(
-        FallbackMarketDataProvider([provider]), ttl_seconds=60,
+    shared = SharedSnapshotMarketDataProvider(FallbackMarketDataProvider([provider]), ttl_seconds=60)
+    timeframes = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
+    first = shared.fetch_ohlcv_snapshot(
+        symbol="BTCUSDT", market_type="spot", timeframes=timeframes, since_ms=100, limit=1,
     )
-    kwargs = dict(symbol="BTCUSDT", market_type="spot", timeframe="1m",
-                  since_ms=100, limit=1)
-    first = shared.fetch_ohlcv_with_source(**kwargs)
-    second = shared.fetch_ohlcv_with_source(**kwargs)
-    assert provider.calls == 1
-    assert first.frame.equals(second.frame)
+    second = shared.fetch_ohlcv_snapshot(
+        symbol="BTCUSDT", market_type="spot", timeframes=timeframes, since_ms=100, limit=1,
+    )
+    assert provider.calls == 7
+    assert tuple(first) == timeframes
+    assert tuple(second) == timeframes
+    assert all(first[tf].frame.equals(second[tf].frame) for tf in timeframes)
 
 
 def test_shared_snapshot_separates_market_and_profile():
     provider = FakeProvider("binance", frame=frame())
-    shared = SharedSnapshotMarketDataProvider(
-        FallbackMarketDataProvider([provider]), ttl_seconds=60,
+    shared = SharedSnapshotMarketDataProvider(FallbackMarketDataProvider([provider]), ttl_seconds=60)
+    timeframes = ("1m", "5m")
+    shared.fetch_ohlcv_snapshot(
+        symbol="BTCUSDT", market_type="spot", timeframes=timeframes,
+        since_ms=100, limit=1, data_profile="ohlcv",
     )
-    kwargs = dict(symbol="BTCUSDT", timeframe="1m", since_ms=100, limit=1)
-    shared.fetch_ohlcv_with_source(**kwargs, market_type="spot", data_profile="ohlcv")
-    shared.fetch_ohlcv_with_source(**kwargs, market_type="linear", data_profile="ohlcv")
-    shared.fetch_ohlcv_with_source(**kwargs, market_type="spot", data_profile="ohlcv+trades")
-    assert provider.calls == 3
+    shared.fetch_ohlcv_snapshot(
+        symbol="BTCUSDT", market_type="linear", timeframes=timeframes,
+        since_ms=100, limit=1, data_profile="ohlcv",
+    )
+    shared.fetch_ohlcv_snapshot(
+        symbol="BTCUSDT", market_type="spot", timeframes=timeframes,
+        since_ms=100, limit=1, data_profile="ohlcv+trades",
+    )
+    assert provider.calls == 6
 
 
-def test_shared_snapshot_expires():
+def test_shared_snapshot_expires_as_one_snapshot():
     provider = FakeProvider("binance", frame=frame())
     now = [100.0]
     shared = SharedSnapshotMarketDataProvider(
-        FallbackMarketDataProvider([provider]), ttl_seconds=60,
-        clock=lambda: now[0],
+        FallbackMarketDataProvider([provider]), ttl_seconds=60, clock=lambda: now[0],
     )
-    kwargs = dict(symbol="BTCUSDT", market_type="spot", timeframe="1m",
-                  since_ms=100, limit=1)
-    shared.fetch_ohlcv_with_source(**kwargs)
+    kwargs = dict(
+        symbol="BTCUSDT", market_type="spot",
+        timeframes=("1m", "5m", "15m"), since_ms=100, limit=1,
+    )
+    shared.fetch_ohlcv_snapshot(**kwargs)
     now[0] = 159.9
-    shared.fetch_ohlcv_with_source(**kwargs)
-    assert provider.calls == 1
+    shared.fetch_ohlcv_snapshot(**kwargs)
+    assert provider.calls == 3
     now[0] = 160.0
-    shared.fetch_ohlcv_with_source(**kwargs)
-    assert provider.calls == 2
+    shared.fetch_ohlcv_snapshot(**kwargs)
+    assert provider.calls == 6
 
 
-def test_shared_snapshot_returns_isolated_frame():
+def test_shared_snapshot_returns_isolated_frames():
     provider = FakeProvider("binance", frame=frame())
-    shared = SharedSnapshotMarketDataProvider(
-        FallbackMarketDataProvider([provider]), ttl_seconds=60,
+    shared = SharedSnapshotMarketDataProvider(FallbackMarketDataProvider([provider]), ttl_seconds=60)
+    kwargs = dict(
+        symbol="BTCUSDT", market_type="spot", timeframes=("1m", "5m"), since_ms=100, limit=1,
     )
-    kwargs = dict(symbol="BTCUSDT", market_type="spot", timeframe="1m",
-                  since_ms=100, limit=1)
-    first = shared.fetch_ohlcv_with_source(**kwargs)
-    first.frame.loc[0, "close"] = -1
-    second = shared.fetch_ohlcv_with_source(**kwargs)
-    assert second.frame.loc[0, "close"] == 100.5
+    first = shared.fetch_ohlcv_snapshot(**kwargs)
+    first["1m"].frame.loc[0, "close"] = -1
+    second = shared.fetch_ohlcv_snapshot(**kwargs)
+    assert second["1m"].frame.loc[0, "close"] == 100.5
