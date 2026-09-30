@@ -61,6 +61,49 @@ class BinanceMarketDataProvider:
         self._opener = opener
         self._sleeper = sleeper
 
+    def resolve_symbol(self, asset: str, *, quote_asset: str = "USDT", market_type: str = "spot") -> str:
+        """Resolve a user asset to a currently tradable Binance symbol.
+
+        Explicit pairs are validated as-is. Bare base assets are resolved to
+        a currently trading USDT pair. No asset universe is hardcoded.
+        """
+        normalized = asset.strip().upper().replace("/", "").replace("-", "").replace("_", "")
+        if not normalized:
+            raise ValueError("asset must not be empty")
+        if "/" in asset or "-" in asset or "_" in asset:
+            requested = normalized
+            symbols = self._exchange_symbols(market_type)
+            if requested not in symbols:
+                raise ValueError(f"unsupported Binance symbol: {requested}")
+            return requested
+
+        base = normalized
+        quote = quote_asset.strip().upper()
+        requested = f"{base}{quote}"
+        symbols = self._exchange_symbols(market_type)
+        if requested not in symbols:
+            raise ValueError(f"no Binance {quote} market found for asset: {base}")
+        return requested
+
+    def _exchange_symbols(self, market_type: str) -> set[str]:
+        endpoint = "https://api.binance.com/api/v3/exchangeInfo" if market_type == "spot" else "https://fapi.binance.com/fapi/v1/exchangeInfo"
+        request = Request(endpoint, headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"}, method="GET")
+        with self._opener(request, timeout=self.timeout_seconds) as response:
+            payload = json.load(response)
+        if not isinstance(payload, dict) or not isinstance(payload.get("symbols"), list):
+            raise ValueError("Binance exchangeInfo response must contain symbols")
+        symbols = set()
+        for item in payload["symbols"]:
+            if not isinstance(item, dict):
+                continue
+            status = item.get("status") if market_type == "spot" else item.get("status") or item.get("contractStatus")
+            if status not in {None, "TRADING"}:
+                continue
+            symbol = item.get("symbol")
+            if isinstance(symbol, str) and symbol:
+                symbols.add(symbol.upper())
+        return symbols
+
     @staticmethod
     def _normalize_symbol(symbol: str) -> str:
         normalized = symbol.replace("/", "").replace("-", "").strip().upper()
