@@ -181,6 +181,7 @@ def test_binance_resolver_resolves_bare_asset_to_live_usdt_symbol():
     assert provider.resolve_symbol("BTC") == "BTCUSDT"
     assert provider.resolve_symbol("DOGE") == "DOGEUSDT"
     assert provider.resolve_symbol("PEPE/USDT") == "PEPEUSDT"
+    assert provider.resolve_symbol("BTCUSDT") == "BTCUSDT"
 
 
 def test_binance_resolver_rejects_unknown_or_non_trading_symbol():
