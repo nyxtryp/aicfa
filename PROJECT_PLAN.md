@@ -1445,3 +1445,13 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - The resolved symbol regression is verified fixed.
 - Status: GREEN / ACCEPTED.
 - Exact next step: perform a controlled live Binance validation of the user-facing asset resolution path, starting with a real supported asset such as BTC and verifying that `BTC` resolves to an active `BTC/USDT` market before the seven-timeframe fetch.
+
+
+## 2026-10-01 — Pre-live resolver hardening
+- Before live Binance validation, identified an edge case: an exact exchange symbol such as `BTCUSDT` could otherwise be mistaken for a bare base asset and become `BTCUSDTUSDT`.
+- Fixed resolver to check exact active exchange symbols before applying the default USDT quote.
+- Added regression coverage for exact `BTCUSDT`.
+- Implementation commit: `1943b8e91ba24c095e4e43ba210fca887fe4150c`.
+- Test commit: `a68c169cf1a72c18618d1a178dbf8e738b0016d2`.
+- Status: FIXED / PENDING deployed verification.
+- Exact next step: deploy this hardening change, run full pytest, then run the live Binance FindSetup smoke test.
