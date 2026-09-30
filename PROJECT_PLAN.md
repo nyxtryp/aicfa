@@ -1701,3 +1701,30 @@ ROADMAP FIXED / IMPLEMENTATION NOT STARTED.
 ### Exact next step
 
 Inspect the existing Market Data implementation and tests first. Identify the current data providers, supported symbols/timeframes, normalization contracts and gaps for universal `FindSetup`. No model installation in this step.
+
+
+## 2026-09-30 — Market Data inspection result
+
+### Finding
+The repository already contains a concrete Binance public OHLCV adapter and a centralized causal scanner. This is NOT a missing-from-scratch Market Data layer.
+
+Verified source files on main:
+- `src/aicfa/market_data.py`: provider-agnostic OHLCV contract, MarketKey, validation, completed-candle filtering, merge and incremental cursor.
+- `src/aicfa/binance_market_data.py`: Binance Spot and USDⓈ-M Futures public REST klines; BTC/USDT-style symbol normalization; 1m/5m/15m/1h/4h/1d/1w transport; retry/backoff and explicit transport errors; no API key for public data.
+- `src/aicfa/market_scanner.py`: centralized one-pass-per-market-key scanner, retained history, completed-candle-only feature input and incremental scans.
+- Existing tests cover adapter transport mapping, retries, rate-limit/server errors, invalid configuration, scanner incremental behavior and completed-candle handling.
+
+### External provider verification
+Binance's current official documentation confirms public unauthenticated market-data endpoints and kline support for 1m, 5m, 15m, 1h, 4h, 1d and 1w. cite source reviewed: Binance official Spot API documentation; no project code change based solely on this citation.
+
+### Gap for FindSetup
+The existing scanner is a configured-universe infrastructure layer. It does NOT yet implement the user-facing universal flow:
+`user text → asset extraction → validate/resolve symbol → build all seven causal timeframes → run AICFA analysis → Setup → Decision → human-readable result`.
+It also does not yet provide the required single-asset orchestration contract for arbitrary user-named assets.
+
+### Status
+Market Data foundation: **GREEN/ACCEPTED foundation exists** from prior release verification.
+FindSetup orchestration: **PENDING / NOT IMPLEMENTED**.
+
+### Exact next step
+Implement and test `FindSetupRequest` + asset/symbol resolution + single-asset seven-timeframe orchestration on top of the existing provider/scanner contracts. Do not install another local model in this step.
