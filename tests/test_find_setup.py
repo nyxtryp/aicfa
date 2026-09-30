@@ -5,10 +5,22 @@ import pytest
 from aicfa.find_setup import CAUSAL_TIMEFRAMES, FindSetupRequest, find_setup, normalize_asset, parse_find_setup
 
 
-def candles(n=120, start=0):
+TIMEFRAME_MS = {
+    "1m": 60_000,
+    "5m": 5 * 60_000,
+    "15m": 15 * 60_000,
+    "1h": 60 * 60_000,
+    "4h": 4 * 60 * 60_000,
+    "1d": 24 * 60 * 60_000,
+    "1w": 7 * 24 * 60 * 60_000,
+}
+
+
+def candles(n=120, start=0, timeframe="1m"):
     close = np.arange(n, dtype=float) + 100
+    step = TIMEFRAME_MS[timeframe]
     return pd.DataFrame({
-        "timestamp": [start + i * 60_000 for i in range(n)],
+        "timestamp": [start + i * step for i in range(n)],
         "open": close - 0.5,
         "high": close + 1,
         "low": close - 1,
@@ -24,7 +36,7 @@ class FakeProvider:
 
     def fetch_ohlcv(self, *, symbol, market_type, timeframe, since_ms, limit):
         self.calls.append((symbol, market_type, timeframe, since_ms, limit))
-        return candles(limit)
+        return candles(limit, timeframe=timeframe)
 
 
 def test_normalize_asset_preserves_explicit_quote():
