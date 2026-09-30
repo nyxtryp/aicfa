@@ -1499,3 +1499,23 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - Known warnings remain non-blocking: pandas performance/deprecation warnings and immutable FrostDeploy pytest-cache PermissionError.
 - Status: GREEN / ACCEPTED for independent per-timeframe evidence implementation.
 - Exact next step: repeat the real user-facing `FindSetup BTC` flow on this release and inspect whether observations are now present across multiple causal timeframes and whether missing context has decreased.
+
+
+## 2026-10-01 — Real FindSetup BTC after independent timeframe evidence implementation
+
+- FrostDeploy release verified: `2026-09-30T17-09-41-2d52c1e`.
+- Real user-facing `FindSetupRequest("BTC")` was executed against Binance with `limit=1000`.
+- Asset resolution succeeded: `BTC → BTCUSDT`.
+- All seven causal timeframes were fetched and analyzed: `1m, 5m, 15m, 1h, 4h, 1d, 1w`.
+- Final authoritative decision: `WAIT`.
+- Reason: `required context is missing`.
+- Evidence count: `2`.
+- Actual observations:
+  - `1w market_structure.bos long observed ('bos_up=np.int8(1)',)`
+  - `1w imbalance.fvg long observed ('fvg_bullish=np.int64(1)',)`
+- Missing context: `1m:no_active_supported_observation`, `5m:no_active_supported_observation`, `15m:no_active_supported_observation`, `1h:no_active_supported_observation`, `4h:no_active_supported_observation`, `1d:no_active_supported_observation`.
+- Conflicts: none.
+- The result proves the new path is independently evaluating the seven timeframe datasets, but the current adapter only emits an observation when supported event/state columns are active on the latest completed candle. This is too narrow for the final product: event concepts such as BOS/FVG may have occurred recently and remain relevant to current context even when their flag is no longer active on the latest row.
+- The DataFrame fragmentation warning is existing non-blocking technical debt; it did not cause the run to fail.
+- Status: **LIVE PIPELINE VERIFIED / PRODUCT PENDING**. The WAIT result is honest and authoritative, but the evidence/context representation is not yet sufficient for reliable setup detection.
+- Exact next step: inspect the live per-timeframe feature/state rows and distinguish **recent event evidence** from **persistent current context**. Extend MarketEvidence construction so current setup context can retain causally valid recent events within a bounded lookback and persistent zones/state, without future leakage or fabricated observations. Keep Decision Layer authoritative.
