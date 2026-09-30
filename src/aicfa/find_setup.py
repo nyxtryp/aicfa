@@ -121,16 +121,16 @@ def find_setup(
         # Preserve the base MarketDataProvider contract for injected test/custom
         # providers. Production fallback providers are wrapped above, so the
         # real FindSetup path still uses one all-timeframe snapshot.
-        frames = {
-            timeframe: provider.fetch_ohlcv(
+        frames = {}
+        for timeframe in CAUSAL_TIMEFRAMES:
+            result = provider.fetch_ohlcv(
                 symbol=symbol,
                 market_type=request.market_type,
                 timeframe=timeframe,
                 since_ms=None,
                 limit=limit,
-            ).frame
-            for timeframe in CAUSAL_TIMEFRAMES
-        }
+            )
+            frames[timeframe] = result.frame if hasattr(result, "frame") else result
 
     base = completed_ohlcv(frames["1m"], timeframe="1m", now_ms=now_ms)
     if base.empty:
