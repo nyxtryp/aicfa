@@ -1171,3 +1171,154 @@ The current feature engine calculates many detailed concepts on the 1m base fram
 
 ### Exact next step
 Deploy these commits and run the mandatory full pytest suite. If green, connect `build_market_evidence()` into `find_setup.py`, replacing its temporary local `_decision()` with the authoritative Evidence → Scenario → Setup → Decision chain.
+
+
+## 2026-09-30 — Current product state / continuation checkpoint
+
+### Verification just completed
+FrostDeploy release: `2026-09-30T16-36-37-a815896`
+
+Mandatory full suite:
+`266 passed, 5579 warnings in 27.61s`
+
+The only known recurring warning is FrostDeploy's pytest-cache PermissionError inside immutable release directories. It is non-blocking and does not invalidate the passing test result.
+
+Status: **GREEN / ACCEPTED** for the deterministic Market State → Market Evidence adapter stage.
+
+### Product goal — final target
+AICFA is a specialized AI system for analysis of digital financial assets / crypto markets. It is not intended to be a wrapper around an external LLM.
+
+The final user experience must be extremely simple:
+
+`Найди сетап <актив>`
+
+The user names an asset. The system resolves the asset against an available real market-data provider, obtains the available market data, runs the canonical AICFA analysis across:
+
+`1m → 5m → 15m → 1h → 4h → 1d → 1w`
+
+and returns the deterministic AICFA decision:
+
+- `LONG`
+- `SHORT`
+- `WAIT`
+- `NO TRADE`
+
+with a concise human-readable explanation of the evidence and why the Decision Layer reached that state.
+
+### What AICFA already contains
+The deterministic analytical core has been built in layers, including:
+- Market Structure
+- Liquidity
+- Displacement
+- Fair Value Gaps
+- Order Blocks
+- Premium / Discount
+- Unified SMC
+- Multi-Timeframe analysis
+- Volume / Volatility
+- Derivatives
+- Order Flow / Microstructure
+- Knowledge Base
+- Evidence Reasoning
+- Scenario Reasoning
+- Setup Detection
+- Setup Analysis
+- authoritative Decision Layer
+
+The Decision Layer is authoritative for the final `LONG / SHORT / WAIT / NO TRADE` state. No interface model may override it.
+
+### Market-data architecture
+Existing foundation:
+- provider-agnostic OHLCV contract;
+- Binance Spot and USDⓈ-M Futures public REST klines;
+- completed-candle handling;
+- incremental scanner/history infrastructure;
+- canonical causal timeframe chain.
+
+The remaining product problem is not building another isolated indicator. It is connecting these existing layers into one reliable user-facing FindSetup pipeline for an arbitrary user-named supported asset.
+
+### Current bridge
+Implemented:
+`feature/state row → MarketObservation → MarketEvidence`
+
+Current adapter: `src/aicfa/market_evidence_adapter.py`
+
+It deliberately emits only deterministic observations supported by actual columns and records unavailable contexts instead of inventing them.
+
+### What remains to reach final product
+1. **Universal asset/symbol resolution**
+   - `BTC/USDT`, `BTC-USDT`, `BTC_USDT`, and bare assets such as `BTC` must be resolved deterministically against the configured provider.
+   - No BTC/ETH/SOL-only hard-coded routing.
+   - Unsupported or unavailable assets must return an explicit unavailable-data result, never fabricated analysis.
+
+2. **FindSetup orchestration**
+   - User command → normalized request → resolved symbol → real market data → seven causal timeframes → existing AICFA Core.
+   - No screenshot dependency.
+   - No manual timeframe input from the user.
+
+3. **Real MarketEvidence construction**
+   - Feed actual `build_features()` / `build_market_state()` output into the adapter.
+   - Preserve evidence provenance and unavailable context.
+   - Expand concept mappings only when corresponding deterministic source columns actually exist.
+
+4. **Authoritative reasoning chain**
+   - `MarketEvidence → Evidence Reasoning → Scenario Reasoning → Setup Analysis → Decision Layer`
+   - Remove the temporary local `_decision()` from `find_setup.py`.
+   - Do not create a second decision algorithm in FindSetup.
+
+5. **Final structured FindSetup result**
+   - asset/symbol;
+   - data availability by timeframe;
+   - key evidence;
+   - scenario/setup state;
+   - authoritative decision;
+   - concise reason;
+   - explicit unavailable context where applicable.
+
+6. **AICFA Interface Knowledge Pack**
+   The future local text model needs only a compact interface/terminology contract:
+   - what AICFA is;
+   - command grammar;
+   - asset extraction/normalization;
+   - canonical AICFA terminology;
+   - structured result schema;
+   - explanation rules;
+   - prohibition on inventing data;
+   - Decision Layer is authoritative.
+
+7. **Local text model — optional interface layer only**
+   Screenshots are intentionally removed from the main product path.
+   A local lightweight text model may later:
+   - parse the user's command;
+   - verbalize structured AICFA results in Russian;
+   - optionally provide a clearly separated second opinion.
+   It must never calculate unavailable market facts, invent indicators, or override the deterministic Decision Layer.
+   No further model downloads until the FindSetup contract and Interface Knowledge Pack are stable.
+
+8. **Production user flow verification**
+   Final acceptance must demonstrate a real user request such as:
+   `Найди сетап <asset>`
+   → real provider resolution
+   → real market data
+   → all required causal timeframes
+   → deterministic AICFA Core
+   → MarketEvidence
+   → Evidence
+   → Scenario
+   → Setup
+   → Decision
+   → human-readable result.
+
+### Explicitly rejected / out of critical path
+- screenshot-based analysis as the main path;
+- blind cycling through random local VLM/text models;
+- paid external AI APIs as a required component;
+- execution/autotrading/order placement;
+- leverage/position sizing logic;
+- letting an LLM invent or override analytical results.
+
+### Current exact next step
+**Connect `build_market_evidence()` to `find_setup.py`, but first inspect the existing asset/provider contract and Decision/Scenario/Setup APIs so the integration uses the real interfaces rather than adding another parallel decision path.**
+
+Operating rule remains:
+`change → commit → deploy → verify → record result in PROJECT_PLAN.md → commit plan → next step`
