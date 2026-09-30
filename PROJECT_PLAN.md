@@ -751,3 +751,25 @@ Do not mark the native Chart Vision stage GREEN yet.
 2. rerun the mandatory full pytest suite;
 3. if green, benchmark `chart_structure_cv.py` on the real public BTC/USDT chart and inspect the extracted trace/swings;
 4. only after that consider BOS/CHoCH visual detection.
+
+
+## 2026-09-30 — Second native Chart Vision test failure: plateau extrema
+
+### Operator verification
+- User reran the full FrostDeploy suite after `8cb7c04...`.
+- Result remained **246 passed, 1 failed, 4864 warnings in 24.56s**.
+- The same synthetic Chart Vision test failed with an empty swings tuple.
+
+### Root cause
+The adaptive trace grouping was not the remaining issue. The smoothed synthetic price trace contains short flat plateaus from candle bodies and interpolation. The local-extrema detector required every neighboring value to be strictly higher/lower than the center, so legitimate plateau extrema were rejected and no swing candidates survived.
+
+### Forward fix
+- `41929bdc0cc896ecd2028d7c229c98d9269bd4f9` — allow plateau extrema while still requiring at least one strict side comparison.
+
+This changes only the candidate-extrema predicate; it does not weaken the downstream confirmation threshold or invent swings.
+
+### Verification status
+**PENDING FrostDeploy verification.**
+
+### Next exact step
+Rerun the mandatory full pytest suite after deployment. If green, benchmark the native extractor on the real BTC/USDT chart before adding further visual semantics.
