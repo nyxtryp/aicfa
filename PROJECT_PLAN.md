@@ -1728,3 +1728,27 @@ FindSetup orchestration: **PENDING / NOT IMPLEMENTED**.
 
 ### Exact next step
 Implement and test `FindSetupRequest` + asset/symbol resolution + single-asset seven-timeframe orchestration on top of the existing provider/scanner contracts. Do not install another local model in this step.
+
+
+## 2026-09-30 — FindSetup fixture verification: GREEN foundation, orchestration still pending
+
+### Verification result
+FrostDeploy release: `2026-09-30T16-13-17-9b21655`
+
+Mandatory full-project verification:
+```
+256 passed, 5579 warnings in 27.04s
+```
+
+Known non-blocking immutable FrostDeploy pytest-cache Permission denied warning only. No test failures.
+
+### Status
+**GREEN for current test suite / NOT YET GREEN for FindSetup product flow.**
+
+The verification confirms the corrected test fixtures and current code pass the full suite. It does not yet prove arbitrary-asset resolution, real-market execution of the pipeline, or authoritative Decision Layer integration.
+
+### Findings for next implementation
+Current `find_setup.py` has a local `_decision()` helper instead of calling the authoritative Decision Layer contract. It also leaves a bare asset such as `DOGE` unresolved instead of validating/resolving it to a concrete market symbol.
+
+### Exact next step
+Inspect the existing Setup/Decision APIs and implement deterministic asset/symbol resolution. Target flow: `Найди сетап <asset> → validate/resolve symbol → real seven-timeframe data → existing AICFA Core → authoritative Decision Layer`. No local model installation.
