@@ -1664,3 +1664,40 @@ The model is no longer installed. Server resources are healthy after removal: 4.
 ### Exact next step
 
 Do not repeat InternLM or the previously rejected candidates. Before any further local-model download, perform provenance/resource/role screening first. If no credible candidate meets the closed-world Russian verbalization requirement on the current 2 vCPU / 4.8 GiB RAM server, continue AICFA Core without a local model.
+
+
+## 2026-09-30 — FindSetup product pipeline roadmap fixed
+
+### Product behavior to implement
+
+The primary user interaction is intentionally minimal:
+
+`FindSetup` — user names any supported market asset; AICFA performs the complete analysis and returns either a confirmed setup direction or WAIT / NO TRADE with a human-readable explanation.
+
+### Implementation order
+
+1. Inspect the existing Market Data layer and determine exactly which live/public sources, symbols and timeframes are already supported.
+2. Define a universal `FindSetupRequest` contract: user text → action + asset, without hard-coded BTC/ETH/SOL-only routing.
+3. Define the orchestration pipeline for the canonical causal timeframes: 1m → 5m → 15m → 1h → 4h → 1d → 1w.
+4. Connect existing deterministic analytical layers to the selected asset and available market data.
+5. Produce one canonical structured `SetupCandidate` / analysis result containing evidence, scenarios, setup state and Decision Layer result.
+6. Keep Decision Layer authoritative: LONG / SHORT / WAIT / NO TRADE. The interface model must never override it.
+7. Create an AICFA Interface Knowledge Pack for the language layer: command grammar, asset extraction, AICFA terminology, structured-result schema, explanation rules and prohibited inventions.
+8. Only after the pipeline and Knowledge Pack exist, evaluate/integrate a local text model. The model is a parser/verbalizer/interface assistant, not the market-analysis brain.
+9. Validate the complete user flow on FrostDeploy before calling it GREEN.
+
+### Knowledge architecture
+
+AICFA analytical knowledge remains in the deterministic Core + Knowledge Base. The local language model receives only the relevant AICFA Interface Knowledge Pack plus the structured Core result. We are not relying on model pretraining to define BOS/FVG/SMC semantics.
+
+### Required operating rule
+
+Do not download another local model before steps 1–7 produce a testable interface contract. Do not return to random/community model cycling.
+
+### Current status
+
+ROADMAP FIXED / IMPLEMENTATION NOT STARTED.
+
+### Exact next step
+
+Inspect the existing Market Data implementation and tests first. Identify the current data providers, supported symbols/timeframes, normalization contracts and gaps for universal `FindSetup`. No model installation in this step.
