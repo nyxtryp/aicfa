@@ -545,3 +545,64 @@ Before pulling it:
 4. run the same `/tmp/btc.png` benchmark with the same evidence-focused Russian prompt;
 5. record latency, peak RAM/swap, CPU usage and actual structured chart output;
 6. do not modify AICFA code during the model comparison.
+
+
+## 2026-09-30 — Local VLM candidates exhausted; GitHub CV research for custom Chart Vision
+
+### Operator actions
+- User removed `qwen3.5:2b` from Ollama after deciding that local CPU vision inference must not exceed roughly 60 seconds for the AICFA interactive workflow.
+- User installed `qwen3-vl:2b` (1.9 GB) and ran the same historical `/tmp/btc.png` benchmark with a 60-second timeout.
+- `qwen3-vl:2b` failed to return within **60.1 seconds** with Python `TimeoutError: timed out`.
+- User removed `qwen3-vl:2b`. Ollama model storage is intentionally empty again.
+- Current server baseline remains approximately **2 vCPU / 4.8 GiB RAM / 2 GiB swap / CPU-only**.
+
+### Local VLM conclusion
+The practical CPU-only VLM path has now been tested enough to stop blind model cycling:
+- MiniCPM-V 4.6 — 299.5 s, weak SMC/chart recognition;
+- Granite 3.2 Vision 2B — >600 s timeout even after 2 vCPU / 4.8 GiB RAM;
+- Qwen3-VL 2B — >60 s timeout;
+- Qwen3.5 2B was pulled briefly but removed before benchmark at the user's request.
+
+**Decision:** do not continue downloading small VLMs merely hoping for sub-minute chart perception. No local VLM is production-active.
+
+### GitHub research: deterministic CV route
+Reviewed public GitHub implementations that can provide fast chart perception without a VLM:
+
+1. **nessos666/chart-vision-mcp** — MIT. Local TradingView chart analysis using OpenCV + Tesseract, no GPU, offline. Its standalone `chart_vision.py` uses deterministic color masks, Hough horizontal-line detection, contours, volume-bar analysis and OCR. The README reports sub-second structural analysis. It explicitly does not claim semantic chart understanding and recommends a hybrid approach where deterministic visual extraction feeds an LLM. Strong reference for AICFA's low-level CV layer, not something to import wholesale.
+2. **Rudra-kakade/vision-market-structure-analyzer** — MIT. Screenshot-based CV pipeline for HH/HL/LH/LL, support/resistance and ZigZag trend shifts. The structure detector removes grid/background noise, extracts a price trace by column, smooths it, finds peaks and classifies confirmed swing points. Directly relevant to AICFA Market Structure.
+3. **Ankitkumar7217734/Candlestick-Chart-OHLC-Extractor-Streamlit-Web-App** — YOLOv8 candlestick detector with bullish/bearish classification, body detection and pixel-to-price mapping. Useful reference for the harder candle/OHLC extraction layer, but not a reason to adopt the whole Streamlit app.
+4. **StephanAkkerman/chart-info-detector** — MIT. YOLO detector trained specifically for TradingView symbol-title and last-price-pill regions, with a public pretrained model/dataset. Useful for chart metadata localization/OCR, but not core market-structure analysis.
+
+### Architectural decision
+Do **not** concatenate these repositories into one monolithic dependency stack.
+
+Preferred direction:
+- build an **AICFA-native Chart Vision** module;
+- borrow/adapt only narrowly useful algorithms/components after license and code review;
+- keep the existing `VisualEvidence` contract as the output boundary;
+- use deterministic CV for fast, non-hallucinating visual extraction;
+- let AICFA's existing Knowledge Base, Evidence Reasoning, Scenario Reasoning, Setup Analysis and Decision Layer perform semantic/causal interpretation;
+- add ML only where deterministic CV is genuinely insufficient (for example candle localization or chart-widget localization).
+
+Conceptual pipeline:
+```
+screenshot
+  ↓
+chart/ROI localization + OCR
+  ↓
+candle / price-trace extraction
+  ↓
+swings + HH/HL/LH/LL
+  ↓
+visual structures (liquidity/FVG/OB/etc. where mechanically detectable)
+  ↓
+AICFA VisualEvidence
+  ↓
+existing analytical layers
+```
+
+### Important limitation
+The GitHub projects were reviewed at README/source level. Their reported speed and capabilities are **not yet verified on AICFA's `/tmp/btc.png`**.
+
+### Next exact step
+Benchmark the most relevant existing deterministic CV code — starting with `chart-vision-mcp` and `vision-market-structure-analyzer` — against the same `/tmp/btc.png`, measure runtime and inspect actual extracted structure. Do not modify AICFA production code until the benchmark demonstrates useful output.
