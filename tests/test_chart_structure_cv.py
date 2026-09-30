@@ -71,8 +71,8 @@ def test_local_extrema_collapses_flat_plateau_to_one_swing():
     highs = _local_extrema(values, radius=1, high=False)
     lows = _local_extrema(values, radius=1, high=True)
 
-    assert highs == [2, 6]
-    assert lows == []
+    assert highs == [6]
+    assert lows == [2]
 
 
 def test_low_swing_labels_follow_price_direction():
