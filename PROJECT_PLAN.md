@@ -1697,3 +1697,19 @@ Record exact release ID and outputs here before adding the next realtime data ad
 - Discovered issue resolved: FindSetup must preserve the base MarketDataProvider contract for test/custom providers while production fallback providers use the shared all-timeframe snapshot.
 - Important scope limitation: the shared snapshot cache is currently process-local, not cross-worker/global. Do not describe it as a globally shared cache across multiple FrostDeploy workers.
 - Exact next step: run a real seven-timeframe BTC snapshot/FindSetup smoke and verify the all-TF request path on live market data. Then record that result before adding trades, order book, funding, open interest, liquidations and mark-price adapters.
+
+
+## 2026-10-01 — Seven-timeframe snapshot integration reverified
+
+- FrostDeploy release: `2026-09-30T17-54-34-8d6a3b8`.
+- Mandatory deployed full-project verification completed successfully.
+- Exact verification output:
+```
+291 passed, 8959 warnings in 31.96s
+```
+- The pytest-cache `Permission denied` warning under the immutable FrostDeploy release remains known and non-blocking.
+- No test failures were reported.
+- Status: **GREEN / ACCEPTED** for the currently deployed seven-timeframe snapshot integration.
+- Important scope limitation remains: the snapshot cache is request-scoped/process-local; it is not a cross-worker/global persistent market-history store.
+- This verification does not yet validate the broader realtime data categories; trades, order book, funding, open interest, liquidations and mark-price adapters remain to be implemented.
+- Exact next step: run the **real seven-timeframe BTC snapshot/FindSetup smoke** against live market data and capture the provider, symbol, all seven timeframe results, row counts, final Decision Layer result, missing context and conflicts. Record that live result before adding the next realtime data adapter.
