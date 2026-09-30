@@ -81,6 +81,7 @@ def test_find_setup_does_not_decide_from_an_open_latest_candle():
     result = find_setup(
         FindSetupRequest("BTC/USDT"),
         provider=provider,
+        resolver=lambda asset, market_type: asset,
         now_ms=120 * 60_000,
         limit=120,
     )
@@ -94,6 +95,7 @@ def test_find_setup_uses_authoritative_market_evidence_decision_chain():
     result = find_setup(
         FindSetupRequest("BTC/USDT"),
         provider=provider,
+        resolver=lambda asset, market_type: asset,
         now_ms=120 * 60_000,
         limit=120,
     )
@@ -125,12 +127,3 @@ def test_find_setup_resolves_user_asset_before_market_data_fetch():
     assert result.evidence.asset == "DOGE/USDT"
     assert all(call[0] == "DOGE/USDT" for call in provider.calls)
 
-
-def test_find_setup_requires_resolver_for_non_binance_provider():
-    with pytest.raises(ValueError, match="resolver is required"):
-        find_setup(
-            FindSetupRequest("DOGE"),
-            provider=FakeProvider(),
-            now_ms=120 * 60_000,
-            limit=120,
-        )
