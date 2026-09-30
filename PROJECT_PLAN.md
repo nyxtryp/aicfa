@@ -991,3 +991,75 @@ Selection criteria:
 ### Status
 
 **PENDING — architecture pivot recorded; local text-model selection is the next implementation step.**
+
+
+## 2026-09-30 — Shirdel-Finance-E4B Q6_K model file downloaded; AICFA performance target clarified
+
+### Operator result
+
+The selected finance/trading-specialized local text-model experiment was downloaded successfully into the AICFA shared storage:
+
+- Model family: **Shirdel-Finance-E4B**;
+- Available downloaded quantization: **Q6_K**;
+- File: `/srv/frostdeploy/aicfa/shared/FinanceGemma-E4B.Q6_K.gguf`;
+- Exact size: **6,217,261,568 bytes** (~5.79 GiB);
+- Download result:
+```
+FinanceGemma-E4B.Q6_K.gguf 100%
+5.79G at 21.9MB/s
+2026-09-30 12:01:01 ... saved [6217261568/6217261568]
+```
+- The Q4_K_M route documented for the repository was not available through the attempted Ollama/Hugging Face tag/file path, so Q6_K is the currently available fallback file.
+- The file is stored in the AICFA shared directory and has **not** yet been integrated into the application or treated as production-active.
+
+### Important project goal clarification
+
+The purpose of the local text-model experiment is **not** to determine whether Shirdel itself can produce 80% profitable trades.
+
+The actual project question is whether the **AICFA system as a whole** can discover a sufficiently selective and statistically robust setup class, potentially targeting **80%+ win rate**, while remaining honest about uncertainty.
+
+AICFA should therefore be evaluated as a complete analytical system:
+
+```
+Market data
+  ↓
+AICFA analytical layers
+  ↓
+Evidence / Scenario / Setup
+  ↓
+Decision Gate
+  ↓
+LONG / SHORT / WAIT / NO TRADE
+  ↓
+Historical outcome
+```
+
+The system is allowed and expected to return WAIT / NO TRADE frequently when evidence is insufficient. The target must be measured rather than assumed.
+
+### Required validation metrics
+
+Any future claim about high setup quality must be based on historical and preferably walk-forward/out-of-sample testing with:
+- win rate;
+- expectancy;
+- profit factor;
+- drawdown;
+- fees/costs;
+- trade frequency/selectivity;
+- robustness across different market regimes;
+- no future leakage.
+
+An 80% win rate is a **target/hypothesis to test, not a promised capability**.
+
+### Verification status
+
+**PENDING** — model file download succeeded, but runtime feasibility and usefulness have not been established.
+
+Do not integrate the model into the AICFA analytical core before an isolated runtime benchmark.
+
+### Next exact step
+
+1. Verify the downloaded file size/ownership/hash on the server.
+2. Load it in an isolated Ollama/model test with a deliberately small context suitable for the current hardware.
+3. Measure model-load success, peak memory, CPU latency and structured-response quality.
+4. Test whether the model can reliably act as the text interface/reasoning layer without inventing live market data or bypassing AICFA's Decision Layer.
+5. Record the benchmark result here before any production integration.
