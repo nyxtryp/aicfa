@@ -1397,3 +1397,17 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - Warnings observed: existing DataFrame fragmentation warning; existing pandas incompatible-dtype FutureWarning; immutable FrostDeploy pytest-cache PermissionError. None caused test failure.
 - Status: GREEN / ACCEPTED.
 - Exact next step: integrate the resolver into `find_setup.py`, so a user-supplied bare asset such as `BTC` is resolved before the seven-timeframe market-data fetch. Preserve explicit unsupported-asset handling and do not introduce a parallel decision path.
+
+
+## 2026-09-30 — FindSetup asset resolver integration implemented
+- Done: connected the provider-backed resolver to the FindSetup orchestration.
+- Changes:
+  - FindSetup resolves the user asset before any OHLCV request;
+  - resolved symbol is used consistently for all seven causal timeframes and MarketEvidence;
+  - Binance provider remains the default resolver path;
+  - injected resolver support keeps non-Binance test providers explicit instead of silently guessing;
+  - added integration tests for bare-asset resolution and resolver enforcement.
+- Implementation commit: `d8633e0d39c2a6c9039481f4b0d2f8f1d92d2d8d`.
+- Test commit: `cd948ef54d92059b0e2578bc070052c1fb79ab0e`.
+- Status: IMPLEMENTED / PENDING deployed verification.
+- Exact next step: deploy this commit and run the complete pytest suite on the resulting FrostDeploy release. If GREEN, then test the actual user-facing command path with a real Binance-resolved asset and verify unsupported assets fail explicitly.
