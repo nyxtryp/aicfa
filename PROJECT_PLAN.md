@@ -1060,3 +1060,47 @@ The authoritative `src/aicfa/decision.py` is now reachable by a dedicated market
 
 ### Exact next step
 Deploy these commits to FrostDeploy and run the mandatory full pytest suite. If green, replace the temporary test-only market observations with a deterministic adapter from the actual `build_features()` / `market_state` output, then connect that adapter to `FindSetup`.
+
+
+## 2026-09-30 — FrostDeploy collection failure: missing legacy VisualObservation imports
+
+### Operator verification
+User ran the mandatory full pytest suite on the deployed release after the Market Evidence bridge changes.
+
+Result:
+```
+ERROR tests/test_decision.py - NameError: name 'VisualObservation' is not defined
+ERROR tests/test_market_evidence_pipeline.py - NameError: name 'VisualObservation' is not defined
+ERROR tests/test_scenario_reasoning.py - NameError: name 'VisualObservation' is not defined
+ERROR tests/test_setup_analysis.py - NameError: name 'VisualObservation' is not defined
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+2 warnings, 4 errors in 1.85s
+```
+
+### Root cause
+The Market Evidence refactor changed imports toward `MarketObservation`, but three existing modules still referenced the legacy `VisualObservation` type in runtime-evaluated annotations without importing that symbol:
+- `src/aicfa/decision.py`
+- `src/aicfa/scenario_reasoning.py`
+- `src/aicfa/setup_analysis.py`
+
+This is a collection-time NameError. It is not evidence that the Market Evidence runtime path itself is correct.
+
+### Forward fix
+Restored the explicit legacy type imports so the existing VisualEvidence tests and the new MarketEvidence path can coexist:
+- `038793f4b09e0ade49dc95aa5fdfdf64ec753f74` — fix `decision.py` VisualObservation import;
+- `624afea43723f4147e297a8d1a6ccec860f5ba32` — fix `scenario_reasoning.py` VisualObservation import;
+- `328fbad0a85712817baed5da39f1b34dfe1ebf68` — fix `setup_analysis.py` VisualObservation import.
+
+No analytical rule was changed. No screenshot dependency was added to the market path.
+
+### Status
+**FAIL → FIXED IN SOURCE / PENDING DEPLOYED VERIFICATION.**
+
+The reported FrostDeploy run is the latest actual verification and must not be treated as GREEN.
+
+### Exact next step
+1. Wait for FrostDeploy deployment containing all three forward fixes.
+2. Run the mandatory full pytest suite again.
+3. If collection and tests pass, record the exact deployed release/output as GREEN.
+4. Then continue with the planned deterministic adapter from actual `build_features()` / `market_state` output into `MarketObservation` / `MarketEvidence`.
+5. Do not install or test another local model.
