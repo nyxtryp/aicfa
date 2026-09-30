@@ -170,7 +170,15 @@ def _local_extrema(values: np.ndarray, radius: int, *, high: bool) -> list[int]:
     start = 0
     while start < len(candidates):
         end = start
-        while end + 1 < len(candidates) and candidates[end + 1] == candidates[end] + 1:
+        # Plateau candidates can occur at both edges of the same flat run
+        # (for example indices 5 and 7 with index 6 rejected by the strict
+        # side-comparison rule). Group candidates while the entire span keeps
+        # the same extremal value, then choose its midpoint as one swing.
+        while end + 1 < len(candidates):
+            next_index = candidates[end + 1]
+            segment = values[candidates[start] : next_index + 1]
+            if not np.all(segment == values[candidates[start]]):
+                break
             end += 1
         collapsed.append(candidates[(start + end) // 2])
         start = end + 1
