@@ -166,3 +166,32 @@ def test_binance_adapter_rejects_invalid_recovery_configuration(max_retries, bac
         BinanceMarketDataProvider(
             max_retries=max_retries, retry_backoff_seconds=backoff
         )
+
+
+def test_binance_resolver_resolves_bare_asset_to_live_usdt_symbol():
+    def opener(request, timeout):
+        assert request.full_url.endswith("/api/v3/exchangeInfo")
+        return FakeResponse({"symbols": [
+            {"symbol": "BTCUSDT", "status": "TRADING"},
+            {"symbol": "DOGEUSDT", "status": "TRADING"},
+            {"symbol": "PEPEUSDT", "status": "TRADING"},
+        ]})
+
+    provider = BinanceMarketDataProvider(opener=opener)
+    assert provider.resolve_symbol("BTC") == "BTCUSDT"
+    assert provider.resolve_symbol("DOGE") == "DOGEUSDT"
+    assert provider.resolve_symbol("PEPE/USDT") == "PEPEUSDT"
+
+
+def test_binance_resolver_rejects_unknown_or_non_trading_symbol():
+    def opener(request, timeout):
+        return FakeResponse({"symbols": [
+            {"symbol": "BTCUSDT", "status": "TRADING"},
+            {"symbol": "OLDUSDT", "status": "BREAK"},
+        ]})
+
+    provider = BinanceMarketDataProvider(opener=opener)
+    with pytest.raises(ValueError, match="no Binance USDT market"):
+        provider.resolve_symbol("DOGE")
+    with pytest.raises(ValueError, match="unsupported Binance symbol"):
+        provider.resolve_symbol("OLD/USDT")
