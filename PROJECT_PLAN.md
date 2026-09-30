@@ -1198,3 +1198,68 @@ Search current **finance/crypto/trading-specialized local text models** with a h
 - no blind downloads: inspect model architecture, quantization size, context and intended task first.
 
 Do not reinstall SmolLM3, Shirdel-Finance-E4B Q6_K, or the previously rejected local VLM candidates.
+
+
+## 2026-09-30 — NEXUS-Finance 1.5B selected for local Text AI benchmark
+
+### Decision
+
+Selected **NEXUS-Finance 1.5B Q4_K_M** as the next local text-model candidate for isolated benchmarking.
+
+Role: optional language/interface layer around AICFA Core — not the source of truth for market data and not the authority for LONG/SHORT/WAIT/NO TRADE decisions.
+
+Expected architecture:
+
+```
+User text
+  ↓
+NEXUS-Finance
+  ↓
+AICFA orchestration / analytical core
+  ↓
+structured AICFA result
+  ↓
+NEXUS-Finance
+  ↓
+human-readable response
+```
+
+The model may help parse user requests and explain AICFA results. It must not invent live market facts, replace deterministic calculations, or bypass the Decision Layer.
+
+### Candidate characteristics checked before installation
+
+- approximately 1.5B parameters;
+- Q4_K_M approximately 986 MB;
+- finance/trading-oriented model family;
+- Ollama distribution available;
+- suitable size target for the current CPU-only 2 vCPU / 4.8 GiB RAM server;
+- substantially lighter than the rejected Shirdel-Finance-E4B Q6_K and SmolLM3 3B candidates.
+
+These characteristics are candidate metadata, not an acceptance claim. Real server latency, peak RAM and AICFA terminology/JSON reliability must be measured.
+
+### Installation / benchmark status
+
+**PENDING operator installation and isolated benchmark.**
+
+No AICFA source code or production integration is changed at this stage.
+
+### Exact operator step
+
+Install only the selected candidate:
+
+```bash
+ollama pull FableForge-AI/nexus-finance
+```
+
+After the pull completes, do not connect it to production yet. First record:
+
+```bash
+ollama list
+free -h
+```
+
+Then run the fixed AICFA terminology/JSON benchmark and record actual latency, memory and output quality before integration.
+
+### Acceptance gate
+
+The candidate is accepted only if it is practically usable on the current server and reliably preserves AICFA terminology/structured output without fabricating unavailable market data. A failed benchmark means remove it and continue searching; it does not change the AICFA Core architecture.
