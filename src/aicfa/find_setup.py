@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from typing import Callable
 
 import pandas as pd
 
@@ -89,14 +90,20 @@ def find_setup(
     provider: MarketDataProvider | None = None,
     now_ms: int,
     limit: int = 1000,
+    resolver: Callable[[str, str], str] | None = None,
 ) -> FindSetupResult:
-    """Fetch seven causal timeframes and run the authoritative AICFA chain."""
+    """Resolve the requested asset, fetch seven causal timeframes, and run AICFA."""
     provider = provider or BinanceMarketDataProvider()
+    if resolver is None:
+        if not isinstance(provider, BinanceMarketDataProvider):
+            raise ValueError("resolver is required for a non-Binance provider")
+        resolver = lambda asset, market_type: provider.resolve_symbol(asset, market_type=market_type)
+    symbol = resolver(request.asset, request.market_type)
     frames: dict[str, pd.DataFrame] = {}
 
     for timeframe in CAUSAL_TIMEFRAMES:
         frames[timeframe] = provider.fetch_ohlcv(
-            symbol=request.asset,
+            symbol=symbol,
             market_type=request.market_type,
             timeframe=timeframe,
             since_ms=None,
@@ -114,7 +121,7 @@ def find_setup(
 
     market_evidence = build_market_evidence(
         analysis,
-        asset=request.asset,
+        asset=symbol,
         timeframes=CAUSAL_TIMEFRAMES,
     )
     evidence_assessment = assess_market_evidence(market_evidence)
