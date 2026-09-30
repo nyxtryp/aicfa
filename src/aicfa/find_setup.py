@@ -17,7 +17,7 @@ from .decision import decide
 from .evidence_reasoning import assess_market_evidence
 from .features import build_features
 from .market_data import MarketDataProvider, completed_ohlcv
-from .market_evidence_adapter import build_market_evidence
+from .market_evidence_adapter import build_market_evidence_from_frames
 from .scenario_reasoning import assess_scenarios
 from .setup_analysis import analyze_setups
 
@@ -115,13 +115,24 @@ def find_setup(
     if base.empty:
         raise ValueError("no completed 1m candle available for decision")
 
-    higher = {key: value for key, value in frames.items() if key != "1m"}
-    analysis = build_features(base, multi_timeframe_frames=higher)
-    if analysis.empty:
-        raise ValueError("AICFA analysis produced no rows")
+    completed_frames: dict[str, pd.DataFrame] = {}
+    analyses: dict[str, pd.DataFrame] = {}
+    for timeframe, frame in frames.items():
+        completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
+        if completed.empty:
+            continue
+        completed_frames[timeframe] = completed
+        timeframe_analysis = build_features(completed)
+        if not timeframe_analysis.empty:
+            analyses[timeframe] = timeframe_analysis
 
-    market_evidence = build_market_evidence(
-        analysis,
+    base_analysis = analyses.get("1m")
+    if base_analysis is None:
+        raise ValueError("AICFA analysis produced no completed 1m rows")
+    analysis = base_analysis
+
+    market_evidence = build_market_evidence_from_frames(
+        analyses,
         asset=symbol,
         timeframes=CAUSAL_TIMEFRAMES,
     )
