@@ -1294,3 +1294,26 @@ ollama list
 free -h
 ```
 Then benchmark NEXUS-Finance against a fixed AICFA prompt covering BOS, CHoCH, FVG, liquidity sweep, Order Block, LONG/SHORT/WAIT and strict JSON output. Record latency, memory and terminology reliability before connecting the model to AICFA.
+
+
+## 2026-09-30 — NEXUS-Finance resource check
+
+### Operator verification
+
+`ollama list`:
+```
+FableForge-AI/nexus-finance:latest    67861ca958a5    986 MB
+```
+
+Memory before inference:
+```
+Mem: 4.8Gi total, 552Mi used, 3.2Gi free, 4.3Gi available
+Swap: 2.0Gi total, 151Mi used, 1.9Gi free
+```
+
+### Status
+
+**PENDING — isolated runtime/quality benchmark.** The model is installed and there is substantial RAM headroom before inference.
+
+### Next exact step
+Run the fixed AICFA terminology + structured JSON benchmark against NEXUS-Finance and measure latency/memory/output reliability before any integration.
