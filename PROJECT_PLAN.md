@@ -1534,3 +1534,98 @@ The Ollama model list is empty. No Qwen model remains installed.
 ### Next exact step
 
 Do not reinstall Qwen3 Q8_0. Continue the local Text AI search only after screening official candidates for actual RAM usage, CPU latency, Russian/English instruction following, structured JSON reliability and closed-world behavior. Prefer a configuration that leaves enough RAM for AICFA to run in parallel. Do not download the next candidate until it passes this resource/role screen.
+
+## 2026-09-30 — Qwen3-0.6B Q8_0 benchmark rejected and model removed
+
+### Installation
+
+Official Qwen GGUF:
+`hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0`
+
+Pull completed successfully:
+```
+pulling 9465e63a22ad: 100% ... 637 MB/639 MB
+verifying sha256 digest
+writing manifest
+success
+```
+
+### Benchmark 1 — exact instruction
+
+Command requested a single exact word:
+`Ответь строго одним словом: CAT. Не переводи, не объясняй, не добавляй ничего другого.`
+
+Actual output:
+```
+Thinking...
+...done thinking.
+
+{ "CAT":{ } }
+```
+
+Timing:
+- total: **1m2.63s**
+- load: **44.64s**
+- prompt eval: **4.57 tok/s**
+- generation: **12.05 tok/s**
+- generated: **85 tokens**
+
+The model did not return the requested literal `CAT`; it returned an object with CAT as a key and exposed a long thinking section.
+
+### Benchmark 2 — AICFA closed-world explanation
+
+Input facts were limited to:
+- BTC/USDT;
+- 1h/15m/5m;
+- bearish market structure;
+- sell-side liquidity sweep;
+- bearish displacement;
+- bearish FVG on 5m;
+- bullish_bos=false;
+- decision=WAIT.
+
+Rules explicitly prohibited inventing price, volume, indicators, levels or unsupported facts and required strict two-field JSON.
+
+Actual output:
+```
+{ "decision": "WAIT", "explanation": "На основе предоставленных данных рынок был бархатным (bearish) с низким спросом и высоким доходом, что привело к бездействию AICFA." }
+```
+
+Timing:
+- total: **26.29s**
+- load: **85.68ms**
+- prompt eval: **84.22 tok/s**
+- generation: **11.85 tok/s**
+- generated: **216 tokens**
+
+The output preserved WAIT and the requested JSON shape, but it invented unsupported claims including “рынок был бархатным” and “с низким спросом и высоким доходом”. This violates the closed-world requirement.
+
+### Decision
+
+**Qwen3-0.6B Q8_0 is REJECTED for the AICFA local text-interface role.**
+
+The runtime is materially better than the previously tested 1.7B Q8 configuration, but reliability is insufficient for a component that must remain strictly inside deterministic AICFA evidence.
+
+### Removal
+
+Operator executed:
+```
+ollama stop hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0
+ollama rm hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0
+ollama list
+```
+
+Actual result:
+```
+deleted 'hf.co/Qwen/Qwen3-0.6B-GGUF:Q8_0'
+NAME    ID    SIZE    MODIFIED
+```
+
+**Status: CLOSED / REJECTED / REMOVED.**
+
+No AICFA source code or analytical layer was changed.
+
+### Next exact step
+
+Research credible remaining local text-model candidates. Specifically investigate official DeepSeek-family models and other first-party Chinese model families before downloading anything. Do not use unverified/random community fine-tunes merely because they are small. Screen provenance, size, quantization, context, languages, structured output, CPU/RAM requirements and role fit first.
+
