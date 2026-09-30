@@ -106,7 +106,8 @@ def _column_trace(mask: np.ndarray, cfg: ChartStructureConfig) -> list[tuple[int
     # pixels apart, so a fixed 3px gap incorrectly breaks synthetic/real charts
     # into one-point runs. Use the observed x-spacing rather than image-specific
     # constants; small UI fragments remain isolated from the dominant span.
-    gaps = np.diff(xs)
+    raw_xs = np.array([p[0] for p in raw], dtype=np.int32)
+    gaps = np.diff(raw_xs)
     typical_gap = float(np.percentile(gaps, 50)) if gaps.size else 1.0
     gap_limit = max(3, int(round(typical_gap * 2.5)))
     runs: list[list[tuple[int, int, int]]] = [[raw[0]]]
