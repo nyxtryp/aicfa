@@ -1468,3 +1468,14 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - No fake provider or fixture was used.
 - Status: GREEN / ACCEPTED for live Binance resolver + 1m transport smoke test.
 - Exact next step: run the real user-facing `FindSetup BTC` flow across all seven causal timeframes and capture the complete AICFA result.
+
+
+## 2026-10-01 — First real FindSetup BTC end-to-end run
+- FrostDeploy release: `2026-09-30T17-05-39-1861af7`.
+- Real `FindSetupRequest("BTC")` resolved to `BTCUSDT` and fetched all seven causal timeframes: `1m, 5m, 15m, 1h, 4h, 1d, 1w`.
+- The authoritative chain executed successfully through MarketEvidence → Evidence Reasoning → Scenario Reasoning → Setup Analysis → Decision Layer.
+- Result: `WAIT`, reason: `required context is missing`.
+- Evidence contained only 1 active observation; missing context reported no active supported observation for `1m, 5m, 15m, 1h, 4h, 1d`.
+- This is not a production GREEN: the run exposed an architecture gap in the current bridge. FindSetup fetches seven real timeframe datasets, but MarketEvidence is still primarily built from the latest 1m feature row plus currently exposed MTF structure columns, so detailed deterministic concepts are not yet independently evaluated on each timeframe.
+- Status: LIVE PIPELINE EXECUTED / PRODUCT PENDING.
+- Exact next step: extend the deterministic MarketEvidence construction so each of the seven real timeframe frames is independently analyzed and contributes its own supported observations, while preserving causal closed-candle rules and the authoritative Decision Layer.
