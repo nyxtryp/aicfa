@@ -77,9 +77,6 @@ class FallbackMarketDataProvider:
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
         raise RuntimeError(format_attempts("all market data providers failed", attempts))
 
-    def resolve_symbol(self, asset: str, *, market_type: str = "spot") -> str:
-        return self._provider.resolve_symbol(asset, market_type=market_type)
-
     def fetch_ohlcv_snapshot(self, *, symbol: str, market_type: str,
                              timeframes: Sequence[str], since_ms: int | None,
                              limit: int) -> dict[str, MarketFetchResult]:
@@ -90,6 +87,9 @@ class FallbackMarketDataProvider:
 class SharedSnapshotMarketDataProvider:
     """One shared temporary snapshot containing all requested timeframes."""
     def __init__(self, provider: FallbackMarketDataProvider, *,
+    def resolve_symbol(self, asset: str, *, market_type: str = "spot") -> str:
+        return self._provider.resolve_symbol(asset, market_type=market_type)
+
                  ttl_seconds: float = 60.0, clock=time.monotonic) -> None:
         if ttl_seconds <= 0:
             raise ValueError("ttl_seconds must be positive")
