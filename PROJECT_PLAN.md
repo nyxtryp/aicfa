@@ -1381,3 +1381,19 @@ The public FindSetup decision is derived from the authoritative DecisionAssessme
 
 ### Exact next step
 Implement deterministic provider-backed asset/symbol resolution for user commands, without hardcoded BTC/ETH/SOL-only routing and without guessing unsupported instruments.
+
+
+## 2026-09-30 — Universal Binance asset resolver verified
+- Done: added provider-backed Binance symbol resolution to support the user-facing `Найди сетап <asset>` flow without a hardcoded asset list.
+- Changes:
+  - bare asset resolves to an active USDT symbol;
+  - explicit pair syntax is validated against Binance exchangeInfo;
+  - non-trading/unknown symbols are rejected explicitly;
+  - added resolver regression tests.
+- Implementation commit: `289e3cc8d52ca9541fcf89b868d6c5c09f682992`.
+- Test commit: `d7611fba25e6a676212151a4a69c83561faaff38`.
+- FrostDeploy verification release: `2026-09-30T16-53-51-d7611fb`.
+- Verification output: `269 passed, 5937 warnings in 28.40s`.
+- Warnings observed: existing DataFrame fragmentation warning; existing pandas incompatible-dtype FutureWarning; immutable FrostDeploy pytest-cache PermissionError. None caused test failure.
+- Status: GREEN / ACCEPTED.
+- Exact next step: integrate the resolver into `find_setup.py`, so a user-supplied bare asset such as `BTC` is resolved before the seven-timeframe market-data fetch. Preserve explicit unsupported-asset handling and do not introduce a parallel decision path.
