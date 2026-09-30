@@ -1322,3 +1322,40 @@ It deliberately emits only deterministic observations supported by actual column
 
 Operating rule remains:
 `change → commit → deploy → verify → record result in PROJECT_PLAN.md → commit plan → next step`
+
+
+## 2026-09-30 — FindSetup wired to authoritative reasoning chain
+
+### What was done
+Replaced the temporary local FindSetup decision logic with the existing authoritative AICFA reasoning pipeline.
+
+### Changes
+`src/aicfa/find_setup.py` now performs:
+`real OHLCV → build_features → MarketEvidence adapter → Evidence Reasoning → Scenario Reasoning → Setup Analysis → Decision Layer`
+
+The result now preserves:
+- MarketEvidence;
+- EvidenceAssessment;
+- ScenarioAssessment;
+- SetupAssessment;
+- DecisionAssessment;
+- final decision derived directly from `DecisionAssessment.action`.
+
+The old private `_decision()` function was removed, so FindSetup no longer contains a second competing decision algorithm.
+
+Added an integration test proving FindSetup exposes MarketEvidence and derives its public decision from the authoritative DecisionAssessment.
+
+### Commits
+- `8366782e1651be2abd42c2be628f2c3613ddae1` — FindSetup integration
+- `7fa570986e7d93f3917a5c2e78833232a5124c18` — integration test
+
+### Verification
+Not yet run on FrostDeploy after these commits.
+
+Status: **IMPLEMENTED / PENDING DEPLOYED VERIFICATION**.
+
+### Current limitation
+Asset resolution is still not universal. A bare asset such as `DOGE` is normalized but not yet resolved to a provider symbol/quote. The next product step is provider-backed symbol resolution rather than guessing a quote.
+
+### Exact next step
+After deployed pytest passes, implement a deterministic Binance symbol resolver for user-named assets, including explicit pairs and bare base assets, with clear unsupported/unavailable errors. Then wire the resolver into FindSetup.
