@@ -122,3 +122,61 @@ def test_bybit_api_rate_limit_is_retryable():
             limit=1,
         )
     assert exc.value.retryable is True
+
+
+def test_bybit_symbol_resolution_follows_instruments_cursor():
+    calls = []
+
+    def opener(request, timeout):
+        from urllib.parse import parse_qs, urlparse
+
+        query = parse_qs(urlparse(request.full_url).query)
+        calls.append(query.get("cursor", [None])[0])
+        cursor = query.get("cursor", [None])[0]
+        if cursor is None:
+            payload = {
+                "retCode": 0,
+                "retMsg": "OK",
+                "result": {
+                    "list": [{"symbol": "FIRSTUSDT", "status": "Trading"}],
+                    "nextPageCursor": "cursor-2",
+                },
+            }
+        else:
+            payload = {
+                "retCode": 0,
+                "retMsg": "OK",
+                "result": {
+                    "list": [{"symbol": "SECONDUSDT", "status": "Trading"}],
+                    "nextPageCursor": "",
+                },
+            }
+        return JsonResponse(payload)
+
+    provider = BybitMarketDataProvider(opener=opener)
+    assert provider.resolve_symbol("SECOND") == "SECONDUSDT"
+    assert calls == [None, "cursor-2"]
+
+
+def test_bybit_symbol_resolution_stops_when_cursor_repeats():
+    calls = []
+
+    def opener(request, timeout):
+        from urllib.parse import parse_qs, urlparse
+
+        query = parse_qs(urlparse(request.full_url).query)
+        cursor = query.get("cursor", [None])[0]
+        calls.append(cursor)
+        return JsonResponse({
+            "retCode": 0,
+            "retMsg": "OK",
+            "result": {
+                "list": [{"symbol": "FIRSTUSDT", "status": "Trading"}],
+                "nextPageCursor": "same-cursor",
+            },
+        })
+
+    provider = BybitMarketDataProvider(opener=opener)
+    with pytest.raises(ValueError, match="no Bybit"):
+        provider.resolve_symbol("SECOND")
+    assert calls == [None, "same-cursor"]
