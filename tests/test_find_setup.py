@@ -86,3 +86,18 @@ def test_find_setup_does_not_decide_from_an_open_latest_candle():
 
     assert result.analysis["timestamp"].max() < 120 * 60_000
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
+
+
+def test_find_setup_uses_authoritative_market_evidence_decision_chain():
+    provider = FakeProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert result.evidence.asset == "BTC/USDT"
+    assert result.evidence.source == "market_data"
+    assert result.decision == result.decision_assessment.action.value.upper().replace("_", " ")
+    assert result.decision_assessment.reasons
