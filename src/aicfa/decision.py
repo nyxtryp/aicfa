@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from aicfa.setup_analysis import SetupAssessment, SetupCandidate, SetupDecision
-from aicfa.visual_evidence import VisualObservation
+from aicfa.market_evidence import MarketObservation
 
 
 class DecisionAction(str, Enum):
@@ -44,7 +44,7 @@ class DecisionAssessment:
 
 
 def _directional_observations(
-    observations: tuple[VisualObservation, ...],
+    observations: tuple[MarketObservation | object, ...],
 ) -> tuple[VisualObservation, ...]:
     return tuple(
         item
