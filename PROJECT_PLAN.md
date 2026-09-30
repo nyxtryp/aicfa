@@ -1453,5 +1453,8 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - Added regression coverage for exact `BTCUSDT`.
 - Implementation commit: `1943b8e91ba24c095e4e43ba210fca887fe4150c`.
 - Test commit: `a68c169cf1a72c18618d1a178dbf8e738b0016d2`.
-- Status: FIXED / PENDING deployed verification.
+- FrostDeploy release: `2026-09-30T17-02-40-9d8f800`.
+- Verification: `270 passed, 6295 warnings in 28.26s`.
+- Known non-blocking warning: immutable FrostDeploy release prevents pytest cache creation.
+- Status: GREEN / ACCEPTED.
 - Exact next step: deploy this hardening change, run full pytest, then run the live Binance FindSetup smoke test.
