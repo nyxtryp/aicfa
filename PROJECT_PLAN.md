@@ -1713,3 +1713,83 @@ Record exact release ID and outputs here before adding the next realtime data ad
 - Important scope limitation remains: the snapshot cache is request-scoped/process-local; it is not a cross-worker/global persistent market-history store.
 - This verification does not yet validate the broader realtime data categories; trades, order book, funding, open interest, liquidations and mark-price adapters remain to be implemented.
 - Exact next step: run the **real seven-timeframe BTC snapshot/FindSetup smoke** against live market data and capture the provider, symbol, all seven timeframe results, row counts, final Decision Layer result, missing context and conflicts. Record that live result before adding the next realtime data adapter.
+
+
+## 2026-10-01 — Live seven-timeframe BTC FindSetup smoke and analysis-depth decision
+
+### Live verification
+FrostDeploy release: `2026-09-30T18-12-08-50c0684`.
+
+Real BTC request executed with `FindSetupRequest(asset="BTC")`. The diagnostic run fetched the complete causal timeframe set:
+- 1m: 1000 rows
+- 5m: 1000 rows
+- 15m: 1000 rows
+- 1h: 1000 rows
+- 4h: 1000 rows
+- 1d: 1000 rows
+- 1w: 477 rows
+
+Symbol resolution: `BTC -> BTCUSDT`.
+
+The smoke reached the full analytical/decision chain and returned:
+`DECISION: WAIT`
+`REASON: required context is missing; material evidence is contradictory`.
+
+Observed evidence:
+- 1m | imbalance.fvg | short | observed | confidence 1.0
+- 1w | market_structure.bos | long | observed | confidence 1.0
+- 1w | imbalance.fvg | long | observed | confidence 1.0
+
+Missing context:
+- 5m:no_active_supported_observation
+- 15m:no_active_supported_observation
+- 1h:no_active_supported_observation
+- 4h:no_active_supported_observation
+- 1d:no_active_supported_observation
+
+Conflict:
+- explicit long and short observations coexist.
+
+Interpretation: the live fetch/snapshot path works, but the current MarketEvidence bridge is too dependent on events being present on the latest row. A recent still-relevant SMC event/state can be absent from the latest row and therefore become invisible to Evidence. This is a pipeline/context-extraction limitation, not evidence that the Decision Layer itself is wrong.
+
+### Important architecture clarification
+AICFA does not yet possess human-like learned market knowledge. Its current SMC knowledge is encoded as deterministic analytical rules/modules (market structure, liquidity, displacement, FVG, order blocks, premium/discount, unified SMC, etc.). The future system may use a lightweight model for interface/reasoning/verbalization, but the authoritative market analysis remains deterministic and data-grounded.
+
+The system must therefore explicitly encode what SMC context is required and how much temporary data is necessary to establish it. It must not blindly fetch 1000 candles per timeframe.
+
+### Analysis-depth decision
+The `limit=1000` smoke value was diagnostic only and is not accepted as the production FindSetup depth.
+
+Current feature-engine inspection shows the largest explicit rolling baseline is 60 candles; displacement uses a prior 20-candle baseline; price action and Wyckoff use 20-candle windows; external structure uses 2+2 swing confirmation and internal structure 1+1. However, SMC context also needs enough prior rows to observe recent events and their current lifecycle/state.
+
+Therefore the initial request-scoped production depth target is:
+- 1m: 240 candles
+- 5m: 240 candles
+- 15m: 160 candles
+- 1h: 120 candles
+- 4h: 100 candles
+- 1d: 100 candles
+- 1w: 80 candles
+
+These are temporary per-request fetch limits, not a persistent buffer or stored history.
+
+This is an initial bounded target, not yet GREEN. Before changing production code, the exact minimum depth must be validated against the dependency graph and event/lifecycle persistence requirements of all active analytical modules. The implementation should derive/centralize the required depth rather than scattering magic numbers across providers.
+
+### Status
+**PENDING / NOT GREEN for final FindSetup context completeness.**
+
+What is GREEN:
+- real seven-timeframe market-data fetch;
+- BTC symbol resolution;
+- snapshot/provider path;
+- deterministic analytical chain execution;
+- Decision Layer correctly refuses to produce a directional result when required context is missing and conflicting observations coexist.
+
+What remains PENDING:
+- authoritative SMC-aware context extraction across recent events and persistent active states;
+- centrally defined per-timeframe analysis depth;
+- production reduction from diagnostic 1000-row fetches;
+- later realtime adapters for trades, order book, funding, open interest, liquidations and mark price.
+
+### Exact next step
+Implement a centralized **analysis-depth contract** derived from actual feature/SMC dependencies, with the above values as provisional upper bounds. Then test that fetching only those depths still produces the same required feature/event/context availability as the larger diagnostic window. After that, fix MarketEvidence to consume recent relevant events plus active lifecycle/state context instead of only the latest-row flags.
