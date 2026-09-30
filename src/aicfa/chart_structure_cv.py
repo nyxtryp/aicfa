@@ -141,11 +141,12 @@ def _local_extrema(values: np.ndarray, radius: int, *, high: bool) -> list[int]:
     for i in range(radius, len(values) - radius):
         window = values[i - radius : i + radius + 1]
         center = values[i]
+        neighbors = np.concatenate((window[:radius], window[radius + 1 :]))
         if high:
-            if center == window.min() and center < window[radius + 1 :].min(initial=np.inf):
+            if center == window.min() and np.all(center < neighbors):
                 indices.append(i)
         else:
-            if center == window.max() and center > window[radius + 1 :].max(initial=-np.inf):
+            if center == window.max() and np.all(center > neighbors):
                 indices.append(i)
     return indices
 
