@@ -1135,3 +1135,39 @@ This verifies the test suite and compatibility of the Market Evidence bridge. It
 
 ### Exact next step
 Implement a deterministic adapter from the existing `build_features()` / `market_state` output into `MarketObservation` / `MarketEvidence`. Then connect that adapter to FindSetup and remove its temporary local decision logic in favor of the authoritative Decision Layer.
+
+
+## 2026-09-30 — Deterministic Market State → Market Evidence adapter added
+
+### What was done
+Added the first production-path adapter that converts the latest completed deterministic AICFA feature/state row into the canonical MarketEvidence contract.
+
+### Changes
+- Added `src/aicfa/market_evidence_adapter.py`.
+- Emits observations only when supported deterministic feature columns are active.
+- Maps explicit directional evidence for:
+  - `market_structure.bos`
+  - `displacement`
+  - `imbalance.fvg`
+  - `order_block.bullish`
+  - `order_block.bearish`
+  - `liquidity.sweep`
+- Reads higher-timeframe market-structure/BOS columns from the existing `mtf_<timeframe>_` output instead of inventing higher-timeframe values.
+- Records timeframes with no active supported observation in `missing_context`.
+- Records coexistence of explicit long and short evidence as a conflict.
+- Added `tests/test_market_evidence_adapter.py` for base observations, higher-timeframe structure and conflicts.
+
+### Commits
+- `f9033865175dd74799776aa81a115c7bb18e57a5` — adapter implementation
+- `b137c48cb741c24af76c4f6e1c6dbbf97898a380` — adapter tests
+
+### Verification
+No FrostDeploy verification has been run after these new commits yet.
+
+Status: **IMPLEMENTED / PENDING DEPLOYED VERIFICATION**.
+
+### Important limitation
+The current feature engine calculates many detailed concepts on the 1m base frame, while the existing MTF layer currently exposes higher-timeframe structure fields. The adapter therefore does not pretend that higher-timeframe FVG/OB/displacement/liquidity observations exist when they are not actually present. Those contexts remain unavailable rather than fabricated.
+
+### Exact next step
+Deploy these commits and run the mandatory full pytest suite. If green, connect `build_market_evidence()` into `find_setup.py`, replacing its temporary local `_decision()` with the authoritative Evidence → Scenario → Setup → Decision chain.
