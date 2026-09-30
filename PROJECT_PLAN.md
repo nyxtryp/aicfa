@@ -606,3 +606,29 @@ The GitHub projects were reviewed at README/source level. Their reported speed a
 
 ### Next exact step
 Benchmark the most relevant existing deterministic CV code — starting with `chart-vision-mcp` and `vision-market-structure-analyzer` — against the same `/tmp/btc.png`, measure runtime and inspect actual extracted structure. Do not modify AICFA production code until the benchmark demonstrates useful output.
+
+
+### Source-code review findings
+
+The deeper source review changes the assessment slightly:
+
+- `chart-vision-mcp` is useful as a **reference implementation**, but its current candle analysis is mostly aggregate color-pixel ratios, not true candle-by-candle OHLC reconstruction. Its level detector counts horizontal Hough lines, and its zone detector relies on configured color ranges. Therefore its README's "structural analysis" should not be interpreted as reliable SMC detection. The code is MIT and modular enough to borrow small utilities from.
+- `vision-market-structure-analyzer/new_markings.py` is more relevant to AICFA's Market Structure layer. It removes background/grid noise, builds a per-column high/low trace, smooths it with Savitzky-Golay, finds peaks/troughs, applies a 25-pixel confirmation move, and labels HH/HL/LH/LL. However, it assumes a manually supplied/selected ROI and pixel-based thresholds, and it does not recover real price values or understand TradingView-specific overlays. Its "20–50 pixel" style thresholds are image-resolution dependent and must be redesigned for AICFA rather than copied directly.
+- `Candlestick-Chart-OHLC-Extractor` uses a trained YOLOv8 model to detect bullish/bearish candle boxes, then derives body/wick geometry and maps pixels to price. This is potentially useful for a later candle-localization component, but the model weights/training domain must be independently verified before adoption.
+- `chart-info-detector` is narrowly scoped to TradingView symbol title and last-price pill localization. It is useful for metadata extraction, not for market structure.
+- Both first two projects are MIT-licensed, so adaptation is legally straightforward provided the required copyright/license notices are retained. Any copied substantial code must still be tracked and attributed in AICFA.
+
+### Technical conclusion from source review
+
+The most promising path is **not** "take one repository and call it AICFA vision." It is to build a small deterministic pipeline around the strongest ideas:
+1. TradingView/chart ROI + metadata localization;
+2. robust candle/price-trace extraction;
+3. normalized swing detection;
+4. AICFA-native HH/HL/LH/LL and structure rules;
+5. only then add mechanical visual detectors for liquidity/FVG/OB;
+6. emit canonical `VisualObservation` objects;
+7. let the existing AICFA analytical stack reason over them.
+
+The key engineering problem is now identified as **pixel-to-market-state extraction**, not image-to-chat generation. This is much better aligned with the sub-minute requirement and the existing AICFA architecture.
+
+No source code from these external repositories has been merged into AICFA yet.
