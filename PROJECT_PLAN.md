@@ -1479,3 +1479,14 @@ Implement deterministic provider-backed asset/symbol resolution for user command
 - This is not a production GREEN: the run exposed an architecture gap in the current bridge. FindSetup fetches seven real timeframe datasets, but MarketEvidence is still primarily built from the latest 1m feature row plus currently exposed MTF structure columns, so detailed deterministic concepts are not yet independently evaluated on each timeframe.
 - Status: LIVE PIPELINE EXECUTED / PRODUCT PENDING.
 - Exact next step: extend the deterministic MarketEvidence construction so each of the seven real timeframe frames is independently analyzed and contributes its own supported observations, while preserving causal closed-candle rules and the authoritative Decision Layer.
+
+
+## 2026-10-01 — Independent seven-timeframe evidence path implemented
+- Reworked FindSetup so each completed causal timeframe is independently passed through the deterministic feature engine before MarketEvidence construction.
+- Added `build_market_evidence_from_frames()` to aggregate observations from independent timeframe analyses and detect cross-timeframe directional conflicts.
+- Preserved the existing single-analysis adapter for compatibility.
+- Changes: `src/aicfa/find_setup.py`, `src/aicfa/market_evidence_adapter.py`.
+- Implementation commits: `09fe4129bb81ab34d07b69576d8703a18b0a88b1`, `e1dbd61366d24869bc4c85c8126d7efdb744bba3`.
+- Test commit: `c77e14bcebb0e1f1c64f4280bf8232b50c82df46`.
+- Status: IMPLEMENTED / PENDING deployed verification.
+- Exact next step: deploy and run full pytest; if GREEN, repeat live FindSetup BTC across seven timeframes and inspect evidence count, missing context, conflicts, and final Decision Layer action.
