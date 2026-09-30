@@ -1,6 +1,6 @@
 import pandas as pd
 
-from aicfa.market_evidence_adapter import build_market_evidence
+from aicfa.market_evidence_adapter import build_market_evidence, build_market_evidence_from_frames
 
 
 def _analysis(**overrides):
@@ -54,4 +54,21 @@ def test_adapter_marks_conflicting_explicit_directions():
         asset="BTC/USDT",
     )
 
+    assert evidence.conflicts == ("explicit long and short observations coexist",)
+
+
+def test_adapter_aggregates_independent_timeframe_analyses():
+    evidence = build_market_evidence_from_frames(
+        {
+            "1m": _analysis(bos_up=1),
+            "4h": _analysis(bos_down=1),
+        },
+        asset="BTC/USDT",
+        timeframes=("1m", "4h"),
+    )
+
+    assert {(item.concept_id, item.timeframe, item.direction) for item in evidence.observations} == {
+        ("market_structure.bos", "1m", "long"),
+        ("market_structure.bos", "4h", "short"),
+    }
     assert evidence.conflicts == ("explicit long and short observations coexist",)
