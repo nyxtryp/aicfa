@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from aicfa.chart_structure_cv import ChartStructureConfig, analyze_chart
+from aicfa.chart_structure_cv import ChartStructureConfig, _label_swings, _local_extrema, analyze_chart
 
 
 def _synthetic_chart() -> bytes:
@@ -63,3 +63,31 @@ def test_native_chart_structure_is_deterministic():
     second = analyze_chart(image)
 
     assert first == second
+
+
+def test_local_extrema_collapses_flat_plateau_to_one_swing():
+    values = np.array([10, 8, 8, 8, 10, 12, 12, 12, 10], dtype=np.float32)
+
+    highs = _local_extrema(values, radius=1, high=False)
+    lows = _local_extrema(values, radius=1, high=True)
+
+    assert highs == [2, 6]
+    assert lows == []
+
+
+def test_low_swing_labels_follow_price_direction():
+    trace = [
+        (0, 100, 180),
+        (1, 95, 210),
+        (2, 105, 190),
+        (3, 90, 230),
+        (4, 100, 190),
+    ]
+
+    swings = _label_swings(
+        trace,
+        [(1, "low"), (3, "low")],
+        confirmation_threshold=1,
+    )
+
+    assert [item.label for item in swings] == ["L", "LL"]
