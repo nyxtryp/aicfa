@@ -1338,3 +1338,21 @@ Observed failure mode:
 ### Next step
 
 Before removing NEXUS, run one minimal diagnostic with a very small output cap and a simple non-analytical JSON task. This isolates whether the failure is caused by the model/configuration's generation behavior or by the AICFA prompt/domain reasoning task. If it still loops or fails JSON, remove the model and record rejection.
+
+
+## 2026-09-30 — NEXUS-Finance benchmark #2: FAIL
+
+### Verification result
+
+A minimal instruction-following test was run:
+`Ответь одним словом: CAT`
+
+The model did not return `CAT`. It generated a long unrelated and repetitive text about a “система ухода”, including unsupported invented content and no adherence to the one-word constraint.
+
+### Status
+
+**FAIL — candidate rejected for the AICFA text-interface role.** Combined with benchmark #1, NEXUS fails both domain-constrained instruction following and a trivial one-word instruction. The model has not been integrated into AICFA.
+
+### Next step
+
+Remove `FableForge-AI/nexus-finance:latest` from Ollama and verify that no model process remains. Then record removal and close the NEXUS experiment. Do not spend additional credits/time on prompt tuning for this candidate.
