@@ -143,18 +143,39 @@ def _column_trace(mask: np.ndarray, cfg: ChartStructureConfig) -> list[tuple[int
 
 
 def _local_extrema(values: np.ndarray, radius: int, *, high: bool) -> list[int]:
-    indices: list[int] = []
+    candidates: list[int] = []
     for i in range(radius, len(values) - radius):
         window = values[i - radius : i + radius + 1]
         center = values[i]
         neighbors = np.concatenate((window[:radius], window[radius + 1 :]))
         if high:
-            if center == window.min() and np.all(center <= neighbors) and np.any(center < neighbors):
-                indices.append(i)
+            is_extreme = (
+                center == window.min()
+                and np.all(center <= neighbors)
+                and np.any(center < neighbors)
+            )
         else:
-            if center == window.max() and np.all(center >= neighbors) and np.any(center > neighbors):
-                indices.append(i)
-    return indices
+            is_extreme = (
+                center == window.max()
+                and np.all(center >= neighbors)
+                and np.any(center > neighbors)
+            )
+        if is_extreme:
+            candidates.append(i)
+
+    # A smoothed pixel trace can contain a flat plateau around one visual
+    # turning point. Every pixel in that plateau may satisfy the extrema
+    # predicate, but it is still one swing, not many adjacent swings.
+    collapsed: list[int] = []
+    start = 0
+    while start < len(candidates):
+        end = start
+        while end + 1 < len(candidates) and candidates[end + 1] == candidates[end] + 1:
+            end += 1
+        collapsed.append(candidates[(start + end) // 2])
+        start = end + 1
+
+    return collapsed
 
 
 def _confirmed(
@@ -200,9 +221,9 @@ def _label_swings(
             value = low_y
             if previous_low is None:
                 label = "L"
-            elif value > previous_low:
-                label = "HL"
             elif value < previous_low:
+                label = "HL"
+            elif value > previous_low:
                 label = "LL"
             else:
                 label = "EL"
