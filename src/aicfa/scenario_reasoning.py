@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from aicfa.evidence_reasoning import EvidenceDecision, EvidenceAssessment
 from aicfa.market_evidence import MarketObservation
+from aicfa.visual_evidence import VisualObservation
 
 
 @dataclass(frozen=True)
