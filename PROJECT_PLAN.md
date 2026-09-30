@@ -1579,3 +1579,61 @@ The registry is only the policy layer. It does not yet contain real Bybit/Bitget
 3. Implement the first real fallback adapter after Binance, prioritizing Bybit because its public market-data coverage includes the realtime data categories AICFA needs.
 4. Add request-scoped source selection and transport failure fallback.
 5. Then add further exchange adapters one by one, recording each result in this plan.
+
+
+## 2026-10-01 — Bybit fallback adapter and request-scoped router implemented
+
+### External verification
+Bybit official documentation was checked before implementation:
+- public HTTP IP limit: 600 requests / 5 seconds / IP;
+- public kline endpoint supports spot, USDT/USDC and inverse contracts, with up to 1000 rows per request;
+- public order book supports spot and contracts, including up to 1000 levels for spot/contracts;
+- public open-interest endpoint supports linear/inverse contracts with 5m/15m/30m/1h/4h/1d intervals;
+- official Bybit market-data skill documents public tickers, klines, funding history, order book, recent trades and open interest without authentication.
+
+Sources: Bybit official API documentation.
+
+### Implementation
+Added src/aicfa/bybit_market_data.py.
+- public unauthenticated V5 transport;
+- spot and linear futures category mapping;
+- asset/symbol resolution through instruments-info;
+- common OHLCV normalization contract;
+- 1m/5m/15m/1h/4h/1d/1w mapping;
+- retry handling for HTTP 429/5xx and Bybit retCode 10006;
+- no permanent state or market-history storage.
+
+Added src/aicfa/market_data_router.py.
+- request-scoped provider fallback;
+- deterministic provider order;
+- resolver fallback;
+- OHLCV fallback;
+- records provider attempts;
+- does not merge incompatible source data.
+
+Integrated default FindSetup construction with BinanceMarketDataProvider → BybitMarketDataProvider.
+
+This means a default FindSetup request now attempts Binance first and automatically falls back to Bybit when symbol resolution or OHLCV retrieval fails.
+
+Commits:
+- 20d2ba4d81719eb384d7ebf6b17a14f3cbe23ff3 — Bybit adapter.
+- 0f306321b40a7cc249949ddeb2e992b80fb1dd0d — Bybit adapter tests.
+- 54a88aee282fd66234351c2e5987f38251a881e4 — request-scoped fallback router.
+- b0edc99060ef229ee0f7a441c84258b5e8eb867a — router tests.
+- 7af87f05f2ebe3bf508ec3eda2d17000cc2cac7c — FindSetup integration.
+- 77bcd873c6855a5681fba85da24ddabc33d88463 — registry capability profile correction.
+
+### Verification status
+The repository has no GitHub Actions workflow available for automatic pytest execution. FrostDeploy verification has not yet been performed after these changes.
+
+Status: IMPLEMENTED / PENDING FROSTDEPLOY VERIFICATION.
+
+### Current known limitation
+The fallback currently covers the common OHLCV path only. The broader registry already models trades/order book/funding/OI/liquidations/mark-price capabilities, but their real transport adapters are not yet wired into the request pipeline. Therefore this checkpoint must not be described as full multi-data fallback.
+
+### Exact next step
+Deploy the current main branch on FrostDeploy and run the mandatory full pytest command. Then run a real BTC FindSetup smoke twice:
+1. normal path to verify Binance remains primary;
+2. controlled provider-failure test to verify the router actually switches to Bybit.
+
+Record exact release ID and outputs here before adding the next realtime data adapters.
