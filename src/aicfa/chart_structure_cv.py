@@ -180,7 +180,7 @@ def _local_extrema(values: np.ndarray, radius: int, *, high: bool) -> list[int]:
             if not np.all(segment == values[candidates[start]]):
                 break
             end += 1
-        collapsed.append(candidates[(start + end) // 2])
+        collapsed.append((candidates[start] + candidates[end]) // 2)
         start = end + 1
 
     return collapsed
