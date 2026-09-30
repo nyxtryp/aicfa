@@ -863,3 +863,38 @@ The current failing result must not be marked GREEN. The previous `248 passed, 1
   1. Wait for FrostDeploy release containing `0572cddedbd29f386081ede9fcee182321719646`.
   2. Run mandatory full pytest on the deployed `current` release.
   3. If GREEN, rerun native Chart Vision against the real BTC chart and inspect duplicate plateau swings plus HH/HL/LH/LL labels.
+
+## 2026-09-30 — Native Chart Vision real BTC benchmark: current trace is rejected
+
+### Operator verification
+- User ran the native Chart Vision benchmark against the deployed /srv/frostdeploy/aicfa/btc-test.png (1131×817 historical BTC/USDT chart).
+- Result: 423 trace points and 56 detected swings.
+- The mandatory full pytest suite immediately before this benchmark was green: 249 passed, 4863 warnings in 23.83s on FrostDeploy release 2026-09-30T09-20-05-76a69aa.
+
+### Real-chart finding
+The current pixel trace is **not structurally acceptable** for real BTC charts.
+
+Observed failures include:
+- repeated highs at approximately y=59 across many unrelated x positions;
+- repeated lows at approximately y=669 across many unrelated x positions;
+- adjacent/near-adjacent EH/EL and repeated swings that do not represent meaningful market turning points;
+- therefore the current 56-swing sequence cannot be treated as a valid HH/HL/LH/LL market-structure representation.
+
+The output strongly indicates that the current saturated-pixel trace is capturing chart/UI or non-price regions at the vertical boundaries. In particular, y≈669 coincides with the configured bottom_fraction=0.82 boundary on an 817px image, so the current fixed fractional price-panel boundary is not sufficiently reliable for this real chart. The repeated y≈59 ceiling similarly indicates contamination by a horizontal chart/UI region or another saturated visual element rather than genuine independent price highs.
+
+### Decision
+**Native Chart Vision real-chart stage remains PENDING / REJECTED for this implementation iteration.**
+The synthetic test suite passing is not sufficient; the actual pixel-to-market-state extraction must first produce a plausible price trace and swing sequence on the real BTC chart.
+
+No BOS/CHoCH/FVG/OB visual semantics will be added yet.
+
+### Next exact implementation step
+Fix the **price-panel/price-trace localization** before changing swing thresholds:
+1. inspect the mask's vertical distribution and identify the actual price plot region separately from the volume/UI regions;
+2. prevent volume bars, chart borders and saturated UI elements from entering the high/low trace;
+3. replace the current fixed top_fraction / bottom_fraction assumption with robust price-panel localization or an explicit price-panel ROI fallback;
+4. add a regression test representing the discovered boundary contamination;
+5. rerun the full deployed pytest suite;
+6. rerun the same real BTC benchmark and inspect the swing sequence again.
+
+Do not tune HH/HL/LH/LL thresholds to hide the contamination. The trace itself must be corrected first.
