@@ -1,8 +1,8 @@
 """Single-command FindSetup orchestration for AICFA.
 
 This module is the deterministic bridge from a user-named asset to the
-existing market-data and feature-analysis core. It does not use an LLM and
-does not place orders.
+existing market-data and reasoning core. It does not use an LLM and does not
+place orders.
 """
 from __future__ import annotations
 
@@ -12,9 +12,13 @@ import re
 import pandas as pd
 
 from .binance_market_data import BinanceMarketDataProvider
+from .decision import decide
+from .evidence_reasoning import assess_market_evidence
 from .features import build_features
 from .market_data import MarketDataProvider, completed_ohlcv
-from .market_state import build_market_state
+from .market_evidence_adapter import build_market_evidence
+from .scenario_reasoning import assess_scenarios
+from .setup_analysis import analyze_setups
 
 CAUSAL_TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
 
@@ -42,6 +46,11 @@ class FindSetupResult:
     timeframes: tuple[str, ...]
     frames: dict[str, pd.DataFrame]
     analysis: pd.DataFrame
+    evidence: object
+    evidence_assessment: object
+    scenario_assessment: object
+    setup_assessment: object
+    decision_assessment: object
     decision: str
     reason: str
 
@@ -74,20 +83,6 @@ def parse_find_setup(text: str) -> FindSetupRequest:
     return FindSetupRequest(asset=normalize_asset(asset_match.group(1)))
 
 
-def _decision(latest: pd.Series) -> tuple[str, str]:
-    conflicted = int(latest.get("setup_candidate_conflicted", 0) or 0)
-    up = int(latest.get("setup_candidate_up", 0) or 0)
-    down = int(latest.get("setup_candidate_down", 0) or 0)
-
-    if conflicted or (up and down):
-        return "WAIT", "setup candidates conflict"
-    if up:
-        return "LONG", "latest deterministic setup candidate is bullish"
-    if down:
-        return "SHORT", "latest deterministic setup candidate is bearish"
-    return "NO TRADE", "no setup candidate is active"
-
-
 def find_setup(
     request: FindSetupRequest,
     *,
@@ -95,7 +90,7 @@ def find_setup(
     now_ms: int,
     limit: int = 1000,
 ) -> FindSetupResult:
-    """Fetch all seven causal timeframes and run the existing AICFA core."""
+    """Fetch seven causal timeframes and run the authoritative AICFA chain."""
     provider = provider or BinanceMarketDataProvider()
     frames: dict[str, pd.DataFrame] = {}
 
@@ -117,22 +112,30 @@ def find_setup(
     if analysis.empty:
         raise ValueError("AICFA analysis produced no rows")
 
-    market_state = build_market_state(analysis)
-    merged = analysis.copy()
-    for column in market_state.columns:
-        if column.startswith("market_state_"):
-            merged[column] = market_state[column].to_numpy()
-
-    latest_timestamp = int(base["timestamp"].max())
-    latest = merged.loc[merged["timestamp"] == latest_timestamp].iloc[-1]
-    decision, reason = _decision(latest)
+    market_evidence = build_market_evidence(
+        analysis,
+        asset=request.asset,
+        timeframes=CAUSAL_TIMEFRAMES,
+    )
+    evidence_assessment = assess_market_evidence(market_evidence)
+    scenario_assessment = assess_scenarios(evidence_assessment)
+    setup_assessment = analyze_setups(evidence_assessment, scenario_assessment)
+    decision_assessment = decide(
+        setup_assessment,
+        observations=evidence_assessment.observations,
+    )
 
     return FindSetupResult(
         request=request,
         symbol=request.asset,
         timeframes=CAUSAL_TIMEFRAMES,
         frames=frames,
-        analysis=merged,
-        decision=decision,
-        reason=reason,
+        analysis=analysis,
+        evidence=market_evidence,
+        evidence_assessment=evidence_assessment,
+        scenario_assessment=scenario_assessment,
+        setup_assessment=setup_assessment,
+        decision_assessment=decision_assessment,
+        decision=decision_assessment.action.value.upper().replace("_", " "),
+        reason="; ".join(decision_assessment.reasons),
     )
