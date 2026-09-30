@@ -657,3 +657,42 @@ TypeError: cannot unpack non-iterable numpy.int32 object
 
 ### Next exact step
 Benchmark the second deterministic-CV candidate, **`Rudra-kakade/vision-market-structure-analyzer`**, against the same `/tmp/btc.png`. Measure runtime and inspect whether its price-trace/swing logic can reliably extract HH/HL/LH/LL. Keep all work outside AICFA until the benchmark demonstrates useful output.
+
+
+## 2026-09-30 — Deterministic CV benchmark: vision-market-structure-analyzer evaluated
+
+### Benchmark method
+- A temporary GitHub Actions benchmark branch was used so the public chart image could be downloaded and the external implementation could be executed without changing AICFA production code.
+- Benchmark image: public dark BTC/USDT 4H candlestick chart, 512×400 price/volume content.
+- Candidate: Rudra-kakade/vision-market-structure-analyzer, MIT licensed.
+- Manual ROI was bypassed with the full image bounds; the implementation itself clipped the actual image to 512×400.
+
+### Results
+- Runtime was extremely fast: approximately 0.011–0.014 seconds per run.
+- Sensitivity sweep:
+- scale 1 → 14 pivots: H, LH, LH, HH, HH, LH, HH, LH, LH, LH, L, LH, LH, HH
+- scale 3 → 6 pivots: H, LH, LH, HH, LH, LH
+- scale 5 → 4 pivots: H, HH, LH, LH
+- scale 7 → 4 pivots: H, HH, LH, LH
+- scale 9 → 4 pivots: H, LH, HH, LH
+- At the useful higher sensitivities it detected no confirmed swing lows at all on this chart; at scale 1 it produced only one low among 14 pivots.
+- The algorithm therefore cannot currently provide a reliable HH/HL/LH/LL market-structure representation for this chart, despite excellent raw latency.
+
+### Decision
+Reject the external implementation as the AICFA Chart Vision implementation. Keep its preprocessing/price-trace ideas as reference only. Its current column-mask extraction is too dependent on the chart's pixel geometry and does not robustly recover both swing highs and lows from the tested dark TradingView-style chart.
+
+### Operator actions recorded
+- A temporary benchmark branch and PR were created solely to run the benchmark through GitHub Actions; nothing from that branch was merged into main.
+- The benchmark was run at scales 1, 3, 5, 7 and 9 and completed successfully.
+- No AICFA production source code was modified by this benchmark.
+
+### Next exact step
+Stop benchmarking external repositories. Build the first AICFA-native deterministic Chart Vision stage around the actual requirement:
+1. chart/price-panel localization;
+2. candle/color segmentation that preserves both bullish and bearish candles;
+3. normalized high/low price trace extraction;
+4. swing candidate detection with image-resolution-independent thresholds;
+5. HH/HL/LH/LL classification;
+6. output only into the existing visual-evidence boundary.
+
+The first native stage must be tested on synthetic chart images plus real public chart screenshots and must remain CPU-only and comfortably below the user's ~60-second interactive limit.
