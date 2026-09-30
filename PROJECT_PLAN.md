@@ -1637,3 +1637,17 @@ Deploy the current main branch on FrostDeploy and run the mandatory full pytest 
 2. controlled provider-failure test to verify the router actually switches to Bybit.
 
 Record exact release ID and outputs here before adding the next realtime data adapters.
+
+
+## 2026-10-01 — Bybit symbol resolver pagination hardened
+
+- Changed src/aicfa/bybit_market_data.py so instruments-info resolution follows Bybit nextPageCursor pages instead of inspecting only the first 1000 instruments.
+- Resolver now stops safely on an empty cursor or a repeated cursor, preventing an infinite pagination loop.
+- Added tests in tests/test_bybit_market_data.py covering successful second-page resolution and repeated-cursor termination.
+- Implementation commit: 04fc55f9d43543681d42f2c5591ea23d1db1f1e2.
+- Test commit: 8a127f44caba03eb5db72ea2401fd2cb0b4d318c.
+- FrostDeploy release: not yet deployed for this checkpoint.
+- Verification output: not yet run on FrostDeploy.
+- Status: IMPLEMENTED / PENDING FROSTDEPLOY VERIFICATION.
+- Discovered issue addressed: Bybit symbol resolution was previously limited to the first 1000 instruments, which could break the intended broad asset fallback.
+- Exact next step: deploy current main, run mandatory full pytest, then perform normal Binance BTC smoke and controlled Binance-failure -> Bybit fallback smoke before adding the next realtime data adapter.
