@@ -135,7 +135,7 @@ def find_setup(
 
     return FindSetupResult(
         request=request,
-        symbol=request.asset,
+        symbol=symbol,
         timeframes=CAUSAL_TIMEFRAMES,
         frames=frames,
         analysis=analysis,
