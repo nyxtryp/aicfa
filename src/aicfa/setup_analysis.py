@@ -61,7 +61,7 @@ def _unique(values: list[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
 
-def _observed(observations: tuple[MarketObservation | object, ...]) -> tuple[VisualObservation, ...]:
+def _observed(observations: tuple) -> tuple[VisualObservation, ...]:
     return tuple(
         item
         for item in observations
