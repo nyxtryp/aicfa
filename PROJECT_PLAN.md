@@ -468,3 +468,18 @@ The correction does **not** weaken the seven-timeframe requirement. It only fixe
 
 ### Verification
 The correction commits are not yet verified by pytest. The next action remains the focused SETUP ENGINE test command, followed by full pytest if green.
+
+
+## 2026-10-01 — SETUP ENGINE second focused-test regression
+
+Focused verification after the previous correction: **25 passed, 1 failed, 16396 warnings in 30.23s**.
+
+Remaining failure:
+- `test_setup_engine_levels_come_from_relevant_timeframe_not_1m` still returned a `1w` target instead of the supporting `4h` target.
+
+Root cause: the target selector passed `source_tfs` into the helper's **concept filter** parameter rather than into an explicit preferred-timeframe parameter. Therefore the intended 4h priority was not actually applied.
+
+Correction:
+- `22582e5dd7e0fed699419f6ef51b92e2edad54d3` — separated explicit preferred timeframes from concept-based evidence discovery in the source-timeframe ordering helper. Target selection now receives `source_tfs` as an actual timeframe priority.
+
+Verification after this correction is pending. The single remaining failure is specifically source-timeframe selection; the other 25 focused tests are green.
