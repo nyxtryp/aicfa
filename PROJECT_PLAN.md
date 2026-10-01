@@ -1987,3 +1987,30 @@ Implement the adaptive request-scoped context/depth resolver from the actual Kno
 
 ### Exact next step
 Wire this resolver into the request-scoped market-data collection path so the router receives the dependency-derived minimum context rather than the diagnostic `limit=1000`. Keep lifecycle/event expansion adaptive and temporary; do not introduce fixed production depth tables. Then verify the full suite and a real BTC FindSetup smoke on FrostDeploy before repairing MarketEvidence.
+
+
+## 2026-10-01 — Wire dependency-derived depth into request-scoped fetching
+
+### Implementation
+- `FindSetup` now calls `resolve_analysis_depth()` after building the Knowledge/Data Requirement plan.
+- The production path no longer defaults to `limit=1000`; without an explicit diagnostic override, each requested timeframe receives the resolver's dependency-derived minimum.
+- The router now accepts a per-timeframe `limits` mapping while retaining the existing single-`limit` compatibility path for tests/diagnostics.
+- Added validation that the per-timeframe mapping exactly matches the requested timeframe set.
+- Added tests proving the resolver-driven default is 60 rows per timeframe and that per-timeframe limits reach the router.
+
+### Commits
+- `a9a83b5cffc46ccfeffed18dacc1ed920a8c40ca` — Pass knowledge-derived per-timeframe depth into market router.
+- `450ab4ea0b423449e94a5f4dabd6287717016355` — Use adaptive analysis depth resolver in FindSetup.
+- `69d3edb433b80a23be01dff4fd5f4b80dda5ac17` — Test per-timeframe market data limits.
+- `5dde3b94211c91a2b46597ceb7eee77d0f63f644` — Test FindSetup dependency-derived default depth.
+
+### Verification
+- Source-level implementation and tests added.
+- FrostDeploy full pytest has not yet been run for these commits.
+- No GREEN claim is made.
+
+### Status
+**IMPLEMENTED / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+Deploy the current main to FrostDeploy and run the mandatory full pytest plus live BTC FindSetup smoke. Confirm that the default request no longer fetches 1000 candles and inspect whether 60-row dependency context is sufficient. If lifecycle/event context remains missing, implement the adaptive expansion loop before repairing MarketEvidence.
