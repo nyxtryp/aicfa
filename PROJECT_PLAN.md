@@ -2165,3 +2165,18 @@ The first server verification of the adaptive expansion implementation did not c
 
 ### Exact next step
 Deploy current `main` and rerun the mandatory full pytest. The previous stalled run must not be allowed to sit indefinitely. If green, immediately run the live BTC FindSetup smoke without an explicit limit and inspect the expansion calls/row counts. If context still stalls, the next planned step is the MarketEvidence repair to consume causally relevant recent events and active lifecycle states rather than only latest-row flags.
+
+
+## 2026-10-01 — Repair accidental FindSetup truncation
+
+### Finding
+FrostDeploy collection failed immediately with `ImportError: cannot import name 'find_setup'`. The adaptive-expansion edit had accidentally truncated `src/aicfa/find_setup.py` after `_expand_missing_context()`, removing the public `find_setup()` orchestration function from the committed file.
+
+### Forward fix
+- `fd5121888c8b2d0a865116553cfc2128598309fe` — restored the complete `find_setup()` orchestration from the preceding known-good adaptive-expansion commit and retained the new `now_ms` argument in the expansion call.
+
+### Status
+**FIXED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+Run the mandatory full pytest on the new release. This failure is a source-integrity error, not a test/runtime performance issue. If collection passes, continue to the adaptive-expansion tests and then live BTC smoke.
