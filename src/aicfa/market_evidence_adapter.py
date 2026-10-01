@@ -194,6 +194,7 @@ def build_market_evidence(
 
     for timeframe in timeframes:
         emitted = False
+        emitted_concepts: set[str] = set()
 
         fvg_active = _latest_active_event(
             analysis,
@@ -205,6 +206,7 @@ def build_market_evidence(
         if fvg_active is not None:
             observations.append(fvg_active)
             emitted = True
+            emitted_concepts.add("imbalance.fvg")
 
         ob_active = _latest_active_event(
             analysis,
@@ -216,13 +218,10 @@ def build_market_evidence(
         if ob_active is not None:
             observations.append(ob_active)
             emitted = True
+            emitted_concepts.update({"order_block.bullish", "order_block.bearish"})
 
         for concept_id in _DIRECTION_COLUMNS:
-            if emitted and concept_id in {
-                "imbalance.fvg",
-                "order_block.bullish",
-                "order_block.bearish",
-            }:
+            if concept_id in emitted_concepts:
                 continue
             item = _latest_event(analysis, concept_id, timeframe, base_timeframe=base_timeframe)
             if item is not None:
