@@ -118,9 +118,9 @@ def test_trade_order_flow_uses_event_window_without_clock_intervals():
     })
     trades = pd.DataFrame({
         "timestamp": [
-            1_767_220_800_100,
-            1_767_220_805_000,
-            1_767_221_100_000,
+            pd.Timestamp("2026-01-01T00:00:10Z").value // 1_000_000,
+            pd.Timestamp("2026-01-01T00:00:20Z").value // 1_000_000,
+            pd.Timestamp("2026-01-01T00:10:00Z").value // 1_000_000,
         ],
         "volume": [2.0, 3.0, 5.0],
         "side": [1, -1, 1],
@@ -136,9 +136,9 @@ def test_trade_order_flow_is_causal_under_future_trade_changes():
     base = base_frame()
     trades = pd.DataFrame({
         "timestamp": [
-            1_767_225_600_000,
-            1_767_225_660_000,
-            1_767_225_720_000,
+            pd.Timestamp("2026-01-01T00:00:10Z").value // 1_000_000,
+            pd.Timestamp("2026-01-01T00:00:20Z").value // 1_000_000,
+            pd.Timestamp("2026-01-01T00:00:30Z").value // 1_000_000,
         ],
         "volume": [2.0, 3.0, 4.0],
         "side": [1, -1, 1],
