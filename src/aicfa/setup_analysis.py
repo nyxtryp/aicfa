@@ -241,40 +241,27 @@ def _zone_levels(
     current_price: float | None,
 ) -> tuple[SetupLevel, ...]:
     """Select one actionable zone, honoring scenario concept priority."""
-    candidates_by_concept = (
-        (
-            "imbalance.fvg",
-            "fvg_bullish_low",
-            "fvg_bullish_high",
-            "active bullish FVG",
+    definitions = {
+        "imbalance.fvg": (
+            "fvg_bullish_low" if direction == "long" else "fvg_bearish_low",
+            "fvg_bullish_high" if direction == "long" else "fvg_bearish_high",
+            "active bullish FVG" if direction == "long" else "active bearish FVG",
         ),
-        (
-            "order_block.bullish",
-            "order_block_bullish_low",
-            "order_block_bullish_high",
-            "active bullish OB",
+        "order_block.bullish" if direction == "long" else "order_block.bearish": (
+            "order_block_bullish_low" if direction == "long" else "order_block_bearish_low",
+            "order_block_bullish_high" if direction == "long" else "order_block_bearish_high",
+            "active bullish OB" if direction == "long" else "active bearish OB",
         ),
-    ) if direction == "long" else (
-        (
-            "imbalance.fvg",
-            "fvg_bearish_low",
-            "fvg_bearish_high",
-            "active bearish FVG",
-        ),
-        (
-            "order_block.bearish",
-            "order_block_bearish_low",
-            "order_block_bearish_high",
-            "active bearish OB",
-        ),
-    )
+    }
 
     zones: list[tuple[float, float, str, str]] = []
     ordered_timeframes = _ordered_source_timeframes(context, concepts)
 
-    for concept, low_col, high_col, source in candidates_by_concept:
-        if concept not in concepts:
+    for concept in concepts:
+        definition = definitions.get(concept)
+        if definition is None:
             continue
+        low_col, high_col, source = definition
         concept_zones: list[tuple[float, float, str, str]] = []
         for timeframe in ordered_timeframes:
             row = context.latest_rows.get(timeframe)
