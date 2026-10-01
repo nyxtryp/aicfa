@@ -181,7 +181,7 @@ class BinanceMarketDataProvider:
         raise AssertionError("unreachable")
 
     def _public_json(self, path: str, *, market_type: str, params: dict[str, object]):
-        base = self._endpoint(market_type).rsplit("/", 1)[0]
+        base = self._endpoint(market_type)
         request = Request(
             f"{base}/{path}?{urlencode(params)}",
             headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"},
