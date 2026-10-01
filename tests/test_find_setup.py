@@ -70,6 +70,7 @@ def test_find_setup_fetches_exactly_seven_causal_timeframes():
     )
 
     assert result.timeframes == CAUSAL_TIMEFRAMES
+    assert result.timeframes == tuple(call[2] for call in provider.calls)
     assert tuple(call[2] for call in provider.calls) == CAUSAL_TIMEFRAMES
     assert all(call[0] == "BTC/USDT" for call in provider.calls)
     assert all(call[1] == "spot" for call in provider.calls)
