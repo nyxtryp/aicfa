@@ -150,7 +150,18 @@ def build_absorption(
             (bw["side"] == resting_side) &
             (bw["size"] > 0)
         ]
-        median_size = float(same_snapshot["size"].median())
+        if len(same_snapshot) >= 2:
+            median_size = float(same_snapshot["size"].median())
+        else:
+            # L1 transport exposes only the best level on each side. In that
+            # case a same-snapshot cross-level median is undefined, so use the
+            # causal historical median of the same displayed level instead.
+            historical_level = bw[
+                (bw["side"] == resting_side) &
+                np.isclose(bw["price"], float(nearest["price"])) &
+                (bw["size"] > 0)
+            ]
+            median_size = float(historical_level["size"].median())
         liquidity_multiple = (
             float(nearest["size"]) / median_size if median_size > 0 else np.nan
         )
