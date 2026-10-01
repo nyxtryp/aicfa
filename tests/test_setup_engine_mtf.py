@@ -122,3 +122,16 @@ def test_setup_engine_requires_all_seven_timeframes():
 
     assert result.decision is SetupDecision.NEED_MORE_EVIDENCE
     assert "required timeframe: 1w" in result.missing_context
+
+
+def test_setup_engine_requires_directionally_coherent_levels():
+    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1m=-1))
+
+    candidate = result.candidates[0]
+    entry_low = min(level.value for level in candidate.entry_zone)
+    entry_high = max(level.value for level in candidate.entry_zone)
+
+    assert candidate.invalidation_level is not None
+    assert candidate.target_levels
+    assert candidate.invalidation_level.value < entry_low
+    assert candidate.target_levels[0].value > entry_high
