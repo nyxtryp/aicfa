@@ -106,3 +106,23 @@ If the chat is lost, resume from this exact section: **CVD + Absorption integrat
 
 ### Project-plan rule
 `PROJECT_PLAN.md` is a **living project journal**. Every meaningful implementation, test result, server verification, architectural finding, commit, regression, and change of the next unfinished task must be recorded here. Historical checkpoints remain historical; the CURRENT STATE and NEXT UNFINISHED sections must reflect the actual repository state at the latest completed step.
+
+## 2026-10-01 — L1 history transport focused verification GREEN
+
+### Verification result
+- Server focused transport regression: **33 passed, 1 warning, 0 failed, 0.50s**.
+- Covered Binance L1 history, Bybit L1 history, and router fallback/provenance.
+- The only warning is the existing pytest cache permission warning in the FrostDeploy release directory; it does not affect test execution.
+
+### CURRENT STATE
+- Full suite immediately before L1 transport changes: **328 passed**.
+- CVD integration: GREEN.
+- Causal L1 history transport: **focused tests GREEN (33 passed)**.
+- Absorption: standalone GREEN; live integration not yet claimed.
+
+### NEXT UNFINISHED
+1. Run the complete pytest suite after the L1 transport changes.
+2. If GREEN, integrate the synchronized causal L1 history into the FindSetup microstructure path.
+3. Build and test the causal Absorption integration without fabricating historical book data.
+4. Run full pytest and live BTC FindSetup smoke with CVD + Absorption provenance/population.
+5. Update this journal again with the exact results and next unfinished analytical block.
