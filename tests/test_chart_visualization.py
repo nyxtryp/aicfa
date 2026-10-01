@@ -80,6 +80,10 @@ def test_chart_model_preserves_setup_geometry_and_provenance():
         ("TP2", 112.0, "1d", "previous high"),
     ]
     assert model.source_timeframes == ("1w", "1d", "4h", "1h", "15m", "5m", "1m")
+    assert any(event.label == "BOS↑" for event in model.events)
+    assert any(event.label == "HH" for event in model.structure_labels)
+    assert any(zone.source == "FVG bullish" for zone in model.zones)
+    assert any(zone.source == "OB bullish" for zone in model.zones)
 
 
 def test_chart_model_never_uses_1m_as_setup_geometry_source():
