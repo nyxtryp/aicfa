@@ -2014,3 +2014,34 @@ Wire this resolver into the request-scoped market-data collection path so the ro
 
 ### Exact next step
 Deploy the current main to FrostDeploy and run the mandatory full pytest plus live BTC FindSetup smoke. Confirm that the default request no longer fetches 1000 candles and inspect whether 60-row dependency context is sufficient. If lifecycle/event context remains missing, implement the adaptive expansion loop before repairing MarketEvidence.
+
+
+## 2026-10-01 — Forward repair of adaptive-depth router wiring
+
+### Finding
+The first FrostDeploy verification of the dependency-derived depth wiring exposed nine failures. The root cause was a forwarding bug in `market_data_router.py`: the fallback attempted to pass an undefined `limits` argument into the provider's single-`limit` contract, while the shared snapshot layer did not forward the new per-timeframe mapping.
+
+A separate contract test exposed that `resolve_analysis_depth(..., timeframes=())` incorrectly fell back to the plan's timeframes because an empty tuple was treated as falsy.
+
+### Forward fixes
+- `a6035ab67df1864ee3772b9345046913e6e7dd65` — Fix per-timeframe limit propagation in market data router.
+  - Removed the undefined `limits` argument from the provider's single-timeframe `fetch_ohlcv()` call.
+  - Shared snapshot now forwards `limits` to the fallback router.
+  - Shared snapshot validates mutually exclusive `limit` / `limits`, exact timeframe coverage and required depth input.
+  - Snapshot cache keys now include the requested depth so different per-timeframe limits cannot reuse an incompatible cached snapshot.
+- `22bec291631f45c5b783acf598011ebdc2716fd8` — Reject explicit empty analysis timeframe selection.
+  - `timeframes=None` uses the plan defaults.
+  - An explicitly supplied empty sequence is rejected as required by the contract.
+
+### Verification
+The reported FrostDeploy result before these fixes was:
+`9 failed, 293 passed, 9984 warnings`.
+The live BTC smoke also failed before data collection because the router received `limits` but the provider path rejected it with `ValueError: either limit or limits is required`.
+
+The two forward fixes are now committed to `main`. FrostDeploy verification has not yet been rerun after these commits.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+Deploy current `main` and rerun the mandatory full pytest. If the suite is green, rerun the live BTC FindSetup smoke without an explicit `limit`. Inspect the returned row counts and evidence/context. Do not modify MarketEvidence until the corrected adaptive-depth wiring is verified.
