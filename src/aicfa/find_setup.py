@@ -187,7 +187,7 @@ def _expand_missing_context(
                 continue
             timeframe_analysis = build_features(completed)
             if timeframe_analysis.empty:
-                analyses.pop(timeframe, None)
+                current_analyses.pop(timeframe, None)
             else:
                 current_analyses[timeframe] = timeframe_analysis
 
@@ -197,7 +197,7 @@ def _expand_missing_context(
         signature = _context_signature(evidence)
         expansion_passes += 1
         if signature == previous_signature or expansion_passes >= max_expansion_passes:
-            return current_frames, current_limits
+            return current_frames, current_limits, current_analyses
         previous_signature = signature
         current_missing = evidence.missing_context
 
@@ -278,7 +278,7 @@ def find_setup(
             raise ValueError("AICFA analysis produced no completed 1m rows")
         analysis = base_analysis
         market_evidence = build_market_evidence_from_frames(
-            current_analyses, asset=symbol, timeframes=timeframes,
+            analyses, asset=symbol, timeframes=timeframes,
         )
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
