@@ -61,3 +61,31 @@ Deploy current `main` and rerun the focused MarketEvidence + adaptive FindSetup 
 - Result: MarketEvidence repair and adaptive FindSetup regression coverage are GREEN on the deployed current release.
 - Performance optimization remains backlog; analytical development continues forward.
 - Exact next step: proceed to the next analytical roadmap item after MarketEvidence repair.
+
+## 2026-10-01 — Order Flow / Microstructure v1 contract
+
+### Finding
+Repository inspection confirmed that AICFA already defines semantic data kinds for `TRADES` and `ORDER_BOOK`, but the analytical core had no dedicated Order Flow / Microstructure implementation. The existing live market-data router is OHLCV-only, so this stage must not invent exchange transport or pretend that trade/order-book data are already available.
+
+External microstructure references support separating signed executed flow from resting-book imbalance; these are distinct observables and must remain distinct in AICFA.
+
+### Forward implementation
+- `54a908959d69ddf2ad66d7da3c6f2fcfc9bee189` — add `src/aicfa/microstructure.py`.
+- Trade-flow contract accepts venue-provided aggressor side `+1/-1` and computes buy volume, sell volume, signed volume, normalized imbalance, and trade counts.
+- L1 book contract accepts timestamped bid/ask prices and sizes and computes latest spread, spread in basis points, and bid/ask depth imbalance.
+- Inputs must be causally ordered by timestamp.
+- No future-price trade-side inference.
+- No LONG/SHORT/WAIT/NO TRADE output.
+- No exchange-specific fetching.
+- `07d40c188fe5db5800cae4f6d53d73d054f2bac2` — add focused causal/validation tests.
+
+### Verification
+Not yet deployed or server-verified. Local test execution has not yet been reported.
+
+### Discovered limitation
+Current `FallbackMarketDataProvider` and `SharedSnapshotMarketDataProvider` expose only OHLCV transport. The next integration stage must extend the existing provider contract for `TRADES` / `ORDER_BOOK` rather than create a parallel market-data router.
+
+### Exact next step
+Deploy current `main` and run:
+`PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_microstructure.py`
+Then run the full suite. If green, implement the existing-router transport contract for trades/order book and wire the knowledge requirements to the new data profile.
