@@ -139,3 +139,25 @@ def test_find_setup_uses_dependency_depth_when_no_diagnostic_limit_is_given():
         now_ms=120 * 60_000,
     )
     assert [call[4] for call in provider.calls] == [60] * 7
+
+
+
+class BoundedProvider(FakeProvider):
+    def fetch_ohlcv(self, *, symbol, market_type, timeframe, since_ms, limit):
+        self.calls.append((symbol, market_type, timeframe, since_ms, limit))
+        return candles(min(limit, 130), timeframe=timeframe)
+
+
+def test_find_setup_expands_missing_context_until_provider_boundary():
+    provider = BoundedProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+    )
+
+    assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
+    assert [call[4] for call in provider.calls if call[2] == "1m"] == [60, 120, 240]
+    assert [call[4] for call in provider.calls if call[2] == "1w"] == [60, 120, 240]
+    assert len(result.frames["1m"]) == 130
