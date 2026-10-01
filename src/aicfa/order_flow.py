@@ -152,11 +152,14 @@ def build_trade_order_flow(
     ]
     for col in list(columns):
         columns += [f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
-    return pd.merge_asof(
+    aligned = pd.merge_asof(
         b[["timestamp"]].sort_values("timestamp"),
         d[["timestamp"] + columns].sort_values("timestamp"),
         on="timestamp", direction="backward", allow_exact_matches=True,
-    )[columns]
+    )
+    # Keep the source-availability timestamp so causal consumers can validate
+    # exactly which trade observation is available at each base timestamp.
+    return aligned[["timestamp"] + columns]
 
 
 def build_order_flow(
