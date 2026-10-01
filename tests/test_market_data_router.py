@@ -138,3 +138,24 @@ def test_shared_snapshot_returns_isolated_frames():
     first["1m"].frame.loc[0, "close"] = -1
     second = shared.fetch_ohlcv_snapshot(**kwargs)
     assert second["1m"].frame.loc[0, "close"] == 100.5
+
+
+def test_shared_snapshot_accepts_per_timeframe_limits():
+    provider = FakeProvider("binance", frame=frame())
+    shared = SharedSnapshotMarketDataProvider(FallbackMarketDataProvider([provider]), ttl_seconds=60)
+    timeframes = ("1m", "1h", "1d")
+    limits = {"1m": 60, "1h": 30, "1d": 10}
+    shared.fetch_ohlcv_snapshot(
+        symbol="BTCUSDT", market_type="spot", timeframes=timeframes,
+        since_ms=None, limits=limits,
+    )
+    assert provider.calls == 3
+
+def test_shared_snapshot_rejects_partial_per_timeframe_limits():
+    provider = FakeProvider("binance", frame=frame())
+    shared = SharedSnapshotMarketDataProvider(FallbackMarketDataProvider([provider]), ttl_seconds=60)
+    with pytest.raises(ValueError, match="exactly the requested timeframes"):
+        shared.fetch_ohlcv_snapshot(
+            symbol="BTCUSDT", market_type="spot", timeframes=("1m", "1h"),
+            since_ms=None, limits={"1m": 60},
+        )
