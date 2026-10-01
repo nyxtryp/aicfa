@@ -34,6 +34,51 @@ def test_adapter_emits_only_active_base_observations():
     assert "5m:no_active_supported_observation" in evidence.missing_context
 
 
+def test_adapter_consumes_latest_causal_event_when_latest_row_is_quiet():
+    analysis = pd.DataFrame(
+        [
+            {
+                "timestamp": 1,
+                "bos_up": 1,
+                "bos_down": 0,
+                "displacement_up": 0,
+                "displacement_down": 0,
+                "fvg_bullish": 0,
+                "fvg_bearish": 0,
+                "order_block_bullish": 0,
+                "order_block_bearish": 0,
+                "sweep_low": 0,
+                "sweep_high": 0,
+            },
+            {
+                "timestamp": 2,
+                "bos_up": 0,
+                "bos_down": 0,
+                "displacement_up": 0,
+                "displacement_down": 0,
+                "fvg_bullish": 0,
+                "fvg_bearish": 0,
+                "order_block_bullish": 0,
+                "order_block_bearish": 0,
+                "sweep_low": 0,
+                "sweep_high": 0,
+            },
+        ]
+    )
+
+    evidence = build_market_evidence(
+        analysis,
+        asset="BTC/USDT",
+        timeframes=("1m",),
+    )
+
+    assert [
+        (item.concept_id, item.timeframe, item.direction)
+        for item in evidence.observations
+    ] == [("market_structure.bos", "1m", "long")]
+    assert evidence.missing_context == ()
+
+
 def test_adapter_reads_higher_timeframe_structure_from_mtf_columns():
     evidence = build_market_evidence(
         _analysis(**{"mtf_4h_bos_down": 1}),
