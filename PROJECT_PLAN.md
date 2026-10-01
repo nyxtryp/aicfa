@@ -1172,3 +1172,24 @@ Build the deterministic AICFA chart visualization model and first PNG renderer.
 
 ### NEXT UNFINISHED
 Run the chart visualization focused tests and full regression on the deployed/current server release, then perform a real BTC rendering smoke and inspect the produced chart before advancing the renderer.
+
+
+## 2026-10-02 — CHART VISUALIZATION: first implementation review
+
+### Found and fixed before server verification
+- Review of the first renderer revealed a concrete integration bug: `_as_frame()` was selecting only OHLCV columns, which silently discarded all analytical feature columns before rendering.
+- That would have produced candles and setup levels but could not actually render BOS/CHoCH/MSS, structure labels, FVG, OB, sweeps or displacement from the feature frame.
+- Fixed by preserving the complete incoming feature frame while still validating the required OHLCV columns.
+- Added regression assertions proving that BOS, HH, FVG and OB annotations reach the `ChartModel`.
+
+### Commits
+- `a7e6abb7ee45cffbcd32ae849fea1dd3fa30fe4b` — fix: preserve analytical feature columns for chart overlays
+- `480b3d49106c5cb05bd872ed69c9810013bf4344` — test: verify analytical overlays reach chart model
+
+### Verification state
+- Focused tests are now the next verification gate.
+- Server/FrostDeploy execution and full regression remain pending.
+- Real BTC rendering and visual inspection remain pending.
+
+### NEXT UNFINISHED
+Run the focused chart tests and full regression on the current server release.
