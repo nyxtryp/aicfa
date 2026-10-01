@@ -231,12 +231,30 @@ def build_market_evidence(
         if not emitted:
             missing.append(f"{timeframe}:no_active_supported_observation")
 
-    directions = {item.direction for item in observations if item.direction in {"long", "short"}}
-    conflicts = (
-        ("explicit long and short observations coexist",)
-        if directions == {"long", "short"}
-        else ()
-    )
+    # Opposite directions across timeframes are not, by themselves, a contradiction.
+    # MTF setup reasoning must preserve that hierarchy and resolve it later.
+    # A material evidence conflict here means that the same timeframe contains
+    # opposing structural signals. Context zones such as FVG/OB may legitimately
+    # oppose the structural leg and therefore do not create a global conflict.
+    structural_concepts = {
+        "market_structure.bos",
+        "market_structure.choch",
+        "displacement",
+    }
+    conflicts = []
+    for timeframe in timeframes:
+        directions = {
+            item.direction
+            for item in observations
+            if item.timeframe == timeframe
+            and item.concept_id in structural_concepts
+            and item.direction in {"long", "short"}
+        }
+        if directions == {"long", "short"}:
+            conflicts.append(
+                f"conflicting structural directions on {timeframe}"
+            )
+    conflicts = tuple(conflicts)
 
     return MarketEvidence(
         asset=asset,
