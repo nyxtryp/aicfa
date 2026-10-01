@@ -240,3 +240,36 @@ def test_setup_engine_uses_scenario_specific_zone_family():
     by_scenario = {candidate.scenario: candidate for candidate in result.candidates}
     assert by_scenario["continuation"].entry_zone[0].source.startswith("active bullish OB")
     assert by_scenario["reversal"].entry_zone[0].source.startswith("active bullish FVG")
+
+
+def test_setup_engine_prioritizes_active_liquidity_over_nearer_structural_extreme():
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    for tf, frame in frames.items():
+        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
+        frame.loc[0, "previous_high"] = float("nan")
+        frame.loc[0, "internal_previous_high"] = float("nan")
+        frame.loc[0, "rolling_high_60"] = float("nan")
+    frames["15m"].loc[0, "active_buy_liquidity_price"] = 108.0
+    frames["15m"].loc[0, "previous_high"] = 106.0
+
+    result = _pipeline(frames)
+    candidate = result.candidates[0]
+    assert candidate.target_levels[0].value == 108.0
+    assert candidate.target_levels[0].source == "active buy-side liquidity"
+
+
+def test_setup_engine_can_return_second_distinct_target_after_primary_draw():
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    for tf, frame in frames.items():
+        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
+        frame.loc[0, "previous_high"] = float("nan")
+        frame.loc[0, "internal_previous_high"] = float("nan")
+        frame.loc[0, "rolling_high_60"] = float("nan")
+    frames["4h"].loc[0, "active_buy_liquidity_price"] = 120.0
+    frames["4h"].loc[0, "previous_high"] = 125.0
+
+    result = _pipeline(frames)
+    targets = result.candidates[0].target_levels
+    assert len(targets) == 2
+    assert targets[0].value == 120.0
+    assert targets[1].value == 125.0
