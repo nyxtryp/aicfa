@@ -393,24 +393,28 @@ def _target_levels(
         ("internal_previous_low", "internal previous low"),
         ("rolling_low_60", "causal rolling low"),
     )
-    result: list[SetupLevel] = []
+    # Targets are MTF objectives, not a lookup tied to the entry timeframe.
+    # A setup zone can be found on 15m while its objective is the next valid
+    # structural/liquidity level on 15m, 1h, 4h, 1d or 1w. Lower execution
+    # timeframes are never allowed to become the sole source of the target.
     if entry_timeframe in SETUP_TIMEFRAMES:
         entry_index = SETUP_TIMEFRAMES.index(entry_timeframe)
         allowed = SETUP_TIMEFRAMES[entry_index:]
-        ordered = tuple(
-            tf for tf in preferred_timeframes if tf in allowed
-        ) + tuple(
-            tf for tf in allowed if tf not in preferred_timeframes
-        )
     else:
-        ordered = _ordered_source_timeframes(
-            context, preferred_timeframes=preferred_timeframes
-        )
+        allowed = SETUP_TIMEFRAMES
+
+    ordered = tuple(
+        tf for tf in preferred_timeframes if tf in allowed
+    ) + tuple(
+        tf for tf in allowed if tf not in preferred_timeframes
+    )
+
+    candidates: list[tuple[float, int, int, str, str]] = []
     for timeframe in ordered:
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
-        for column, source in columns:
+        for priority, (column, source) in enumerate(columns):
             value = _numeric(row, column)
             if value is None:
                 continue
@@ -419,11 +423,18 @@ def _target_levels(
                     continue
                 if direction == "short" and value >= current_price:
                     continue
-            result.append(SetupLevel(value=value, timeframe=timeframe, source=source))
-            break
-        if result:
-            break
-    return tuple(result)
+            # Prefer the nearest valid objective; source priority breaks ties.
+            distance = (
+                value - current_price if direction == "long"
+                else current_price - value
+            ) if current_price is not None else 0.0
+            candidates.append((distance, priority, SETUP_TIMEFRAMES.index(timeframe), timeframe, source, value))
+
+    if not candidates:
+        return ()
+
+    _, _, _, timeframe, source, value = min(candidates, key=lambda item: item[:3])
+    return (SetupLevel(value=value, timeframe=timeframe, source=source),)
 
 
 def _resolve_direction(context: MultiTimeframeContext) -> tuple[str | None, str | None]:
@@ -631,3 +642,36 @@ def analyze_setups(
         conflicts=evidence_assessment.conflicts,
         reasons=("one or more conditional setups are sufficiently specified by the current seven-timeframe state",),
     )
+
+
+def test_setup_engine_selects_nearest_mtf_target_above_current_price():
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    for tf, frame in frames.items():
+        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
+        frame.loc[0, "previous_high"] = float("nan")
+        frame.loc[0, "internal_previous_high"] = float("nan")
+        frame.loc[0, "rolling_high_60"] = float("nan")
+    frames["1h"].loc[0, "previous_high"] = 130.0
+    frames["4h"].loc[0, "previous_high"] = 125.0
+
+    result = _pipeline(frames)
+    candidate = result.candidates[0]
+    assert candidate.target_levels
+    assert candidate.target_levels[0].timeframe == "4h"
+    assert candidate.target_levels[0].value == 125.0
+
+
+def test_setup_engine_does_not_use_execution_timeframe_as_target_source():
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    for tf, frame in frames.items():
+        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
+        frame.loc[0, "previous_high"] = float("nan")
+        frame.loc[0, "internal_previous_high"] = float("nan")
+        frame.loc[0, "rolling_high_60"] = float("nan")
+    frames["1m"].loc[0, "previous_high"] = 106.0
+    frames["4h"].loc[0, "previous_high"] = 125.0
+
+    result = _pipeline(frames)
+    candidate = result.candidates[0]
+    assert candidate.target_levels
+    assert candidate.target_levels[0].timeframe == "4h"
