@@ -38,6 +38,28 @@ class FakeProvider:
         self.calls.append((symbol, market_type, timeframe, since_ms, limit))
         return candles(limit, timeframe=timeframe)
 
+    def fetch_trades(self, *, symbol, market_type, limit):
+        self.trade_calls = getattr(self, "trade_calls", [])
+        self.trade_calls.append((symbol, market_type, limit))
+        base = 60 * 60_000
+        return pd.DataFrame({
+            "timestamp": [base + i * 10_000 for i in range(min(limit, 60))],
+            "price": np.full(min(limit, 60), 100.0),
+            "volume": np.full(min(limit, 60), 1.0),
+            "side": [1 if i % 2 == 0 else -1 for i in range(min(limit, 60))],
+        })
+
+    def fetch_order_book(self, *, symbol, market_type, limit=1):
+        self.book_calls = getattr(self, "book_calls", [])
+        self.book_calls.append((symbol, market_type, limit))
+        return pd.DataFrame({
+            "timestamp": [90 * 60_000],
+            "bid_price": [99.9],
+            "bid_size": [5.0],
+            "ask_price": [100.1],
+            "ask_size": [4.0],
+        })
+
 
 def test_normalize_asset_preserves_explicit_quote():
     assert normalize_asset(" btc-usdt ") == "BTC/USDT"
@@ -179,3 +201,21 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
     assert all(call[4] in {60, 120, 240} for call in provider.calls)
     assert [call[4] for call in provider.calls if call[2] == "1m"] == [60, 120, 240]
+
+
+def test_find_setup_feeds_request_scoped_microstructure_data():
+    provider = FakeProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert provider.trade_calls == [("BTC/USDT", "spot", 60)]
+    assert provider.book_calls == [("BTC/USDT", "spot", 1)]
+    assert not result.trades.empty
+    assert not result.order_book.empty
+    assert not result.order_flow_analysis.empty
+    assert not result.order_book_analysis.empty
