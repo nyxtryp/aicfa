@@ -380,6 +380,10 @@ def _target_levels(
     preferred_timeframes: tuple[str, ...] = (),
     entry_timeframe: str | None = None,
 ) -> tuple[SetupLevel, ...]:
+    # A target is the next causal draw-on-liquidity/objective, not an arbitrary
+    # number above/below price. The hierarchy follows the market-delivery logic:
+    # active liquidity first, then breakout objective, then confirmed structural
+    # extremes, then causal range extremes.
     columns = (
         ("active_buy_liquidity_price", "active buy-side liquidity"),
         ("liquidity_breakout_high", "liquidity breakout high"),
@@ -393,10 +397,9 @@ def _target_levels(
         ("internal_previous_low", "internal previous low"),
         ("rolling_low_60", "causal rolling low"),
     )
-    # Targets are MTF objectives, not a lookup tied to the entry timeframe.
-    # A setup zone can be found on 15m while its objective is the next valid
-    # structural/liquidity level on 15m, 1h, 4h, 1d or 1w. Lower execution
-    # timeframes are never allowed to become the sole source of the target.
+
+    # Execution/entry TFs below the setup zone are not allowed to manufacture
+    # the setup objective. Targets are drawn from the setup timeframe upward.
     if entry_timeframe in SETUP_TIMEFRAMES:
         entry_index = SETUP_TIMEFRAMES.index(entry_timeframe)
         allowed = SETUP_TIMEFRAMES[entry_index:]
@@ -405,16 +408,14 @@ def _target_levels(
 
     ordered = tuple(
         tf for tf in preferred_timeframes if tf in allowed
-    ) + tuple(
-        tf for tf in allowed if tf not in preferred_timeframes
-    )
+    ) + tuple(tf for tf in allowed if tf not in preferred_timeframes)
 
-    candidates: list[tuple[float, int, int, str, str]] = []
-    for timeframe in ordered:
-        row = context.latest_rows.get(timeframe)
-        if row is None:
-            continue
-        for priority, (column, source) in enumerate(columns):
+    candidates: list[tuple[int, float, int, str, str, float]] = []
+    for source_priority, (column, source) in enumerate(columns):
+        for timeframe in ordered:
+            row = context.latest_rows.get(timeframe)
+            if row is None:
+                continue
             value = _numeric(row, column)
             if value is None:
                 continue
@@ -423,18 +424,48 @@ def _target_levels(
                     continue
                 if direction == "short" and value >= current_price:
                     continue
-            # Prefer the nearest valid objective; source priority breaks ties.
             distance = (
-                value - current_price if direction == "long"
-                else current_price - value
-            ) if current_price is not None else 0.0
-            candidates.append((distance, priority, SETUP_TIMEFRAMES.index(timeframe), timeframe, source, value))
+                abs(value - current_price) if current_price is not None else 0.0
+            )
+            candidates.append((
+                source_priority,
+                distance,
+                -SETUP_TIMEFRAMES.index(timeframe),
+                timeframe,
+                source,
+                value,
+            ))
 
     if not candidates:
         return ()
 
-    _, _, _, timeframe, source, value = min(candidates, key=lambda item: item[:3])
-    return (SetupLevel(value=value, timeframe=timeframe, source=source),)
+    # First target = the nearest valid objective within the highest available
+    # objective class. This prevents a random nearby swing from outranking an
+    # actual active liquidity draw.
+    candidates.sort(key=lambda item: item[:3])
+    first = candidates[0]
+    result = [
+        SetupLevel(value=first[5], timeframe=first[3], source=first[4])
+    ]
+
+    # Second target = next distinct objective above/below T1, preferably from
+    # the same or a higher objective class. Never duplicate the first level.
+    first_value = first[5]
+    for candidate in candidates[1:]:
+        value = candidate[5]
+        if value == first_value:
+            continue
+        if direction == "long" and value <= first_value:
+            continue
+        if direction == "short" and value >= first_value:
+            continue
+        result.append(
+            SetupLevel(value=value, timeframe=candidate[3], source=candidate[4])
+        )
+        break
+
+    return tuple(result)
+
 
 
 def _resolve_direction(context: MultiTimeframeContext) -> tuple[str | None, str | None]:
