@@ -441,3 +441,30 @@ Implemented the first genuine multi-timeframe SETUP ENGINE pass.
 - Tests have not yet been run after these commits.
 - Previous green checkpoint remains historical: 332 passed, 21228 warnings, 0 failed.
 - Next action is focused SETUP ENGINE tests, then full pytest, then live BTC FindSetup smoke.
+
+## 2026-10-01 — SETUP ENGINE focused-test regression and correction
+
+The first focused verification of the seven-timeframe SETUP ENGINE produced **5 failures, 21 passed, 16396 warnings in 31.71s**.
+
+Failures:
+- `tests/test_setup_engine_mtf.py::test_setup_engine_levels_come_from_relevant_timeframe_not_1m` — target/level selection returned `1w` where the test requires the relevant supporting `4h` timeframe.
+- Four `tests/test_setup_analysis.py` failures because `VisualObservation` did not preserve its parent chart timeframe, while the new setup-analysis path now needs observation-level timeframe provenance.
+
+This was a real implementation regression, not a test-only workaround.
+
+### Corrections committed
+- `4ff0409193f5074e029b9299f5d13e3c46f6bc6e` — setup zone/level selection now prefers timeframes that supplied the observed setup evidence instead of blindly starting at 1w.
+- `b472e1cb8700bd15a3fc37e984486a568c5d5247` — `VisualObservation` now preserves optional timeframe provenance.
+- `1c615dfc51721ed1cf656d03a79fa871d7f11bdc` — visual evidence assessment propagates the parent chart timeframe into each observation.
+- `697c352fb9d147bb981b5776acc0999a5e28e820` — target-level selection now receives supporting setup timeframes and prefers those timeframes.
+
+### Architectural rule preserved
+The correction does **not** weaken the seven-timeframe requirement. It only fixes provenance and source-timeframe selection:
+- higher TF structure still determines direction;
+- 15m/5m remain confirmation;
+- 1m remains execution/microstructure only;
+- entry/invalidation/targets must come from the timeframe where the relevant evidence exists;
+- no fabricated numeric levels and no automatic 1m-close entry.
+
+### Verification
+The correction commits are not yet verified by pytest. The next action remains the focused SETUP ENGINE test command, followed by full pytest if green.
