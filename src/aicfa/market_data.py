@@ -66,6 +66,24 @@ class MarketDataProvider(Protocol):
     ) -> pd.DataFrame:
         """Return OHLCV rows with provider-native candle-open timestamps."""
 
+    def fetch_trades(
+        self,
+        *,
+        symbol: str,
+        market_type: str,
+        limit: int,
+    ) -> pd.DataFrame:
+        """Return recent public trades with venue-provided aggressor side."""
+
+    def fetch_order_book(
+        self,
+        *,
+        symbol: str,
+        market_type: str,
+        limit: int,
+    ) -> pd.DataFrame:
+        """Return timestamped order-book snapshots normalized to L1."""
+
 
 def validate_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize and validate an OHLCV frame without inventing missing data."""
