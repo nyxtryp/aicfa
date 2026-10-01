@@ -313,3 +313,78 @@ These failures must be reconciled against the actual repository `main` state and
 
 ### Continuity rule
 When resuming AICFA after a chat reset, start from this document, verify the repository state, then continue from **NEXT UNFINISHED**. Do not restart completed analytical blocks and do not resurrect closed branches.
+
+
+## 2026-10-01 — CURRENT SOURCE OF TRUTH: SETUP ENGINE
+
+This section supersedes all earlier "NEXT UNFINISHED" sections below it.
+
+### Product direction
+AICFA's immediate purpose is to analyze the **current market/chart** and produce a structured trading setup when conditions align. Historical data is not the current product goal and must not become a detour into model training.
+
+The live analytical path is:
+
+```
+CURRENT MARKET / CHART
+→ multi-timeframe market state
+→ Market Structure / SMC
+→ Liquidity
+→ BOS / CHoCH / MSS
+→ FVG
+→ Order Blocks
+→ Displacement
+→ Premium / Discount
+→ Price Action / Wyckoff
+→ Volume / Volatility
+→ Derivatives
+→ Order Flow
+→ CVD
+→ Absorption
+→ Scenario
+→ SETUP ENGINE
+→ Entry / Invalidation / Targets / Required Confirmation
+→ LONG / SHORT / WAIT / NO TRADE
+```
+
+### Already completed
+The deterministic analytical core already contains the completed blocks listed in the reconciliation above, including Displacement, FVG, Order Blocks, Unified SMC, Setup Detection, Setup Events, CVD, L1 history and Absorption.
+
+The current deployed regression gate is **332 passed, 21228 warnings, 0 failed**. The previously reported Order Flow / FindSetup failures are no longer current and must not be resurrected as unfinished work.
+
+### Current gap
+There are already separate layers named:
+- `setup_detection.py`
+- `setup_events.py`
+- `setup_analysis.py`
+- `decision.py`
+
+However, the request path still treats them primarily as separate descriptive/reasoning stages. The next implementation must make them function as one coherent **SETUP ENGINE** over the current multi-timeframe market state.
+
+The engine must:
+1. identify the active setup family from the current state;
+2. resolve direction from actual current evidence rather than guessing;
+3. combine SMC/price-action/microstructure confluence;
+4. identify the relevant entry condition;
+5. identify a concrete invalidation reference when the available market data supports one;
+6. identify visible target/liquidity objectives when available;
+7. explicitly state missing confirmation/context instead of inventing prices;
+8. preserve WAIT / NO TRADE when evidence conflicts or the setup is incomplete;
+9. remain deterministic and causal;
+10. not execute orders.
+
+### Important distinction
+Historical labels and the existing leak-safe dataset foundation remain valid project infrastructure. They are **not** the next implementation block and must not replace the current setup-engine work.
+
+Model training is deferred until the deterministic setup engine is sufficiently complete to define exactly what AICFA is trying to learn.
+
+### NEXT UNFINISHED
+1. Unify current setup detection, scenario reasoning, setup analysis and decision into the coherent SETUP ENGINE.
+2. Make the engine consume the actual current multi-timeframe state and available microstructure evidence.
+3. Add explicit structured setup output: family, direction, entry condition, invalidation, targets, confirmation requirements and rationale.
+4. Add focused causal/conflict/no-invention tests.
+5. Run the focused tests and complete pytest.
+6. Run a live BTC FindSetup smoke and inspect the resulting setup object.
+7. Record the exact GREEN result here before advancing to the next analytical block.
+
+### Continuity rule
+After a chat reset, start from this section. Do not jump to model training, do not redo completed analytical layers, and do not reopen closed local-model research.
