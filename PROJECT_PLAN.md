@@ -1219,3 +1219,22 @@ Run the focused chart tests on FrostDeploy and record the real result; do not ad
 
 ### NEXT UNFINISHED
 Run the full AICFA regression suite on the same deployed release. If GREEN, perform the real BTC chart rendering smoke and inspect the generated chart.
+
+
+## 2026-10-02 — CHART VISUALIZATION: full regression GREEN
+
+### Verification
+- Deployed release: `2026-10-01T18-45-25-cdc4f6f`.
+- Full AICFA regression: **350 passed, 0 failed, 53.30s**.
+- 21,508 warnings were emitted; no test failure occurred.
+- The chart visualization layer did not introduce a repository regression.
+
+### CURRENT STATE
+- Chart visualization focused suite: **5 passed**.
+- Full repository regression: **350 passed**.
+- Deterministic chart model/PNG renderer: implemented and regression-covered.
+- Real BTC chart rendering smoke: **not yet run**.
+- Visual inspection of the produced BTC chart: **not yet run**.
+
+### NEXT UNFINISHED
+Run a real BTC Spot FindSetup + chart rendering smoke using the deployed AICFA analytical path, save the generated PNG, and inspect it for geometry/provenance and visual correctness before advancing the renderer.
