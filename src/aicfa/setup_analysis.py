@@ -411,16 +411,14 @@ def _actionable_geometry_key(candidate: SetupCandidate) -> tuple:
     )
 
 
-def _risk_reward_is_valid(
+def _risk_reward_value(
     direction: str,
     entry_zone: tuple[SetupLevel, ...],
     invalidation: SetupLevel | None,
     targets: tuple[SetupLevel, ...],
-    *,
-    minimum_rr: float = 2.0,
-) -> bool:
+) -> float | None:
     if len(entry_zone) < 2 or invalidation is None or not targets:
-        return False
+        return None
     entry_low = min(level.value for level in entry_zone)
     entry_high = max(level.value for level in entry_zone)
     if direction == "long":
@@ -430,8 +428,20 @@ def _risk_reward_is_valid(
         risk = invalidation.value - entry_high
         reward = entry_low - targets[0].value
     if risk <= 0 or reward <= 0:
-        return False
-    return reward / risk >= minimum_rr
+        return None
+    return reward / risk
+
+
+def _risk_reward_is_valid(
+    direction: str,
+    entry_zone: tuple[SetupLevel, ...],
+    invalidation: SetupLevel | None,
+    targets: tuple[SetupLevel, ...],
+    *,
+    minimum_rr: float = 2.0,
+) -> bool:
+    rr = _risk_reward_value(direction, entry_zone, invalidation, targets)
+    return rr is not None and rr >= minimum_rr
 
 
 def _target_levels(
@@ -698,12 +708,27 @@ def analyze_setups(
             if not target_levels:
                 missing.append(f"{hypothesis.scenario}: no geometrically valid target is available")
                 continue
-            if not _risk_reward_is_valid(
+            rr = _risk_reward_value(
                 direction, entry_levels, invalidation_level, target_levels
-            ):
+            )
+            if rr is None or rr < 2.0:
+                entry_low = min(level.value for level in entry_levels)
+                entry_high = max(level.value for level in entry_levels)
+                invalidation_value = invalidation_level.value
+                tp1 = target_levels[0].value
+                tp2 = target_levels[1].value if len(target_levels) > 1 else None
                 missing.append(
-                    f"{hypothesis.scenario}: structural risk/reward is below the minimum"
+                    f"{hypothesis.scenario}: structural risk/reward is below the minimum "
+                    f"(entry={entry_low:.2f}-{entry_high:.2f}, "
+                    f"invalidation={invalidation_value:.2f}, "
+                    f"tp1={tp1:.2f}, "
+                    f"tp2={tp2:.2f}" if tp2 is not None else
+                    f"{hypothesis.scenario}: structural risk/reward is below the minimum "
+                    f"(entry={entry_low:.2f}-{entry_high:.2f}, "
+                    f"invalidation={invalidation_value:.2f}, "
+                    f"tp1={tp1:.2f}, tp2=none"
                 )
+                missing[-1] += f", rr={'none' if rr is None else f'{rr:.3f}'}, minimum=2.000)"
                 continue
 
         candidates.append(
