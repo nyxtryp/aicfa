@@ -240,25 +240,46 @@ def _zone_levels(
     concepts: tuple[str, ...],
     current_price: float | None,
 ) -> tuple[SetupLevel, ...]:
-    """Select one actionable zone with directionally valid price geometry."""
-    zones: list[tuple[float, float, str, str, str]] = []
-    for timeframe in _ordered_source_timeframes(context, concepts):
-        row = context.latest_rows.get(timeframe)
-        if row is None:
+    """Select one actionable zone, honoring scenario concept priority."""
+    candidates_by_concept = (
+        (
+            "imbalance.fvg",
+            "fvg_bullish_low",
+            "fvg_bullish_high",
+            "active bullish FVG",
+        ),
+        (
+            "order_block.bullish",
+            "order_block_bullish_low",
+            "order_block_bullish_high",
+            "active bullish OB",
+        ),
+    ) if direction == "long" else (
+        (
+            "imbalance.fvg",
+            "fvg_bearish_low",
+            "fvg_bearish_high",
+            "active bearish FVG",
+        ),
+        (
+            "order_block.bearish",
+            "order_block_bearish_low",
+            "order_block_bearish_high",
+            "active bearish OB",
+        ),
+    )
+
+    zones: list[tuple[float, float, str, str]] = []
+    ordered_timeframes = _ordered_source_timeframes(context, concepts)
+
+    for concept, low_col, high_col, source in candidates_by_concept:
+        if concept not in concepts:
             continue
-        if direction == "long":
-            candidates = []
-            if "imbalance.fvg" in concepts:
-                candidates.append(("fvg_bullish_low", "fvg_bullish_high", "active bullish FVG"))
-            if "order_block.bullish" in concepts:
-                candidates.append(("order_block_bullish_low", "order_block_bullish_high", "active bullish OB"))
-        else:
-            candidates = []
-            if "imbalance.fvg" in concepts:
-                candidates.append(("fvg_bearish_low", "fvg_bearish_high", "active bearish FVG"))
-            if "order_block.bearish" in concepts:
-                candidates.append(("order_block_bearish_low", "order_block_bearish_high", "active bearish OB"))
-        for low_col, high_col, source in candidates:
+        concept_zones: list[tuple[float, float, str, str]] = []
+        for timeframe in ordered_timeframes:
+            row = context.latest_rows.get(timeframe)
+            if row is None:
+                continue
             low = _numeric(row, low_col)
             high = _numeric(row, high_col)
             if low is None or high is None or low > high:
@@ -268,26 +289,27 @@ def _zone_levels(
                     continue
                 if direction == "short" and high <= current_price:
                     continue
-            zones.append((low, high, timeframe, source, direction))
+            concept_zones.append((low, high, timeframe, source))
+        if concept_zones:
+            zones = concept_zones
+            break
 
     if not zones:
         return ()
 
     if current_price is None:
-        low, high, timeframe, source, _ = zones[0]
+        low, high, timeframe, source = zones[0]
     elif direction == "long":
         below = [zone for zone in zones if zone[1] <= current_price]
-        low, high, timeframe, source, _ = max(below, key=lambda zone: zone[1]) if below else zones[0]
+        low, high, timeframe, source = max(below, key=lambda zone: zone[1]) if below else zones[0]
     else:
         above = [zone for zone in zones if zone[0] >= current_price]
-        low, high, timeframe, source, _ = min(above, key=lambda zone: zone[0]) if above else zones[0]
+        low, high, timeframe, source = min(above, key=lambda zone: zone[0]) if above else zones[0]
 
     return (
         SetupLevel(value=low, timeframe=timeframe, source=f"{source} low"),
         SetupLevel(value=high, timeframe=timeframe, source=f"{source} high"),
     )
-
-
 
 def _scenario_zone_concepts(
     scenario: str,
