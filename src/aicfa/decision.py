@@ -87,17 +87,6 @@ def decide(
         )
 
     directional = _directional_observations(observations)
-    sides = {item.direction for item in directional}
-
-    if len(sides) > 1:
-        return DecisionAssessment(
-            action=DecisionAction.WAIT,
-            candidates=(),
-            missing_context=setup_assessment.missing_context,
-            conflicts=setup_assessment.conflicts + ("directional evidence conflicts between LONG and SHORT",),
-            reasons=("directional evidence is contradictory",),
-        )
-
     if not directional:
         return DecisionAssessment(
             action=DecisionAction.WAIT,
@@ -109,7 +98,29 @@ def decide(
             reasons=("setup is structurally ready but direction is not established by evidence",),
         )
 
-    side = next(iter(sides))
+    candidate_directions = {candidate.direction for candidate in setup_assessment.candidates}
+    if None in candidate_directions or len(candidate_directions) != 1:
+        return DecisionAssessment(
+            action=DecisionAction.WAIT,
+            candidates=(),
+            missing_context=setup_assessment.missing_context,
+            conflicts=setup_assessment.conflicts + ("setup candidates do not share one resolved MTF direction",),
+            reasons=("setup direction is not uniquely resolved",),
+        )
+
+    side = next(iter(candidate_directions))
+    matching = tuple(item for item in directional if item.direction == side)
+    if not matching:
+        return DecisionAssessment(
+            action=DecisionAction.WAIT,
+            candidates=(),
+            missing_context=setup_assessment.missing_context,
+            conflicts=setup_assessment.conflicts + (
+                f"no explicit directional evidence supports resolved {side} setup direction",
+            ),
+            reasons=("resolved MTF setup direction lacks matching explicit evidence",),
+        )
+
     action = DecisionAction.LONG if side == "long" else DecisionAction.SHORT
     candidates = tuple(
         DecisionCandidate(
