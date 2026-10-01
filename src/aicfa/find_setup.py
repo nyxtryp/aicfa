@@ -286,14 +286,24 @@ def find_setup(
         market_evidence = build_market_evidence_from_frames(
             analyses, asset=symbol, timeframes=timeframes,
         )
-    trade_result = provider.fetch_trades_with_source(
-        symbol=symbol, market_type=request.market_type, limit=60
-    )
-    book_result = provider.fetch_order_book_with_source(
-        symbol=symbol, market_type=request.market_type, limit=1
-    )
-    trades = trade_result.frame
-    order_book = book_result.frame
+    trade_fetch = getattr(provider, "fetch_trades_with_source", None)
+    book_fetch = getattr(provider, "fetch_order_book_with_source", None)
+    if trade_fetch is not None:
+        trades = trade_fetch(
+            symbol=symbol, market_type=request.market_type, limit=60
+        ).frame
+    else:
+        trades = provider.fetch_trades(
+            symbol=symbol, market_type=request.market_type, limit=60
+        )
+    if book_fetch is not None:
+        order_book = book_fetch(
+            symbol=symbol, market_type=request.market_type, limit=1
+        ).frame
+    else:
+        order_book = provider.fetch_order_book(
+            symbol=symbol, market_type=request.market_type, limit=1
+        )
 
     trade_work = trades.copy()
     trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
