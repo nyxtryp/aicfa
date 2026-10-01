@@ -218,4 +218,7 @@ def test_find_setup_feeds_request_scoped_microstructure_data():
     assert not result.trades.empty
     assert not result.order_book.empty
     assert not result.order_flow_analysis.empty
+    assert result.order_flow_analysis["taker_net_volume"].notna().any()
     assert not result.order_book_analysis.empty
+    assert result.trades_provider
+    assert result.order_book_provider
