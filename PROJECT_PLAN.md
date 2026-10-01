@@ -534,3 +534,74 @@ The deterministic repository regression gate is GREEN at **336 passed**. The sev
 4. Inspect whether the corrected hierarchy produces a real setup candidate when the current market state supports one, or correctly returns WAIT/NEED_MORE_EVIDENCE when it does not.
 5. Verify family, direction, entry zone/condition, invalidation, targets, confirmation timeframes and source timeframes.
 6. Record the exact production result before advancing the SETUP ENGINE block.
+
+
+## 2026-10-01 — SETUP ENGINE: scenario-specific zones and live target gap
+
+### Completed since previous checkpoint
+- Corrected Market Evidence so directional event opposition is not manufactured into a global conflict.
+- Commits:
+  - `68dbd11d9fb6b64ae7ca646acb9a2a8c56882568` — preserve per-timeframe conflicts in MTF evidence.
+  - `19641d8151f48fa2318b1a3dbf58215c890c5965` — align MTF conflict expectations.
+  - `2f1c282a507bd5777cb8c4ee448a5b2a67a8075c` — do not infer evidence conflicts from event opposition.
+  - `0f5133be8d76d78b8ba3dd02c9fad618071042b0` — align evidence-conflict tests with event semantics.
+- Focused conflict regression: **11 passed, 1 warning**.
+- Full regression after conflict correction: **338 passed, 21228 warnings, 0 failed**.
+- Corrected setup geometry so entry zones, invalidation and targets respect the relevant timeframe and actionable side of current price.
+- Commits:
+  - `c7638b4` — enforce coherent MTF setup levels.
+  - `d9d3f97` — respect resolved MTF direction in decision gate.
+  - `46354e6` — preserve legacy decision direction gating.
+  - `3b12ce6` — enforce setup level geometry tests.
+  - `be632a2` — preserve hierarchical MTF direction tests.
+  - `d2c033b8162522f0886be6ffd161b252045d57ed` — keep setup targets at zone timeframe scale.
+  - `501067ca40d29b3a576224b58fb8f106be68af89` — prevent lower-timeframe setup targets.
+- Added scenario-specific entry-zone concept priority:
+  - continuation: directional Order Block, then FVG;
+  - reversal: FVG, then directional Order Block;
+  - breakout failure: directional Order Block, then FVG.
+- Commits:
+  - `b3ffee36a5bfe53ddfed73e8eaeef28779de7372` — make setup zones scenario-specific.
+  - `a708a62e0147b2891edde1eedfa0d90ca397d984` — scenario-specific zone tests.
+  - `1d5d6aded0dd494d15685e8fee06f0417d4cccab` — honor scenario zone priority.
+- Focused SETUP ENGINE tests: **14 passed, 1 warning, 0 failed**.
+- Complete repository regression: **341 passed, 21228 warnings, 0 failed**.
+
+### Live BTC verification
+The live BTC Spot FindSetup path now reaches the scenario/setup layers with all seven timeframes and populated evidence:
+- seven TF: `1m, 5m, 15m, 1h, 4h, 1d, 1w`;
+- Market Evidence: PROCEED, no global conflict, no missing context;
+- scenarios: continuation, reversal and breakout-failure have supporting evidence;
+- Order Flow, CVD and Absorption are populated from the live request-scoped data.
+
+The current live result is nevertheless:
+`WAIT — setup conditions are not sufficiently specified`.
+
+The immediate reason is explicit and valid:
+- continuation: no geometrically valid target is available;
+- reversal: no geometrically valid target is available;
+- breakout_failure: no geometrically valid target is available.
+
+This is **not** a test failure. It is the live setup engine refusing to invent a target when the currently available target levels do not satisfy its causal MTF geometry.
+
+### Architectural issue now isolated
+The next task is **target/level construction**, not another broad rewrite:
+1. inspect the actual live seven-timeframe target/zone geometry;
+2. determine which legitimate liquidity/structure objectives can serve as targets for each scenario;
+3. make target construction scenario-aware where the market evidence supports it;
+4. preserve WAIT when no valid objective exists;
+5. add focused tests;
+6. run full pytest;
+7. run live BTC FindSetup again.
+
+Do not relax causality, do not use 1m as the sole source of setup levels, and do not manufacture targets merely to produce LONG/SHORT.
+
+### CURRENT STATE
+- Seven-timeframe SETUP ENGINE: implemented and regression GREEN.
+- Scenario-specific entry zones: implemented and regression GREEN.
+- CVD / Absorption / Order Flow: live integrated and GREEN.
+- Full regression: **341 passed, 21228 warnings, 0 failed**.
+- Live BTC: reaches scenario reasoning but currently returns honest WAIT because no geometrically valid target is available.
+
+### NEXT UNFINISHED
+**Target/level construction for the SETUP ENGINE** — inspect real live level geometry, define valid scenario-aware target selection, test it, then re-run full regression and live BTC smoke.
