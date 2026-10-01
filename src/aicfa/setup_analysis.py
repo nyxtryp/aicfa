@@ -220,14 +220,16 @@ def _numeric(row: pd.Series, column: str) -> float | None:
 def _ordered_source_timeframes(
     context: MultiTimeframeContext,
     concepts: tuple[str, ...] = (),
+    preferred_timeframes: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
-    """Prefer timeframes that actually supplied the observed setup evidence."""
+    """Prefer explicit supporting timeframes, then observed evidence timeframes."""
+    ordered = [tf for tf in preferred_timeframes if tf in context.latest_rows]
     observed = {
         item.timeframe
         for item in context.observations
         if item.concept_id in concepts and getattr(item, "timeframe", None)
     }
-    ordered = [tf for tf in SETUP_TIMEFRAMES if tf in observed]
+    ordered.extend(tf for tf in SETUP_TIMEFRAMES if tf in observed and tf not in ordered)
     ordered.extend(tf for tf in SETUP_TIMEFRAMES[::-1] if tf not in ordered)
     return tuple(ordered)
 
@@ -305,7 +307,7 @@ def _target_levels(
         ("previous_low", "previous low"),
     )
     result: list[SetupLevel] = []
-    for timeframe in _ordered_source_timeframes(context, preferred_timeframes):
+    for timeframe in _ordered_source_timeframes(context, preferred_timeframes=preferred_timeframes):
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
