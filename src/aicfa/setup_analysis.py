@@ -384,10 +384,14 @@ def _target_levels(
         ("active_buy_liquidity_price", "active buy-side liquidity"),
         ("liquidity_breakout_high", "liquidity breakout high"),
         ("previous_high", "previous high"),
+        ("internal_previous_high", "internal previous high"),
+        ("rolling_high_60", "causal rolling high"),
     ) if direction == "long" else (
         ("active_sell_liquidity_price", "active sell-side liquidity"),
         ("liquidity_breakout_low", "liquidity breakout low"),
         ("previous_low", "previous low"),
+        ("internal_previous_low", "internal previous low"),
+        ("rolling_low_60", "causal rolling low"),
     )
     result: list[SetupLevel] = []
     if entry_timeframe in SETUP_TIMEFRAMES:
