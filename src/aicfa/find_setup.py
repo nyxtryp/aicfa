@@ -62,6 +62,8 @@ class FindSetupResult:
     order_book: pd.DataFrame
     order_flow_analysis: pd.DataFrame
     order_book_analysis: pd.DataFrame
+    trades_provider: str
+    order_book_provider: str
     decision: str
     reason: str
 
@@ -291,27 +293,35 @@ def find_setup(
 
     trade_limit = 60
     if trade_fetch is not None:
-        trades = trade_fetch(
+        trade_result = trade_fetch(
             symbol=symbol, market_type=request.market_type, limit=trade_limit
-        ).frame
+        )
+        trades = trade_result.frame
+        trades_provider = trade_result.provider
     else:
         trades = provider.fetch_trades(
             symbol=symbol, market_type=request.market_type, limit=trade_limit
         )
+        trades_provider = provider.__class__.__name__
 
     if trades.empty:
         raise ValueError("no trade data available for microstructure analysis")
     if book_fetch is not None:
-        order_book = book_fetch(
+        book_result = book_fetch(
             symbol=symbol, market_type=request.market_type, limit=1
-        ).frame
+        )
+        order_book = book_result.frame
+        order_book_provider = book_result.provider
     else:
         order_book = provider.fetch_order_book(
             symbol=symbol, market_type=request.market_type, limit=1
         )
-    flow_base = pd.DataFrame({
-        "timestamp": pd.to_datetime(analysis["timestamp"], utc=True)
-    })
+        order_book_provider = provider.__class__.__name__
+
+    trade_work = trades.copy()
+    trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
+    latest_trade_timestamp = trade_work["timestamp"].max()
+    flow_base = pd.DataFrame({"timestamp": [latest_trade_timestamp]})
     order_flow_analysis = build_trade_order_flow(
         flow_base,
         trades,
@@ -348,6 +358,8 @@ def find_setup(
         order_book=order_book,
         order_flow_analysis=order_flow_analysis,
         order_book_analysis=order_book_analysis,
+        trades_provider=trades_provider,
+        order_book_provider=order_book_provider,
         decision=decision_assessment.action.value.upper().replace("_", " "),
         reason="; ".join(decision_assessment.reasons),
     )
