@@ -2304,3 +2304,10 @@ Deploy current `main` and rerun the mandatory full pytest. Expected test count r
 - No analytical rules, timeframe semantics, structure detection, or causal boundaries were changed.
 - Verification: pending FrostDeploy deployment and focused/full test run.
 - Exact next step: deploy `ed75d91bd2921aab6ed0c598b869e3803a4664aa`, run the focused MTF tests first, then the full suite if focused tests pass.
+
+
+### 2026-10-01 — MTF optimization import repair
+- Focused verification of `ed75d91` failed immediately with `NameError: name 'np' is not defined` in both MTF tests.
+- Action: commit `81f6e598616f112677cdf05fe4524c14593cbfc9` adds the missing NumPy import required by the new `searchsorted` implementation.
+- No logic or analytical behavior changed.
+- Exact next step: deploy `81f6e598616f112677cdf05fe4524c14593cbfc9` and rerun the same two focused MTF tests.
