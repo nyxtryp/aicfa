@@ -294,12 +294,21 @@ def build_market_evidence_from_frames(
         observations.extend(item.observations)
         missing.extend(item.missing_context)
 
-    directions = {item.direction for item in observations if item.direction in {"long", "short"}}
-    conflicts = (
-        ("explicit long and short observations coexist",)
-        if directions == {"long", "short"}
-        else ()
-    )
+    # Preserve per-timeframe structural conflicts; opposite directions across
+    # different timeframes are hierarchical context, not a global contradiction.
+    conflicts = []
+    for timeframe in timeframes:
+        frame = analyses.get(timeframe)
+        if frame is None:
+            continue
+        frame_evidence = build_market_evidence(
+            frame,
+            asset=asset,
+            base_timeframe=timeframe,
+            timeframes=(timeframe,),
+        )
+        conflicts.extend(frame_evidence.conflicts)
+    conflicts = tuple(conflicts)
 
     return MarketEvidence(
         asset=asset,
