@@ -138,3 +138,32 @@ Deploy current `main` and run:
 - Fallback results were non-empty and provenance recorded the failed Binance attempt; no cross-exchange merging/fabrication occurred.
 - Result: live transport smoke GREEN.
 - Exact next step: wire `TRADES` / `ORDER_BOOK` into the existing request-scoped Knowledge/Data Requirement flow and feed the existing order-flow/microstructure analytical layers. Do not create a second market-data router.
+
+
+## 2026-10-01 — Knowledge/Data Requirements + FindSetup microstructure integration
+
+### Forward implementation
+- `09bf47eff1f14952ce405f2bcede039a0d11c504` — add explicit knowledge concepts `microstructure.order_flow` and `microstructure.order_book` with observable evidence and non-signal semantics.
+- `d3b98dfe757f299c15cce706c526152bcf7e9f6d` — map those concepts to distinct `TRADES` / `ORDER_BOOK` data kinds and include both concepts in the default setup requirement plan.
+- `398d4397dd5ecb6ea1510369d205c0ca3852a18e` — expose TRADES / ORDER_BOOK through the existing shared snapshot wrapper without creating a second router.
+- `99a5a7e5224d38ad5a88ff77c94829fa4fdbf0d5` — feed live trade and L1 book transport into `FindSetup` and the existing `order_flow.py` / `order_book.py` analytical layers.
+- `b0af21d18745e25e2d603afd69abeadfe64b644a` — preserve the provider contract for injected test providers while using source-aware transport when available.
+- `0b2bf1f44ce8f52c1c3b7b5e5995f5e649b1f7c9` — add FindSetup microstructure integration coverage.
+- `25faf3a99e335ac33eccc0a347c8afd1fe7eb5de` — add knowledge/data-requirement coverage for distinct microstructure data kinds.
+
+### Causal rules
+- Signed trade flow uses venue-provided aggressor side only.
+- Trade-flow intervals are restricted to completed one-minute intervals relative to the request `now_ms`.
+- L1 order-book analysis uses the source observation timestamp; it is not backfilled into earlier candles.
+- Microstructure remains descriptive evidence; it does not create a decision by itself.
+
+### Verification
+Not yet deployed or server-verified.
+
+### Exact next step
+Deploy current `main` and run focused:
+1. `tests/test_data_requirements.py`
+2. `tests/test_find_setup.py`
+3. `tests/test_market_data_microstructure_transport.py`
+4. then full pytest.
+If green, run live BTC FindSetup smoke without explicit `limit` and inspect that TRADES / ORDER_BOOK are actually populated in the result before advancing to the next analytical integration block.
