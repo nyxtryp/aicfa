@@ -78,9 +78,9 @@ class FakeProvider:
         base = 60 * 60_000
         return pd.DataFrame({
             "timestamp": [base + i * 10_000 for i in range(snapshots)],
-            "bid_price": np.full(snapshots, 99.9),
+            "bid_price": np.full(snapshots, 99.96),
             "bid_size": [5.0 + i for i in range(snapshots)],
-            "ask_price": np.full(snapshots, 100.1),
+            "ask_price": np.full(snapshots, 100.04),
             "ask_size": [4.0 + 2.0 * i for i in range(snapshots)],
         })
 
