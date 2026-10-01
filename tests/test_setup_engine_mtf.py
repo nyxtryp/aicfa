@@ -146,3 +146,80 @@ def test_setup_engine_does_not_use_lower_timeframe_target_than_entry_zone():
     allowed = TFS[TFS.index(entry_tf):]
     assert candidate.target_levels
     assert candidate.target_levels[0].timeframe in allowed
+
+
+def test_setup_engine_uses_scenario_specific_zone_family():
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    for tf, frame in frames.items():
+        frame.loc[0, "order_block_bullish_low"] = 101.0 if tf == "15m" else float("nan")
+        frame.loc[0, "order_block_bullish_high"] = 103.0 if tf == "15m" else float("nan")
+        frame.loc[0, "fvg_bullish_low"] = 96.0 if tf == "4h" else float("nan")
+        frame.loc[0, "fvg_bullish_high"] = 99.0 if tf == "4h" else float("nan")
+
+    evidence = MarketEvidence(
+        asset="BTC/USDT",
+        observations=(
+            MarketObservation(
+                concept_id="market_structure.bos",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("bos_up=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="displacement",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("displacement_up=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="order_block.bullish",
+                timeframe="15m",
+                state="observed",
+                confidence=1.0,
+                evidence=("order_block_bullish=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="market_structure.choch",
+                timeframe="15m",
+                state="observed",
+                confidence=1.0,
+                evidence=("choch_up=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="liquidity.sweep",
+                timeframe="15m",
+                state="observed",
+                confidence=1.0,
+                evidence=("sweep_low=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="imbalance.fvg",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("fvg_bullish=1",),
+                direction="long",
+            ),
+        ),
+        timeframes=TFS,
+    )
+    assessment = assess_market_evidence(evidence)
+    scenarios = assess_scenarios(assessment)
+    result = analyze_setups(
+        assessment,
+        scenarios,
+        observations=evidence.observations,
+        analyses=frames,
+        timeframes=TFS,
+    )
+
+    by_scenario = {candidate.scenario: candidate for candidate in result.candidates}
+    assert by_scenario["continuation"].entry_zone[0].source.startswith("active bullish OB")
+    assert by_scenario["reversal"].entry_zone[0].source.startswith("active bullish FVG")
