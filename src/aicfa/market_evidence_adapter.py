@@ -21,10 +21,9 @@ _DIRECTION_COLUMNS = {
     "liquidity.sweep": ("sweep_low", "sweep_high"),
 }
 
-_ACTIVE_COLUMNS = {
+_LIFECYCLE_COLUMNS = {
     "imbalance.fvg": "fvg_active",
-    "order_block.bullish": "order_block_active",
-    "order_block.bearish": "order_block_active",
+    "order_block": "order_block_active",
 }
 
 
@@ -91,7 +90,7 @@ def _latest_event(
     if not available:
         return None
 
-    mask = analysis[available].fillna(0).applymap(_active).any(axis=1)
+    mask = analysis[available].fillna(0).astype(float).ne(0).any(axis=1)
     if not mask.any():
         return None
 
@@ -105,33 +104,55 @@ def _latest_event(
     )
 
 
-def _latest_active(
+def _latest_active_event(
     analysis: pd.DataFrame,
-    concept_id: str,
     timeframe: str,
+    *,
+    event_concepts: tuple[str, ...],
+    lifecycle_column: str,
 ) -> MarketObservation | None:
-    active_column = _ACTIVE_COLUMNS.get(concept_id)
-    if active_column is None or active_column not in analysis.columns:
+    if lifecycle_column not in analysis.columns:
         return None
 
     latest = analysis.sort_values("timestamp").iloc[-1]
-    if not _active(latest.get(active_column, 0)):
+    if not _active(latest.get(lifecycle_column, 0)):
         return None
 
-    # Lifecycle columns are stateful rather than directional. Recover the
-    # direction from the latest creation event at or before the active row.
-    event = _latest_event(analysis, concept_id, timeframe)
-    if event is None:
+    candidates: list[tuple[object, str, MarketObservation]] = []
+    for concept_id in event_concepts:
+        columns = _DIRECTION_COLUMNS[concept_id]
+        available = [
+            column for column in columns
+            if column is not None and column in analysis.columns
+        ]
+        if not available:
+            continue
+        mask = analysis[available].fillna(0).astype(float).ne(0).any(axis=1)
+        if not mask.any():
+            continue
+        row = analysis.loc[mask].iloc[-1]
+        item = _observation(
+            concept_id,
+            timeframe,
+            row,
+            columns,
+            notes="currently active lifecycle state",
+        )
+        if item is not None:
+            candidates.append((row["timestamp"], concept_id, item))
+
+    if not candidates:
         return None
 
+    _, _, item = max(candidates, key=lambda value: value[0])
     return MarketObservation(
-        concept_id=event.concept_id,
-        timeframe=event.timeframe,
+        concept_id=item.concept_id,
+        timeframe=item.timeframe,
         state="observed",
         confidence=1.0,
-        evidence=event.evidence + (f"{active_column}=1",),
-        direction=event.direction,
-        notes="currently active lifecycle state",
+        evidence=item.evidence + (f"{lifecycle_column}=1",),
+        direction=item.direction,
+        notes=item.notes,
     )
 
 
@@ -158,19 +179,33 @@ def build_market_evidence(
     for timeframe in timeframes:
         emitted = False
 
-        # Active lifecycle state has priority over the creation event because
-        # it represents the current state that remains relevant at the latest
-        # completed candle.
-        for concept_id in ("imbalance.fvg", "order_block.bullish", "order_block.bearish"):
-            item = _latest_active(analysis, concept_id, timeframe)
-            if item is not None:
-                observations.append(item)
-                emitted = True
+        fvg_active = _latest_active_event(
+            analysis,
+            timeframe,
+            event_concepts=("imbalance.fvg",),
+            lifecycle_column="fvg_active",
+        )
+        if fvg_active is not None:
+            observations.append(fvg_active)
+            emitted = True
+
+        ob_active = _latest_active_event(
+            analysis,
+            timeframe,
+            event_concepts=("order_block.bullish", "order_block.bearish"),
+            lifecycle_column="order_block_active",
+        )
+        if ob_active is not None:
+            observations.append(ob_active)
+            emitted = True
 
         for concept_id in _DIRECTION_COLUMNS:
-            if concept_id in {"imbalance.fvg", "order_block.bullish", "order_block.bearish"}:
-                if emitted:
-                    continue
+            if emitted and concept_id in {
+                "imbalance.fvg",
+                "order_block.bullish",
+                "order_block.bearish",
+            }:
+                continue
             item = _latest_event(analysis, concept_id, timeframe)
             if item is not None:
                 observations.append(item)
