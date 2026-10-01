@@ -22,6 +22,7 @@ from .features import build_features
 from .market_data import MarketDataProvider, completed_ohlcv
 from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarketDataProvider
 from .order_flow import build_trade_order_flow
+from .cvd import build_trade_cvd
 from .order_book import build_order_book
 from .market_evidence_adapter import build_market_evidence_from_frames
 from .scenario_reasoning import assess_scenarios
@@ -62,6 +63,7 @@ class FindSetupResult:
     order_book: pd.DataFrame
     order_flow_analysis: pd.DataFrame
     order_book_analysis: pd.DataFrame
+    cvd_analysis: pd.DataFrame
     trades_provider: str
     order_book_provider: str
     decision: str
@@ -334,6 +336,9 @@ def find_setup(
     order_book_analysis = build_order_book(
         pd.DataFrame({"timestamp": book_work["timestamp"]}), order_book
     )
+    cvd_analysis = build_trade_cvd(
+        pd.DataFrame({"timestamp": [latest_trade_timestamp]}), trades
+    )
 
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
@@ -358,6 +363,7 @@ def find_setup(
         order_book=order_book,
         order_flow_analysis=order_flow_analysis,
         order_book_analysis=order_book_analysis,
+        cvd_analysis=cvd_analysis,
         trades_provider=trades_provider,
         order_book_provider=order_book_provider,
         decision=decision_assessment.action.value.upper().replace("_", " "),
