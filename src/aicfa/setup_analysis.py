@@ -238,38 +238,61 @@ def _zone_levels(
     context: MultiTimeframeContext,
     direction: str,
     concepts: tuple[str, ...],
+    current_price: float | None,
 ) -> tuple[SetupLevel, ...]:
-    levels: list[SetupLevel] = []
+    """Select one actionable zone with directionally valid price geometry."""
+    zones: list[tuple[float, float, str, str, str]] = []
     for timeframe in _ordered_source_timeframes(context, concepts):
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
-        candidates: list[tuple[str, str]] = []
         if direction == "long":
+            candidates = []
             if "imbalance.fvg" in concepts:
-                candidates += [("fvg_bullish_low", "active bullish FVG low"),
-                               ("fvg_bullish_high", "active bullish FVG high")]
+                candidates.append(("fvg_bullish_low", "fvg_bullish_high", "active bullish FVG"))
             if "order_block.bullish" in concepts:
-                candidates += [("order_block_bullish_low", "active bullish OB low"),
-                               ("order_block_bullish_high", "active bullish OB high")]
+                candidates.append(("order_block_bullish_low", "order_block_bullish_high", "active bullish OB"))
         else:
+            candidates = []
             if "imbalance.fvg" in concepts:
-                candidates += [("fvg_bearish_low", "active bearish FVG low"),
-                               ("fvg_bearish_high", "active bearish FVG high")]
+                candidates.append(("fvg_bearish_low", "fvg_bearish_high", "active bearish FVG"))
             if "order_block.bearish" in concepts:
-                candidates += [("order_block_bearish_low", "active bearish OB low"),
-                               ("order_block_bearish_high", "active bearish OB high")]
-        for column, source in candidates:
-            value = _numeric(row, column)
-            if value is not None:
-                levels.append(SetupLevel(value=value, timeframe=timeframe, source=source))
-    return tuple(levels)
+                candidates.append(("order_block_bearish_low", "order_block_bearish_high", "active bearish OB"))
+        for low_col, high_col, source in candidates:
+            low = _numeric(row, low_col)
+            high = _numeric(row, high_col)
+            if low is None or high is None or low > high:
+                continue
+            if current_price is not None:
+                if direction == "long" and low >= current_price:
+                    continue
+                if direction == "short" and high <= current_price:
+                    continue
+            zones.append((low, high, timeframe, source, direction))
+
+    if not zones:
+        return ()
+
+    if current_price is None:
+        low, high, timeframe, source, _ = zones[0]
+    elif direction == "long":
+        below = [zone for zone in zones if zone[1] <= current_price]
+        low, high, timeframe, source, _ = max(below, key=lambda zone: zone[1]) if below else zones[0]
+    else:
+        above = [zone for zone in zones if zone[0] >= current_price]
+        low, high, timeframe, source, _ = min(above, key=lambda zone: zone[0]) if above else zones[0]
+
+    return (
+        SetupLevel(value=low, timeframe=timeframe, source=f"{source} low"),
+        SetupLevel(value=high, timeframe=timeframe, source=f"{source} high"),
+    )
 
 
 def _invalidation_level(
     context: MultiTimeframeContext,
     direction: str,
     source_timeframes: tuple[str, ...],
+    entry_zone: tuple[SetupLevel, ...],
 ) -> SetupLevel | None:
     columns = (
         ("smc_sweep_low_level", "sweep low"),
@@ -280,15 +303,31 @@ def _invalidation_level(
         ("previous_high", "previous high"),
         ("active_buy_liquidity_price", "buy-side liquidity"),
     )
-    for timeframe in source_timeframes + tuple(tf for tf in SETUP_TIMEFRAMES if tf not in source_timeframes):
+    if len(entry_zone) < 2:
+        return None
+    entry_low = min(level.value for level in entry_zone)
+    entry_high = max(level.value for level in entry_zone)
+    candidates: list[SetupLevel] = []
+    ordered_timeframes = source_timeframes + tuple(
+        tf for tf in SETUP_TIMEFRAMES if tf not in source_timeframes
+    )
+    for timeframe in ordered_timeframes:
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
         for column, source in columns:
             value = _numeric(row, column)
-            if value is not None:
-                return SetupLevel(value=value, timeframe=timeframe, source=source)
-    return None
+            if value is None:
+                continue
+            if direction == "long" and value < entry_low:
+                candidates.append(SetupLevel(value=value, timeframe=timeframe, source=source))
+            elif direction == "short" and value > entry_high:
+                candidates.append(SetupLevel(value=value, timeframe=timeframe, source=source))
+    if not candidates:
+        return None
+    if direction == "long":
+        return max(candidates, key=lambda level: level.value)
+    return min(candidates, key=lambda level: level.value)
 
 
 def _target_levels(
@@ -454,10 +493,10 @@ def analyze_setups(
             entry_conditions = _unique(list(hypothesis.confirmations) + list(confirmations))
             rationale = _unique(list(hypothesis.rationale) + [f"setup zone observed on {tf}" for tf in source_tfs])
         else:
-            entry_levels = _zone_levels(context, direction, zones)
             current_row = context.latest_rows.get("1m")
             current_price = _numeric(current_row, "close") if current_row is not None else None
-            invalidation_level = _invalidation_level(context, direction, source_tfs)
+            entry_levels = _zone_levels(context, direction, zones, current_price)
+            invalidation_level = _invalidation_level(context, direction, source_tfs, entry_levels)
             target_levels = _target_levels(context, direction, current_price, source_tfs)
             entry_conditions = _unique(
                 list(hypothesis.confirmations)
@@ -474,6 +513,16 @@ def analyze_setups(
                     list(rationale)
                     + [f"{tf} directional evidence={side}" for tf, side in directional_observations.items()]
                 )
+
+            if not entry_levels:
+                missing.append(f"{hypothesis.scenario}: no directionally valid entry zone is available")
+                continue
+            if invalidation_level is None:
+                missing.append(f"{hypothesis.scenario}: no geometrically valid invalidation level is available")
+                continue
+            if not target_levels:
+                missing.append(f"{hypothesis.scenario}: no geometrically valid target is available")
+                continue
 
         candidates.append(
             SetupCandidate(
