@@ -100,7 +100,7 @@ def build_multi_timeframe_structure(
         ).sort_index()
 
         mapped = {
-            f"mtf_{timeframe}_{column}": merged[column].to_numpy()
+            f"mtf_{timeframe}_{column}": merged[f"mtf_{timeframe}_{column}"].to_numpy()
             for column in state_columns
         }
         out = pd.concat([out, pd.DataFrame(mapped, index=out.index)], axis=1)
