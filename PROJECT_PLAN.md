@@ -1,3 +1,24 @@
+## 2026-10-01 — Trade-level Order Flow focused failures repaired
+
+### Finding
+The first focused verification after the trade-level Order Flow correction was:
+- 20 passed, 3 failed.
+- `test_trade_order_flow_uses_event_window_without_clock_intervals` had an incorrect expectation: with a 2-trade event window, the 00:10 observation correctly contains the latest two trades (00:00:20 and 00:10:00), not the first two trades.
+- `test_trade_order_flow_is_causal_under_future_trade_changes` incorrectly placed the altered trade at 00:00:30, which is already known by the 00:01 base observation; the test therefore did not represent a future trade.
+- `test_find_setup_feeds_request_scoped_microstructure_data` exposed that FindSetup had been left at a hard-coded 240-trade request after the old completed-minute implementation was removed.
+
+### Forward fix
+- `71d624b9258b40b86d64fbaa6b8cd3579d3b2601` — restore the request-scoped trade fetch to the intended initial 60 rows for trade-level microstructure.
+- `ba862ca4c294b0bef67c110323239aed4af9af34` — correct the event-window test expectation and move the causal test's altered trade genuinely into the future.
+- No analytical rule was weakened and no causal boundary was changed.
+- The trade-level event window remains based on individual venue-timestamped trades; it is not a candle/clock interval.
+
+### Verification status
+These fixes are committed to `main` but are not yet server-verified.
+
+### Exact next step
+Deploy current `main` to FrostDeploy and run the focused Order Flow + FindSetup tests. If all focused tests are green, run the full pytest suite. Only after full regression is green, run the live BTC FindSetup smoke without explicit `limit` and inspect TRADES, ORDER_BOOK, order-flow analysis, order-book analysis, and provider provenance before advancing the roadmap.
+
 ## 2026-10-01 — Repair MarketEvidence timeframe column mapping
 
 ### Finding
