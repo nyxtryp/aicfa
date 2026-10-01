@@ -301,6 +301,14 @@ def find_setup(
 
     if trades.empty:
         raise ValueError("no trade data available for microstructure analysis")
+    if book_fetch is not None:
+        order_book = book_fetch(
+            symbol=symbol, market_type=request.market_type, limit=1
+        ).frame
+    else:
+        order_book = provider.fetch_order_book(
+            symbol=symbol, market_type=request.market_type, limit=1
+        )
     flow_base = pd.DataFrame({
         "timestamp": pd.to_datetime(analysis["timestamp"], utc=True)
     })
