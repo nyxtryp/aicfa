@@ -240,3 +240,16 @@ Forward correction:
 The previous live smoke remains evidence that BTC TRADES/ORDER_BOOK transport and microstructure output were populated. The old completed-1m aggregation path is being replaced rather than retained.
 
 Exact next step: deploy current main, run focused Order Flow + FindSetup tests, then full pytest and live BTC FindSetup smoke.
+
+
+## 2026-10-01 — Trade-level Order Flow repair fully verified
+
+### Verification
+- Focused Order Flow + FindSetup regression: **23 passed, 14337 warnings, 25.58s**.
+- Full regression on FrostDeploy current release: **325 passed, 19170 warnings, 49.49s**.
+- Result: the trade-level Order Flow correction, request-scoped FindSetup microstructure integration, and existing regression suite are GREEN.
+- The warnings are non-fatal; no test failures occurred.
+- The 325-test full regression is the current verified baseline.
+
+### Exact next step
+Run the live BTC/USDT Spot FindSetup smoke **without explicit limit** against the current deployed release. Verify real TRADES and ORDER_BOOK, populated trade-level order-flow and order-book analysis, causal event-window behavior, and Binance-primary/Bybit-fallback provenance. Only after that smoke is GREEN should the roadmap advance to the next analytical block.
