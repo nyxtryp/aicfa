@@ -2296,3 +2296,11 @@ Post-deploy verification of `1888abde0fd4345e8b3d11b5ff70f8054ad6e4a2` failed 3 
 
 ### Exact next step
 Deploy current `main` and rerun the mandatory full pytest. Expected test count remains 304. If GREEN, run `pytest -q --durations=20` to measure whether the duplicate-recomputation optimization actually reduced the adaptive FindSetup bottleneck.
+
+
+### 2026-10-01 — MTF mapping performance optimization
+- Profiling on deployed release `2026-10-01T08-31-11-5bcc6e6` showed the main remaining bottleneck in `tests/test_features.py::test_feature_mtf_future_changes_do_not_rewrite_earlier_rows` at 7.90s, with `test_feature_integration_exposes_required_higher_timeframes` at 4.24s.
+- Action: commit `ed75d91bd2921aab6ed0c598b869e3803a4664aa` replaced the wide per-timeframe `pd.merge_asof` mapping in `src/aicfa/multi_timeframe.py` with a causal NumPy `searchsorted` backward lookup. The lookup uses source candle close time (`timestamp + timeframe duration`) and preserves the same causal boundary, while avoiding repeated wide merge materialization.
+- No analytical rules, timeframe semantics, structure detection, or causal boundaries were changed.
+- Verification: pending FrostDeploy deployment and focused/full test run.
+- Exact next step: deploy `ed75d91bd2921aab6ed0c598b869e3803a4664aa`, run the focused MTF tests first, then the full suite if focused tests pass.
