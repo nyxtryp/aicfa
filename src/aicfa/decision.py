@@ -99,7 +99,20 @@ def decide(
         )
 
     candidate_directions = {candidate.direction for candidate in setup_assessment.candidates}
-    if None in candidate_directions or len(candidate_directions) != 1:
+    if candidate_directions == {None}:
+        sides = {item.direction for item in directional}
+        if len(sides) > 1:
+            return DecisionAssessment(
+                action=DecisionAction.WAIT,
+                candidates=(),
+                missing_context=setup_assessment.missing_context,
+                conflicts=setup_assessment.conflicts + ("directional evidence conflicts between LONG and SHORT",),
+                reasons=("directional evidence is contradictory",),
+            )
+        side = next(iter(sides))
+    elif len(candidate_directions) == 1 and None not in candidate_directions:
+        side = next(iter(candidate_directions))
+    else:
         return DecisionAssessment(
             action=DecisionAction.WAIT,
             candidates=(),
@@ -108,7 +121,6 @@ def decide(
             reasons=("setup direction is not uniquely resolved",),
         )
 
-    side = next(iter(candidate_directions))
     matching = tuple(item for item in directional if item.direction == side)
     if not matching:
         return DecisionAssessment(
