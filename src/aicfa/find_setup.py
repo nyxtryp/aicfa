@@ -151,6 +151,13 @@ def _expand_missing_context(
     previous_signature: tuple[object, ...] | None = None
     expansion_passes = 0
     max_expansion_passes = 2
+    analyses: dict[str, pd.DataFrame] = {}
+    for timeframe, frame in current_frames.items():
+        completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
+        if not completed.empty:
+            timeframe_analysis = build_features(completed)
+            if not timeframe_analysis.empty:
+                analyses[timeframe] = timeframe_analysis
 
     while True:
         unresolved = {
@@ -175,13 +182,19 @@ def _expand_missing_context(
             if rows < requested[timeframe]:
                 exhausted.add(timeframe)
 
-        analyses = {}
-        for timeframe, frame in current_frames.items():
+        for timeframe in unresolved:
+            frame = current_frames[timeframe]
             completed = completed_ohlcv(
                 frame, timeframe=timeframe, now_ms=now_ms,
             )
-            if not completed.empty:
-                analyses[timeframe] = build_features(completed)
+            if completed.empty:
+                analyses.pop(timeframe, None)
+                continue
+            timeframe_analysis = build_features(completed)
+            if timeframe_analysis.empty:
+                analyses.pop(timeframe, None)
+            else:
+                analyses[timeframe] = timeframe_analysis
 
         evidence = build_market_evidence_from_frames(
             analyses, asset=symbol, timeframes=timeframes,
