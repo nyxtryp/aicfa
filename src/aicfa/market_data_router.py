@@ -77,6 +77,59 @@ class FallbackMarketDataProvider:
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
         raise RuntimeError(format_attempts("all market data providers failed", attempts))
 
+    def _fetch_recent_with_source(
+        self,
+        method_name: str,
+        *,
+        symbol: str,
+        market_type: str,
+        limit: int,
+    ) -> MarketFetchResult:
+        attempts: list[ProviderAttempt] = []
+        for provider in self._providers:
+            try:
+                method = getattr(provider, method_name, None)
+                if method is None:
+                    raise ValueError(f"provider does not support {method_name}")
+                frame = method(symbol=symbol, market_type=market_type, limit=limit)
+                if frame is None or frame.empty:
+                    raise ValueError(f"provider returned no {method_name.removeprefix('fetch_')} rows")
+                return MarketFetchResult(
+                    provider=provider_name(provider),
+                    symbol=symbol,
+                    frame=frame,
+                    attempts=tuple(attempts),
+                )
+            except Exception as exc:
+                attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
+        raise RuntimeError(format_attempts("all market data providers failed", attempts))
+
+    def fetch_trades_with_source(
+        self, *, symbol: str, market_type: str, limit: int
+    ) -> MarketFetchResult:
+        return self._fetch_recent_with_source(
+            "fetch_trades", symbol=symbol, market_type=market_type, limit=limit
+        )
+
+    def fetch_trades(self, *, symbol: str, market_type: str, limit: int) -> pd.DataFrame:
+        return self.fetch_trades_with_source(
+            symbol=symbol, market_type=market_type, limit=limit
+        ).frame
+
+    def fetch_order_book_with_source(
+        self, *, symbol: str, market_type: str, limit: int = 1
+    ) -> MarketFetchResult:
+        return self._fetch_recent_with_source(
+            "fetch_order_book", symbol=symbol, market_type=market_type, limit=limit
+        )
+
+    def fetch_order_book(
+        self, *, symbol: str, market_type: str, limit: int = 1
+    ) -> pd.DataFrame:
+        return self.fetch_order_book_with_source(
+            symbol=symbol, market_type=market_type, limit=limit
+        ).frame
+
     def fetch_ohlcv_snapshot(self, *, symbol: str, market_type: str,
                              timeframes: Sequence[str], since_ms: int | None,
                              limit: int | None = None,
