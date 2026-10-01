@@ -80,12 +80,41 @@ External microstructure references support separating signed executed flow from 
 - `07d40c188fe5db5800cae4f6d53d73d054f2bac2` — add focused causal/validation tests.
 
 ### Verification
-Not yet deployed or server-verified. Local test execution has not yet been reported.
+- Focused server verification: `8 passed, 2 warnings in 0.49s` on FrostDeploy release `2026-10-01T09-31-36-84315af`.
+- Full suite: `313 passed, 18146 warnings in 51.60s` on the same release.
+- Result: Order Flow / Microstructure v1 primitives are GREEN on deployed main.
 
 ### Discovered limitation
-Current `FallbackMarketDataProvider` and `SharedSnapshotMarketDataProvider` expose only OHLCV transport. The next integration stage must extend the existing provider contract for `TRADES` / `ORDER_BOOK` rather than create a parallel market-data router.
+The existing Binance/Bybit adapters and centralized fallback router still expose only OHLCV transport. The repository already contains `order_flow.py` and `order_book.py` analytical feature layers, but they are not yet fed by live TRADES / ORDER_BOOK transport.
+
+### Exact next step
+Extend the existing Binance/Bybit adapters and centralized fallback router with causal `TRADES` / `ORDER_BOOK` transport, add provider/fallback tests, then deploy and verify before wiring these data kinds into the request-scoped knowledge/data-requirement flow.
+
+
+## 2026-10-01 — Existing-router TRADES / ORDER_BOOK transport
+
+### Finding
+Repository inspection confirmed the live scanner already uses a centralized Binance-primary / Bybit-fallback market-data architecture. No second router is required. `MarketCapability.TRADES` and `MarketCapability.ORDER_BOOK` were already declared in the source registry, but the actual provider adapters exposed only OHLCV.
+
+### Forward implementation
+- `3e9201fcf37d11d7c293b853886ae98c9efb0517` — extend the provider contract with `fetch_trades()` and `fetch_order_book()`.
+- `1dbd615f4caf77399daa7cdfc9b765d52e8ad167` — add centralized fallback routing for both data kinds, preserving provider provenance and failure attempts.
+- `9df27e785642eb0f1124a9aa5afa3bba3018294c` — add Binance public recent-trade and order-book transport.
+- `fc6224bf5ca763dbf2396488bdf4c38859242baf` — correct Binance public endpoint path handling.
+- `6df0a4b335b1304bdc105bc83d7cf90507db4d03` — add Bybit public recent-trade and order-book transport.
+- `1c98530da11f7356d3e654280aa84f79633e858f` — add centralized-router fallback/capability tests.
+- `6648e4fb3a7bfd92af77d7d92b48405b994ef964` — add Binance transport tests for signed public trades and L1 order book.
+- `7ba1ae137309cff53a36496b7f85b3d49e322257` — add Bybit transport tests for signed public trades and timestamped L1 order book.
+- Trade side is normalized to AICFA's causal `+1` buy / `-1` sell contract using venue-provided aggressor information.
+- Order-book transport currently normalizes the best bid/ask only; Binance uses local observation time as the conservative availability timestamp because the REST response lacks a public source timestamp, while Bybit uses its returned source timestamp.
+- No fabricated data, no cross-exchange merging, and no trading decision is produced.
+
+### Verification
+Not yet deployed or server-verified. The next verification must run focused provider/router transport tests first, then the full suite.
 
 ### Exact next step
 Deploy current `main` and run:
-`PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_microstructure.py`
-Then run the full suite. If green, implement the existing-router transport contract for trades/order book and wire the knowledge requirements to the new data profile.
+1. `PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_binance_market_data.py tests/test_bybit_market_data.py tests/test_market_data_microstructure_transport.py`
+2. full `PYTHONPATH=src .venv/bin/python -m pytest -q`
+3. if green, run a live BTC Spot transport smoke for Binance trades/order book and controlled Binance failure -> Bybit fallback.
+4. then wire `TRADES` / `ORDER_BOOK` into the request-scoped knowledge/data-requirement flow and feed the existing order-flow/microstructure analytical layers.
