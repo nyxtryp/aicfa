@@ -84,6 +84,16 @@ class MarketDataProvider(Protocol):
     ) -> pd.DataFrame:
         """Return timestamped order-book snapshots normalized to L1."""
 
+    def fetch_order_book_history(
+        self,
+        *,
+        symbol: str,
+        market_type: str,
+        snapshots: int,
+        interval_seconds: float,
+    ) -> pd.DataFrame:
+        """Collect a causal sequence of real-time L1 observations."""
+
 
 def validate_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize and validate an OHLCV frame without inventing missing data."""
