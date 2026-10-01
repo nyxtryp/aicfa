@@ -2180,3 +2180,25 @@ FrostDeploy collection failed immediately with `ImportError: cannot import name 
 
 ### Exact next step
 Run the mandatory full pytest on the new release. This failure is a source-integrity error, not a test/runtime performance issue. If collection passes, continue to the adaptive-expansion tests and then live BTC smoke.
+
+
+## 2026-10-01 — Repair adaptive-expansion test hang and diagnostic-limit interaction
+
+### Finding
+The first post-truncation verification produced a failure after normal collection progress and then stalled. Source/test inspection identified two independent problems in the new adaptive path:
+- Tests that explicitly pass `limit=` are diagnostic/compatibility tests and must not enter the production adaptive-expansion loop; otherwise an explicit fixed test depth unexpectedly triggers repeated refetches.
+- Context-signature stagnation alone is not a sufficient termination guarantee when the analytical state can change as more rows are supplied. The loop therefore needs a finite algorithmic expansion-pass guard in addition to the provider-availability and signature checks.
+
+### Forward fix
+- `0aa130b616eec4eb7efa95b70969a17605104c19` — Bound adaptive expansion and isolate diagnostic limit overrides.
+- Explicit `limit=` now remains a diagnostic/test override and bypasses adaptive expansion.
+- Adaptive production requests retain the dependency-derived starting depth.
+- Adaptive expansion is now bounded to two expansion passes after the initial dependency-derived fetch, giving a deterministic maximum sequence of `60 → 120 → 240` for the current dependency minimum without turning 240 into a production depth contract.
+- Existing provider-boundary and context-signature termination checks remain in place.
+- The expansion still refetches only unresolved timeframes and preserves the original request `now_ms`.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+Deploy current `main` and rerun the mandatory full pytest. If the suite completes, report the exact failure count/output rather than waiting indefinitely. Only after the suite is green run the live BTC FindSetup smoke without an explicit limit.
