@@ -622,7 +622,7 @@ def analyze_setups(
         if len(supporting) < 2:
             missing.append(f"{hypothesis.scenario}: at least two independent supporting concepts are required")
             continue
-        if not _scenario_has_required_evidence(hypothesis.scenario, supporting):
+        if not legacy_mode and not _scenario_has_required_evidence(hypothesis.scenario, supporting):
             missing.append(f"{hypothesis.scenario}: required scenario evidence is incomplete")
             continue
         if not zones:
