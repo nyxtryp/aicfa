@@ -21,6 +21,8 @@ from .evidence_reasoning import assess_market_evidence
 from .features import build_features
 from .market_data import MarketDataProvider, completed_ohlcv
 from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarketDataProvider
+from .order_flow import build_order_flow
+from .order_book import build_order_book
 from .market_evidence_adapter import build_market_evidence_from_frames
 from .scenario_reasoning import assess_scenarios
 from .setup_analysis import analyze_setups
@@ -56,6 +58,10 @@ class FindSetupResult:
     scenario_assessment: object
     setup_assessment: object
     decision_assessment: object
+    trades: pd.DataFrame
+    order_book: pd.DataFrame
+    order_flow_analysis: pd.DataFrame
+    order_book_analysis: pd.DataFrame
     decision: str
     reason: str
 
@@ -280,6 +286,44 @@ def find_setup(
         market_evidence = build_market_evidence_from_frames(
             analyses, asset=symbol, timeframes=timeframes,
         )
+    trade_result = provider.fetch_trades_with_source(
+        symbol=symbol, market_type=request.market_type, limit=60
+    )
+    book_result = provider.fetch_order_book_with_source(
+        symbol=symbol, market_type=request.market_type, limit=1
+    )
+    trades = trade_result.frame
+    order_book = book_result.frame
+
+    trade_work = trades.copy()
+    trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
+    trade_work["price"] = pd.to_numeric(trade_work["price"], errors="coerce")
+    trade_work["volume"] = pd.to_numeric(trade_work["volume"], errors="coerce")
+    trade_work["side"] = pd.to_numeric(trade_work["side"], errors="coerce")
+    trade_work["interval"] = trade_work["timestamp"].dt.floor("min")
+    cutoff = pd.Timestamp(now_ms, unit="ms", tz="UTC")
+    trade_work = trade_work[trade_work["interval"] + pd.Timedelta(minutes=1) <= cutoff]
+    if trade_work.empty:
+        raise ValueError("no completed trade-flow interval available for microstructure analysis")
+    trade_flow = (
+        trade_work.assign(
+            taker_buy_volume=trade_work["volume"].where(trade_work["side"].eq(1), 0.0),
+            taker_sell_volume=trade_work["volume"].where(trade_work["side"].eq(-1), 0.0),
+        )
+        .groupby("interval", as_index=False)[["taker_buy_volume", "taker_sell_volume"]]
+        .sum()
+        .rename(columns={"interval": "timestamp"})
+    )
+    trade_flow["timestamp"] = trade_flow["timestamp"] + pd.Timedelta(minutes=1) - pd.Timedelta(milliseconds=1)
+    flow_base = pd.DataFrame({"timestamp": trade_flow["timestamp"]})
+    order_flow_analysis = build_order_flow(flow_base, trade_flow, baseline_window=24)
+
+    book_work = order_book.copy()
+    book_work["timestamp"] = pd.to_datetime(book_work["timestamp"], unit="ms", utc=True)
+    order_book_analysis = build_order_book(
+        pd.DataFrame({"timestamp": book_work["timestamp"]}), order_book
+    )
+
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
     setup_assessment = analyze_setups(evidence_assessment, scenario_assessment)
@@ -299,6 +343,10 @@ def find_setup(
         scenario_assessment=scenario_assessment,
         setup_assessment=setup_assessment,
         decision_assessment=decision_assessment,
+        trades=trades,
+        order_book=order_book,
+        order_flow_analysis=order_flow_analysis,
+        order_book_analysis=order_book_analysis,
         decision=decision_assessment.action.value.upper().replace("_", " "),
         reason="; ".join(decision_assessment.reasons),
     )
