@@ -191,6 +191,26 @@ class BybitMarketDataProvider:
             "timestamp"
         ).reset_index(drop=True)
 
+    def fetch_order_book_history(
+        self,
+        *,
+        symbol: str,
+        market_type: str,
+        snapshots: int,
+        interval_seconds: float,
+    ) -> pd.DataFrame:
+        if snapshots <= 0:
+            raise ValueError("snapshots must be positive")
+        if interval_seconds < 0:
+            raise ValueError("interval_seconds must be non-negative")
+
+        rows = []
+        for index in range(int(snapshots)):
+            frame = self.fetch_order_book(symbol=symbol, market_type=market_type, limit=1)
+            rows.append(frame.iloc[0].to_dict())
+            if index + 1 < int(snapshots) and interval_seconds:
+                self._sleeper(float(interval_seconds))
+        return pd.DataFrame(rows, columns=_BOOK_COLUMNS)
     def fetch_order_book(self, *, symbol: str, market_type: str, limit: int = 1) -> pd.DataFrame:
         max_limit = 50 if market_type == "spot" else 200
         if limit <= 0 or limit > max_limit:
