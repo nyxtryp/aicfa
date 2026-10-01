@@ -420,7 +420,7 @@ def _risk_reward_is_valid(
     return reward / risk >= minimum_rr
 
 
-def _target_levels/(
+def _target_levels(
     context: MultiTimeframeContext,
     direction: str,
     current_price: float | None,
