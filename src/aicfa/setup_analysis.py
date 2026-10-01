@@ -293,6 +293,7 @@ def _target_levels(
     context: MultiTimeframeContext,
     direction: str,
     current_price: float | None,
+    preferred_timeframes: tuple[str, ...] = (),
 ) -> tuple[SetupLevel, ...]:
     columns = (
         ("active_buy_liquidity_price", "active buy-side liquidity"),
@@ -304,7 +305,7 @@ def _target_levels(
         ("previous_low", "previous low"),
     )
     result: list[SetupLevel] = []
-    for timeframe in _ordered_source_timeframes(context):
+    for timeframe in _ordered_source_timeframes(context, preferred_timeframes):
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
@@ -455,7 +456,7 @@ def analyze_setups(
             current_row = context.latest_rows.get("1m")
             current_price = _numeric(current_row, "close") if current_row is not None else None
             invalidation_level = _invalidation_level(context, direction, source_tfs)
-            target_levels = _target_levels(context, direction, current_price)
+            target_levels = _target_levels(context, direction, current_price, source_tfs)
             entry_conditions = _unique(
                 list(hypothesis.confirmations)
                 + list(confirmations)
