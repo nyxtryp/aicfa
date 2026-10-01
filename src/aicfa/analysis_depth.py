@@ -78,7 +78,7 @@ def resolve_analysis_depth(
     Such state requires adaptive expansion until the relevant causal anchor is
     established or the provider's available context is exhausted.
     """
-    selected = tuple(timeframes or plan.required_timeframes)
+    selected = tuple(plan.required_timeframes if timeframes is None else timeframes)
     if not selected:
         raise ValueError("analysis depth requires at least one timeframe")
 
