@@ -734,7 +734,19 @@ def analyze_setups(
             reasons=("setup conditions are not sufficiently specified",),
         )
 
-    # Multiple scenario hypotheses may describe the same actionable trade
+    # Legacy/non-numeric setup analysis preserves scenario hypotheses.
+    # Actionable geometry deduplication belongs only to the real MTF engine,
+    # where numeric Entry/Invalidation/Target geometry exists.
+    if legacy_mode:
+        return SetupAssessment(
+            decision=SetupDecision.READY,
+            candidates=tuple(candidates),
+            missing_context=_unique(missing),
+            conflicts=evidence_assessment.conflicts,
+            reasons=("one or more conditional setups are sufficiently specified by the current evidence",),
+        )
+
+    # Multiple MTF scenario hypotheses may describe the same actionable trade
     # geometry. Keep one setup object rather than presenting the same trade
     # twice. This does not rank scenarios: distinct geometry remains distinct,
     # while duplicate geometry is recorded as a non-actionable duplicate.
@@ -754,6 +766,10 @@ def analyze_setups(
     return SetupAssessment(
         decision=SetupDecision.READY,
         candidates=tuple(unique_candidates),
+        missing_context=_unique(missing),
+        conflicts=evidence_assessment.conflicts,
+        reasons=("one or more conditional setups are sufficiently specified by the current seven-timeframe state",),
+    )
         missing_context=_unique(missing),
         conflicts=evidence_assessment.conflicts,
         reasons=("one or more conditional setups are sufficiently specified by the current seven-timeframe state",),
