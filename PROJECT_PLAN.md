@@ -1960,3 +1960,30 @@ The 1000-row fetch remains diagnostic only and is **not** accepted as a producti
 
 ### Exact next step
 Implement the adaptive request-scoped context/depth resolver from the actual Knowledge Base and analytical dependency/event-lifecycle graph. It must determine sufficient temporary context without arbitrary fixed candle counts, then feed those requirements into the existing multi-source router. Only after that repair MarketEvidence to consume causally relevant recent events and active current states rather than latest-row flags. Verify the resulting release on FrostDeploy and record the exact output before marking the resolver GREEN.
+
+
+## 2026-10-01 — Dependency-derived adaptive analysis-depth contract started
+
+### Implementation
+- Added `src/aicfa/analysis_depth.py`.
+- The resolver derives the finite initialization requirement from the actual causal feature graph: the largest explicit dependency is the 60-row rolling baseline used by `features.py`.
+- It also records concrete dependencies for displacement, Price Action, Wyckoff, external/internal structure confirmation, FVG creation and Order Block creation.
+- Recent events and active lifecycle state are represented as separate context-resolution requirements instead of being converted into arbitrary candle counts.
+- Active lifecycle context is explicitly marked adaptive because FVG/OB/liquidity state can persist for a data-dependent interval; a fixed row count cannot prove that an old state is inactive.
+- Added `tests/test_analysis_depth.py` covering dependency-derived minimum context, adaptive event/lifecycle requirements, and empty-timeframe rejection.
+
+### Commits
+- `3ea9a4b803f7b3772e9d03b846691d904354e82b` — Add dependency-derived adaptive analysis depth contract.
+- `505e48c665e0744b7ad8def76ceabe9f39ae02be` — Keep structural anchors distinct from lifecycle state.
+- `e00997aa730459195644b1bb49abaead1c8fde81` — Test dependency-derived adaptive analysis depth.
+
+### Verification
+- GitHub source inspection completed.
+- FrostDeploy pytest has not yet been run for these commits.
+- No GREEN claim is made.
+
+### Status
+**IMPLEMENTED / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+Wire this resolver into the request-scoped market-data collection path so the router receives the dependency-derived minimum context rather than the diagnostic `limit=1000`. Keep lifecycle/event expansion adaptive and temporary; do not introduce fixed production depth tables. Then verify the full suite and a real BTC FindSetup smoke on FrostDeploy before repairing MarketEvidence.
