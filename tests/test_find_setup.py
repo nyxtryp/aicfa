@@ -81,7 +81,7 @@ class FakeProvider:
             "bid_price": np.full(snapshots, 99.9),
             "bid_size": [5.0 + i for i in range(snapshots)],
             "ask_price": np.full(snapshots, 100.1),
-            "ask_size": [4.0 + i for i in range(snapshots)],
+            "ask_size": [4.0 + 2.0 * i for i in range(snapshots)],
         })
 
 
