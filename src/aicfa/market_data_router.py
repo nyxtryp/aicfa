@@ -271,6 +271,26 @@ class SharedSnapshotMarketDataProvider:
             symbol=symbol, market_type=market_type, limit=limit
         )
 
+    def fetch_order_book_history_with_source(
+        self, *, symbol: str, market_type: str, snapshots: int, interval_seconds: float
+    ):
+        return self._provider.fetch_order_book_history_with_source(
+            symbol=symbol,
+            market_type=market_type,
+            snapshots=snapshots,
+            interval_seconds=interval_seconds,
+        )
+
+    def fetch_order_book_history(
+        self, *, symbol: str, market_type: str, snapshots: int, interval_seconds: float
+    ) -> pd.DataFrame:
+        return self.fetch_order_book_history_with_source(
+            symbol=symbol,
+            market_type=market_type,
+            snapshots=snapshots,
+            interval_seconds=interval_seconds,
+        ).frame
+
     def _source_key(self) -> str:
         return "fallback:" + ",".join(provider_name(p) for p in self._provider.providers)
 
