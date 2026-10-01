@@ -288,14 +288,30 @@ def find_setup(
         )
     trade_fetch = getattr(provider, "fetch_trades_with_source", None)
     book_fetch = getattr(provider, "fetch_order_book_with_source", None)
-    if trade_fetch is not None:
-        trades = trade_fetch(
-            symbol=symbol, market_type=request.market_type, limit=60
-        ).frame
-    else:
-        trades = provider.fetch_trades(
-            symbol=symbol, market_type=request.market_type, limit=60
-        )
+
+    trade_limits = (60, 120, 240, 480, 960)
+    trades = pd.DataFrame()
+    for trade_limit in trade_limits:
+        if trade_fetch is not None:
+            trades = trade_fetch(
+                symbol=symbol, market_type=request.market_type, limit=trade_limit
+            ).frame
+        else:
+            trades = provider.fetch_trades(
+                symbol=symbol, market_type=request.market_type, limit=trade_limit
+            )
+        if trades.empty:
+            continue
+        probe = trades.copy()
+        probe["timestamp"] = pd.to_datetime(probe["timestamp"], unit="ms", utc=True)
+        probe["interval"] = probe["timestamp"].dt.floor("min")
+        cutoff = pd.Timestamp(now_ms, unit="ms", tz="UTC")
+        completed_intervals = probe[
+            probe["interval"] + pd.Timedelta(minutes=1) <= cutoff
+        ]
+        if not completed_intervals.empty or trade_limit == trade_limits[-1]:
+            break
+
     if book_fetch is not None:
         order_book = book_fetch(
             symbol=symbol, market_type=request.market_type, limit=1
