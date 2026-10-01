@@ -149,6 +149,8 @@ def _expand_missing_context(
     current_frames = dict(frames)
     current_missing = tuple(missing_context)
     previous_signature: tuple[object, ...] | None = None
+    expansion_passes = 0
+    max_expansion_passes = 2
 
     while True:
         unresolved = {
@@ -185,7 +187,8 @@ def _expand_missing_context(
             analyses, asset=symbol, timeframes=timeframes,
         )
         signature = _context_signature(evidence)
-        if signature == previous_signature:
+        expansion_passes += 1
+        if signature == previous_signature or expansion_passes >= max_expansion_passes:
             return current_frames, current_limits
         previous_signature = signature
         current_missing = evidence.missing_context
@@ -250,7 +253,7 @@ def find_setup(
         asset=symbol,
         timeframes=timeframes,
     )
-    if market_evidence.missing_context:
+    if market_evidence.missing_context and limit is None:
         frames, limits = _expand_missing_context(
             provider,
             symbol=symbol,
