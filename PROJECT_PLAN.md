@@ -53,3 +53,11 @@ Deploy current `main` and rerun the focused MarketEvidence + adaptive FindSetup 
 - Fix: track emitted_concepts and suppress only a concept already emitted by its lifecycle path; independent supported concepts can now coexist.
 - Status: code committed; deployment/verification pending.
 - Exact next step: deploy current main, then rerun the focused MarketEvidence + adaptive FindSetup tests. If green, run full pytest.
+
+
+## MarketEvidence verification — 2026-10-01
+- Focused verification: 8 passed, 9217 warnings, 15.97s.
+- Full suite verification: 305 passed, 18145 warnings, 47.09s.
+- Result: MarketEvidence repair and adaptive FindSetup regression coverage are GREEN on the deployed current release.
+- Performance optimization remains backlog; analytical development continues forward.
+- Exact next step: proceed to the next analytical roadmap item after MarketEvidence repair.
