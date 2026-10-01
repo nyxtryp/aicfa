@@ -724,3 +724,33 @@ Server pytest verification is pending.
 
 ### NEXT UNFINISHED
 Run focused SETUP ENGINE tests, then full pytest. If green, run live BTC FindSetup smoke and inspect the actual selected entry zone, invalidation and MTF target.
+
+
+## 2026-10-01 — SETUP ENGINE: target hierarchy grounded in market-delivery methodology
+
+The prior target implementation was treated as an implementation experiment and is superseded by a stricter target hierarchy.
+
+### Methodology constraints checked against external references
+- SMC/ICT setup logic treats structure, liquidity, displacement and PD arrays as a connected framework; an isolated OB/FVG is not sufficient by itself. citeturn0search5turn0search8
+- Profit targets are described as the next draw on liquidity / significant opposing liquidity or higher-timeframe objective, rather than an arbitrary nearby price column. citeturn2search0turn2search10
+- Higher-timeframe structure supplies the directional anchor while lower timeframes provide confirmation/execution; 1m must not determine the setup by itself. citeturn2search9turn1search0
+- Binance provides public klines, trades, depth and realtime WebSocket market data required for AICFA to construct current-market state itself. citeturn0search0turn0search1turn0search2
+
+### Implementation
+- Target selection is now hierarchical: active liquidity → liquidity breakout objective → confirmed structural extreme → causal range extreme.
+- The first target is the nearest valid objective within the highest available objective class, not the nearest arbitrary level across all classes.
+- A second distinct target may be returned beyond Target 1 when a causal objective exists.
+- Targets remain constrained to the setup timeframe and higher; execution-only lower timeframes cannot manufacture the setup target.
+- Direction, entry and invalidation remain MTF/hierarchical; 1m remains execution context only.
+
+### Commits
+- de5ac103767d2cb8ad7acf08951f761a6b8320a6 — fix: prioritize true draw on liquidity targets
+- 8418084ffd0562df50fe3d4f59fa2efdbca08202 — test: validate draw on liquidity target hierarchy
+
+### 80% objective
+80% is a **measured acceptance target, not a hard-coded claim**. We cannot honestly declare an 80% win rate before running a causal, out-of-sample evaluation with fixed entry/SL/TP rules and costs. Backtesting literature specifically warns about data mining, multiple testing and overfitting. citeturn3search12turn3search14
+
+The product goal is therefore: **only emit setups when the full confluence passes the defined gates, then measure realized setup outcomes and iterate against a fixed evaluation protocol.** No artificial confidence percentage will be used to make a weak setup look like an 80% setup.
+
+### NEXT UNFINISHED
+Run focused SETUP ENGINE tests, then full regression. If green, run live BTC FindSetup and inspect the actual MTF setup: scenario, entry zone, invalidation, Target 1, Target 2 and confirmation requirements. After that, build the causal setup outcome evaluator needed to measure the real hit rate.
