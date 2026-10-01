@@ -789,3 +789,29 @@ Run live BTC FindSetup smoke against the new release and inspect:
 3. target timeframes/sources;
 4. whether continuation/reversal/breakout_failure remain meaningfully distinct.
 Do not advance to outcome evaluation until this live setup geometry is GREEN.
+
+
+## 2026-10-01 — SETUP ENGINE: structural geometry gates verified
+
+### Regression verification
+After enforcing structural setup geometry and scenario-specific evidence in the MTF SETUP ENGINE:
+- focused SETUP ENGINE tests: **10 passed, 1 warning**;
+- full regression: **344 passed, 0 failed, 21228 warnings**;
+- the remaining full-suite failure was a legacy scenario-preservation test; the scenario-specific evidence gate was correctly scoped to the real MTF engine, while legacy/non-numeric analysis continues to preserve upstream scenario hypotheses.
+
+### Relevant commits
+- a43bdd0de6b138a32e54895e569caa0579a1c0ab — test: keep scenario zone fixture geometrically valid
+- dde7003d92426eaed35fab332b41a045b361fb39 — test: keep both scenario fixtures above RR threshold
+- 53aa3d2962314e32d3dd7a2779768a4800fa064b — fix: preserve legacy scenario hypotheses
+
+### Current checkpoint
+The complete test suite is green. The known pytest cache permission warnings remain non-fatal and are not part of the functional failure count.
+
+### NEXT UNFINISHED
+Run live BTC FindSetup smoke against the current release and inspect the actual MTF setup geometry:
+1. entry timeframe/source;
+2. invalidation timeframe/source and whether structural risk is sane;
+3. Target 1/Target 2 timeframes/sources and draw-on-liquidity logic;
+4. continuation/reversal/breakout_failure geometry and whether unsupported scenarios are omitted;
+5. final LONG/SHORT/WAIT/NO TRADE decision.
+Do not advance to outcome evaluation until this live geometry checkpoint is GREEN.
