@@ -68,7 +68,7 @@ class FallbackMarketDataProvider:
             try:
                 frame = provider.fetch_ohlcv(
                     symbol=symbol, market_type=market_type, timeframe=timeframe,
-                    since_ms=since_ms, limit=limit, limits=limits)
+                    since_ms=since_ms, limit=limit)
                 if frame is None or frame.empty:
                     raise ValueError("provider returned no OHLCV rows")
                 return MarketFetchResult(provider=provider_name(provider),
@@ -117,9 +117,20 @@ class SharedSnapshotMarketDataProvider:
         normalized = tuple(timeframes)
         if not normalized:
             raise ValueError("at least one timeframe is required")
+        if limits is not None and limit is not None:
+            raise ValueError("provide either limit or limits, not both")
+        if limits is not None and set(limits) != set(normalized):
+            raise ValueError("limits must contain exactly the requested timeframes")
+        if limit is None and limits is None:
+            raise ValueError("either limit or limits is required")
+        limit_key = (
+            "limit=" + str(limit)
+            if limits is None
+            else "limits=" + ",".join(f"{tf}:{limits[tf]}" for tf in normalized)
+        )
         key = SnapshotKey(
             source=self._source_key(), market_type=market_type, symbol=symbol,
-            data_profile=data_profile + ":" + ",".join(normalized))
+            data_profile=data_profile + ":" + ",".join(normalized) + ":" + limit_key)
         now = self._clock()
         with self._lock:
             cached = self._snapshots.get(key)
@@ -127,7 +138,7 @@ class SharedSnapshotMarketDataProvider:
                 return clone_snapshot(cached)
             fetched = self._provider.fetch_ohlcv_snapshot(
                 symbol=symbol, market_type=market_type, timeframes=normalized,
-                since_ms=since_ms, limit=limit)
+                since_ms=since_ms, limit=limit, limits=limits)
             snapshot = _Snapshot(now, {tf: clone_result(result) for tf, result in fetched.items()})
             self._discard_expired(now)
             self._snapshots[key] = snapshot
