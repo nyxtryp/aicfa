@@ -115,3 +115,54 @@ def test_setup_has_no_execution_fields():
     assert not hasattr(result, "order")
     assert not hasattr(result, "quantity")
     assert not hasattr(result, "leverage")
+
+
+def test_setup_uses_current_market_direction_and_levels_without_fabrication():
+    import pandas as pd
+
+    _, _, result = _pipeline(
+        _obs("market_structure.bos"),
+        _obs("displacement"),
+        _obs("imbalance.fvg"),
+    )
+    analyses = {
+        "1m": pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2026-10-01T12:00:00Z"]),
+                "open": [99.0],
+                "high": [101.0],
+                "low": [98.0],
+                "close": [100.0],
+                "setup_direction": [1],
+                "setup_invalidation_price": [97.5],
+            }
+        )
+    }
+    evidence = assess_visual_evidence(
+        VisualEvidenceSet(
+            items=(
+                VisualEvidence(
+                    asset="BTC/USDT",
+                    timeframe="1m",
+                    observations=(
+                        _obs("market_structure.bos"),
+                        _obs("displacement"),
+                        _obs("imbalance.fvg"),
+                    ),
+                ),
+            )
+        )
+    )
+    scenarios = assess_scenarios(evidence)
+    enriched = analyze_setups(
+        evidence,
+        scenarios,
+        observations=evidence.observations,
+        analyses=analyses,
+    )
+    candidate = next(item for item in enriched.candidates if item.scenario == "continuation")
+    assert candidate.direction == "long"
+    assert candidate.current_price == 100.0
+    assert candidate.entry_price == 100.0
+    assert candidate.invalidation_price == 97.5
+    assert candidate.target_prices == (101.0, 98.0)
