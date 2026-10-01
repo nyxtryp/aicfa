@@ -26,7 +26,9 @@ _BYBIT_INTERVALS = {
     "1w": "W",
 }
 _BASE_URL = "https://api.bybit.com/v5/market"
-_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+_OHLCV_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+_TRADE_COLUMNS = ("timestamp", "price", "volume", "side")
+_BOOK_COLUMNS = ("timestamp", "bid_price", "bid_size", "ask_price", "ask_size")
 
 
 class BybitTransportError(RuntimeError):
@@ -160,6 +162,60 @@ class BybitMarketDataProvider:
 
         raise ValueError(f"no Bybit {quote_asset.upper()} market found for asset: {normalized}")
 
+    def fetch_trades(self, *, symbol: str, market_type: str, limit: int) -> pd.DataFrame:
+        max_limit = 60 if market_type == "spot" else 1000
+        if limit <= 0 or limit > max_limit:
+            raise ValueError(f"Bybit trade limit must be between 1 and {max_limit}")
+        payload = self._get(
+            "recent-trade",
+            {
+                "category": self._category(market_type),
+                "symbol": self._normalize_symbol(symbol),
+                "limit": int(limit),
+            },
+        )
+        rows = payload.get("result", {}).get("list", [])
+        if not isinstance(rows, list):
+            raise ValueError("Bybit trade result must contain a list")
+        normalized = []
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError("Bybit trade row must be an object")
+            if any(key not in row for key in ("time", "price", "size", "side")):
+                raise ValueError("Bybit trade row is incomplete")
+            side = {"Buy": 1, "Sell": -1}.get(str(row["side"]))
+            if side is None:
+                raise ValueError("Bybit trade side must be Buy or Sell")
+            normalized.append([row["time"], row["price"], row["size"], side])
+        return pd.DataFrame(normalized, columns=_TRADE_COLUMNS).sort_values(
+            "timestamp"
+        ).reset_index(drop=True)
+
+    def fetch_order_book(self, *, symbol: str, market_type: str, limit: int = 1) -> pd.DataFrame:
+        max_limit = 50 if market_type == "spot" else 200
+        if limit <= 0 or limit > max_limit:
+            raise ValueError(f"Bybit order-book limit must be between 1 and {max_limit}")
+        payload = self._get(
+            "orderbook",
+            {
+                "category": self._category(market_type),
+                "symbol": self._normalize_symbol(symbol),
+                "limit": int(limit),
+            },
+        )
+        result = payload.get("result", {})
+        bids = result.get("b", [])
+        asks = result.get("a", [])
+        if not isinstance(bids, list) or not isinstance(asks, list) or not bids or not asks:
+            raise ValueError("Bybit order book must contain bids and asks")
+        timestamp = result.get("ts")
+        if timestamp is None:
+            raise ValueError("Bybit order book is missing source timestamp")
+        return pd.DataFrame(
+            [[timestamp, bids[0][0], bids[0][1], asks[0][0], asks[0][1]]],
+            columns=_BOOK_COLUMNS,
+        )
+
     def fetch_ohlcv(
         self,
         *,
@@ -190,4 +246,4 @@ class BybitMarketDataProvider:
             if not isinstance(row, list) or len(row) < 6:
                 raise ValueError("Bybit kline row must contain at least 6 fields")
             normalized_rows.append(row[:6])
-        return pd.DataFrame(normalized_rows, columns=_COLUMNS)
+        return pd.DataFrame(normalized_rows, columns=_OHLCV_COLUMNS)
