@@ -1015,4 +1015,89 @@ Live BTC setup geometry: **GREEN**.
 С этого момента этот master roadmap фиксирует непрерывную линию проекта: **идея → аналитические блоки → MTF SETUP ENGINE → live GREEN setup → causal outcome evaluation → последующая проверка/улучшение качества**.
 
 ### NEXT UNFINISHED
-**Build the causal setup outcome evaluator.**
+**Build the AICFA chart visualization output layer.**
+
+The causal setup outcome evaluator remains a later validation block and is deliberately deferred while the product output is made directly visible on the market chart.
+
+
+## 2026-10-02 — PRODUCT DIRECTION: VISUAL SETUP OUTPUT ON AICFA CHART
+
+### Decision
+The product direction is clarified: AICFA does not need a separate screenshot-reading workflow as the immediate interface. The existing AICFA market-analysis path already constructs the setup from real market data. The next product layer is to make that exact analytical result visible as a high-quality chart with the setup drawn on it.
+
+### What AICFA already does
+The current live analytical path reaches a coherent actionable setup from current market data:
+- 7-timeframe market context: 1w → 1d → 4h → 1h → 15m → 5m → 1m;
+- Market Structure / SMC;
+- Liquidity;
+- BOS / CHoCH / MSS-related structural events;
+- FVG;
+- Order Blocks;
+- Displacement;
+- Premium / Discount;
+- Volume / Volatility;
+- Derivatives;
+- Order Flow;
+- CVD;
+- causal L1 history;
+- Absorption;
+- scenario reasoning;
+- Setup Engine;
+- Decision Layer.
+
+The current output already contains the core trade geometry: direction, Entry zone, Invalidation, ordered Target 1 / Target 2 and confirmation, with source timeframe/provenance.
+
+### New product goal
+AICFA should produce two equivalent representations of the same setup:
+1. a precise textual setup;
+2. a professional chart visualization of that exact setup.
+
+The chart is not a second analysis engine. It is a visualization of the already-computed AICFA analytical state and setup geometry. The renderer must not invent or modify Entry, Invalidation, Targets, BOS, FVG, OB or other analytical facts.
+
+### Required chart quality
+The visualization must be a real trading-style chart, not a generic decorative graph. It should contain the relevant market data and clearly visualize, where available and causally supported:
+- candlesticks / price action;
+- timeframe and asset;
+- current price;
+- Market Structure labels and levels;
+- BOS / CHoCH / MSS events where produced by the analytical layers;
+- HH / HL / LH / LL structure where available;
+- liquidity levels / sweeps;
+- FVG zones;
+- Order Blocks;
+- displacement events;
+- Premium / Discount context where applicable;
+- Volume / relevant market activity information;
+- the final Entry zone;
+- Invalidation / SL;
+- ordered Target 1 / Target 2 and their provenance;
+- setup direction and scenario;
+- confirmation requirements.
+
+Only information actually produced by AICFA's analytical layers should be drawn. Missing evidence must remain missing; the renderer must never fabricate annotations just to make the chart look complete.
+
+### Rendering architecture
+The intended flow is:
+current market data → AICFA analytical layers → MTF SETUP ENGINE → textual setup + chart renderer → final visual setup
+
+The renderer should be deterministic and GPU-free. It can use the same OHLCV/feature/event objects already used by AICFA and draw the resulting setup programmatically.
+
+### Explicit non-goal
+We are not changing the product into screenshot ingestion/vision analysis at this stage. A user-uploaded screenshot is a possible future interface concept, but it is not the current implementation target and must not replace the deterministic AICFA analytical core.
+
+### Validation requirements
+The chart output must be validated against the exact textual setup:
+- Entry coordinates must match the Setup Engine exactly;
+- Invalidation must match exactly;
+- Target 1 / Target 2 must match exactly and remain ordered;
+- source timeframe/provenance must be preserved;
+- 1m must not become a setup-geometry source merely because the chart is rendered on 1m data;
+- annotations must respect causal availability and not display future-derived structure;
+- WAIT / NO TRADE must render as such without drawing a fictional trade setup;
+- the chart renderer must have regression tests for geometry and causal annotation behavior.
+
+### Relationship to outcome evaluation
+The causal setup outcome evaluator remains required for later measurement of realized setup quality and the product's approximately 80% profitability objective. It is deferred, not cancelled. The immediate next implementation is the chart visualization layer because it makes the already-existing AICFA reasoning and setup directly inspectable by a human.
+
+### NEXT UNFINISHED
+Build the AICFA chart visualization output layer.
