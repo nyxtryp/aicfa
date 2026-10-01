@@ -365,12 +365,13 @@ def analyze_setups(
         )
 
     evidence_observations = observations or evidence_assessment.observations
+    legacy_mode = analyses is None
     context = build_multi_timeframe_context(
         evidence_observations,
         analyses or {},
         timeframes=timeframes,
-    )
-    if context.missing_timeframes:
+    ) if not legacy_mode else None
+    if not legacy_mode and context.missing_timeframes:
         return SetupAssessment(
             decision=SetupDecision.NEED_MORE_EVIDENCE,
             candidates=(),
@@ -381,7 +382,9 @@ def analyze_setups(
             reasons=("complete seven-timeframe current state is required",),
         )
 
-    direction, direction_conflict = _resolve_direction(context)
+    direction, direction_conflict = (
+        (None, None) if legacy_mode else _resolve_direction(context)
+    )
     if direction_conflict:
         return SetupAssessment(
             decision=SetupDecision.WAIT,
@@ -390,7 +393,7 @@ def analyze_setups(
             conflicts=evidence_assessment.conflicts + (direction_conflict,),
             reasons=("higher-timeframe structure and lower-timeframe confirmation conflict",),
         )
-    if direction is None:
+    if direction is None and not legacy_mode:
         return SetupAssessment(
             decision=SetupDecision.NEED_MORE_EVIDENCE,
             candidates=(),
@@ -426,27 +429,33 @@ def analyze_setups(
             for item in _observed(evidence_observations)
             if item.concept_id in supporting
         ])
-        entry_levels = _zone_levels(context, direction, zones)
-        current_row = context.latest_rows.get("1m")
-        current_price = _numeric(current_row, "close") if current_row is not None else None
-        invalidation_level = _invalidation_level(context, direction, source_tfs)
-        target_levels = _target_levels(context, direction, current_price)
-
-        entry_conditions = _unique(
-            list(hypothesis.confirmations)
-            + list(confirmations)
-            + [f"direction confirmed by {context.structure_timeframe} structure"]
-        )
-        rationale = _unique(
-            list(hypothesis.rationale)
-            + [f"higher-timeframe structure: {context.structure_timeframe}={direction}"]
-            + [f"setup zone observed on {tf}" for tf in source_tfs]
-        )
-        if directional_observations:
-            rationale = _unique(
-                list(rationale)
-                + [f"{tf} directional evidence={side}" for tf, side in directional_observations.items()]
+        if legacy_mode:
+            entry_levels = ()
+            invalidation_level = None
+            target_levels = ()
+            entry_conditions = _unique(list(hypothesis.confirmations) + list(confirmations))
+            rationale = _unique(list(hypothesis.rationale) + [f"setup zone observed on {tf}" for tf in source_tfs])
+        else:
+            entry_levels = _zone_levels(context, direction, zones)
+            current_row = context.latest_rows.get("1m")
+            current_price = _numeric(current_row, "close") if current_row is not None else None
+            invalidation_level = _invalidation_level(context, direction, source_tfs)
+            target_levels = _target_levels(context, direction, current_price)
+            entry_conditions = _unique(
+                list(hypothesis.confirmations)
+                + list(confirmations)
+                + [f"direction confirmed by {context.structure_timeframe} structure"]
             )
+            rationale = _unique(
+                list(hypothesis.rationale)
+                + [f"higher-timeframe structure: {context.structure_timeframe}={direction}"]
+                + [f"setup zone observed on {tf}" for tf in source_tfs]
+            )
+            if directional_observations:
+                rationale = _unique(
+                    list(rationale)
+                    + [f"{tf} directional evidence={side}" for tf, side in directional_observations.items()]
+                )
 
         candidates.append(
             SetupCandidate(
