@@ -502,3 +502,35 @@ The deterministic repository regression gate is GREEN at **336 passed**. The sev
 3. Verify direction, setup family, entry condition/zone, invalidation, targets, confirmation requirements and source timeframes; no 1m-only inference and no fabricated numeric levels.
 4. Record the exact live output and any production-path regression here.
 5. Only after the live setup object is verified GREEN, advance to the next analytical block.
+
+
+## 2026-10-01 — SETUP ENGINE: MTF conflict semantics corrected
+
+### Live smoke finding
+- Live BTC Spot FindSetup returned all seven required timeframes:
+  1m, 5m, 15m, 1h, 4h, 1d, 1w.
+- The result was WAIT with material evidence is contradictory.
+- The raw observations showed that long and short directions coexisted across the seven timeframes and also inside different evidence types.
+- This exposed an overly broad conflict rule in Market Evidence: any coexistence of LONG and SHORT observations was being treated as a global contradiction.
+- That rule is incompatible with hierarchical MTF reasoning because opposite directions across timeframes are expected market context and must be resolved by the SETUP ENGINE hierarchy rather than rejected upstream.
+
+### Correction
+- Market Evidence conflict detection now distinguishes:
+  - same-timeframe opposing structural signals (BOS, CHoCH, Displacement) — material conflict;
+  - opposite structural directions on different timeframes — preserved as MTF context, not a global evidence conflict;
+  - opposing contextual zones such as bullish/bearish FVG or OB — not automatically a structural contradiction.
+- The SETUP ENGINE remains responsible for resolving higher-timeframe structure against 15m/5m confirmation.
+- No direction is inferred from the count of LONG/SHORT observations.
+- No 1m-only direction or level inference is introduced.
+
+### Commits
+- 0c41b2b72c178b782ff56492d81e6f41e087e981 — classify MTF evidence conflicts by timeframe.
+- 66a5572532ab00b8af1742f47ca33c6f9d4e9840 — add regression coverage for hierarchical MTF conflict semantics.
+
+### NEXT UNFINISHED
+1. Run focused Market Evidence + SETUP ENGINE tests on the deployed release.
+2. Run the complete pytest suite.
+3. Run live BTC FindSetup again.
+4. Inspect whether the corrected hierarchy produces a real setup candidate when the current market state supports one, or correctly returns WAIT/NEED_MORE_EVIDENCE when it does not.
+5. Verify family, direction, entry zone/condition, invalidation, targets, confirmation timeframes and source timeframes.
+6. Record the exact production result before advancing the SETUP ENGINE block.
