@@ -1238,3 +1238,57 @@ Run the full AICFA regression suite on the same deployed release. If GREEN, perf
 
 ### NEXT UNFINISHED
 Run a real BTC Spot FindSetup + chart rendering smoke using the deployed AICFA analytical path, save the generated PNG, and inspect it for geometry/provenance and visual correctness before advancing the renderer.
+
+
+## 2026-10-02 — CHART SMOKE DIAGNOSTIC: renderer proven non-mutating
+
+### What was tested
+A single real BTC Spot FindSetup result was captured once. The exact same `result.setup_assessment` object was then passed into the chart model/PNG renderer. The setup state was compared before and after rendering.
+
+### Result
+- BEFORE chart:
+  - Decision: `WAIT`
+  - Setup decision: `NEED_MORE_EVIDENCE`
+  - Candidates: `0`
+  - Missing:
+    - `continuation: structural risk/reward is below the minimum`
+    - `reversal: structural risk/reward is below the minimum`
+    - `breakout_failure: required scenario evidence is incomplete`
+  - Conflicts: none
+- AFTER chart:
+  - Decision, setup decision, candidates, missing context, conflicts and reasons were identical.
+- Comparison:
+  - `SETUP_OBJECT_SAME: True`
+  - `DECISION_SAME: True`
+  - `REASON_SAME: True`
+
+### Architectural finding
+The new chart visualization path does **not** mutate FindSetup output and does **not** cause the current WAIT decision. The current WAIT is produced before chart rendering by Setup Analysis.
+
+### RR finding
+The exact production RR gate was inspected:
+- minimum RR is `2.0`;
+- a valid numeric entry requires at least two levels;
+- for LONG, risk = entry_low - invalidation and reward = TP1 - entry_high;
+- only `targets[0]` (TP1) is used by the RR gate;
+- TP2 is not used to make the candidate pass the minimum RR check.
+The current BTC run therefore needs its actual generated Entry / Invalidation / TP1 / TP2 geometry inspected before changing any RR logic.
+
+### Important correction to historical checkpoint
+The previously verified BTC LONG geometry recorded in this journal was:
+- Entry: 15m bullish FVG;
+- Invalidation: 5m sell-side liquidity;
+- TP1: 15m;
+- TP2: 4h;
+- Confirmation: 15m + 5m.
+This must remain the reference checkpoint; do not replace TP1 with 4h in later summaries.
+
+### CURRENT STATE
+- Chart renderer: proven non-mutating against the same live FindSetup result.
+- Current BTC live smoke: WAIT because continuation/reversal fail structural RR and breakout_failure lacks required evidence.
+- Exact current numeric geometry causing the RR rejection is not yet recorded.
+- No RR rule has been changed.
+- No chart code has been changed as a result of this diagnostic.
+
+### NEXT UNFINISHED
+Instrument/inspect the existing Setup Analysis path to print the actual current BTC Entry, Invalidation, TP1, TP2 and computed RR for each scenario before the candidate is rejected. Compare that geometry against the recorded BTC LONG checkpoint above. Only then decide whether a production logic change is justified.
