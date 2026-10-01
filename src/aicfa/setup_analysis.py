@@ -288,6 +288,35 @@ def _zone_levels(
     )
 
 
+
+def _scenario_zone_concepts(
+    scenario: str,
+    direction: str,
+    available: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Choose a scenario-specific zone family without inventing levels."""
+    if scenario == "continuation":
+        preferred = (
+            "order_block.bullish" if direction == "long" else "order_block.bearish",
+            "imbalance.fvg",
+        )
+    elif scenario == "reversal":
+        preferred = (
+            "imbalance.fvg",
+            "order_block.bullish" if direction == "long" else "order_block.bearish",
+        )
+    elif scenario == "breakout_failure":
+        preferred = (
+            "order_block.bullish" if direction == "long" else "order_block.bearish",
+            "imbalance.fvg",
+        )
+    else:
+        preferred = ("imbalance.fvg",)
+    selected = tuple(concept for concept in preferred if concept in available)
+    return selected or available
+
+
+
 def _invalidation_level(
     context: MultiTimeframeContext,
     direction: str,
@@ -513,7 +542,12 @@ def analyze_setups(
         else:
             current_row = context.latest_rows.get("1m")
             current_price = _numeric(current_row, "close") if current_row is not None else None
-            entry_levels = _zone_levels(context, direction, zones, current_price)
+            scenario_zones = _scenario_zone_concepts(
+                hypothesis.scenario,
+                direction,
+                zones,
+            )
+            entry_levels = _zone_levels(context, direction, scenario_zones, current_price)
             invalidation_level = _invalidation_level(context, direction, source_tfs, entry_levels)
             entry_timeframe = entry_levels[0].timeframe if entry_levels else None
             target_levels = _target_levels(
