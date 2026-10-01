@@ -19,9 +19,11 @@ import pandas as pd
 from .market_data import BASE_TIMEFRAMES
 
 _BINANCE_INTERVALS = set(BASE_TIMEFRAMES)
-_SPOT_BASE_URL = "https://data-api.binance.vision/api/v3/klines"
-_FUTURES_BASE_URL = "https://fapi.binance.com/fapi/v1/klines"
-_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+_SPOT_BASE_URL = "https://data-api.binance.vision/api/v3"
+_FUTURES_BASE_URL = "https://fapi.binance.com/fapi/v1"
+_OHLCV_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
+_TRADE_COLUMNS = ("timestamp", "price", "volume", "side")
+_BOOK_COLUMNS = ("timestamp", "bid_price", "bid_size", "ask_price", "ask_size")
 
 class BinanceTransportError(RuntimeError):
     """Provider transport failure classified as retryable or terminal."""
@@ -141,18 +143,28 @@ class BinanceMarketDataProvider:
         params = {"symbol": self._normalize_symbol(symbol), "interval": timeframe, "limit": self._validate_limit(limit)}
         if since_ms is not None:
             params["startTime"] = int(since_ms)
-
+        endpoint = self._endpoint(market_type).replace("/klines", "")
         request = Request(
-            f"{self._endpoint(market_type)}?{urlencode(params)}",
+            f"{endpoint}/klines?{urlencode(params)}",
             headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"},
             method="GET",
         )
+        payload = self._request_json(request)
+        if not isinstance(payload, list):
+            raise ValueError("Binance klines response must be a list")
+        rows = []
+        for row in payload:
+            if not isinstance(row, list) or len(row) < 6:
+                raise ValueError("Binance kline row must contain at least 6 fields")
+            rows.append(row[:6])
+        return pd.DataFrame(rows, columns=_OHLCV_COLUMNS)
+
+    def _request_json(self, request: Request):
         attempts = self.max_retries + 1
         for attempt in range(attempts):
             try:
                 with self._opener(request, timeout=self.timeout_seconds) as response:
-                    payload = json.load(response)
-                break
+                    return json.load(response)
             except HTTPError as exc:
                 retryable = exc.code == 429 or 500 <= exc.code < 600
                 if not retryable or attempt == attempts - 1:
@@ -166,14 +178,54 @@ class BinanceMarketDataProvider:
                     ) from exc
             if self.retry_backoff_seconds:
                 self._sleeper(self.retry_backoff_seconds * (2**attempt))
+        raise AssertionError("unreachable")
 
+    def _public_json(self, path: str, *, market_type: str, params: dict[str, object]):
+        base = self._endpoint(market_type).rsplit("/", 1)[0]
+        request = Request(
+            f"{base}/{path}?{urlencode(params)}",
+            headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"},
+            method="GET",
+        )
+        return self._request_json(request)
+
+    def fetch_trades(self, *, symbol: str, market_type: str, limit: int) -> pd.DataFrame:
+        if limit <= 0 or limit > 1000:
+            raise ValueError("Binance trade limit must be between 1 and 1000")
+        payload = self._public_json(
+            "trades", market_type=market_type,
+            params={"symbol": self._normalize_symbol(symbol), "limit": int(limit)},
+        )
         if not isinstance(payload, list):
-            raise ValueError("Binance klines response must be a list")
-
+            raise ValueError("Binance trades response must be a list")
         rows = []
         for row in payload:
-            if not isinstance(row, list) or len(row) < 6:
-                raise ValueError("Binance kline row must contain at least 6 fields")
-            rows.append(row[:6])
+            if not isinstance(row, dict):
+                raise ValueError("Binance trade row must be an object")
+            required = ("price", "qty", "time", "isBuyerMaker")
+            if any(key not in row for key in required):
+                raise ValueError("Binance trade row is incomplete")
+            side = -1 if bool(row["isBuyerMaker"]) else 1
+            rows.append([row["time"], row["price"], row["qty"], side])
+        return pd.DataFrame(rows, columns=_TRADE_COLUMNS).sort_values(
+            "timestamp"
+        ).reset_index(drop=True)
 
-        return pd.DataFrame(rows, columns=_COLUMNS)
+    def fetch_order_book(self, *, symbol: str, market_type: str, limit: int = 1) -> pd.DataFrame:
+        if limit <= 0 or limit > 5000:
+            raise ValueError("Binance order-book limit must be between 1 and 5000")
+        payload = self._public_json(
+            "depth", market_type=market_type,
+            params={"symbol": self._normalize_symbol(symbol), "limit": int(limit)},
+        )
+        if not isinstance(payload, dict):
+            raise ValueError("Binance order book response must be an object")
+        bids = payload.get("bids")
+        asks = payload.get("asks")
+        if not isinstance(bids, list) or not isinstance(asks, list) or not bids or not asks:
+            raise ValueError("Binance order book must contain bids and asks")
+        observed_at = int(time.time() * 1000)
+        return pd.DataFrame(
+            [[observed_at, bids[0][0], bids[0][1], asks[0][0], asks[0][1]]],
+            columns=_BOOK_COLUMNS,
+        )
