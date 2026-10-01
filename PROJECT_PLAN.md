@@ -483,3 +483,22 @@ Correction:
 - `22582e5dd7e0fed699419f6ef51b92e2edad54d3` — separated explicit preferred timeframes from concept-based evidence discovery in the source-timeframe ordering helper. Target selection now receives `source_tfs` as an actual timeframe priority.
 
 Verification after this correction is pending. The single remaining failure is specifically source-timeframe selection; the other 25 focused tests are green.
+
+
+## 2026-10-01 — SETUP ENGINE full regression GREEN
+
+### Verification completed
+- Focused SETUP ENGINE regression after commit `22582e5dd7e0fed699419f6ef51b92e2edad54d3`: **26 passed, 0 failed, 16395 warnings** in 30.72s.
+- Complete repository regression after the SETUP ENGINE changes: **336 passed, 0 failed, 21228 warnings** in 55.66s.
+- The remaining focused failure from the previous checkpoint is resolved: setup levels/targets now honor the relevant supporting timeframe instead of incorrectly falling back to 1w.
+- The existing `PytestCacheWarning` about permissions in the immutable FrostDeploy release directory remains non-fatal and does not affect test execution.
+
+### GREEN checkpoint
+The deterministic repository regression gate is GREEN at **336 passed**. The seven-timeframe SETUP ENGINE implementation is therefore regression-verified against the full test suite.
+
+### NEXT UNFINISHED
+1. Run the live BTC FindSetup smoke against the deployed current release.
+2. Inspect the returned setup object and verify the seven-timeframe context is actually populated in production.
+3. Verify direction, setup family, entry condition/zone, invalidation, targets, confirmation requirements and source timeframes; no 1m-only inference and no fabricated numeric levels.
+4. Record the exact live output and any production-path regression here.
+5. Only after the live setup object is verified GREEN, advance to the next analytical block.
