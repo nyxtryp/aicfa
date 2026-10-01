@@ -197,6 +197,16 @@ class SharedSnapshotMarketDataProvider:
             self._snapshots[key] = snapshot
             return clone_snapshot(snapshot)
 
+    def fetch_trades_with_source(self, *, symbol: str, market_type: str, limit: int):
+        return self._provider.fetch_trades_with_source(
+            symbol=symbol, market_type=market_type, limit=limit
+        )
+
+    def fetch_order_book_with_source(self, *, symbol: str, market_type: str, limit: int = 1):
+        return self._provider.fetch_order_book_with_source(
+            symbol=symbol, market_type=market_type, limit=limit
+        )
+
     def _source_key(self) -> str:
         return "fallback:" + ",".join(provider_name(p) for p in self._provider.providers)
 
