@@ -118,3 +118,12 @@ Deploy current `main` and run:
 2. full `PYTHONPATH=src .venv/bin/python -m pytest -q`
 3. if green, run a live BTC Spot transport smoke for Binance trades/order book and controlled Binance failure -> Bybit fallback.
 4. then wire `TRADES` / `ORDER_BOOK` into the request-scoped knowledge/data-requirement flow and feed the existing order-flow/microstructure analytical layers.
+
+
+## 2026-10-01 — TRADES / ORDER_BOOK transport full-suite verification
+
+- FrostDeploy release: `2026-10-01T09-39-56-cd003e5`.
+- Focused transport verification: `30 passed, 1 warning in 0.57s`.
+- Full regression verification: `321 passed, 18146 warnings in 51.08s`.
+- Result: existing Binance-primary / Bybit-fallback TRADES + ORDER_BOOK transport is GREEN at the full-suite level; warning is the known pytest cache permission warning.
+- Exact next step: live BTC/USDT Spot transport smoke for Binance trades + L1 order book, then controlled Binance failure with Bybit fallback for both data kinds. Verify provider provenance, non-empty real rows, causal schema, and no cross-exchange merging before wiring TRADES / ORDER_BOOK into request-scoped knowledge/data requirements.
