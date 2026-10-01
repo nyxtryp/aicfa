@@ -99,7 +99,7 @@ def test_adapter_marks_conflicting_explicit_directions():
         asset="BTC/USDT",
     )
 
-    assert evidence.conflicts == ("explicit long and short observations coexist",)
+    assert evidence.conflicts == ("conflicting structural directions on 1m",)
 
 
 def test_adapter_preserves_opposite_directions_across_timeframes_without_global_conflict():
