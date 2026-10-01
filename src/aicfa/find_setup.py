@@ -344,6 +344,8 @@ def find_setup(
     history_work = order_book_history.copy()
     if not history_work.empty:
         history_work["timestamp"] = pd.to_datetime(history_work["timestamp"], unit="ms", utc=True)
+        for column in ("bid_price", "bid_size", "ask_price", "ask_size"):
+            history_work[column] = pd.to_numeric(history_work[column], errors="raise")
         latest_book_timestamp = history_work["timestamp"].max()
     else:
         latest_book_timestamp = latest_trade_timestamp
