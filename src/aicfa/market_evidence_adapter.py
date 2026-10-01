@@ -231,30 +231,18 @@ def build_market_evidence(
         if not emitted:
             missing.append(f"{timeframe}:no_active_supported_observation")
 
-    # Opposite directions across timeframes are not, by themselves, a contradiction.
-    # MTF setup reasoning must preserve that hierarchy and resolve it later.
-    # A material evidence conflict here means that the same timeframe contains
-    # opposing structural signals. Context zones such as FVG/OB may legitimately
-    # oppose the structural leg and therefore do not create a global conflict.
-    structural_concepts = {
-        "market_structure.bos",
-        "market_structure.choch",
-        "displacement",
-    }
-    conflicts = []
-    for timeframe in timeframes:
-        directions = {
-            item.direction
-            for item in observations
-            if item.timeframe == timeframe
-            and item.concept_id in structural_concepts
-            and item.direction in {"long", "short"}
-        }
-        if directions == {"long", "short"}:
-            conflicts.append(
-                f"conflicting structural directions on {timeframe}"
-            )
-    conflicts = tuple(conflicts)
+    # Opposite event directions are not enough to declare contradictory market
+    # evidence. BOS/CHoCH/displacement are causal events that may occur at
+    # different timestamps; a displacement opposite to an established
+    # structure can be a transition/confirmation event rather than a data
+    # contradiction. Current structural state is resolved from the dedicated
+    # structure_direction field by the MTF setup engine.
+    #
+    # Context zones (FVG/OB) can also legitimately oppose the structural leg.
+    # Therefore this adapter does not manufacture a conflict from directional
+    # event opposition. Conflicts must come from a rule with explicit
+    # contradictory state semantics.
+    conflicts: tuple[str, ...] = ()
 
     return MarketEvidence(
         asset=asset,
@@ -294,26 +282,10 @@ def build_market_evidence_from_frames(
         observations.extend(item.observations)
         missing.extend(item.missing_context)
 
-    # Preserve per-timeframe structural conflicts; opposite directions across
-    # different timeframes are hierarchical context, not a global contradiction.
-    conflicts = []
-    for timeframe in timeframes:
-        frame = analyses.get(timeframe)
-        if frame is None:
-            continue
-        frame_evidence = build_market_evidence(
-            frame,
-            asset=asset,
-            base_timeframe=timeframe,
-            timeframes=(timeframe,),
-        )
-        conflicts.extend(frame_evidence.conflicts)
-    conflicts = tuple(conflicts)
-
     return MarketEvidence(
         asset=asset,
         observations=tuple(observations),
         timeframes=timeframes,
         missing_context=tuple(missing),
-        conflicts=conflicts,
+        conflicts=(),
     )
