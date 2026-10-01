@@ -851,3 +851,21 @@ Do not advance to outcome evaluation until this live geometry checkpoint is GREE
 1. Run the complete pytest suite after commit `8993238`.
 2. If GREEN, run the live BTC FindSetup smoke and inspect one coherent actionable setup: Entry zone, Invalidation, ordered Target 1/Target 2, confirmation and source timeframes, with duplicate scenario geometry collapsed.
 3. Only after live setup geometry is GREEN, build the causal setup outcome evaluator to measure the actual realized setup hit rate against the project’s ~80% product objective.
+
+
+## 2026-10-02 — SETUP ENGINE: full regression GREEN after geometry dedupe
+
+### Verification
+- Complete server regression after the duplicate actionable-geometry fix: **345 passed, 0 failed, 21228 warnings, 54.01s**.
+- This is the new full green checkpoint after commit `8993238318d6a11ec3957f0442e4710fe4d9e823`.
+- The warnings remain non-fatal and are the known FrostDeploy pytest cache permission warning.
+
+### CURRENT STATE
+- MTF SETUP ENGINE: regression GREEN.
+- Legacy scenario preservation: GREEN.
+- Duplicate actionable scenario geometry: deduplication implemented and GREEN.
+- Full repository regression: **345 passed**.
+- Live BTC setup geometry still needs re-verification after the final dedupe sequence.
+
+### NEXT UNFINISHED
+Run the live BTC FindSetup smoke and inspect the actual coherent actionable setup geometry: Entry zone, Invalidation, ordered Target 1/Target 2, confirmation and source timeframes, and duplicate scenario handling. Do not advance to the outcome evaluator until this live geometry checkpoint is GREEN.
