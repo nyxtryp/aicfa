@@ -86,6 +86,79 @@ def _zscore_against_past(series: pd.Series, window: int) -> pd.Series:
     return (series - mean) / std.replace(0, np.nan)
 
 
+def build_trade_order_flow(
+    base: pd.DataFrame,
+    trades: pd.DataFrame,
+    *,
+    baseline_window: int = 24,
+    event_window: int = 60,
+) -> pd.DataFrame:
+    """Build causal order-flow features directly from individual trades."""
+    if baseline_window < 2:
+        raise ValueError("baseline_window must be >= 2")
+    if event_window < 1:
+        raise ValueError("event_window must be >= 1")
+    if "timestamp" not in base.columns:
+        raise ValueError("missing required base columns: ['timestamp']")
+    required = {"timestamp", "volume", "side"}
+    missing = required - set(trades.columns)
+    if missing:
+        raise ValueError(f"missing required trade columns: {sorted(missing)}")
+
+    b = base.copy()
+    b["timestamp"] = pd.to_datetime(b["timestamp"], utc=True)
+    b = b.sort_values("timestamp").reset_index(drop=True)
+    d = trades.copy()
+    if pd.api.types.is_numeric_dtype(d["timestamp"]):
+        d["timestamp"] = pd.to_datetime(d["timestamp"], unit="ms", utc=True)
+    else:
+        d["timestamp"] = pd.to_datetime(d["timestamp"], utc=True)
+    d["volume"] = pd.to_numeric(d["volume"], errors="coerce")
+    d["side"] = pd.to_numeric(d["side"], errors="coerce")
+    if d[["volume", "side"]].isna().any().any():
+        raise ValueError("trade volume and side must be numeric and non-null")
+    if d["volume"].lt(0).any():
+        raise ValueError("trade volume must be non-negative")
+    if not d["side"].isin([-1, 1]).all():
+        raise ValueError("trade side must be venue-provided +1 or -1")
+    d = d.sort_values("timestamp").reset_index(drop=True)
+
+    d["taker_buy_volume"] = d["volume"].where(d["side"].eq(1), 0.0)
+    d["taker_sell_volume"] = d["volume"].where(d["side"].eq(-1), 0.0)
+    d["taker_net_volume"] = d["taker_buy_volume"] - d["taker_sell_volume"]
+    d["trade_count"] = 1.0
+    cols = ["taker_buy_volume", "taker_sell_volume", "taker_net_volume", "trade_count"]
+    rolling = d[cols].rolling(event_window, min_periods=1).sum()
+    for col in cols:
+        d[col] = rolling[col]
+    total = d["taker_buy_volume"] + d["taker_sell_volume"]
+    d["taker_imbalance"] = d["taker_net_volume"] / total.replace(0, np.nan)
+    d["taker_buy_share"] = d["taker_buy_volume"] / total.replace(0, np.nan)
+    d["taker_sell_share"] = d["taker_sell_volume"] / total.replace(0, np.nan)
+
+    for col in (
+        "taker_buy_volume", "taker_sell_volume", "taker_net_volume",
+        "taker_imbalance", "taker_buy_share", "taker_sell_share", "trade_count",
+    ):
+        d[f"{col}_delta"] = d[col].diff()
+        d[f"{col}_change_pct"] = (
+            d[f"{col}_delta"] / d[col].shift(1).abs().replace(0, np.nan)
+        ).replace([np.inf, -np.inf], np.nan)
+        d[f"{col}_zscore"] = _zscore_against_past(d[col], baseline_window)
+
+    columns = [
+        "taker_buy_volume", "taker_sell_volume", "taker_net_volume",
+        "taker_imbalance", "taker_buy_share", "taker_sell_share", "trade_count",
+    ]
+    for col in list(columns):
+        columns += [f"{col}_delta", f"{col}_change_pct", f"{col}_zscore"]
+    return pd.merge_asof(
+        b[["timestamp"]].sort_values("timestamp"),
+        d[["timestamp"] + columns].sort_values("timestamp"),
+        on="timestamp", direction="backward", allow_exact_matches=True,
+    )[columns]
+
+
 def build_order_flow(
     base: pd.DataFrame,
     order_flow: pd.DataFrame,
