@@ -289,7 +289,7 @@ def find_setup(
     trade_fetch = getattr(provider, "fetch_trades_with_source", None)
     book_fetch = getattr(provider, "fetch_order_book_with_source", None)
 
-    trade_limit = 240
+    trade_limit = 60
     if trade_fetch is not None:
         trades = trade_fetch(
             symbol=symbol, market_type=request.market_type, limit=trade_limit
