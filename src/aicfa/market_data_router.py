@@ -116,12 +116,76 @@ class FallbackMarketDataProvider:
             symbol=symbol, market_type=market_type, limit=limit
         ).frame
 
+    def _fetch_history_with_source(
+        self,
+        method_name: str,
+        *,
+        symbol: str,
+        market_type: str,
+        snapshots: int,
+        interval_seconds: float,
+    ) -> MarketFetchResult:
+        attempts: list[ProviderAttempt] = []
+        for provider in self._providers:
+            try:
+                method = getattr(provider, method_name, None)
+                if method is None:
+                    raise ValueError(f"provider does not support {method_name}")
+                frame = method(
+                    symbol=symbol,
+                    market_type=market_type,
+                    snapshots=snapshots,
+                    interval_seconds=interval_seconds,
+                )
+                if frame is None or frame.empty:
+                    raise ValueError("provider returned no order-book history")
+                return MarketFetchResult(
+                    provider=provider_name(provider),
+                    symbol=symbol,
+                    frame=frame,
+                    attempts=tuple(attempts),
+                )
+            except Exception as exc:
+                attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
+        raise RuntimeError(format_attempts("all order-book history providers failed", attempts))
+
     def fetch_order_book_with_source(
         self, *, symbol: str, market_type: str, limit: int = 1
     ) -> MarketFetchResult:
         return self._fetch_recent_with_source(
             "fetch_order_book", symbol=symbol, market_type=market_type, limit=limit
         )
+
+    def fetch_order_book_history_with_source(
+        self,
+        *,
+        symbol: str,
+        market_type: str,
+        snapshots: int,
+        interval_seconds: float,
+    ) -> MarketFetchResult:
+        return self._fetch_history_with_source(
+            "fetch_order_book_history",
+            symbol=symbol,
+            market_type=market_type,
+            snapshots=snapshots,
+            interval_seconds=interval_seconds,
+        )
+
+    def fetch_order_book_history(
+        self,
+        *,
+        symbol: str,
+        market_type: str,
+        snapshots: int,
+        interval_seconds: float,
+    ) -> pd.DataFrame:
+        return self.fetch_order_book_history_with_source(
+            symbol=symbol,
+            market_type=market_type,
+            snapshots=snapshots,
+            interval_seconds=interval_seconds,
+        ).frame
 
     def fetch_order_book(
         self, *, symbol: str, market_type: str, limit: int = 1
