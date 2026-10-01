@@ -148,6 +148,23 @@ def test_setup_engine_does_not_use_lower_timeframe_target_than_entry_zone():
     assert candidate.target_levels[0].timeframe in allowed
 
 
+def test_setup_engine_can_use_causal_rolling_extreme_as_target_fallback():
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    for tf, frame in frames.items():
+        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
+        frame.loc[0, "liquidity_breakout_high"] = float("nan")
+        frame.loc[0, "previous_high"] = float("nan")
+        frame.loc[0, "rolling_high_60"] = 125.0 if tf == "4h" else float("nan")
+
+    result = _pipeline(frames)
+    assert result.candidates
+    candidate = result.candidates[0]
+    assert candidate.target_levels
+    assert candidate.target_levels[0].timeframe == "4h"
+    assert candidate.target_levels[0].value == 125.0
+    assert candidate.target_levels[0].source == "causal rolling high"
+
+
 def test_setup_engine_uses_scenario_specific_zone_family():
     frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
     for tf, frame in frames.items():
