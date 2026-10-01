@@ -2109,3 +2109,36 @@ Implement the adaptive expansion loop driven by the missing context / analytical
 
 ### Control rule
 This entry records the assistant's implementation direction and exact next action so the next session can resume from the plan without relying on chat history.
+
+
+## 2026-10-01 — Adaptive context expansion implementation
+
+### Actions taken
+I implemented the next planned step without changing MarketEvidence itself.
+
+- Added request-scoped adaptive expansion to `FindSetup`.
+- The initial dependency-derived depth remains 60 rows per timeframe.
+- When MarketEvidence reports missing context, only the unresolved timeframes are eligible for expansion.
+- Their requested depth doubles on each expansion pass.
+- After each expansion, the deterministic features and existing MarketEvidence adapter are recomputed.
+- Expansion stops for a timeframe when the provider returns fewer rows than requested; this is the mechanically observable data-availability boundary.
+- No arbitrary production depth table was introduced.
+- Existing provider fallback and shared snapshot routing remain the collection path.
+- Added a regression test with a bounded provider proving the expansion sequence `60 → 120 → 240` and the provider-boundary stop.
+
+### Commits
+- `d4a85e84e01d3ac381669727b71882294e9f3093` — Implement adaptive context expansion in FindSetup.
+- `5321d9bee187186ded766ce54d66e06efda64e7e` — Test adaptive context expansion boundary.
+
+### Verification
+GitHub source/test changes are committed. FrostDeploy verification has **not** yet been run for these commits.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+1. Deploy current `main` to FrostDeploy.
+2. Run the mandatory full pytest suite.
+3. If green, run the live BTC FindSetup smoke without an explicit `limit`.
+4. Inspect whether the adaptive expansion actually increases only unresolved timeframes and whether missing context decreases.
+5. Only after this verification decide whether MarketEvidence's latest-row limitation still requires repair.
