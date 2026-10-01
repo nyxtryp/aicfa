@@ -68,7 +68,7 @@ class FallbackMarketDataProvider:
             try:
                 frame = provider.fetch_ohlcv(
                     symbol=symbol, market_type=market_type, timeframe=timeframe,
-                    since_ms=since_ms, limit=limit)
+                    since_ms=since_ms, limit=limit, limits=limits)
                 if frame is None or frame.empty:
                     raise ValueError("provider returned no OHLCV rows")
                 return MarketFetchResult(provider=provider_name(provider),
@@ -79,10 +79,20 @@ class FallbackMarketDataProvider:
 
     def fetch_ohlcv_snapshot(self, *, symbol: str, market_type: str,
                              timeframes: Sequence[str], since_ms: int | None,
-                             limit: int) -> dict[str, MarketFetchResult]:
+                             limit: int | None = None,
+                             limits: dict[str, int] | None = None) -> dict[str, MarketFetchResult]:
+        normalized = tuple(timeframes)
+        if not normalized:
+            raise ValueError("at least one timeframe is required")
+        if limits is not None and limit is not None:
+            raise ValueError("provide either limit or limits, not both")
+        if limits is not None and set(limits) != set(normalized):
+            raise ValueError("limits must contain exactly the requested timeframes")
+        if limit is None and limits is None:
+            raise ValueError("either limit or limits is required")
         return {tf: self.fetch_ohlcv_with_source(
             symbol=symbol, market_type=market_type, timeframe=tf,
-            since_ms=since_ms, limit=limit) for tf in timeframes}
+            since_ms=since_ms, limit=(limits[tf] if limits is not None else limit)) for tf in normalized}
 
 class SharedSnapshotMarketDataProvider:
     """One shared temporary snapshot containing all requested timeframes."""
@@ -101,7 +111,9 @@ class SharedSnapshotMarketDataProvider:
 
     def fetch_ohlcv_snapshot(self, *, symbol: str, market_type: str,
                              timeframes: Sequence[str], since_ms: int | None,
-                             limit: int, data_profile: str = "ohlcv") -> dict[str, MarketFetchResult]:
+                             limit: int | None = None,
+                             limits: dict[str, int] | None = None,
+                             data_profile: str = "ohlcv") -> dict[str, MarketFetchResult]:
         normalized = tuple(timeframes)
         if not normalized:
             raise ValueError("at least one timeframe is required")
