@@ -754,3 +754,38 @@ The product goal is therefore: **only emit setups when the full confluence passe
 
 ### NEXT UNFINISHED
 Run focused SETUP ENGINE tests, then full regression. If green, run live BTC FindSetup and inspect the actual MTF setup: scenario, entry zone, invalidation, Target 1, Target 2 and confirmation requirements. After that, build the causal setup outcome evaluator needed to measure the real hit rate.
+
+
+## 2026-10-01 — SETUP ENGINE: live smoke exposed forbidden 1m setup levels
+
+### Live BTC verification
+The corrected live FindSetup smoke reached a READY setup, but exposed a remaining architectural violation:
+- direction was resolved from higher-timeframe structure: 1w=long;
+- all seven required timeframes were present;
+- target levels came from 5m, not 1m;
+- however the selected entry zone was still an active bullish FVG on **1m**;
+- invalidation was also derived from a **1m previous low**;
+- continuation, reversal and breakout_failure candidates all reused the same 1m entry/invalidation/targets, so the scenario distinction was not yet reflected in actual geometry.
+
+### Correction
+Commit:
+- bd508400e8b3eec75a437bf4af3e4a86d2187f8a — `fix: keep setup zones above execution timeframe`
+
+`_zone_levels()` now explicitly excludes the execution timeframe (`1m`) from setup-zone construction.
+
+Architectural rule reinforced:
+- 1m = execution/microstructure confirmation only;
+- setup Entry zone and setup Invalidation cannot be manufactured from 1m;
+- setup direction is still determined hierarchically from higher-timeframe structure;
+- setup targets may use relevant MTF objectives but never 1m-only objectives.
+
+### Verification
+The code correction has been committed to `main`. A new live BTC smoke is required to verify that Entry/Invalidation now come from an appropriate higher setup timeframe and that scenario-specific geometry is not collapsing into one identical 1m-derived setup.
+
+### NEXT UNFINISHED
+Run live BTC FindSetup smoke against the new release and inspect:
+1. actual setup entry timeframe/source;
+2. invalidation timeframe/source;
+3. target timeframes/sources;
+4. whether continuation/reversal/breakout_failure remain meaningfully distinct.
+Do not advance to outcome evaluation until this live setup geometry is GREEN.
