@@ -1,50 +1,31 @@
-"""Structured setup analysis over evidence and scenario hypotheses.
+"""Deterministic multi-timeframe SETUP ENGINE for AICFA.
 
-This layer turns sufficiently supported scenario hypotheses into explicit,
-conditional setup candidates. It never fabricates numeric prices and never
-places or executes orders.
+The engine consumes the complete current seven-timeframe market context:
+1w -> 1d -> 4h -> 1h -> 15m -> 5m -> 1m.
+
+Higher timeframes establish structure; lower timeframes confirm and execute.
+The 1m timeframe is never sufficient to establish setup direction or levels.
+No future data, scores, probabilities, order execution, or fabricated prices.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Mapping
 
-from aicfa.evidence_reasoning import EvidenceDecision, EvidenceAssessment
+import pandas as pd
+
+from aicfa.evidence_reasoning import EvidenceAssessment, EvidenceDecision
 from aicfa.knowledge_base import get_knowledge
-from aicfa.scenario_reasoning import ScenarioAssessment, ScenarioHypothesis
 from aicfa.market_evidence import MarketObservation
+from aicfa.scenario_reasoning import ScenarioAssessment, ScenarioHypothesis
 from aicfa.visual_evidence import VisualObservation
 
-
-class SetupDecision(str, Enum):
-    READY = "ready"
-    NEED_MORE_EVIDENCE = "need_more_evidence"
-    WAIT = "wait"
-
-
-@dataclass(frozen=True)
-class SetupCandidate:
-    """A conditional setup candidate grounded in observed evidence."""
-
-    scenario: str
-    supporting_concepts: tuple[str, ...]
-    zone_concepts: tuple[str, ...]
-    zone_locations: tuple[str, ...]
-    entry_condition: tuple[str, ...]
-    invalidation: tuple[str, ...]
-    targets: tuple[str, ...]
-    rationale: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class SetupAssessment:
-    """Setup analysis result preserving uncertainty and multiple candidates."""
-
-    decision: SetupDecision
-    candidates: tuple[SetupCandidate, ...]
-    missing_context: tuple[str, ...]
-    conflicts: tuple[str, ...]
-    reasons: tuple[str, ...]
-
+SETUP_TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
+_HIGHER_STRUCTURE = ("1w", "1d", "4h", "1h")
+_CONFIRMATION = ("15m", "5m")
+_EXECUTION = ("1m",)
 
 _ZONE_CONCEPTS = {
     "imbalance.fvg",
@@ -54,23 +35,147 @@ _ZONE_CONCEPTS = {
     "price_action.rejection",
     "premium_discount.dealing_range",
 }
+_STRUCTURAL_CONCEPTS = {
+    "market_structure.bos",
+    "market_structure.choch",
+    "displacement",
+    "liquidity.sweep",
+}
+_DIRECTIONAL_CONCEPTS = _STRUCTURAL_CONCEPTS | {
+    "order_block.bullish",
+    "order_block.bearish",
+    "imbalance.fvg",
+}
 
-_MIN_SUPPORTING_CONCEPTS = 2
+
+class SetupDecision(str, Enum):
+    READY = "ready"
+    NEED_MORE_EVIDENCE = "need_more_evidence"
+    WAIT = "wait"
+
+
+@dataclass(frozen=True)
+class SetupLevel:
+    value: float
+    timeframe: str
+    source: str
+
+
+@dataclass(frozen=True)
+class MultiTimeframeContext:
+    timeframes: tuple[str, ...]
+    latest_rows: Mapping[str, pd.Series]
+    observations: tuple[MarketObservation, ...]
+    missing_timeframes: tuple[str, ...] = ()
+    structure_direction: str | None = None
+    structure_timeframe: str | None = None
+    confirmation_directions: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class SetupCandidate:
+    scenario: str
+    supporting_concepts: tuple[str, ...]
+    zone_concepts: tuple[str, ...]
+    zone_locations: tuple[str, ...]
+    entry_condition: tuple[str, ...]
+    invalidation: tuple[str, ...]
+    targets: tuple[str, ...]
+    rationale: tuple[str, ...]
+    direction: str | None = None
+    entry_zone: tuple[SetupLevel, ...] = ()
+    invalidation_level: SetupLevel | None = None
+    target_levels: tuple[SetupLevel, ...] = ()
+    confirmation_timeframes: tuple[str, ...] = ()
+    source_timeframes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class SetupAssessment:
+    decision: SetupDecision
+    candidates: tuple[SetupCandidate, ...]
+    missing_context: tuple[str, ...]
+    conflicts: tuple[str, ...]
+    reasons: tuple[str, ...]
 
 
 def _unique(values: list[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
 
-def _observed(observations: tuple) -> tuple[VisualObservation, ...]:
+def _observed(observations: tuple) -> tuple:
     return tuple(
-        item
-        for item in observations
+        item for item in observations
         if item.state == "observed" and item.confidence >= 0.5
     )
 
 
-def _zone_data(observations: tuple[VisualObservation, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def _latest_rows(analyses: Mapping[str, pd.DataFrame]) -> dict[str, pd.Series]:
+    rows: dict[str, pd.Series] = {}
+    for timeframe, frame in analyses.items():
+        if frame is None or frame.empty or "timestamp" not in frame.columns:
+            continue
+        ordered = frame.sort_values("timestamp").drop_duplicates("timestamp")
+        if not ordered.empty:
+            rows[timeframe] = ordered.iloc[-1]
+    return rows
+
+
+def _structure_direction(row: pd.Series) -> int:
+    for column in ("smc_structure_direction", "structure_direction"):
+        if column in row.index:
+            try:
+                value = float(row[column])
+            except (TypeError, ValueError):
+                continue
+            if value in (-1.0, 1.0):
+                return int(value)
+    return 0
+
+
+def build_multi_timeframe_context(
+    observations: tuple[MarketObservation, ...],
+    analyses: Mapping[str, pd.DataFrame],
+    *,
+    timeframes: tuple[str, ...] = SETUP_TIMEFRAMES,
+) -> MultiTimeframeContext:
+    """Build one causal current-state object from all required timeframes."""
+    rows = _latest_rows(analyses)
+    missing = tuple(tf for tf in timeframes if tf not in rows)
+
+    structure_direction = None
+    structure_timeframe = None
+    for timeframe in _HIGHER_STRUCTURE:
+        row = rows.get(timeframe)
+        if row is None:
+            continue
+        direction = _structure_direction(row)
+        if direction:
+            structure_direction = "long" if direction > 0 else "short"
+            structure_timeframe = timeframe
+            break
+
+    confirmations: list[str] = []
+    for timeframe in _CONFIRMATION:
+        row = rows.get(timeframe)
+        if row is None:
+            continue
+        direction = _structure_direction(row)
+        if direction:
+            confirmations.append("long" if direction > 0 else "short")
+
+    return MultiTimeframeContext(
+        timeframes=timeframes,
+        latest_rows=rows,
+        observations=observations,
+        missing_timeframes=missing,
+        structure_direction=structure_direction,
+        structure_timeframe=structure_timeframe,
+        confirmation_directions=tuple(confirmations),
+    )
+
+
+def _zone_data(observations: tuple) -> tuple[tuple[str, ...], tuple[str, ...]]:
     concepts: list[str] = []
     locations: list[str] = []
     for item in _observed(observations):
@@ -97,28 +202,132 @@ def _knowledge_requirements(concepts: tuple[str, ...]) -> tuple[tuple[str, ...],
 
 def _targets(hypothesis: ScenarioHypothesis) -> tuple[str, ...]:
     if hypothesis.scenario == "range":
-        return ("opposing visible range boundary or opposing liquidity, if present in evidence",)
+        return ("opposing visible range boundary or opposing liquidity, if present",)
     if hypothesis.scenario == "breakout_failure":
-        return ("opposing visible liquidity or structural extreme",)
+        return ("opposing visible liquidity or structural extreme, if present",)
     if hypothesis.scenario == "reversal":
-        return ("next visible opposing liquidity or structural extreme",)
-    return ("next visible opposing liquidity or structural objective",)
+        return ("next visible opposing liquidity or structural extreme, if present",)
+    return ("next visible opposing liquidity or structural objective, if present",)
+
+
+def _numeric(row: pd.Series, column: str) -> float | None:
+    if column not in row.index:
+        return None
+    value = pd.to_numeric(pd.Series([row[column]]), errors="coerce").iloc[0]
+    return None if pd.isna(value) else float(value)
+
+
+def _zone_levels(
+    context: MultiTimeframeContext,
+    direction: str,
+    concepts: tuple[str, ...],
+) -> tuple[SetupLevel, ...]:
+    levels: list[SetupLevel] = []
+    for timeframe in SETUP_TIMEFRAMES[::-1]:
+        row = context.latest_rows.get(timeframe)
+        if row is None:
+            continue
+        candidates: list[tuple[str, str]] = []
+        if direction == "long":
+            if "imbalance.fvg" in concepts:
+                candidates += [("fvg_bullish_low", "active bullish FVG low"),
+                               ("fvg_bullish_high", "active bullish FVG high")]
+            if "order_block.bullish" in concepts:
+                candidates += [("order_block_bullish_low", "active bullish OB low"),
+                               ("order_block_bullish_high", "active bullish OB high")]
+        else:
+            if "imbalance.fvg" in concepts:
+                candidates += [("fvg_bearish_low", "active bearish FVG low"),
+                               ("fvg_bearish_high", "active bearish FVG high")]
+            if "order_block.bearish" in concepts:
+                candidates += [("order_block_bearish_low", "active bearish OB low"),
+                               ("order_block_bearish_high", "active bearish OB high")]
+        for column, source in candidates:
+            value = _numeric(row, column)
+            if value is not None:
+                levels.append(SetupLevel(value=value, timeframe=timeframe, source=source))
+    return tuple(levels)
+
+
+def _invalidation_level(
+    context: MultiTimeframeContext,
+    direction: str,
+    source_timeframes: tuple[str, ...],
+) -> SetupLevel | None:
+    columns = (
+        ("smc_sweep_low_level", "sweep low"),
+        ("previous_low", "previous low"),
+        ("active_sell_liquidity_price", "sell-side liquidity"),
+    ) if direction == "long" else (
+        ("smc_sweep_high_level", "sweep high"),
+        ("previous_high", "previous high"),
+        ("active_buy_liquidity_price", "buy-side liquidity"),
+    )
+    for timeframe in source_timeframes + tuple(tf for tf in SETUP_TIMEFRAMES if tf not in source_timeframes):
+        row = context.latest_rows.get(timeframe)
+        if row is None:
+            continue
+        for column, source in columns:
+            value = _numeric(row, column)
+            if value is not None:
+                return SetupLevel(value=value, timeframe=timeframe, source=source)
+    return None
+
+
+def _target_levels(
+    context: MultiTimeframeContext,
+    direction: str,
+    current_price: float | None,
+) -> tuple[SetupLevel, ...]:
+    columns = (
+        ("active_buy_liquidity_price", "active buy-side liquidity"),
+        ("liquidity_breakout_high", "liquidity breakout high"),
+        ("previous_high", "previous high"),
+    ) if direction == "long" else (
+        ("active_sell_liquidity_price", "active sell-side liquidity"),
+        ("liquidity_breakout_low", "liquidity breakout low"),
+        ("previous_low", "previous low"),
+    )
+    result: list[SetupLevel] = []
+    for timeframe in SETUP_TIMEFRAMES[::-1]:
+        row = context.latest_rows.get(timeframe)
+        if row is None:
+            continue
+        for column, source in columns:
+            value = _numeric(row, column)
+            if value is None:
+                continue
+            if current_price is not None:
+                if direction == "long" and value <= current_price:
+                    continue
+                if direction == "short" and value >= current_price:
+                    continue
+            result.append(SetupLevel(value=value, timeframe=timeframe, source=source))
+            break
+        if result:
+            break
+    return tuple(result)
+
+
+def _resolve_direction(context: MultiTimeframeContext) -> tuple[str | None, str | None]:
+    """Resolve direction from higher-timeframe structure, never from 1m alone."""
+    if context.structure_direction is None:
+        return None, None
+    confirmations = set(context.confirmation_directions)
+    if confirmations and context.structure_direction not in confirmations:
+        return None, "lower confirmation conflicts with higher-timeframe structure"
+    return context.structure_direction, None
 
 
 def analyze_setups(
     evidence_assessment: EvidenceAssessment,
     scenario_assessment: ScenarioAssessment,
     *,
-    observations: tuple[VisualObservation, ...] | None = None,
+    observations: tuple[MarketObservation, ...] | None = None,
+    analyses: Mapping[str, pd.DataFrame] | None = None,
+    timeframes: tuple[str, ...] = SETUP_TIMEFRAMES,
 ) -> SetupAssessment:
-    """Build conditional setups without inventing unseen market information.
-
-    A candidate is READY when evidence is contradiction-free, the scenario is
-    supported by at least two observed concepts, and a contextual zone is
-    visible. The entry remains conditional on explicit confirmation; numeric
-    prices are included only when the visual evidence supplied them.
-    """
-
+    """Run setup analysis over the complete current multi-timeframe state."""
     if evidence_assessment.decision is EvidenceDecision.WAIT:
         return SetupAssessment(
             decision=SetupDecision.WAIT,
@@ -156,53 +365,105 @@ def analyze_setups(
         )
 
     evidence_observations = observations or evidence_assessment.observations
+    context = build_multi_timeframe_context(
+        evidence_observations,
+        analyses or {},
+        timeframes=timeframes,
+    )
+    if context.missing_timeframes:
+        return SetupAssessment(
+            decision=SetupDecision.NEED_MORE_EVIDENCE,
+            candidates=(),
+            missing_context=tuple(
+                f"required timeframe: {tf}" for tf in context.missing_timeframes
+            ),
+            conflicts=evidence_assessment.conflicts,
+            reasons=("complete seven-timeframe current state is required",),
+        )
+
+    direction, direction_conflict = _resolve_direction(context)
+    if direction_conflict:
+        return SetupAssessment(
+            decision=SetupDecision.WAIT,
+            candidates=(),
+            missing_context=(),
+            conflicts=evidence_assessment.conflicts + (direction_conflict,),
+            reasons=("higher-timeframe structure and lower-timeframe confirmation conflict",),
+        )
+    if direction is None:
+        return SetupAssessment(
+            decision=SetupDecision.NEED_MORE_EVIDENCE,
+            candidates=(),
+            missing_context=("higher-timeframe structural direction is not established",),
+            conflicts=evidence_assessment.conflicts,
+            reasons=("setup direction cannot be established without higher-timeframe structure",),
+        )
+
     zones, locations = _zone_data(evidence_observations)
     candidates: list[SetupCandidate] = []
     missing: list[str] = []
+    directional_observations = {
+        item.timeframe: item.direction
+        for item in _observed(evidence_observations)
+        if item.direction in {"long", "short"} and item.concept_id in _DIRECTIONAL_CONCEPTS
+    }
 
     for hypothesis in scenario_assessment.hypotheses:
-        if len(hypothesis.supporting_concepts) < _MIN_SUPPORTING_CONCEPTS:
-            missing.append(
-                f"{hypothesis.scenario}: at least two independent supporting concepts are required"
-            )
+        supporting = tuple(
+            concept for concept in hypothesis.supporting_concepts
+            if concept in {item.concept_id for item in _observed(evidence_observations)}
+        )
+        if len(supporting) < 2:
+            missing.append(f"{hypothesis.scenario}: at least two independent supporting concepts are required")
             continue
         if not zones:
-            missing.append(
-                f"{hypothesis.scenario}: no contextual setup zone is visible"
-            )
+            missing.append(f"{hypothesis.scenario}: no contextual setup zone is visible")
             continue
 
-        confirmations, invalidations = _knowledge_requirements(
-            hypothesis.supporting_concepts
-        )
-        entry_conditions = _unique(
-            list(hypothesis.confirmations) + list(confirmations)
-        )
-        invalidation_conditions = _unique(
-            list(hypothesis.invalidations) + list(invalidations)
-        )
+        confirmations, invalidations = _knowledge_requirements(supporting)
+        source_tfs = _unique([
+            item.timeframe
+            for item in _observed(evidence_observations)
+            if item.concept_id in supporting
+        ])
+        entry_levels = _zone_levels(context, direction, zones)
+        current_row = context.latest_rows.get("1m")
+        current_price = _numeric(current_row, "close") if current_row is not None else None
+        invalidation_level = _invalidation_level(context, direction, source_tfs)
+        target_levels = _target_levels(context, direction, current_price)
 
+        entry_conditions = _unique(
+            list(hypothesis.confirmations)
+            + list(confirmations)
+            + [f"direction confirmed by {context.structure_timeframe} structure"]
+        )
         rationale = _unique(
             list(hypothesis.rationale)
-            + [f"contextual zone observed: {concept}" for concept in zones]
-            + ([f"current market direction is {direction}"] if direction else [])
+            + [f"higher-timeframe structure: {context.structure_timeframe}={direction}"]
+            + [f"setup zone observed on {tf}" for tf in source_tfs]
         )
+        if directional_observations:
+            rationale = _unique(
+                list(rationale)
+                + [f"{tf} directional evidence={side}" for tf, side in directional_observations.items()]
+            )
 
         candidates.append(
             SetupCandidate(
                 scenario=hypothesis.scenario,
-                supporting_concepts=hypothesis.supporting_concepts,
+                supporting_concepts=supporting,
                 zone_concepts=zones,
                 zone_locations=locations,
                 entry_condition=entry_conditions,
-                invalidation=invalidation_conditions,
+                invalidation=invalidations,
                 targets=_targets(hypothesis),
                 rationale=rationale,
                 direction=direction,
-                current_price=current_price,
-                entry_price=current_price if direction else None,
-                invalidation_price=invalidation_price,
-                target_prices=tuple(float(value) for value in target_prices),
+                entry_zone=entry_levels,
+                invalidation_level=invalidation_level,
+                target_levels=target_levels,
+                confirmation_timeframes=_CONFIRMATION,
+                source_timeframes=source_tfs,
             )
         )
 
@@ -220,5 +481,5 @@ def analyze_setups(
         candidates=tuple(candidates),
         missing_context=_unique(missing),
         conflicts=evidence_assessment.conflicts,
-        reasons=("one or more conditional setups are sufficiently specified by current evidence",),
+        reasons=("one or more conditional setups are sufficiently specified by the current seven-timeframe state",),
     )
