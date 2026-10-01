@@ -14,6 +14,7 @@ import pandas as pd
 
 from .binance_market_data import BinanceMarketDataProvider
 from .bybit_market_data import BybitMarketDataProvider
+from .analysis_depth import resolve_analysis_depth
 from .data_requirements import default_setup_requirements
 from .decision import decide
 from .evidence_reasoning import assess_market_evidence
@@ -92,7 +93,7 @@ def find_setup(
     *,
     provider: MarketDataProvider | None = None,
     now_ms: int,
-    limit: int = 1000,
+    limit: int | None = None,
     resolver: Callable[[str, str], str] | None = None,
 ) -> FindSetupResult:
     """Resolve the asset, collect knowledge-required context, and run AICFA."""
@@ -112,6 +113,10 @@ def find_setup(
     timeframes = requirements.required_timeframes
     if not timeframes:
         raise ValueError("knowledge requirements produced no timeframes")
+    depth = resolve_analysis_depth(requirements, timeframes=timeframes)
+    limits = {timeframe: requirement.minimum_rows for timeframe, requirement in depth.items()}
+    if limit is not None:
+        limits = {timeframe: int(limit) for timeframe in timeframes}
 
     frames: dict[str, pd.DataFrame] = {}
 
@@ -121,7 +126,7 @@ def find_setup(
             market_type=request.market_type,
             timeframes=timeframes,
             since_ms=None,
-            limit=limit,
+            limits=limits,
         )
         frames = {timeframe: result.frame for timeframe, result in snapshot.items()}
     else:
@@ -135,7 +140,7 @@ def find_setup(
                 market_type=request.market_type,
                 timeframe=timeframe,
                 since_ms=None,
-                limit=limit,
+                limit=limits[timeframe],
             )
             frames[timeframe] = result.frame if hasattr(result, "frame") else result
 
