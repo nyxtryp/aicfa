@@ -167,3 +167,22 @@ Deploy current `main` and run focused:
 3. `tests/test_market_data_microstructure_transport.py`
 4. then full pytest.
 If green, run live BTC FindSetup smoke without explicit `limit` and inspect that TRADES / ORDER_BOOK are actually populated in the result before advancing to the next analytical integration block.
+
+
+## 2026-10-01 — Knowledge/Data Requirements + FindSetup microstructure integration verification
+
+### Verification
+- FrostDeploy full regression: `323 passed, 19194 warnings in 50.08s`.
+- Focused integration verification immediately before full regression: `22 passed, 14361 warnings in 25.87s`.
+- Result: the request-scoped Knowledge/Data Requirement mapping and FindSetup microstructure integration are GREEN at full-suite level on the deployed current release.
+- Warnings are non-fatal; no test failures occurred.
+
+### Exact next step
+Run the live BTC FindSetup smoke **without explicit `limit`** and verify that:
+- `TRADES` is populated;
+- `ORDER_BOOK` is populated;
+- `order_flow_analysis` is populated;
+- `order_book_analysis` is populated;
+- completed-minute trade-flow handling remains causal relative to `now_ms`;
+- the existing Binance-primary / Bybit-fallback provenance is preserved.
+Only after this smoke is GREEN should we advance to the next analytical integration block.
