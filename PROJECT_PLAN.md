@@ -127,3 +127,14 @@ Deploy current `main` and run:
 - Full regression verification: `321 passed, 18146 warnings in 51.08s`.
 - Result: existing Binance-primary / Bybit-fallback TRADES + ORDER_BOOK transport is GREEN at the full-suite level; warning is the known pytest cache permission warning.
 - Exact next step: live BTC/USDT Spot transport smoke for Binance trades + L1 order book, then controlled Binance failure with Bybit fallback for both data kinds. Verify provider provenance, non-empty real rows, causal schema, and no cross-exchange merging before wiring TRADES / ORDER_BOOK into request-scoped knowledge/data requirements.
+
+
+## 2026-10-01 — Live BTC Spot TRADES / ORDER_BOOK transport smoke GREEN
+
+- FrostDeploy release: `2026-10-01T09-39-56-cd003e5`.
+- Binance primary returned real BTCUSDT Spot trades and L1 order book rows.
+- Binance trades preserved venue aggressor side as AICFA `+1/-1`; order book returned bid/ask with observation timestamp.
+- Controlled Binance failure `CONTROLLED_TEST_BINANCE_FAILURE` caused the existing router to fall back to Bybit for both TRADES and ORDER_BOOK.
+- Fallback results were non-empty and provenance recorded the failed Binance attempt; no cross-exchange merging/fabrication occurred.
+- Result: live transport smoke GREEN.
+- Exact next step: wire `TRADES` / `ORDER_BOOK` into the existing request-scoped Knowledge/Data Requirement flow and feed the existing order-flow/microstructure analytical layers. Do not create a second market-data router.
