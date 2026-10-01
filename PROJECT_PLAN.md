@@ -1314,3 +1314,44 @@ Added `_risk_reward_value()` and changed RR rejection reporting so `missing_cont
 
 ### NEXT UNFINISHED
 Run the updated deployed BTC smoke and read the new RR diagnostics. Use those exact numbers to determine whether the current rejection is valid live-market geometry or exposes a setup-level selection bug. Do not change the RR threshold without that evidence.
+
+
+## 2026-10-02 — SETUP LIFECYCLE: stateless recomputation bug isolated and state machine added
+
+### Architectural finding
+- find_setup() is currently a stateless analytical request: every call rebuilds the seven-timeframe market state, runs analyze_setups(), then decide().
+- There was no active-setup state, setup identifier, lifecycle status, or preserved original geometry between calls.
+- Therefore a previously emitted LONG could disappear on the next call when current evidence no longer satisfied the new-setup gates, including RR/geometry gates.
+- This is incorrect for a Swing/Position setup lifecycle: deterioration of the conditions for opening a new setup must not silently invalidate an already active setup.
+
+### Correction implemented
+- Added src/aicfa/setup_lifecycle.py.
+- SetupLifecycle now separates new setup detection from active setup lifecycle.
+- Active setup preserves immutable original Entry, Invalidation, Target 1/Target 2 and direction.
+- Lifecycle states: ACTIVE, TP1_HIT, COMPLETED, INVALIDATED, EXPIRED.
+- Once a setup is active, a later analytical WAIT or changed candidate geometry does not replace it.
+- The active setup closes only when its original invalidation is hit, Target 2 is reached, or an explicit expiry timestamp is reached.
+- A new setup is activated only when there is no active setup and exactly one actionable candidate exists. Multiple distinct candidates are not silently ranked.
+- The underlying stateless find_setup() remains unchanged for backward compatibility. The lifecycle is an explicit stateful orchestration layer and must be connected to the eventual serving/API layer rather than introducing global mutable state.
+
+### Tests
+- Added tests/test_setup_lifecycle.py.
+- Covers LONG surviving a later analytical WAIT; invalidation closing the active LONG; changed new geometry not mutating active geometry; and Target 2 completing the setup.
+
+### Commits
+- 0e25dde6d3d67199b1a16a2dd7aada87342e56d7 — feat: add persistent setup lifecycle state machine
+- 326c3558443ac677397058fb01054e06d04c7c47 — test: verify setup lifecycle persistence and invalidation
+
+### CURRENT STATE
+- Stateless MTF SETUP ENGINE: GREEN.
+- Live BTC geometry checkpoint: GREEN.
+- Active setup lifecycle: implemented; regression verification pending.
+- No RR threshold was changed.
+- No target-selection rule was changed by this lifecycle correction.
+
+### NEXT UNFINISHED
+1. Run the new lifecycle tests and complete repository regression.
+2. If GREEN, integrate the lifecycle wrapper into the actual AICFA serving/orchestration entry point so repeated FindSetup requests use the state machine.
+3. Add live BTC repeated-call smoke: LONG → temporary WAIT/new-setup degradation → still LONG, then verify closure only on invalidation/TP2.
+4. Define durable state persistence for process restarts before calling lifecycle production-ready.
+5. Only after lifecycle behavior is GREEN, continue to the causal setup outcome evaluator.
