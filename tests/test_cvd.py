@@ -59,3 +59,44 @@ def test_cvd_future_rows_do_not_backfill_earlier_state():
     # The modified source row becomes available at 00:06:30, after base row 5.
     # Earlier CVD must remain exactly unchanged.
     pd.testing.assert_frame_equal(original.iloc[:6], altered.iloc[:6], check_dtype=False)
+
+
+def trade_frame():
+    ts = [1000, 1000, 2000, 3000]
+    return pd.DataFrame({
+        "timestamp": ts,
+        "price": [100, 100, 101, 100],
+        "volume": [2.0, 3.0, 4.0, 1.0],
+        "side": [1, -1, 1, -1],
+    })
+
+
+def test_trade_cvd_preserves_same_timestamp_trades_and_is_causal():
+    from aicfa.cvd import build_trade_cvd
+
+    base = pd.DataFrame({
+        "timestamp": pd.to_datetime([500, 1000, 2000, 3000], unit="ms", utc=True)
+    })
+    out = build_trade_cvd(base, trade_frame())
+    assert np.isclose(out.loc[1, "cvd"], -1.0)
+    assert np.isclose(out.loc[2, "cvd"], 3.0)
+    assert np.isclose(out.loc[3, "cvd"], 2.0)
+
+    altered = trade_frame()
+    altered.loc[3, "volume"] = 999.0
+    changed = build_trade_cvd(base, altered)
+    pd.testing.assert_frame_equal(
+        out.iloc[:3], changed.iloc[:3], check_dtype=False
+    )
+
+
+def test_trade_cvd_rejects_invalid_side():
+    from aicfa.cvd import build_trade_cvd
+
+    bad = trade_frame()
+    bad.loc[0, "side"] = 0
+    base = pd.DataFrame({
+        "timestamp": pd.to_datetime([1000], unit="ms", utc=True)
+    })
+    with pytest.raises(ValueError):
+        build_trade_cvd(base, bad)
