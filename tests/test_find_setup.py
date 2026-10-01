@@ -222,3 +222,18 @@ def test_find_setup_feeds_request_scoped_microstructure_data():
     assert not result.order_book_analysis.empty
     assert result.trades_provider
     assert result.order_book_provider
+
+
+def test_find_setup_exposes_causal_trade_cvd():
+    provider = FakeProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert not result.cvd_analysis.empty
+    assert result.cvd_analysis["cvd"].notna().any()
+    assert np.isclose(result.cvd_analysis.iloc[-1]["cvd"], 0.0)
