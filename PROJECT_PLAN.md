@@ -175,3 +175,25 @@ If the chat is lost, resume from this exact section: **CVD + Absorption integrat
 2. If GREEN, run the complete pytest suite after this repair.
 3. Run live BTC Spot FindSetup smoke and verify real L1 history, provenance, CVD, and Absorption population.
 4. Inspect causal timestamps before marking Absorption live GREEN.
+
+
+## 2026-10-01 — Absorption L1 regression diagnosed and repaired
+
+### Regression found
+- Focused FindSetup/Absorption verification: **18 passed, 1 failed** after the timestamp repair.
+- The remaining integration failure was an empty Absorption result, not a causal timestamp failure.
+- Root cause: FindSetup intentionally collects L1 (best bid/best ask) observations. The previous liquidity-multiple calculation compared a candidate level with the same-snapshot median of that side. With only one L1 level, that median equals the candidate itself, making the multiple exactly 1 and preventing the configured 1.5 threshold from ever qualifying.
+
+### Repair
+- `build_absorption()` now keeps the original same-snapshot cross-level calculation when multiple levels exist.
+- For true L1 input, it causally falls back to the historical median size of the same displayed level within the observation window.
+- The FindSetup L1 fixture now models actual replenishment/growth strongly enough to exercise that contract.
+- Commits:
+  - b3d94216209bcac670d74824d4d3009ca40e4cd5 — fix: support causal liquidity multiple for L1 absorption
+  - 505f8ff54552f333cdd35ef408c99fb9249fa46d — test: strengthen L1 replenishment fixture
+
+### NEXT UNFINISHED
+1. Re-run focused `tests/test_find_setup.py tests/test_absorption.py` on the deployed server.
+2. If GREEN, run the complete pytest suite after these Absorption changes.
+3. Run live BTC Spot FindSetup smoke and verify real L1 history, provenance, CVD, and Absorption population.
+4. Inspect causal timestamps before marking Absorption live GREEN.
