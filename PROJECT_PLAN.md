@@ -1848,3 +1848,31 @@ Multi-source architecture remains required: AICFA must be able to try providers 
 3. If green, connect `DataRequirementPlan` to FindSetup's market-data request path so requirements, rather than fixed seven-TF/1000-row assumptions, drive collection.
 4. Then extend the requirement resolver to translate semantic timeframe/context needs into the minimum temporary data actually required by the analytical dependencies/events/states.
 5. Only after that repair MarketEvidence's latest-row limitation.
+
+
+## 2026-10-01 — FindSetup now consumes knowledge-derived timeframe requirements
+
+### Implementation
+- `FindSetup` now creates a request-scoped `DataRequirementPlan` before market collection.
+- The required timeframe set is derived from semantic knowledge roles rather than a hard-coded seven-timeframe fetch inside the orchestration path.
+- The current knowledge baseline resolves to 1m → 5m → 15m → 1h → 4h → 1d → 1w because its required roles include execution, lower confirmation, higher structure and broader context.
+- Added `DataRequirementPlan.required_timeframes`; candle depth remains a separate unresolved adaptive requirement.
+- MarketEvidence now receives the timeframe set produced by the knowledge plan.
+
+### Commit
+- `27459460ff3ed6b7ffb1f37b9bf819836fb30d56` — Drive FindSetup timeframes from knowledge requirements.
+
+### Verification
+- GitHub commit created successfully from `bd38ed809504ae4113efe0c09f445b0237dbe907`.
+- No GitHub Actions workflow is configured for this repository.
+- FrostDeploy verification has not yet been performed for this commit.
+
+### Status
+**IMPLEMENTED / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+1. Deploy `27459460ff3ed6b7ffb1f37b9bf819836fb30d56` and run the mandatory full pytest suite.
+2. Verify a real BTC FindSetup request still resolves/fetches the knowledge-derived timeframe set.
+3. Then implement the adaptive context/depth resolver so additional temporary context is requested only when knowledge/analytical dependencies require it.
+4. Keep `limit=1000` diagnostic-only; never turn it into a production depth contract.
+5. After adaptive collection works, repair MarketEvidence's latest-row limitation.
