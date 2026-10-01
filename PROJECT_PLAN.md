@@ -404,3 +404,40 @@ The first implementation attempt incorrectly passed the `1m` analysis as the mar
 ### Current implementation checkpoint
 - Reversion commits: `56ab85d0a1ab9496d54eb19c567f3c9bf1adb4f2`, `4c1944067f361dc5c70b187a81f36d359e96e5e3`, `69ead87d751696d9fa79df1eb8e75bb03bef4ff0`.
 - Next code work remains the genuine multi-timeframe SETUP ENGINE, not a 1m shortcut.
+
+## 2026-10-01 — SETUP ENGINE implementation: seven-timeframe current state
+
+Implemented the first genuine multi-timeframe SETUP ENGINE pass.
+
+### Implementation
+- src/aicfa/setup_analysis.py now defines an explicit MultiTimeframeContext.
+- The live setup path requires the complete seven-timeframe state: 1w → 1d → 4h → 1h → 15m → 5m → 1m.
+- Higher-timeframe structure (1w/1d/4h/1h) establishes setup direction.
+- 15m/5m are confirmation timeframes.
+- 1m is execution/microstructure context only and cannot establish setup direction.
+- A lower-timeframe confirmation conflict with higher-timeframe structure produces WAIT.
+- Setup candidates now expose structured direction, entry zone levels, invalidation level, target levels, confirmation timeframes and source timeframes.
+- Numeric levels are read from the timeframe where the relevant FVG/OB/liquidity evidence exists. The engine does not use the 1m close as an automatic entry.
+- The engine explicitly requires all seven timeframes in the live path.
+- The old visual analyze_setups API remains compatible when no analyses mapping is supplied; the actual FindSetup production path always supplies all seven analyses.
+
+### FindSetup integration
+- find_setup.py now passes the complete analyses mapping and canonical seven-timeframe list into analyze_setups().
+- The production request path therefore cannot silently fall back to a 1m-only setup context.
+
+### Tests added
+- tests/test_setup_engine_mtf.py
+  - higher-timeframe direction beats contradictory 1m direction;
+  - 15m conflict with higher structure forces WAIT;
+  - entry/invalidation/target levels come from the relevant 4h context rather than 1m;
+  - missing one of the seven required timeframes blocks setup readiness.
+
+### Commits
+- e2fe456f10958713c16d6804eaeb34c8e2a6aa5b — genuine seven-timeframe SETUP ENGINE implementation.
+- 89422483df6e785209e7aea179554ffceec193bc — pass complete seven-timeframe state from FindSetup.
+- 9411dea4b63f40a58ba2e2af27b01662f326f0f6 — seven-timeframe SETUP ENGINE tests.
+
+### Verification status
+- Tests have not yet been run after these commits.
+- Previous green checkpoint remains historical: 332 passed, 21228 warnings, 0 failed.
+- Next action is focused SETUP ENGINE tests, then full pytest, then live BTC FindSetup smoke.
