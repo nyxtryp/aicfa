@@ -2253,3 +2253,27 @@ The first MTF fragmentation optimization changed the construction path but incor
 **IMPLEMENTED IN GIT / PENDING VERIFICATION.**
 
 The suite still took **54.64s** despite the failures, so after restoring GREEN the remaining runtime must be measured and, if still high, profiled with `pytest -q --durations=20` rather than making further speculative changes.
+
+
+## 2026-10-01 — Remove duplicate FindSetup feature recomputation
+
+### Profiling result
+`pytest --durations=20` identified the dominant runtime:
+- `test_find_setup_expands_missing_context_until_provider_boundary`: 8.65s
+- `test_find_setup_stops_expansion_when_context_signature_stalls`: 8.34s
+- `test_find_setup_uses_dependency_depth_when_no_diagnostic_limit_is_given`: 8.24s
+- MTF feature tests: 7.93s and 4.26s
+
+The three adaptive FindSetup tests were especially expensive because the initial `find_setup()` already built features for all seven timeframes, then `_expand_missing_context()` rebuilt all seven again before its first expansion, and `find_setup()` rebuilt them again after expansion.
+
+### Forward fix
+- `1888abde0fd4345e8b3d11b5ff70f8054ad6e4a2` — Reuse the already-built feature analyses during adaptive expansion.
+- `_expand_missing_context()` now receives the existing analyses and only recomputes analyses for timeframes actually refetched.
+- The final `find_setup()` path reuses the returned analyses instead of rebuilding every timeframe.
+- Analytical rules, depth values, causal timestamps, and evidence logic are unchanged.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Next step
+Deploy current `main` and run the full suite. Expected result is unchanged test count with materially lower runtime. If runtime remains high, profile again before further changes.
