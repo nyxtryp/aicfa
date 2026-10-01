@@ -1910,3 +1910,53 @@ Multi-source architecture remains required: AICFA must be able to try providers 
 2. Run the mandatory full pytest suite.
 3. Run the real BTC FindSetup smoke and record the exact provider/timeframes/decision/evidence.
 4. Only after that begin the adaptive context/depth resolver.
+
+
+## 2026-10-01 — Current d4269cc deployed verification and live BTC FindSetup smoke
+
+### Deployment
+- Current main: `d4269cc1838f914b8582c5d9f500b86614bc0509` — Record forward repair of malformed timeframe integration.
+- FrostDeploy release: `2026-10-01T07-13-15-d4269cc`.
+
+### Mandatory full-project verification
+Exact output:
+```
+295 passed, 8959 warnings in 36.57s
+```
+The immutable-release pytest-cache permission warning remains known and non-blocking. No test failures.
+
+### Live BTC FindSetup smoke
+Real request: `FindSetupRequest("BTC/USDT")`.
+- Symbol: `BTCUSDT`
+- Knowledge-derived timeframes: `1m, 5m, 15m, 1h, 4h, 1d, 1w`
+- Rows: 1m=1000, 5m=1000, 15m=1000, 1h=1000, 4h=1000, 1d=1000, 1w=477
+- Decision: `WAIT`
+- Reason: `required context is missing; material evidence is contradictory`
+
+Observed evidence:
+- 5m displacement long
+- 5m bullish order block long
+- 15m BOS short
+- 15m displacement short
+- 15m bearish FVG short
+- 1w BOS long
+- 1w bullish FVG long
+
+Missing context reported by Evidence:
+- 1m:no_active_supported_observation
+- 1h:no_active_supported_observation
+- 4h:no_active_supported_observation
+- 1d:no_active_supported_observation
+
+Conflict: explicit long and short observations coexist.
+
+### Interpretation
+The complete deterministic chain is operational on live BTC data and the Decision Layer correctly returns WAIT when required context is missing and material evidence conflicts. The remaining limitation is upstream context extraction: MarketEvidence currently depends too heavily on latest-row event flags, so still-relevant recent SMC events and active lifecycle states can be hidden.
+
+The 1000-row fetch remains diagnostic only and is **not** accepted as a production depth contract.
+
+### Status
+**GREEN / ACCEPTED** for the deployed knowledge-derived timeframe integration and live seven-timeframe FindSetup execution. **PENDING** for adaptive context/depth resolution and final context completeness.
+
+### Exact next step
+Implement the adaptive request-scoped context/depth resolver from the actual Knowledge Base and analytical dependency/event-lifecycle graph. It must determine sufficient temporary context without arbitrary fixed candle counts, then feed those requirements into the existing multi-source router. Only after that repair MarketEvidence to consume causally relevant recent events and active current states rather than latest-row flags. Verify the resulting release on FrostDeploy and record the exact output before marking the resolver GREEN.
