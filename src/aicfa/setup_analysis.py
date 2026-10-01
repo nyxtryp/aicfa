@@ -770,8 +770,3 @@ def analyze_setups(
         conflicts=evidence_assessment.conflicts,
         reasons=("one or more conditional setups are sufficiently specified by the current seven-timeframe state",),
     )
-        missing_context=_unique(missing),
-        conflicts=evidence_assessment.conflicts,
-        reasons=("one or more conditional setups are sufficiently specified by the current seven-timeframe state",),
-    )
-
