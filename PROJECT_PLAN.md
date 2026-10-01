@@ -815,3 +815,39 @@ Run live BTC FindSetup smoke against the current release and inspect the actual 
 4. continuation/reversal/breakout_failure geometry and whether unsupported scenarios are omitted;
 5. final LONG/SHORT/WAIT/NO TRADE decision.
 Do not advance to outcome evaluation until this live geometry checkpoint is GREEN.
+
+
+## 2026-10-02 — SETUP ENGINE: duplicate actionable geometry gate verified
+
+### Implementation and regression history
+- Added actionable-geometry deduplication so the real MTF SETUP ENGINE does not emit multiple setup objects when different scenario hypotheses resolve to the exact same trade geometry.
+- Geometry identity is based on direction plus Entry zone, Invalidation and ordered Target levels with their value/timeframe/source provenance.
+- This does **not** rank scenarios. Distinct geometry remains distinct; only duplicate actionable trade geometry is collapsed.
+- Legacy/non-numeric setup analysis is intentionally excluded from this deduplication so its multiple plausible scenario hypotheses remain preserved.
+- Commits:
+  - `81828cae30016fddbf4c203ad2c5cced375bcee5` — fix: collapse duplicate actionable setup geometry
+  - `817224946bba9c0e91460d619a2de9afb2ba44fc` — test: collapse duplicate actionable scenario geometry
+  - `e43742e9535785063e08749065e2c9c8ee1b632c` — fix: scope setup geometry dedupe to MTF engine
+  - `8993238318d6a11ec3957f0442e4710fe4d9e823` — fix: remove duplicate setup assessment return
+
+### Regression found and repaired
+- The first dedupe implementation was applied too broadly and caused the legacy test `test_multiple_plausible_setups_are_preserved` to fail because distinct legacy scenario hypotheses were collapsed.
+- The correction scoped deduplication only to the real numeric MTF engine.
+- A deployment syntax error was then exposed: a duplicated tail of the final `SetupAssessment` return caused `IndentationError` during test collection. This was a patching mistake, not an architectural issue, and was removed in commit `8993238318d6a11ec3957f0442e4710fe4d9e823`.
+
+### Verification
+- Focused server regression after repair: **18 passed, 0 failed, 1 warning in 0.59s**.
+- Covered `tests/test_setup_analysis.py` and `tests/test_setup_engine_mtf.py`.
+- The only warning is the existing non-fatal FrostDeploy pytest cache permission warning.
+- Full repository regression after commit `8993238` is **not yet run**.
+
+### CURRENT STATE
+- MTF SETUP ENGINE duplicate-geometry gate: **focused GREEN**.
+- Legacy scenario preservation: **focused GREEN**.
+- Full repository regression: **pending** after the latest fix.
+- Live BTC setup geometry: not yet re-verified after the latest dedupe/fix sequence.
+
+### NEXT UNFINISHED
+1. Run the complete pytest suite after commit `8993238`.
+2. If GREEN, run the live BTC FindSetup smoke and inspect one coherent actionable setup: Entry zone, Invalidation, ordered Target 1/Target 2, confirmation and source timeframes, with duplicate scenario geometry collapsed.
+3. Only after live setup geometry is GREEN, build the causal setup outcome evaluator to measure the actual realized setup hit rate against the project’s ~80% product objective.
