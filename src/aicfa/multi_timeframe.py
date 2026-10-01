@@ -99,8 +99,10 @@ def build_multi_timeframe_structure(
             allow_exact_matches=True,
         ).sort_index()
 
-        for column in state_columns:
-            target = f"mtf_{timeframe}_{column}"
-            out[target] = merged[target].to_numpy()
+        mapped = {
+            f"mtf_{timeframe}_{column}": merged[column].to_numpy()
+            for column in state_columns
+        }
+        out = pd.concat([out, pd.DataFrame(mapped, index=out.index)], axis=1)
 
     return out
