@@ -605,3 +605,24 @@ Do not relax causality, do not use 1m as the sole source of setup levels, and do
 
 ### NEXT UNFINISHED
 **Target/level construction for the SETUP ENGINE** — inspect real live level geometry, define valid scenario-aware target selection, test it, then re-run full regression and live BTC smoke.
+
+
+## 2026-10-01 — SETUP ENGINE target geometry inspection: first live diagnostic
+
+The requested live seven-timeframe level dump returned only `close` for every timeframe:
+- 1w: close 84055.59
+- 1d: close 84037.96
+- 4h: close 84037.96
+- 1h: close 84037.97
+- 15m: close 84037.96
+- 5m: close 84037.96
+- 1m: close 84037.96
+
+None of the requested target/zone columns were present in the returned frames:
+`previous_high`, `previous_low`, active liquidity prices, liquidity breakout levels, FVG bounds, or Order Block bounds.
+
+### Finding
+This means the current live target problem cannot yet be solved by choosing a better target among those columns: the FindSetup frames used by this diagnostic are not exposing those level columns at all. Before changing target-selection logic, the production feature/level population path must be inspected to determine where the relevant causal levels actually live and why they are absent from `r.frames`.
+
+### NEXT UNFINISHED
+Inspect the live frame columns and the feature builders that populate previous highs/lows, liquidity, FVG and Order Block levels. Do not invent fallback target prices and do not relax target geometry until the source-level data contract is understood.
