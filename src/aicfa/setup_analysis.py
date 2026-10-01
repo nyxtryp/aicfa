@@ -308,8 +308,13 @@ def _invalidation_level(
     entry_low = min(level.value for level in entry_zone)
     entry_high = max(level.value for level in entry_zone)
     candidates: list[SetupLevel] = []
-    ordered_timeframes = source_timeframes + tuple(
-        tf for tf in SETUP_TIMEFRAMES if tf not in source_timeframes
+    entry_timeframe = entry_zone[0].timeframe
+    entry_index = SETUP_TIMEFRAMES.index(entry_timeframe)
+    allowed = SETUP_TIMEFRAMES[entry_index:]
+    ordered_timeframes = tuple(
+        tf for tf in source_timeframes if tf in allowed
+    ) + tuple(
+        tf for tf in allowed if tf not in source_timeframes
     )
     for timeframe in ordered_timeframes:
         row = context.latest_rows.get(timeframe)
@@ -335,6 +340,7 @@ def _target_levels(
     direction: str,
     current_price: float | None,
     preferred_timeframes: tuple[str, ...] = (),
+    entry_timeframe: str | None = None,
 ) -> tuple[SetupLevel, ...]:
     columns = (
         ("active_buy_liquidity_price", "active buy-side liquidity"),
@@ -346,7 +352,19 @@ def _target_levels(
         ("previous_low", "previous low"),
     )
     result: list[SetupLevel] = []
-    for timeframe in _ordered_source_timeframes(context, preferred_timeframes=preferred_timeframes):
+    if entry_timeframe in SETUP_TIMEFRAMES:
+        entry_index = SETUP_TIMEFRAMES.index(entry_timeframe)
+        allowed = SETUP_TIMEFRAMES[entry_index:]
+        ordered = tuple(
+            tf for tf in preferred_timeframes if tf in allowed
+        ) + tuple(
+            tf for tf in allowed if tf not in preferred_timeframes
+        )
+    else:
+        ordered = _ordered_source_timeframes(
+            context, preferred_timeframes=preferred_timeframes
+        )
+    for timeframe in ordered:
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
@@ -497,7 +515,14 @@ def analyze_setups(
             current_price = _numeric(current_row, "close") if current_row is not None else None
             entry_levels = _zone_levels(context, direction, zones, current_price)
             invalidation_level = _invalidation_level(context, direction, source_tfs, entry_levels)
-            target_levels = _target_levels(context, direction, current_price, source_tfs)
+            entry_timeframe = entry_levels[0].timeframe if entry_levels else None
+            target_levels = _target_levels(
+                context,
+                direction,
+                current_price,
+                source_tfs,
+                entry_timeframe,
+            )
             entry_conditions = _unique(
                 list(hypothesis.confirmations)
                 + list(confirmations)
