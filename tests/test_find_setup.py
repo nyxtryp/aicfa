@@ -128,3 +128,14 @@ def test_find_setup_resolves_user_asset_before_market_data_fetch():
     assert result.evidence.asset == "DOGE/USDT"
     assert all(call[0] == "DOGE/USDT" for call in provider.calls)
 
+
+
+def test_find_setup_uses_dependency_depth_when_no_diagnostic_limit_is_given():
+    provider = FakeProvider()
+    find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+    )
+    assert [call[4] for call in provider.calls] == [60] * 7
