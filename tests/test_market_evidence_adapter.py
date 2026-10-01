@@ -93,13 +93,13 @@ def test_adapter_reads_higher_timeframe_structure_from_mtf_columns():
     )
 
 
-def test_adapter_marks_conflicting_explicit_directions():
+def test_adapter_does_not_treat_opposite_displacement_as_structural_conflict():
     evidence = build_market_evidence(
         _analysis(bos_up=1, displacement_down=1),
         asset="BTC/USDT",
     )
 
-    assert evidence.conflicts == ("conflicting structural directions on 1m",)
+    assert evidence.conflicts == ()
 
 
 def test_adapter_preserves_opposite_directions_across_timeframes_without_global_conflict():
@@ -117,15 +117,6 @@ def test_adapter_preserves_opposite_directions_across_timeframes_without_global_
         ("market_structure.bos", "4h", "short"),
     }
     assert evidence.conflicts == ()
-
-
-def test_adapter_flags_opposing_structural_signals_on_one_timeframe():
-    evidence = build_market_evidence(
-        _analysis(bos_up=1, displacement_down=1),
-        asset="BTC/USDT",
-    )
-
-    assert evidence.conflicts == ("conflicting structural directions on 1m",)
 
 
 def test_adapter_does_not_treat_context_zone_opposition_as_structural_conflict():
