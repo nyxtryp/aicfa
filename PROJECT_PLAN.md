@@ -1292,3 +1292,25 @@ This must remain the reference checkpoint; do not replace TP1 with 4h in later s
 
 ### NEXT UNFINISHED
 Instrument/inspect the existing Setup Analysis path to print the actual current BTC Entry, Invalidation, TP1, TP2 and computed RR for each scenario before the candidate is rejected. Compare that geometry against the recorded BTC LONG checkpoint above. Only then decide whether a production logic change is justified.
+
+
+## 2026-10-02 — SETUP ENGINE: RR rejection diagnostics added
+
+### Finding
+Code inspection confirmed that the current WAIT is produced by the existing MTF Setup Engine, not by chart rendering. Historical commit `9ebb71c` recorded a prior live GREEN setup, while the current live run is rejecting continuation/reversal on structural RR.
+
+### Action taken
+Added `_risk_reward_value()` and changed RR rejection reporting so `missing_context` now includes actual Entry low/high, Invalidation, TP1, TP2 when available, computed RR and minimum RR. Added regression coverage. No RR threshold or setup-selection rule was changed.
+
+### Commits
+- `f0e7dff5c67923a36b2076d89d2dba4832282818` — expose rejected setup geometry
+- `3a9166c5adad5852314768d6f08c8afe65bfbc3c` — test rejected RR geometry
+
+### CURRENT STATE
+- Chart renderer: proven non-mutating.
+- Setup Engine: still requires RR >= 2.0.
+- Current live BTC WAIT will now expose exact rejected geometry.
+- No production trading rule was loosened.
+
+### NEXT UNFINISHED
+Run the updated deployed BTC smoke and read the new RR diagnostics. Use those exact numbers to determine whether the current rejection is valid live-market geometry or exposes a setup-level selection bug. Do not change the RR threshold without that evidence.
