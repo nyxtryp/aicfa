@@ -118,3 +118,19 @@ def test_decision_has_no_execution_fields():
     assert not hasattr(result, "order")
     assert not hasattr(result, "quantity")
     assert not hasattr(result, "leverage")
+
+
+def test_mtf_resolved_direction_ignores_opposite_lower_timeframe_evidence():
+    from tests.test_setup_engine_mtf import _frames, _pipeline
+
+    setup = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1m=-1))
+    result = decide(
+        setup,
+        observations=(
+            _obs("market_structure.bos", direction="long"),
+            _obs("displacement", direction="short"),
+        ),
+    )
+
+    assert result.action is DecisionAction.LONG
+    assert result.candidates
