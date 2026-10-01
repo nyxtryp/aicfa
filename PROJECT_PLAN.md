@@ -626,3 +626,30 @@ This means the current live target problem cannot yet be solved by choosing a be
 
 ### NEXT UNFINISHED
 Inspect the live frame columns and the feature builders that populate previous highs/lows, liquidity, FVG and Order Block levels. Do not invent fallback target prices and do not relax target geometry until the source-level data contract is understood.
+
+
+## 2026-10-01 — Correction: live level diagnostic inspected the wrong object
+
+The previous diagnostic conclusion that the level columns were absent from AICFA was **incorrect**.
+
+### Root cause of the diagnostic mistake
+- `FindSetupResult.frames` intentionally contains the raw OHLCV frames returned by the market-data provider.
+- The analytical level columns are added by `build_features()` and stored in `FindSetupResult.analysis` / the internal `analyses` mapping.
+- `find_setup.py` passes the full `analyses` mapping into `analyze_setups()`.
+- Therefore the absence of FVG/OB/liquidity columns in `r.frames` is expected and is **not** evidence of a production data-loss bug.
+
+### Code verification
+`src/aicfa/features.py` explicitly propagates:
+- liquidity: `previous_high/low`, active liquidity prices, breakout levels;
+- FVG: bullish/bearish bounds and lifecycle;
+- Order Blocks: bullish/bearish bounds and lifecycle.
+
+`src/aicfa/setup_analysis.py` reads those analytical columns from `context.latest_rows`, which is built from the `analyses` mapping.
+
+### Consequence
+The live `WAIT` caused by missing geometrically valid targets remains the real issue to investigate. The next diagnostic must inspect `r.analysis` or the actual setup candidate source rows, not `r.frames`.
+
+No production code was changed for the incorrect diagnostic. This correction is recorded to preserve the mistake rather than rewrite history.
+
+### NEXT UNFINISHED
+Inspect the actual analytical level values from `r.analysis` / seven-timeframe `analyses` and determine why target selection finds no valid objective above/below current price for the live scenarios. Then implement only the target rule supported by the actual causal level data.
