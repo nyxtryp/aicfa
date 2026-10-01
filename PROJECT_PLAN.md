@@ -1101,3 +1101,44 @@ The causal setup outcome evaluator remains required for later measurement of rea
 
 ### NEXT UNFINISHED
 Build the AICFA chart visualization output layer.
+
+
+## 2026-10-02 — CHART VISUALIZATION: implementation started
+
+### Reconciliation before code
+- Re-read the current `PROJECT_PLAN.md` and confirmed it remains the single source of truth.
+- Confirmed `main` HEAD is `3ce75fe1fec658e5778dd00dd65ef6b67a731d39`, the checkpoint that defines chart visualization as the current product direction.
+- Confirmed the repository already reaches the live GREEN MTF SETUP ENGINE checkpoint and that chart rendering must visualize existing analytical state rather than recalculate trading logic.
+- Confirmed `requirements.txt` currently has no plotting library. The first implementation step is therefore to add a CPU-only deterministic renderer dependency and a dedicated visualization contract.
+
+### Implementation contract being fixed before coding
+The chart layer will be split into:
+1. a deterministic visualization model that converts existing AICFA OHLCV/features/setup state into render-ready primitives;
+2. a renderer that only draws those primitives and never changes Entry, Invalidation, Targets, provenance, or analytical decisions.
+
+The first renderer output will be a high-quality PNG suitable for human inspection and regression testing. SVG/export extensions remain possible after the first GREEN renderer.
+
+The primary chart timeframe will be selected from the actionable setup Entry zone timeframe, while higher/lower timeframe levels are projected with explicit source-timeframe labels. The 1m timeframe remains execution/microstructure context and can never manufacture setup geometry.
+
+The first implementation must support, where the source data actually contains them:
+- candles and volume;
+- current price;
+- HH/HL/LH/LL and structure direction;
+- BOS/CHoCH/MSS events;
+- liquidity levels and sweeps;
+- FVG zones;
+- Order Blocks;
+- displacement;
+- Premium/Discount context;
+- Entry zone;
+- Invalidation;
+- ordered TP1/TP2 with provenance;
+- direction, scenario, confirmation and source timeframes.
+
+No annotation is fabricated when its causal source is absent.
+
+### Immediate action
+Implement the visualization model + renderer, then add focused geometry/causality tests, run them on the server, run the full regression, execute a real BTC smoke, inspect the produced chart, and update this journal after each meaningful checkpoint.
+
+### NEXT UNFINISHED
+Build the deterministic AICFA chart visualization model and first PNG renderer.
