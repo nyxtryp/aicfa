@@ -397,6 +397,20 @@ def _scenario_has_required_evidence(
     return not required or all(concept in supporting for concept in required)
 
 
+def _actionable_geometry_key(candidate: SetupCandidate) -> tuple:
+    """Identify duplicate trade geometry without ranking different hypotheses."""
+    return (
+        candidate.direction,
+        tuple((level.value, level.timeframe, level.source) for level in candidate.entry_zone),
+        None if candidate.invalidation_level is None else (
+            candidate.invalidation_level.value,
+            candidate.invalidation_level.timeframe,
+            candidate.invalidation_level.source,
+        ),
+        tuple((level.value, level.timeframe, level.source) for level in candidate.target_levels),
+    )
+
+
 def _risk_reward_is_valid(
     direction: str,
     entry_zone: tuple[SetupLevel, ...],
@@ -720,9 +734,26 @@ def analyze_setups(
             reasons=("setup conditions are not sufficiently specified",),
         )
 
+    # Multiple scenario hypotheses may describe the same actionable trade
+    # geometry. Keep one setup object rather than presenting the same trade
+    # twice. This does not rank scenarios: distinct geometry remains distinct,
+    # while duplicate geometry is recorded as a non-actionable duplicate.
+    unique_candidates: list[SetupCandidate] = []
+    seen_geometry: dict[tuple, str] = {}
+    for candidate in candidates:
+        key = _actionable_geometry_key(candidate)
+        if key in seen_geometry:
+            missing.append(
+                f"{candidate.scenario}: same actionable geometry as "
+                f"{seen_geometry[key]}; not emitted as a separate setup"
+            )
+            continue
+        seen_geometry[key] = candidate.scenario
+        unique_candidates.append(candidate)
+
     return SetupAssessment(
         decision=SetupDecision.READY,
-        candidates=tuple(candidates),
+        candidates=tuple(unique_candidates),
         missing_context=_unique(missing),
         conflicts=evidence_assessment.conflicts,
         reasons=("one or more conditional setups are sufficiently specified by the current seven-timeframe state",),
