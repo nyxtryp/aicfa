@@ -231,3 +231,27 @@ def test_binance_adapter_maps_l1_order_book():
     assert out.columns.tolist() == ["timestamp", "bid_price", "bid_size", "ask_price", "ask_size"]
     assert out.iloc[0]["bid_price"] == "100.0"
     assert out.iloc[0]["ask_size"] == "4.0"
+
+
+def test_binance_adapter_collects_timestamped_l1_history_without_inventing_rows():
+    payloads = [
+        {"lastUpdateId": 1, "bids": [["100.0", "5.0"]], "asks": [["100.1", "4.0"]]},
+        {"lastUpdateId": 2, "bids": [["100.0", "6.0"]], "asks": [["100.1", "3.0"]]},
+    ]
+    sleeps = []
+
+    def opener(request, timeout):
+        assert "/api/v3/depth?" in request.full_url
+        return FakeResponse(payloads.pop(0))
+
+    provider = BinanceMarketDataProvider(opener=opener, sleeper=sleeps.append)
+    out = provider.fetch_order_book_history(
+        symbol="BTCUSDT",
+        market_type="spot",
+        snapshots=2,
+        interval_seconds=0.25,
+    )
+    assert len(out) == 2
+    assert out["bid_size"].tolist() == ["5.0", "6.0"]
+    assert len(sleeps) == 1
+    assert sleeps == [0.25]
