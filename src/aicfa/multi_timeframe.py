@@ -7,6 +7,7 @@ higher timeframe implicitly, avoiding accidental partial-candle leakage.
 """
 from __future__ import annotations
 import re
+import numpy as np
 import pandas as pd
 from .structure import build_structure
 
