@@ -206,3 +206,16 @@ Fix committed to `main`; deployment and server verification pending.
 
 ### Exact next step
 Deploy current `main`, rerun focused FindSetup/microstructure tests, then rerun live BTC FindSetup smoke without explicit `limit`.
+
+## 2026-10-01 — Order Flow corrected to trade-level microstructure
+
+The first live smoke proved transport and analysis population, but exposed an architectural issue: FindSetup was converting raw trades into completed 1-minute buckets before calling Order Flow. Microstructure must not be defined by candle timeframes.
+
+Forward correction:
+- `53a2893b61b383563d14e7711dde6aa3c8920b13` — added `build_trade_order_flow()`, using individual venue-timestamped trades and a causal event window; no clock/candle aggregation.
+- `6393ca8070f79c074c2796be6a64aaa543c8d8f7` — FindSetup now feeds raw trades directly into the trade-level Order Flow layer.
+- `70b3d0aa7dcf62d2978fa0df854ee84bbaee323b` — tests for event-window behavior and future-trade causality.
+
+The previous live smoke remains evidence that BTC TRADES/ORDER_BOOK transport and microstructure output were populated. The old completed-1m aggregation path is being replaced rather than retained.
+
+Exact next step: deploy current main, run focused Order Flow + FindSetup tests, then full pytest and live BTC FindSetup smoke.
