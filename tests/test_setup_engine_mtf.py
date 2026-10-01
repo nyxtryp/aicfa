@@ -173,6 +173,7 @@ def test_setup_engine_uses_scenario_specific_zone_family():
         frame.loc[0, "fvg_bullish_low"] = 96.0 if tf == "4h" else float("nan")
         frame.loc[0, "fvg_bullish_high"] = 99.0 if tf == "4h" else float("nan")
     frames["4h"].loc[0, "smc_sweep_low_level"] = 90.0
+    frames["4h"].loc[0, "active_buy_liquidity_price"] = 130.0
 
     evidence = MarketEvidence(
         asset="BTC/USDT",
