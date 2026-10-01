@@ -4,10 +4,11 @@ from aicfa.market_data_router import FallbackMarketDataProvider
 
 
 class FakeProvider:
-    def __init__(self, name, *, trades=None, book=None, error=None):
+    def __init__(self, name, *, trades=None, book=None, book_history=None, error=None):
         self.exchange = name
         self.trades = trades
         self.book = book
+        self.book_history = book_history if book_history is not None else book
         self.error = error
 
     def fetch_trades(self, **kwargs):
@@ -19,6 +20,11 @@ class FakeProvider:
         if self.error:
             raise RuntimeError(self.error)
         return self.book
+
+    def fetch_order_book_history(self, **kwargs):
+        if self.error:
+            raise RuntimeError(self.error)
+        return self.book_history
 
 
 def _trades():
@@ -85,3 +91,29 @@ def test_router_rejects_empty_order_book_result():
         assert "order_book" in str(exc)
     else:
         raise AssertionError("expected empty order book to fail")
+
+
+def test_router_falls_back_for_order_book_history():
+    history = pd.DataFrame(
+        {
+            "timestamp": [1000, 1100],
+            "bid_price": [100.0, 100.0],
+            "bid_size": [5.0, 6.0],
+            "ask_price": [100.1, 100.1],
+            "ask_size": [4.0, 3.0],
+        }
+    )
+    router = FallbackMarketDataProvider(
+        [
+            FakeProvider("binance", error="timeout"),
+            FakeProvider("bybit", book_history=history),
+        ]
+    )
+    result = router.fetch_order_book_history_with_source(
+        symbol="BTCUSDT",
+        market_type="spot",
+        snapshots=2,
+        interval_seconds=0,
+    )
+    assert result.provider == "bybit"
+    assert result.frame["bid_size"].tolist() == [5.0, 6.0]
