@@ -217,13 +217,28 @@ def _numeric(row: pd.Series, column: str) -> float | None:
     return None if pd.isna(value) else float(value)
 
 
+def _ordered_source_timeframes(
+    context: MultiTimeframeContext,
+    concepts: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    """Prefer timeframes that actually supplied the observed setup evidence."""
+    observed = {
+        item.timeframe
+        for item in context.observations
+        if item.concept_id in concepts and getattr(item, "timeframe", None)
+    }
+    ordered = [tf for tf in SETUP_TIMEFRAMES if tf in observed]
+    ordered.extend(tf for tf in SETUP_TIMEFRAMES[::-1] if tf not in ordered)
+    return tuple(ordered)
+
+
 def _zone_levels(
     context: MultiTimeframeContext,
     direction: str,
     concepts: tuple[str, ...],
 ) -> tuple[SetupLevel, ...]:
     levels: list[SetupLevel] = []
-    for timeframe in SETUP_TIMEFRAMES[::-1]:
+    for timeframe in _ordered_source_timeframes(context, concepts):
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
@@ -289,7 +304,7 @@ def _target_levels(
         ("previous_low", "previous low"),
     )
     result: list[SetupLevel] = []
-    for timeframe in SETUP_TIMEFRAMES[::-1]:
+    for timeframe in _ordered_source_timeframes(context):
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
