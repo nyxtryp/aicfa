@@ -213,3 +213,26 @@ def test_bybit_adapter_maps_l1_order_book():
     assert out.columns.tolist() == ["timestamp", "bid_price", "bid_size", "ask_price", "ask_size"]
     assert out.iloc[0]["timestamp"] == 1700000000300
     assert out.iloc[0]["bid_size"] == "5.0"
+
+
+def test_bybit_adapter_collects_timestamped_l1_history():
+    payloads = [
+        {"retCode": 0, "retMsg": "OK", "result": {"a": [["100.1", "4.0"]], "b": [["100.0", "5.0"]], "ts": 1700000000300}},
+        {"retCode": 0, "retMsg": "OK", "result": {"a": [["100.1", "3.0"]], "b": [["100.0", "6.0"]], "ts": 1700000000400}},
+    ]
+    sleeps = []
+
+    def opener(request, timeout):
+        return JsonResponse(payloads.pop(0))
+
+    provider = BybitMarketDataProvider(opener=opener, sleeper=sleeps.append)
+    out = provider.fetch_order_book_history(
+        symbol="BTCUSDT",
+        market_type="spot",
+        snapshots=2,
+        interval_seconds=0.25,
+    )
+    assert len(out) == 2
+    assert out["timestamp"].tolist() == [1700000000300, 1700000000400]
+    assert out["bid_size"].tolist() == ["5.0", "6.0"]
+    assert sleeps == [0.25]
