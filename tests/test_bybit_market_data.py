@@ -180,3 +180,36 @@ def test_bybit_symbol_resolution_stops_when_cursor_repeats():
     with pytest.raises(ValueError, match="no Bybit"):
         provider.resolve_symbol("SECOND")
     assert calls == [None, "same-cursor"]
+
+def test_bybit_adapter_maps_public_trades_to_signed_flow():
+    provider = BybitMarketDataProvider(opener=lambda request, timeout: JsonResponse({
+        "retCode": 0,
+        "retMsg": "OK",
+        "result": {
+            "list": [
+                {"execId": "2", "symbol": "BTCUSDT", "price": "101", "size": "3", "side": "Sell", "time": "1700000000200"},
+                {"execId": "1", "symbol": "BTCUSDT", "price": "100", "size": "2", "side": "Buy", "time": "1700000000100"},
+            ]
+        },
+    }))
+    out = provider.fetch_trades(symbol="BTCUSDT", market_type="spot", limit=2)
+    assert out.columns.tolist() == ["timestamp", "price", "volume", "side"]
+    assert out["side"].tolist() == [1, -1]
+
+
+def test_bybit_adapter_maps_l1_order_book():
+    provider = BybitMarketDataProvider(opener=lambda request, timeout: JsonResponse({
+        "retCode": 0,
+        "retMsg": "OK",
+        "result": {
+            "s": "BTCUSDT",
+            "a": [["100.1", "4.0"]],
+            "b": [["100.0", "5.0"]],
+            "ts": 1700000000300,
+            "u": 7,
+        },
+    }))
+    out = provider.fetch_order_book(symbol="BTCUSDT", market_type="spot", limit=1)
+    assert out.columns.tolist() == ["timestamp", "bid_price", "bid_size", "ask_price", "ask_size"]
+    assert out.iloc[0]["timestamp"] == 1700000000300
+    assert out.iloc[0]["bid_size"] == "5.0"
