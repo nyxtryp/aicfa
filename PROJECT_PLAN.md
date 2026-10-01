@@ -46,3 +46,10 @@ Not yet deployed/verified.
 
 ### Exact next step
 Deploy current `main` and rerun the focused MarketEvidence + adaptive FindSetup tests. If green, continue to mandatory full pytest and live BTC FindSetup smoke.
+
+
+## MarketEvidence follow-up — bb00dd0f60e7af67ddc5a9635b42c0bb463bca47
+- Finding: build_market_evidence() used a single emitted flag, so once BOS/displacement/etc. emitted, later FVG/Order Block concepts were skipped even when independently active.
+- Fix: track emitted_concepts and suppress only a concept already emitted by its lifecycle path; independent supported concepts can now coexist.
+- Status: code committed; deployment/verification pending.
+- Exact next step: deploy current main, then rerun the focused MarketEvidence + adaptive FindSetup tests. If green, run full pytest.
