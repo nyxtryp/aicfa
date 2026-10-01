@@ -66,7 +66,7 @@ def _as_frame(frame: pd.DataFrame) -> pd.DataFrame:
     missing = [c for c in required if c not in frame.columns]
     if missing:
         raise ValueError(f"missing chart columns: {missing}")
-    out = frame.loc[:, required].copy()
+    out = frame.copy()
     out["timestamp"] = pd.to_datetime(out["timestamp"], utc=True)
     for column in required[1:]:
         out[column] = pd.to_numeric(out[column], errors="coerce")
