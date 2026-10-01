@@ -11,6 +11,8 @@ def test_setup_requirements_are_knowledge_driven():
     plan = default_setup_requirements("BTC")
     assert plan.asset == "BTC"
     assert DataKind.OHLCV in plan.data_kinds
+    assert DataKind.TRADES in plan.data_kinds
+    assert DataKind.ORDER_BOOK in plan.data_kinds
     assert ContextNeed.STRUCTURAL_ANCHORS in plan.context_needs
     assert ContextNeed.CROSS_TIMEFRAME_CONTEXT in plan.context_needs
     assert TimeframeRole.EXECUTION in plan.timeframe_roles
@@ -46,3 +48,11 @@ def test_unknown_knowledge_concept_is_rejected():
         pass
     else:
         raise AssertionError("unknown knowledge concept must not be silently ignored")
+
+
+def test_microstructure_knowledge_maps_to_distinct_data_kinds():
+    flow = requirements_for_concepts("BTC", ("microstructure.order_flow",))
+    book = requirements_for_concepts("BTC", ("microstructure.order_book",))
+
+    assert flow.data_kinds == {DataKind.OHLCV, DataKind.TRADES}
+    assert book.data_kinds == {DataKind.OHLCV, DataKind.ORDER_BOOK}
