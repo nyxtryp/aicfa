@@ -2142,3 +2142,26 @@ GitHub source/test changes are committed. FrostDeploy verification has **not** y
 3. If green, run the live BTC FindSetup smoke without an explicit `limit`.
 4. Inspect whether the adaptive expansion actually increases only unresolved timeframes and whether missing context decreases.
 5. Only after this verification decide whether MarketEvidence's latest-row limitation still requires repair.
+
+
+## 2026-10-01 — Stop runaway adaptive expansion at causal-context stagnation
+
+### Finding
+The first server verification of the adaptive expansion implementation did not complete: pytest output advanced normally but the command stalled during the suite. Source inspection identified the cause before waiting for an arbitrary exchange/network boundary: the expansion loop could keep doubling forever when the provider continued returning full batches but MarketEvidence remained unchanged. The current latest-row MarketEvidence adapter can produce exactly this condition.
+
+### Forward fix
+- `3aa485e7c790e4a2ded9af6892361094fa5ed329` — Stop adaptive expansion when context stops changing.
+- Expansion now compares a deterministic context signature containing observations, missing-context state and conflicts after each expansion pass.
+- If the signature is unchanged after an expansion, that timeframe/context expansion is no longer providing new causal information under the current evidence model, so expansion stops instead of doubling without bound.
+- Expansion now passes the original request `now_ms` into temporary analysis, preserving strict causality.
+- The temporary fetch now requests only unresolved timeframes instead of refetching all seven timeframes on every pass.
+
+### Tests
+- Updated the dependency-depth test to expect the finite diagnostic sequence `60 → 120 → 240` under the current no-context fixture.
+- Added a regression test proving an unbounded provider with unchanged context terminates at `60 → 120 → 240` rather than looping indefinitely.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+Deploy current `main` and rerun the mandatory full pytest. The previous stalled run must not be allowed to sit indefinitely. If green, immediately run the live BTC FindSetup smoke without an explicit limit and inspect the expansion calls/row counts. If context still stalls, the next planned step is the MarketEvidence repair to consume causally relevant recent events and active lifecycle states rather than only latest-row flags.
