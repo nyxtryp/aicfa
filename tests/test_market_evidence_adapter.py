@@ -102,7 +102,7 @@ def test_adapter_marks_conflicting_explicit_directions():
     assert evidence.conflicts == ("explicit long and short observations coexist",)
 
 
-def test_adapter_aggregates_independent_timeframe_analyses():
+def test_adapter_preserves_opposite_directions_across_timeframes_without_global_conflict():
     evidence = build_market_evidence_from_frames(
         {
             "1m": _analysis(bos_up=1),
@@ -116,4 +116,22 @@ def test_adapter_aggregates_independent_timeframe_analyses():
         ("market_structure.bos", "1m", "long"),
         ("market_structure.bos", "4h", "short"),
     }
-    assert evidence.conflicts == ("explicit long and short observations coexist",)
+    assert evidence.conflicts == ()
+
+
+def test_adapter_flags_opposing_structural_signals_on_one_timeframe():
+    evidence = build_market_evidence(
+        _analysis(bos_up=1, displacement_down=1),
+        asset="BTC/USDT",
+    )
+
+    assert evidence.conflicts == ("conflicting structural directions on 1m",)
+
+
+def test_adapter_does_not_treat_context_zone_opposition_as_structural_conflict():
+    evidence = build_market_evidence(
+        _analysis(bos_up=1, fvg_bearish=1, order_block_bullish=1),
+        asset="BTC/USDT",
+    )
+
+    assert evidence.conflicts == ()
