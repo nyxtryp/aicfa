@@ -236,3 +236,63 @@ Goals:
 5. Add focused tests for bullish/bearish displacement, weak/non-displacement candles, threshold validation, and future-change causality.
 6. Integrate displacement into the existing analytical chain only after the standalone contract is GREEN.
 7. Run focused tests, then full pytest, then verify the live BTC FindSetup path.
+
+## 2026-10-01 — PLAN RECONCILIATION / CURRENT SOURCE OF TRUTH
+
+The previous `NEXT UNFINISHED — Displacement Engine` section is superseded by the actual repository state. Displacement and the subsequent SMC/analytical layers already exist in `main` and must not be restarted.
+
+### Verified implemented chain
+- Market Structure
+- Liquidity
+- Displacement
+- FVG
+- Order Blocks
+- Premium / Discount
+- Unified SMC
+- Multi-Timeframe
+- Volume / Volatility
+- Derivatives
+- Canonical Market State
+- Setup Events
+- Knowledge Base / Data Requirements
+- Market Evidence
+- Evidence Reasoning
+- Scenario Reasoning
+- Setup Detection
+- Setup Analysis
+- Authoritative Decision Layer
+- Universal asset resolution
+- FindSetup seven-timeframe orchestration
+- Trade-level Order Flow / Microstructure
+- Trade-level CVD
+- Causal L1 history transport
+- Causal Absorption
+
+### Verified current integration state
+The current `find_setup.py` already executes:
+`asset resolution → seven causal timeframes → features → MarketEvidence → Evidence → Scenario → Setup → Decision`, plus request-scoped trades/order book/L1 history, Order Flow, CVD and Absorption.
+
+The latest documented live checkpoint is GREEN for the deterministic market-analysis path and microstructure integration. The repository HEAD is `4b37625d5ae670b80b7c834b287aca9dce5b464c`.
+
+### Important correction
+The project plan had fallen behind the repository because later implementation commits were not reconciled into the final NEXT UNFINISHED section. From this point forward, the latest code/test state and Git history are the source of truth; historical NEXT UNFINISHED sections remain historical only.
+
+### Work completed after the older product checkpoint
+AICFA's current deterministic core is already beyond the earlier Displacement/SMC stage. The remaining work is productization and learning, not another restart of completed analytical primitives.
+
+### CURRENT NEXT UNFINISHED
+**AICFA Interface Knowledge Pack** was the next missing contract for a future local interface model. It has now been added at `docs/AICFA_INTERFACE_KNOWLEDGE.md` in commit `9a7c3b27f07e6f1b58c64b4fc52adbb1a939db91`.
+
+### NEXT AFTER INTERFACE PACK
+The next substantive product block is the **first own learning/training pipeline**:
+1. define causal prediction/label tasks from the existing market-state representation;
+2. build a chronological training/validation/test dataset;
+3. define leakage-safe labels and evaluation windows;
+4. train/evaluate the first AICFA-owned model;
+5. compare model output against the deterministic core without allowing the model to override it;
+6. record results and only then decide the next model/experience stage.
+
+The deterministic core remains authoritative while the learning layer is being developed.
+
+### Regression gate
+Before starting the learning pipeline, the currently reported server regression failures must be reconciled against the actual repository HEAD. Do not rewrite correct main-branch code to satisfy a stale release. Verify the deployed release SHA first, then fix only a genuine regression and run the full suite.
