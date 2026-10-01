@@ -1142,3 +1142,33 @@ Implement the visualization model + renderer, then add focused geometry/causalit
 
 ### NEXT UNFINISHED
 Build the deterministic AICFA chart visualization model and first PNG renderer.
+
+
+## 2026-10-02 — CHART VISUALIZATION: first implementation checkpoint
+
+### Code completed
+- Added `src/aicfa/chart_visualization.py`.
+- Added a typed `ChartModel` contract containing candles, current price, setup geometry, provenance, analytical events, structure labels, zones, direction, scenario, confirmation and status.
+- Added deterministic CPU-only PNG rendering with matplotlib.
+- The renderer consumes the existing `SetupAssessment` geometry verbatim; it does not recalculate Entry, Invalidation or Targets.
+- Primary chart timeframe is the setup Entry timeframe; the 1m layer cannot become setup geometry.
+- Added initial rendering of candles, volume, current price, setup levels, FVG/OB zones, BOS/CHoCH/MSS, liquidity sweeps, displacement and HH/HL/LH/LL labels when those columns are present.
+- WAIT/NO TRADE produces no fictional trade levels.
+- Added focused tests for geometry/provenance, 1m exclusion, WAIT behavior, PNG generation and future-feature causality.
+- Added `matplotlib>=3.9,<4` as the CPU rendering dependency.
+
+### Commits
+- `69fbd18b48f0aa4b25ddd9924e944ef8e95ddba6` — docs: record chart visualization implementation start
+- `8969ec8dd23b1e27e53ce476003ec6a04bcd3212` — feat: add deterministic AICFA chart model and renderer
+- `305433dfe4fd1d70c3722e46ece2214949883d5c` — test: cover chart geometry and causal rendering
+- `df2a3e4734151e06fc178ecb69d69961afb9b826` — build: add CPU chart rendering dependency
+
+### Verification state
+- Code has been written and committed to `main`.
+- Server/FrostDeploy verification is **pending**.
+- Full regression is **pending** after the new visualization dependency/module.
+- A real BTC chart smoke and visual inspection are still required.
+- This first implementation is intentionally the visualization foundation, not yet the final integrated product output path.
+
+### NEXT UNFINISHED
+Run the chart visualization focused tests and full regression on the deployed/current server release, then perform a real BTC rendering smoke and inspect the produced chart before advancing the renderer.
