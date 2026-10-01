@@ -46,7 +46,7 @@ class FakeProvider:
             "timestamp": [base + i * 10_000 for i in range(min(limit, 60))],
             "price": np.full(min(limit, 60), 100.0),
             "volume": np.full(min(limit, 60), 1.0),
-            "side": [1 if i % 2 == 0 else -1 for i in range(min(limit, 60))],
+            "side": ([1] * min(limit, 60) if self.direction == "buy" else [1 if i % 2 == 0 else -1 for i in range(min(limit, 60))]),
         })
 
     def fetch_order_book(self, *, symbol, market_type, limit=1):
@@ -237,7 +237,7 @@ def test_find_setup_feeds_request_scoped_microstructure_data():
 
 
 def test_find_setup_integrates_causal_l1_history_and_absorption():
-    provider = FakeProvider()
+    provider = FakeProvider("buy")
     result = find_setup(
         FindSetupRequest("BTC/USDT"),
         provider=provider,
