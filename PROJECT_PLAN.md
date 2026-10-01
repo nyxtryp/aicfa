@@ -1193,3 +1193,17 @@ Run the chart visualization focused tests and full regression on the deployed/cu
 
 ### NEXT UNFINISHED
 Run the focused chart tests and full regression on the current server release.
+
+
+## 2026-10-02 — CHART VISUALIZATION: verification execution note
+
+### Attempted verification
+- The repository-side implementation is ready for focused tests.
+- The currently available connected tools do not expose the user's FrostDeploy/SSH server shell, so I cannot honestly claim that the server-side pytest run has executed from this chat.
+- I will not mark tests GREEN or invent a server result.
+- The next executable verification remains the exact server command from the deployment environment:
+  `sudo -u fd-aicfa bash -lc 'cd "$(readlink -f /srv/frostdeploy/aicfa/current)" && PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_chart_visualization.py'`
+- After that passes, run the full regression with the same environment and only then perform the real BTC chart smoke.
+
+### NEXT UNFINISHED
+Run the focused chart tests on FrostDeploy and record the real result; do not advance to the BTC smoke until that gate is GREEN.
