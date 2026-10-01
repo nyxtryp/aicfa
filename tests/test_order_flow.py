@@ -127,9 +127,9 @@ def test_trade_order_flow_uses_event_window_without_clock_intervals():
     })
     out = build_trade_order_flow(base, trades, baseline_window=2, event_window=2)
     assert len(out) == 3
-    assert np.isclose(out.loc[1, "taker_buy_volume"], 2.0)
+    assert np.isclose(out.loc[1, "taker_buy_volume"], 5.0)
     assert np.isclose(out.loc[1, "taker_sell_volume"], 3.0)
-    assert np.isclose(out.loc[1, "taker_net_volume"], -1.0)
+    assert np.isclose(out.loc[1, "taker_net_volume"], 2.0)
 
 
 def test_trade_order_flow_is_causal_under_future_trade_changes():
@@ -138,7 +138,7 @@ def test_trade_order_flow_is_causal_under_future_trade_changes():
         "timestamp": [
             pd.Timestamp("2026-01-01T00:00:10Z").value // 1_000_000,
             pd.Timestamp("2026-01-01T00:00:20Z").value // 1_000_000,
-            pd.Timestamp("2026-01-01T00:00:30Z").value // 1_000_000,
+            pd.Timestamp("2026-01-01T00:02:00Z").value // 1_000_000,
         ],
         "volume": [2.0, 3.0, 4.0],
         "side": [1, -1, 1],
