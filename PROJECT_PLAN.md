@@ -126,3 +126,32 @@ If the chat is lost, resume from this exact section: **CVD + Absorption integrat
 3. Build and test the causal Absorption integration without fabricating historical book data.
 4. Run full pytest and live BTC FindSetup smoke with CVD + Absorption provenance/population.
 5. Update this journal again with the exact results and next unfinished analytical block.
+
+## 2026-10-01 — FindSetup causal L1/Absorption integration implemented
+
+### Work completed
+- Exposed causal L1 history through SharedSnapshotMarketDataProvider.
+- Extended FindSetupResult with order_book_history, order_book_history_provider, and absorption_analysis.
+- FindSetup now requests 8 real L1 observations at 1-second intervals through the existing routed provider.
+- The final microstructure observation timestamp is the causal minimum of the latest available trade timestamp and latest L1 observation timestamp, preventing later trades from being used against an earlier book state.
+- L1 bid/ask snapshots are converted into causal long-format levels for build_absorption().
+- Price observations for Absorption are derived from real L1 bid/ask mid-prices: each observation uses the previous/current mid as open/close and their extrema as high/low. No synthetic market history is introduced.
+- Absorption remains descriptive only; it does not modify the decision chain or emit LONG/SHORT/WAIT.
+- Added FindSetup integration coverage for L1 history transport, provider provenance, and populated causal Absorption analysis.
+- Commits:
+  - 95582784a50c42805e6fa6333928640af4cb852d — expose causal L1 history through shared provider
+  - 85a071d376374352992ac8a1c8b5c40ca257b72e — integrate causal L1 history into FindSetup absorption
+  - dbcd67a610978eb30b7c6b509d5c9c4dda1175e7 — exercise populated causal absorption state
+
+### CURRENT STATE
+- CVD integration: GREEN from the previous full-suite checkpoint.
+- Causal L1 history transport: focused regression GREEN — 33 passed.
+- FindSetup Absorption integration: implemented; server verification pending.
+- No claim yet that live Absorption is GREEN.
+
+### NEXT UNFINISHED
+1. Run focused FindSetup/Absorption integration tests on the deployed server.
+2. If GREEN, run the complete pytest suite after the integration.
+3. Run live BTC Spot FindSetup smoke and verify real L1 history, provider provenance, CVD, and Absorption population.
+4. Inspect live Absorption output for causal timestamps and ensure no future observations are consumed.
+5. Record exact results and only then mark Absorption live GREEN.
