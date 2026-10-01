@@ -2202,3 +2202,22 @@ The first post-truncation verification produced a failure after normal collectio
 
 ### Exact next step
 Deploy current `main` and rerun the mandatory full pytest. If the suite completes, report the exact failure count/output rather than waiting indefinitely. Only after the suite is green run the live BTC FindSetup smoke without an explicit limit.
+
+
+## 2026-10-01 — Reduce adaptive expansion recomputation cost
+
+### Finding
+The completed FrostDeploy suite passed, but runtime increased to **52.40s**. Source inspection showed the adaptive expansion loop was rebuilding the full feature stack for every timeframe on every expansion pass, even when only a subset of timeframes had been refetched. `build_features()` invokes the full deterministic SMC/feature pipeline, so this multiplied unnecessary CPU work.
+
+### Forward fix
+- `17728db16142e0c8e69171fb8dccc45c3c8879b` — Avoid rebuilding unchanged timeframe features during adaptive expansion.
+- The expansion path now builds the initial feature frames once and retains them.
+- After each expansion, only the newly refetched/unresolved timeframes are recomputed.
+- Existing analyses for unaffected timeframes are reused.
+- No analytical behavior or depth contract was changed.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+Deploy current `main` and rerun the mandatory full pytest. Compare runtime with the previous 52.40s result and confirm all tests remain green. If runtime is still materially inflated, profile the slowest test groups before making further architectural changes.
