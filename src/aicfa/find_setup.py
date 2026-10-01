@@ -407,6 +407,8 @@ def find_setup(
         evidence_assessment,
         scenario_assessment,
         observations=evidence_assessment.observations,
+        analyses=analyses,
+        timeframes=timeframes,
     )
     decision_assessment = decide(
         setup_assessment,
