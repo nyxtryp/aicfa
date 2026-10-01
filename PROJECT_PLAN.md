@@ -653,3 +653,29 @@ No production code was changed for the incorrect diagnostic. This correction is 
 
 ### NEXT UNFINISHED
 Inspect the actual analytical level values from `r.analysis` / seven-timeframe `analyses` and determine why target selection finds no valid objective above/below current price for the live scenarios. Then implement only the target rule supported by the actual causal level data.
+
+
+## 2026-10-01 — SETUP ENGINE: causal target fallback added
+
+### Investigation
+- Inspected the real Git implementation instead of changing target logic blindly.
+- Confirmed `build_features()` already propagates liquidity, FVG, Order Block and causal rolling-range features into analytical frames.
+- Confirmed `_target_levels()` only accepted three objective families:
+  - active liquidity;
+  - liquidity breakout;
+  - confirmed previous swing high/low.
+- This can legitimately produce no target even when the current analytical state has a valid causal range extreme above/below price, because confirmed swing/liquidity events may not exist on the required timeframe at the latest row.
+
+### Change
+- Added `internal_previous_high/low` as additional causal target candidates.
+- Added `rolling_high_60 / rolling_low_60` as the final causal fallback.
+- No fabricated prices, future data, or 1m-only target logic was introduced.
+- Existing target timeframe restriction remains: target must come from the entry timeframe or a higher timeframe.
+- Added regression test proving a 4h causal rolling high can serve as a target when liquidity/swing target columns are unavailable.
+
+### Commits
+- `7cba3c9422e88dca8a1fe1043921a6d7e245db42` — test: allow causal rolling extreme target fallback
+- `31b052e08dd39018ab888fca2e8a94e17b042738` — fix: add causal rolling extremes as target fallback
+
+### NEXT UNFINISHED
+Run focused SETUP ENGINE tests, then full regression, then repeat live BTC FindSetup smoke. The live smoke must verify that the target is an actual causal analytical level, remains at entry-TF or higher, and is not derived solely from 1m.
