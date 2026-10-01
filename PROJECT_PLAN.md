@@ -1818,3 +1818,33 @@ Multi-source architecture remains required: AICFA must be able to try providers 
 3. Feed those requirements into the existing multi-source router so providers supply the required temporary data and fallback when capabilities are unavailable.
 4. Only then repair MarketEvidence so it consumes the causally relevant recent events and persistent current states required by the knowledge layer, rather than only latest-row flags.
 5. Verify on FrostDeploy and record exact output before marking any part GREEN.
+
+
+## 2026-10-01 — Knowledge + Data Requirement layer implemented
+
+### Implementation
+- Added `src/aicfa/data_requirements.py` as the request-scoped contract between AICFA knowledge and market-data collection.
+- Knowledge requirements now express required data kinds (OHLCV, trades, order book, funding, open interest, liquidations, mark price), context needs (structural anchors, recent events, active zones, cross-timeframe context, confirmation response, positioning context), and semantic timeframe roles (execution, lower confirmation, higher structure, broader context).
+- Requirements are derived from the existing Knowledge Base concepts and merged per request.
+- Unknown concepts are rejected instead of silently producing incomplete collection requirements.
+- The contract deliberately contains no candle count, fixed history length, exchange-specific transport logic, or persistent market buffer.
+- Added regression tests in `tests/test_data_requirements.py` covering knowledge-driven requirements, derivative-data expansion, absence of fixed depth fields, and unknown-concept rejection.
+
+### Commit
+- `bd38ed809504ae4113efe0c09f445b0237dbe907` — Add knowledge-driven data requirement layer.
+
+### Verification
+- GitHub commit created successfully from control point `74c58f93072e9b308d1aa6993203d48cbef19cc9`.
+- GitHub reports no CI workflow runs/statuses for this commit.
+- Local syntax validation completed successfully for the new requirement module: `syntax: OK`.
+- FrostDeploy full pytest has **not yet been run** for this commit, so this checkpoint is not GREEN.
+
+### Status
+**IMPLEMENTED / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+1. Deploy commit `bd38ed809504ae4113efe0c09f445b0237dbe907` to FrostDeploy.
+2. Run the mandatory full pytest suite and record the exact release/output.
+3. If green, connect `DataRequirementPlan` to FindSetup's market-data request path so requirements, rather than fixed seven-TF/1000-row assumptions, drive collection.
+4. Then extend the requirement resolver to translate semantic timeframe/context needs into the minimum temporary data actually required by the analytical dependencies/events/states.
+5. Only after that repair MarketEvidence's latest-row limitation.
