@@ -350,9 +350,9 @@ def _invalidation_level(
     entry_low = min(level.value for level in entry_zone)
     entry_high = max(level.value for level in entry_zone)
     candidates: list[SetupLevel] = []
-    entry_timeframe = entry_zone[0].timeframe
-    entry_index = SETUP_TIMEFRAMES.index(entry_timeframe)
-    allowed = SETUP_TIMEFRAMES[entry_index:]
+    # Invalidation is tied to the structural premise, not mechanically to
+    # the entry zone timeframe. Inspect every non-execution structural layer.
+    allowed = tuple(tf for tf in SETUP_TIMEFRAMES if tf != "1m")
     ordered_timeframes = tuple(
         tf for tf in source_timeframes if tf in allowed
     ) + tuple(
@@ -377,7 +377,50 @@ def _invalidation_level(
     return min(candidates, key=lambda level: level.value)
 
 
-def _target_levels(
+def _scenario_requirements(scenario: str) -> tuple[str, ...]:
+    return {
+        "continuation": ("market_structure.bos", "displacement"),
+        "reversal": ("market_structure.choch", "liquidity.sweep"),
+        "breakout_failure": (
+            "market_structure.bos",
+            "liquidity.sweep",
+            "price_action.rejection",
+        ),
+    }.get(scenario, ())
+
+
+def _scenario_has_required_evidence(
+    scenario: str,
+    supporting: tuple[str, ...],
+) -> bool:
+    required = _scenario_requirements(scenario)
+    return not required or all(concept in supporting for concept in required)
+
+
+def _risk_reward_is_valid(
+    direction: str,
+    entry_zone: tuple[SetupLevel, ...],
+    invalidation: SetupLevel | None,
+    targets: tuple[SetupLevel, ...],
+    *,
+    minimum_rr: float = 2.0,
+) -> bool:
+    if len(entry_zone) < 2 or invalidation is None or not targets:
+        return False
+    entry_low = min(level.value for level in entry_zone)
+    entry_high = max(level.value for level in entry_zone)
+    if direction == "long":
+        risk = entry_low - invalidation.value
+        reward = targets[0].value - entry_high
+    else:
+        risk = invalidation.value - entry_high
+        reward = entry_low - targets[0].value
+    if risk <= 0 or reward <= 0:
+        return False
+    return reward / risk >= minimum_rr
+
+
+def _target_levels/(
     context: MultiTimeframeContext,
     direction: str,
     current_price: float | None,
@@ -579,6 +622,9 @@ def analyze_setups(
         if len(supporting) < 2:
             missing.append(f"{hypothesis.scenario}: at least two independent supporting concepts are required")
             continue
+        if not _scenario_has_required_evidence(hypothesis.scenario, supporting):
+            missing.append(f"{hypothesis.scenario}: required scenario evidence is incomplete")
+            continue
         if not zones:
             missing.append(f"{hypothesis.scenario}: no contextual setup zone is visible")
             continue
@@ -638,8 +684,15 @@ def analyze_setups(
             if not target_levels:
                 missing.append(f"{hypothesis.scenario}: no geometrically valid target is available")
                 continue
+            if not _risk_reward_is_valid(
+                direction, entry_levels, invalidation_level, target_levels
+            ):
+                missing.append(
+                    f"{hypothesis.scenario}: structural risk/reward is below the minimum"
+                )
+                continue
 
-        candidates.append(
+        candidates.append/(
             SetupCandidate(
                 scenario=hypothesis.scenario,
                 supporting_concepts=supporting,
