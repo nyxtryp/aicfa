@@ -372,3 +372,22 @@ def test_setup_engine_can_return_second_distinct_target_after_primary_draw():
     assert len(targets) == 2
     assert targets[0].value == 120.0
     assert targets[1].value == 125.0
+
+
+def test_setup_engine_reports_rejected_rr_geometry():
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames["4h"].loc[0, "active_buy_liquidity_price"] = 104.0
+    frames["4h"].loc[0, "smc_sweep_low_level"] = 100.0
+
+    result = _pipeline(frames)
+
+    assert result.candidates == ()
+    rr_messages = [
+        item for item in result.missing_context
+        if item.startswith("continuation: structural risk/reward is below the minimum")
+    ]
+    assert rr_messages
+    assert "entry=" in rr_messages[0]
+    assert "invalidation=" in rr_messages[0]
+    assert "tp1=" in rr_messages[0]
+    assert "rr=" in rr_messages[0]
