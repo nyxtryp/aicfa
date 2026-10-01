@@ -197,3 +197,42 @@ If the chat is lost, resume from this exact section: **CVD + Absorption integrat
 2. If GREEN, run the complete pytest suite after these Absorption changes.
 3. Run live BTC Spot FindSetup smoke and verify real L1 history, provenance, CVD, and Absorption population.
 4. Inspect causal timestamps before marking Absorption live GREEN.
+
+## 2026-10-01 — CVD + Absorption live checkpoint GREEN
+
+### Verification completed
+- Focused FindSetup/Absorption regression after the L1 fixture repair: **19 passed, 16399 warnings, 0 failed**.
+- Complete repository regression: **332 passed, 21228 warnings, 0 failed**.
+- Live BTC Spot FindSetup smoke exposed and repaired a real production-path type bug: Binance L1 adapter fields arrive as strings while the FindSetup Absorption mid-price calculation expected numeric values.
+- Commit: `9ddced38e3292685b83952bc4ccad6ea0da2fece` — `fix: normalize live L1 numeric fields before absorption`.
+- Final live BTC Spot diagnostic is GREEN: Binance provides trades, current order book, and L1 history; 60 trades; 8 L1 observations; populated Order Flow, CVD, and Absorption.
+- Live decision was `WAIT` with reason `material evidence is contradictory`.
+- Absorption remained descriptive and did not qualify as absorption in the observed request despite aggressive buy imbalance.
+- Causal timestamp alignment was verified: Order Flow uses the common causal observation timestamp rather than pairing later trades with an earlier book state.
+
+### Architectural constraint preserved
+- L1 history is collected only during the user's FindSetup request.
+- There is no continuous/background collector.
+- The current transport collects 8 real observations at approximately 1-second intervals. It is an interim request-scoped observation burst, not fabricated historical data.
+
+### CURRENT STATE
+- Market Evidence: GREEN
+- Order Flow / Microstructure v1: LIVE GREEN
+- Trade-level CVD: LIVE GREEN
+- Causal L1 history transport: GREEN
+- Absorption: **LIVE GREEN**
+- FindSetup microstructure integration: **LIVE GREEN**
+- Full regression: **332 passed**
+- No new analytical block should redesign the completed Order Flow/CVD/Absorption work.
+
+### NEXT UNFINISHED — Displacement Engine
+The next analytical block is **Displacement**.
+
+Goals:
+1. Implement a causal displacement primitive over completed OHLCV data.
+2. Detect abnormal directional price expansion relative to a causal baseline.
+3. Measure body/range expansion, directional efficiency, and relative volume without future leakage.
+4. Keep displacement descriptive; it must not directly emit LONG/SHORT/WAIT.
+5. Add focused tests for bullish/bearish displacement, weak/non-displacement candles, threshold validation, and future-change causality.
+6. Integrate displacement into the existing analytical chain only after the standalone contract is GREEN.
+7. Run focused tests, then full pytest, then verify the live BTC FindSetup path.
