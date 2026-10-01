@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 from aicfa.knowledge_base import get_knowledge
@@ -98,7 +98,7 @@ def assess_visual_evidence(
     """Assess screenshot evidence without predicting direction."""
 
     observations = tuple(
-        observation
+        replace(observation, timeframe=item.timeframe)
         for item in evidence.items
         for observation in item.observations
     )
