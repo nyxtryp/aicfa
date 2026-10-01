@@ -24,6 +24,7 @@ from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarket
 from .order_flow import build_trade_order_flow
 from .cvd import build_trade_cvd
 from .order_book import build_order_book
+from .absorption import build_absorption
 from .market_evidence_adapter import build_market_evidence_from_frames
 from .scenario_reasoning import assess_scenarios
 from .setup_analysis import analyze_setups
@@ -64,6 +65,9 @@ class FindSetupResult:
     order_flow_analysis: pd.DataFrame
     order_book_analysis: pd.DataFrame
     cvd_analysis: pd.DataFrame
+    absorption_analysis: pd.DataFrame
+    order_book_history: pd.DataFrame
+    order_book_history_provider: str
     trades_provider: str
     order_book_provider: str
     decision: str
@@ -308,6 +312,20 @@ def find_setup(
 
     if trades.empty:
         raise ValueError("no trade data available for microstructure analysis")
+
+    history_fetch = getattr(provider, "fetch_order_book_history_with_source", None)
+    if history_fetch is not None:
+        history_result = history_fetch(
+            symbol=symbol,
+            market_type=request.market_type,
+            snapshots=8,
+            interval_seconds=1.0,
+        )
+        order_book_history = history_result.frame
+        order_book_history_provider = history_result.provider
+    else:
+        order_book_history = pd.DataFrame()
+        order_book_history_provider = ""
     if book_fetch is not None:
         book_result = book_fetch(
             symbol=symbol, market_type=request.market_type, limit=1
@@ -323,7 +341,14 @@ def find_setup(
     trade_work = trades.copy()
     trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
     latest_trade_timestamp = trade_work["timestamp"].max()
-    flow_base = pd.DataFrame({"timestamp": [latest_trade_timestamp]})
+    history_work = order_book_history.copy()
+    if not history_work.empty:
+        history_work["timestamp"] = pd.to_datetime(history_work["timestamp"], unit="ms", utc=True)
+        latest_book_timestamp = history_work["timestamp"].max()
+    else:
+        latest_book_timestamp = latest_trade_timestamp
+    observation_timestamp = min(latest_trade_timestamp, latest_book_timestamp)
+    flow_base = pd.DataFrame({"timestamp": [observation_timestamp]})
     order_flow_analysis = build_trade_order_flow(
         flow_base,
         trades,
@@ -337,8 +362,42 @@ def find_setup(
         pd.DataFrame({"timestamp": book_work["timestamp"]}), order_book
     )
     cvd_analysis = build_trade_cvd(
-        pd.DataFrame({"timestamp": [latest_trade_timestamp]}), trades
+        pd.DataFrame({"timestamp": [observation_timestamp]}), trades
     )
+
+    if not history_work.empty:
+        levels = pd.concat(
+            [
+                history_work[["timestamp", "bid_price", "bid_size"]].rename(
+                    columns={"bid_price": "price", "bid_size": "size"}
+                ).assign(side="bid"),
+                history_work[["timestamp", "ask_price", "ask_size"]].rename(
+                    columns={"ask_price": "price", "ask_size": "size"}
+                ).assign(side="ask"),
+            ],
+            ignore_index=True,
+        )
+        mids = (history_work["bid_price"] + history_work["ask_price"]) / 2.0
+        price_frame = pd.DataFrame({"timestamp": history_work["timestamp"], "mid": mids})
+        price_frame = price_frame.sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+        price_frame["open"] = price_frame["mid"].shift(1).fillna(price_frame["mid"])
+        price_frame["close"] = price_frame["mid"]
+        price_frame["high"] = price_frame[["open", "close"]].max(axis=1)
+        price_frame["low"] = price_frame[["open", "close"]].min(axis=1)
+        absorption_base = price_frame[["timestamp", "open", "high", "low", "close"]]
+        absorption_flow = build_trade_order_flow(
+            flow_base,
+            trades,
+            baseline_window=24,
+            event_window=60,
+        )
+        absorption_analysis = build_absorption(
+            absorption_base,
+            absorption_flow,
+            levels,
+        )
+    else:
+        absorption_analysis = pd.DataFrame()
 
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
@@ -364,6 +423,9 @@ def find_setup(
         order_flow_analysis=order_flow_analysis,
         order_book_analysis=order_book_analysis,
         cvd_analysis=cvd_analysis,
+        absorption_analysis=absorption_analysis,
+        order_book_history=order_book_history,
+        order_book_history_provider=order_book_history_provider,
         trades_provider=trades_provider,
         order_book_provider=order_book_provider,
         decision=decision_assessment.action.value.upper().replace("_", " "),
