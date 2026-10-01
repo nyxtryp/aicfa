@@ -2221,3 +2221,20 @@ The completed FrostDeploy suite passed, but runtime increased to **52.40s**. Sou
 
 ### Exact next step
 Deploy current `main` and rerun the mandatory full pytest. Compare runtime with the previous 52.40s result and confirm all tests remain green. If runtime is still materially inflated, profile the slowest test groups before making further architectural changes.
+
+
+## 2026-10-01 — Remove multi-timeframe DataFrame fragmentation hotspot
+
+### Finding
+After the adaptive recomputation optimization, the full suite still regressed to **59.69s** with **24,319 warnings**. The warning output identifies `src/aicfa/multi_timeframe.py:104` as a `pandas PerformanceWarning`: 15 MTF columns were inserted into the output DataFrame one-by-one. This is an avoidable fragmented-DataFrame construction pattern and is executed inside the MTF feature path.
+
+### Forward fix
+- `083b38e9d9fb7b03c82985c24de248063d2b5897` — Replace repeated per-column DataFrame assignment with one `pd.concat(axis=1)` per timeframe.
+- No feature names, values, causal mapping, or analytical rules were changed.
+- This directly removes the identified fragmentation hotspot instead of suppressing the warning.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Next step
+Deploy current `main` and run the full pytest suite again. Record pass count, warning count, and runtime. If runtime remains materially above the historical ~30–40s range, run `pytest -q --durations=20` to identify the remaining slow tests before changing more code.
