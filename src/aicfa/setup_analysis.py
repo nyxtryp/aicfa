@@ -692,7 +692,7 @@ def analyze_setups(
                 )
                 continue
 
-        candidates.append/(
+        candidates.append(
             SetupCandidate(
                 scenario=hypothesis.scenario,
                 supporting_concepts=supporting,
@@ -728,35 +728,3 @@ def analyze_setups(
         reasons=("one or more conditional setups are sufficiently specified by the current seven-timeframe state",),
     )
 
-
-def test_setup_engine_selects_nearest_mtf_target_above_current_price():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
-    for tf, frame in frames.items():
-        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
-        frame.loc[0, "previous_high"] = float("nan")
-        frame.loc[0, "internal_previous_high"] = float("nan")
-        frame.loc[0, "rolling_high_60"] = float("nan")
-    frames["1h"].loc[0, "previous_high"] = 130.0
-    frames["4h"].loc[0, "previous_high"] = 125.0
-
-    result = _pipeline(frames)
-    candidate = result.candidates[0]
-    assert candidate.target_levels
-    assert candidate.target_levels[0].timeframe == "4h"
-    assert candidate.target_levels[0].value == 125.0
-
-
-def test_setup_engine_does_not_use_execution_timeframe_as_target_source():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
-    for tf, frame in frames.items():
-        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
-        frame.loc[0, "previous_high"] = float("nan")
-        frame.loc[0, "internal_previous_high"] = float("nan")
-        frame.loc[0, "rolling_high_60"] = float("nan")
-    frames["1m"].loc[0, "previous_high"] = 106.0
-    frames["4h"].loc[0, "previous_high"] = 125.0
-
-    result = _pipeline(frames)
-    candidate = result.candidates[0]
-    assert candidate.target_levels
-    assert candidate.target_levels[0].timeframe == "4h"
