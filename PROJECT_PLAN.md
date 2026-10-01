@@ -914,3 +914,105 @@ This closes the live geometry checkpoint:
 
 The evaluator must measure realized outcomes of emitted setups against the fixed Entry/Invalidation/Target rules and the project product objective of approximately 80% profitable realized setups over a sufficiently large forward/out-of-sample sample. Do not hard-code 80%, do not turn it into a confidence score, and do not alter setup rules merely to improve a retrospective metric.
 
+## MASTER ROADMAP — FROM START TO CURRENT STATE
+
+### 1. С чего начали
+AICFA задуман как собственная специализированная AI-система для анализа крипторынка и цифровых активов, а не оболочка над чужой AI-моделью.
+Исходная цель: система получает текущий рынок/график сама, анализирует его и при наличии условий формирует торговый setup.
+Обязательные режимы: Scalping, Intraday, Swing, Position.
+Главный аналитический фундамент: Smart Money Concepts — Market Structure, Liquidity, BOS/CHoCH/MSS, HH/HL/LH, FVG, Order Blocks, Displacement, Premium/Discount и связанные подтверждения.
+На первом этапе рабочий актив — BTC; позже планируется расширение на top-100.
+
+### 2. Что построили по дороге
+Постепенно собрана собственная детерминированная аналитическая цепочка:
+- market-data adapters и универсальное разрешение актива;
+- OHLCV и семь обязательных таймфреймов;
+- Market Structure;
+- Liquidity;
+- Displacement;
+- FVG;
+- Order Blocks;
+- Premium / Discount;
+- Unified SMC;
+- Multi-Timeframe analysis;
+- Volume / Volatility;
+- Derivatives;
+- Canonical Market State;
+- Setup Events;
+- Market Evidence и Evidence Reasoning;
+- Scenario Reasoning;
+- Setup Detection;
+- Setup Analysis;
+- Decision Layer;
+- trade-level Order Flow / Microstructure;
+- trade-level CVD;
+- causal L1 observation history;
+- causal Absorption;
+- единый MTF SETUP ENGINE.
+
+Параллельно построен leakage-safe фундамент для будущей оценки/данных, но обучение модели не является текущей целью проекта.
+
+### 3. Ключевые архитектурные решения
+- AICFA сама строит аналитический вывод из рыночных данных; биржа не выдаёт ей готовый сигнал.
+- Основная MTF-цепочка: `1w → 1d → 4h → 1h → 15m → 5m → 1m`.
+- 1m — только execution/microstructure context.
+- 1m никогда не является единственным источником направления, Entry, Invalidation или Target.
+- Один actionable setup = одно направление/тезис + одна Entry zone + один Invalidation + упорядоченный Target ladder + Confirmation.
+- Разные цели внутри одного тезиса могут быть TP1/TP2; это не означает два разных setup.
+- Если разные гипотезы дают абсолютно одинаковую торговую геометрию, в реальном MTF engine они схлопываются в один actionable setup.
+- Если доказательств недостаточно или геометрия невалидна, система должна честно выдавать WAIT/NO TRADE.
+- Никаких будущих данных, искусственных исторических order-book данных или подгонки правил ради красивого результата.
+- Цель ~80% прибыльных реализованных setup — продуктовая acceptance target, а не hard-coded confidence и не заявленный результат.
+
+### 4. Где дошли сейчас
+Текущий путь уже проходит от реального рыночного ввода до actionable setup:
+`market data → 7 TF → аналитические слои → evidence/scenario reasoning → SETUP ENGINE → LONG/SHORT/WAIT → Entry / Invalidation / TP1 / TP2 / Confirmation`.
+
+Последний проверенный live BTC setup:
+- LONG;
+- continuation;
+- Entry: 15m bullish FVG 84412.01–84432.90;
+- Invalidation: 5m sell-side liquidity 84101.62;
+- TP1: 4h previous high 85649.95;
+- TP2: 1d previous high 87395.67;
+- Confirmation: 15m + 5m;
+- все 7 TF присутствуют;
+- 1m не используется для setup geometry;
+- duplicate reversal geometry не эмитируется отдельно;
+- breakout_failure не выдумывается при неполном evidence.
+
+Текущий regression checkpoint: **345 passed, 0 failed**.
+Live BTC setup geometry: **GREEN**.
+
+### 5. К чему идём
+Теперь AICFA должна перейти от «мы умеем сформировать setup» к «мы умеем причинно измерять, что произошло с каждым сформированным setup после его появления».
+
+Следующий блок:
+**Causal Setup Outcome Evaluator.**
+
+Он должен:
+1. фиксировать emitted setup как неизменяемый snapshot;
+2. фиксировать Entry zone, Invalidation, TP1/TP2, direction, confirmation и provenance;
+3. после появления будущих market observations определять, что произошло первым и по каким правилам;
+4. корректно обрабатывать достижение Entry, SL, TP1, TP2, отсутствие активации и неоднозначные случаи;
+5. не использовать данные, которые были недоступны на момент setup;
+6. работать на forward/out-of-sample данных;
+7. считать фактические outcome-метрики по большой выборке;
+8. отдельно учитывать комиссии/slippage, когда будет определён execution protocol;
+9. не менять setup rules задним числом ради улучшения метрики.
+
+Только после появления этого evaluator можно объективно проверять, насколько AICFA приближается к продуктовой цели ~80% прибыльных реализованных setup.
+
+### 6. Что НЕ делаем сейчас
+- Не уходим в обучение модели ради обучения.
+- Не возвращаемся к поиску локальной LLM.
+- Не делаем 1m главным аналитическим timeframe.
+- Не строим сигналы из чужого готового AI.
+- Не добавляем искусственные уровни/данные ради LONG/SHORT.
+- Не пересобираем уже GREEN Order Flow/CVD/Absorption без конкретной регрессии.
+
+### CURRENT SOURCE OF TRUTH
+С этого момента этот master roadmap фиксирует непрерывную линию проекта: **идея → аналитические блоки → MTF SETUP ENGINE → live GREEN setup → causal outcome evaluation → последующая проверка/улучшение качества**.
+
+### NEXT UNFINISHED
+**Build the causal setup outcome evaluator.**
