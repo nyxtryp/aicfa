@@ -186,3 +186,23 @@ Run the live BTC FindSetup smoke **without explicit `limit`** and verify that:
 - completed-minute trade-flow handling remains causal relative to `now_ms`;
 - the existing Binance-primary / Bybit-fallback provenance is preserved.
 Only after this smoke is GREEN should we advance to the next analytical integration block.
+
+
+## 2026-10-01 — Live FindSetup smoke exposed insufficient trade-flow depth
+
+### Finding
+The first live BTC FindSetup smoke without explicit `limit` reached the new microstructure path but failed with:
+`ValueError: no completed trade-flow interval available for microstructure analysis`.
+
+Cause: the implementation fetched only 60 most-recent trades. On a live high-liquidity BTC market, those trades can all belong to the currently open one-minute interval, so there is no causally completed interval even though valid trade data exists.
+
+### Forward fix
+- `f4d3421ae9410e5470bd598e3490354b28fcc6b1` — make FindSetup adaptively request trade history at `60 -> 120 -> 240 -> 480 -> 960` rows until at least one completed one-minute interval is available relative to request `now_ms`.
+- No future-price inference, no cross-exchange merge, and no change to the completed-interval causal rule.
+- Explicit diagnostic `limit=` remains unrelated to this microstructure transport depth.
+
+### Verification
+Fix committed to `main`; deployment and server verification pending.
+
+### Exact next step
+Deploy current `main`, rerun focused FindSetup/microstructure tests, then rerun live BTC FindSetup smoke without explicit `limit`.
