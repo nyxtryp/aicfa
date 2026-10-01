@@ -2238,3 +2238,18 @@ After the adaptive recomputation optimization, the full suite still regressed to
 
 ### Next step
 Deploy current `main` and run the full pytest suite again. Record pass count, warning count, and runtime. If runtime remains materially above the historical ~30–40s range, run `pytest -q --durations=20` to identify the remaining slow tests before changing more code.
+
+
+## 2026-10-01 — Repair MTF concat column-name regression
+
+### Finding
+The first MTF fragmentation optimization changed the construction path but incorrectly read the already-renamed merged columns using their pre-rename names. This caused 7 MTF/feature integration tests to fail with `KeyError: structure_direction`.
+
+### Forward repair
+- `b58f9cc0612f3c769a0475d6c0095c5be38e4fc8` — Read the correctly renamed `mtf_<timeframe>_<state>` columns after merge, while retaining the batched `pd.concat()` construction.
+- No analytical logic or causal mapping was changed.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING VERIFICATION.**
+
+The suite still took **54.64s** despite the failures, so after restoring GREEN the remaining runtime must be measured and, if still high, profiled with `pytest -q --durations=20` rather than making further speculative changes.
