@@ -403,7 +403,12 @@ def find_setup(
 
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
-    setup_assessment = analyze_setups(evidence_assessment, scenario_assessment)
+    setup_assessment = analyze_setups(
+        evidence_assessment,
+        scenario_assessment,
+        observations=evidence_assessment.observations,
+        analyses=analyses,
+    )
     decision_assessment = decide(
         setup_assessment,
         observations=evidence_assessment.observations,
