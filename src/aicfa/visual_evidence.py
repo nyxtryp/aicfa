@@ -20,6 +20,7 @@ class VisualObservation:
     notes: str = ""
     price_location: str | None = None
     direction: str | None = None
+    timeframe: str | None = None
 
     def __post_init__(self) -> None:
         if not self.concept_id.strip():
@@ -32,6 +33,8 @@ class VisualObservation:
             raise ValueError("visual observation requires evidence")
         if self.direction not in {None, "long", "short"}:
             raise ValueError("direction must be long, short, or None")
+        if self.timeframe is not None and not self.timeframe.strip():
+            raise ValueError("timeframe must be non-empty when provided")
 
 
 @dataclass(frozen=True)
@@ -99,6 +102,7 @@ def observation(
     notes: str = "",
     price_location: str | None = None,
     direction: str | None = None,
+    timeframe: str | None = None,
 ) -> VisualObservation:
     """Build one normalized observation from the future vision layer."""
 
@@ -110,4 +114,5 @@ def observation(
         notes=notes,
         price_location=price_location,
         direction=direction,
+        timeframe=timeframe,
     )
