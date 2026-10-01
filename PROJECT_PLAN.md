@@ -701,3 +701,26 @@ Run the full AICFA regression, then perform the live BTC FindSetup smoke and ins
 
 ### NEXT UNFINISHED
 Run the live BTC FindSetup smoke and inspect whether the current seven-timeframe market state now produces a geometrically valid causal target without relying on 1m.
+
+
+## 2026-10-01 — SETUP ENGINE: MTF target construction correction
+
+The previous target selector was too dependent on the entry timeframe and selected the first valid objective in timeframe/source order rather than treating targets as multi-timeframe market objectives.
+
+### Correction implemented
+- _target_levels() now evaluates all allowed setup-objective timeframes from the entry timeframe upward.
+- It collects every causal target candidate that is geometrically beyond current price.
+- It selects the nearest valid objective in the trade direction.
+- Source priority is used only as a tie-breaker.
+- The execution timeframe cannot become the target source when the entry zone is higher-timeframe.
+- No future data, fabricated prices, or 1m-only direction logic was introduced.
+
+### Commits
+- 986d78fcb676c87b5da8ed115de397273cf91425 — fix: build setup targets from MTF objectives
+- 52fe4ed787e916b97ccaed0d22765cd3721798dc — test: validate MTF target selection
+
+### Verification
+Server pytest verification is pending.
+
+### NEXT UNFINISHED
+Run focused SETUP ENGINE tests, then full pytest. If green, run live BTC FindSetup smoke and inspect the actual selected entry zone, invalidation and MTF target.
