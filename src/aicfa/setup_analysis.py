@@ -398,13 +398,10 @@ def _target_levels(
         ("rolling_low_60", "causal rolling low"),
     )
 
-    # Execution/entry TFs below the setup zone are not allowed to manufacture
-    # the setup objective. Targets are drawn from the setup timeframe upward.
-    if entry_timeframe in SETUP_TIMEFRAMES:
-        entry_index = SETUP_TIMEFRAMES.index(entry_timeframe)
-        allowed = SETUP_TIMEFRAMES[entry_index:]
-    else:
-        allowed = SETUP_TIMEFRAMES
+    # Target discovery is independent of the entry zone timeframe.
+    # A setup may draw liquidity/objectives from any relevant MTF layer;
+    # only the 1m execution layer must never manufacture the setup objective.
+    allowed = tuple(tf for tf in SETUP_TIMEFRAMES if tf != "1m")
 
     ordered = tuple(
         tf for tf in preferred_timeframes if tf in allowed
