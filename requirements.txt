@@ -4,3 +4,4 @@ numpy>=2.0,<3
 websocket-client>=1.8,<2
 pytest>=8,<9
 opencv-python-headless>=4.10,<5
+matplotlib>=3.9,<4
