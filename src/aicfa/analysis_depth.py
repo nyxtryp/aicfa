@@ -88,8 +88,6 @@ def resolve_analysis_depth(
         resolutions.append(ContextResolution.RECENT_EVENTS)
     if plan.needs(ContextNeed.ACTIVE_ZONES):
         resolutions.append(ContextResolution.ACTIVE_LIFECYCLE_STATE)
-    if plan.needs(ContextNeed.STRUCTURAL_ANCHORS):
-        resolutions.append(ContextResolution.ACTIVE_LIFECYCLE_STATE)
 
     adaptive = any(
         item in resolutions
