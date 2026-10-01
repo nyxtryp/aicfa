@@ -196,3 +196,38 @@ def test_binance_resolver_rejects_unknown_or_non_trading_symbol():
         provider.resolve_symbol("DOGE")
     with pytest.raises(ValueError, match="unsupported Binance symbol"):
         provider.resolve_symbol("OLD/USDT")
+
+def test_binance_adapter_maps_public_trades_to_signed_flow():
+    payload = [
+        {"id": 1, "price": "100", "qty": "2", "quoteQty": "200", "time": 1700000000100, "isBuyerMaker": False},
+        {"id": 2, "price": "101", "qty": "3", "quoteQty": "303", "time": 1700000000200, "isBuyerMaker": True},
+    ]
+
+    def opener(request, timeout):
+        assert "/api/v3/trades?" in request.full_url
+        return FakeResponse(payload)
+
+    out = BinanceMarketDataProvider(opener=opener).fetch_trades(
+        symbol="BTCUSDT", market_type="spot", limit=2
+    )
+    assert out.columns.tolist() == ["timestamp", "price", "volume", "side"]
+    assert out["side"].tolist() == [1, -1]
+
+
+def test_binance_adapter_maps_l1_order_book():
+    payload = {
+        "lastUpdateId": 7,
+        "bids": [["100.0", "5.0"]],
+        "asks": [["100.1", "4.0"]],
+    }
+
+    def opener(request, timeout):
+        assert "/api/v3/depth?" in request.full_url
+        return FakeResponse(payload)
+
+    out = BinanceMarketDataProvider(opener=opener).fetch_order_book(
+        symbol="BTCUSDT", market_type="spot", limit=1
+    )
+    assert out.columns.tolist() == ["timestamp", "bid_price", "bid_size", "ask_price", "ask_size"]
+    assert out.iloc[0]["bid_price"] == "100.0"
+    assert out.iloc[0]["ask_size"] == "4.0"
