@@ -869,3 +869,48 @@ Do not advance to outcome evaluation until this live geometry checkpoint is GREE
 
 ### NEXT UNFINISHED
 Run the live BTC FindSetup smoke and inspect the actual coherent actionable setup geometry: Entry zone, Invalidation, ordered Target 1/Target 2, confirmation and source timeframes, and duplicate scenario handling. Do not advance to the outcome evaluator until this live geometry checkpoint is GREEN.
+
+
+## 2026-10-02 — SETUP ENGINE: live BTC geometry GREEN
+
+### Verification
+Live BTC Spot FindSetup smoke against the current release produced one coherent actionable setup:
+
+- Decision: `LONG`
+- Reason: `direction and setup structure are both supported by current evidence`
+- All seven required timeframes present: `1m, 5m, 15m, 1h, 4h, 1d, 1w`
+- Candidate count: **1**
+- Scenario: `continuation`
+- Direction: `long`
+- Entry zone: **15m active bullish FVG**, 84412.01–84432.90
+- Invalidation: **5m sell-side liquidity**, 84101.62
+- Target 1: **4h previous high**, 85649.95
+- Target 2: **1d previous high**, 87395.67
+- Confirmation: `15m, 5m`
+- Source timeframes: all seven required timeframes
+- No conflicts.
+- Unsupported breakout-failure scenario is explicitly reported as incomplete.
+- Reversal is not emitted separately because it resolves to the exact same actionable geometry as continuation.
+
+### Geometry gate
+This closes the live geometry checkpoint:
+- Entry is above the 1m execution timeframe.
+- Invalidation is above the 1m execution timeframe and comes from a structural/liquidity level.
+- Targets are ordered and come from 4h/1d causal objectives.
+- Target 1 and Target 2 form one ordered target ladder for the same directional thesis.
+- Duplicate scenario geometry is collapsed rather than emitted as multiple identical trades.
+- 1m remains execution/microstructure context and does not determine the setup geometry.
+
+### CURRENT STATE
+- MTF SETUP ENGINE: **regression GREEN**
+- Legacy scenario preservation: **GREEN**
+- Duplicate actionable geometry handling: **GREEN**
+- Full repository regression: **345 passed, 0 failed**
+- Live BTC setup geometry: **GREEN**
+- Current product path now reaches a coherent live actionable setup with Entry / Invalidation / Target 1 / Target 2 / Confirmation.
+
+### NEXT UNFINISHED
+**Build the causal setup outcome evaluator.**
+
+The evaluator must measure realized outcomes of emitted setups against the fixed Entry/Invalidation/Target rules and the project product objective of approximately 80% profitable realized setups over a sufficiently large forward/out-of-sample sample. Do not hard-code 80%, do not turn it into a confidence score, and do not alter setup rules merely to improve a retrospective metric.
+
