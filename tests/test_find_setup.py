@@ -60,6 +60,18 @@ class FakeProvider:
             "ask_size": [4.0],
         })
 
+    def fetch_order_book_history(self, *, symbol, market_type, snapshots, interval_seconds):
+        self.history_calls = getattr(self, "history_calls", [])
+        self.history_calls.append((symbol, market_type, snapshots, interval_seconds))
+        base = 60 * 60_000
+        return pd.DataFrame({
+            "timestamp": [base + i * 10_000 for i in range(snapshots)],
+            "bid_price": np.full(snapshots, 99.9),
+            "bid_size": [5.0 + i for i in range(snapshots)],
+            "ask_price": np.full(snapshots, 100.1),
+            "ask_size": [4.0] * snapshots,
+        })
+
 
 def test_normalize_asset_preserves_explicit_quote():
     assert normalize_asset(" btc-usdt ") == "BTC/USDT"
@@ -222,6 +234,23 @@ def test_find_setup_feeds_request_scoped_microstructure_data():
     assert not result.order_book_analysis.empty
     assert result.trades_provider
     assert result.order_book_provider
+
+
+def test_find_setup_integrates_causal_l1_history_and_absorption():
+    provider = FakeProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert provider.history_calls == [("BTC/USDT", "spot", 8, 1.0)]
+    assert result.order_book_history_provider == "fakeprovider"
+    assert len(result.order_book_history) == 8
+    assert not result.absorption_analysis.empty
+    assert result.absorption_analysis["timestamp"].is_monotonic_increasing
 
 
 def test_find_setup_exposes_causal_trade_cvd():
