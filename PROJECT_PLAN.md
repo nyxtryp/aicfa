@@ -253,3 +253,33 @@ Exact next step: deploy current main, run focused Order Flow + FindSetup tests, 
 
 ### Exact next step
 Run the live BTC/USDT Spot FindSetup smoke **without explicit limit** against the current deployed release. Verify real TRADES and ORDER_BOOK, populated trade-level order-flow and order-book analysis, causal event-window behavior, and Binance-primary/Bybit-fallback provenance. Only after that smoke is GREEN should the roadmap advance to the next analytical block.
+
+
+## 2026-10-01 — Live FindSetup smoke exposed current-event alignment bug
+
+### Finding
+The live BTC/USDT Spot smoke reached real Binance TRADES and L1 ORDER_BOOK successfully, but order_flow_analysis contained only NaN values.
+
+The cause is now confirmed: the completed 1m analysis timestamps are historical candle-open timestamps, while the 60 live trades were all from the currently open minute. build_trade_order_flow() correctly applies a causal backward alignment, so those current trades were newer than the last completed-candle timestamp and therefore could not appear in the historical candle rows.
+
+This is an alignment/orchestration bug, not a transport failure and not evidence that trade-level Order Flow is empty.
+
+### Forward fix
+- 96f7ca80b4c942c31f164e990e40b269d6f554b5 — align the live trade-level Order Flow snapshot to the latest observed trade timestamp, so the current event window is analyzed causally instead of being forced onto the last completed candle.
+- The fix keeps raw venue timestamps and the existing event-window semantics; it does not aggregate trades into candles or use future trades.
+- The same change exposes the actual TRADES and ORDER_BOOK provider names in FindSetupResult, so live Binance-primary / Bybit-fallback provenance is directly inspectable.
+- 9515b7a538e3b4897754f8298e6425a9225a1e75 — regression coverage now requires non-null trade-flow output and populated provider provenance.
+
+### Verification
+Not yet server-verified. The repository changes are committed to main, but the current deployed release predates these two commits.
+
+### Exact next step
+Deploy current main, then run the same live BTC/USDT Spot FindSetup smoke without explicit limit. Expected GREEN checks:
+- TRADES = 60 and non-empty;
+- ORDER_BOOK = 1 and non-empty;
+- order_flow_analysis is non-empty and has non-null current values;
+- order_book_analysis is non-empty;
+- trades_provider and order_book_provider report the actual provider;
+- no future-trade contamination;
+- decision remains produced by the existing evidence/decision chain.
+Only after this verification should the roadmap advance to the next analytical integration block.
