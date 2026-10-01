@@ -28,18 +28,26 @@ def _columns_for(
     analysis: pd.DataFrame,
     timeframe: str,
     columns: tuple[str | None, str | None],
+    *,
+    base_timeframe: str,
 ) -> tuple[str | None, str | None]:
-    prefix = "" if timeframe == "1m" else f"mtf_{timeframe}_"
+    prefix = "" if timeframe == base_timeframe else f"mtf_{timeframe}_"
     return tuple(
         f"{prefix}{column}" if column is not None else None
         for column in columns
     )
 
 
-def _lifecycle_column(analysis: pd.DataFrame, timeframe: str, name: str) -> str | None:
+def _lifecycle_column(
+    analysis: pd.DataFrame,
+    timeframe: str,
+    name: str,
+    *,
+    base_timeframe: str,
+) -> str | None:
     candidates = (
-        name,
-        f"mtf_{timeframe}_{name}",
+        name if timeframe == base_timeframe else f"mtf_{timeframe}_{name}",
+        f"mtf_{timeframe}_{name}" if timeframe == base_timeframe else name,
     )
     return next((column for column in candidates if column in analysis.columns), None)
 
@@ -91,8 +99,10 @@ def _latest_event(
     analysis: pd.DataFrame,
     concept_id: str,
     timeframe: str,
+    *,
+    base_timeframe: str,
 ) -> MarketObservation | None:
-    columns = _columns_for(analysis, timeframe, _DIRECTION_COLUMNS[concept_id])
+    columns = _columns_for(analysis, timeframe, _DIRECTION_COLUMNS[concept_id], base_timeframe=base_timeframe)
     available = [column for column in columns if column is not None and column in analysis.columns]
     if not available:
         return None
@@ -117,8 +127,9 @@ def _latest_active_event(
     *,
     event_concepts: tuple[str, ...],
     lifecycle_name: str,
+    base_timeframe: str,
 ) -> MarketObservation | None:
-    lifecycle_column = _lifecycle_column(analysis, timeframe, lifecycle_name)
+    lifecycle_column = _lifecycle_column(analysis, timeframe, lifecycle_name, base_timeframe=base_timeframe)
     if lifecycle_column is None:
         return None
 
@@ -128,7 +139,7 @@ def _latest_active_event(
 
     candidates: list[tuple[object, MarketObservation]] = []
     for concept_id in event_concepts:
-        columns = _columns_for(analysis, timeframe, _DIRECTION_COLUMNS[concept_id])
+        columns = _columns_for(analysis, timeframe, _DIRECTION_COLUMNS[concept_id], base_timeframe=base_timeframe)
         available = [column for column in columns if column is not None and column in analysis.columns]
         if not available:
             continue
@@ -189,6 +200,7 @@ def build_market_evidence(
             timeframe,
             event_concepts=("imbalance.fvg",),
             lifecycle_name="fvg_active",
+            base_timeframe=base_timeframe,
         )
         if fvg_active is not None:
             observations.append(fvg_active)
@@ -199,6 +211,7 @@ def build_market_evidence(
             timeframe,
             event_concepts=("order_block.bullish", "order_block.bearish"),
             lifecycle_name="order_block_active",
+            base_timeframe=base_timeframe,
         )
         if ob_active is not None:
             observations.append(ob_active)
@@ -211,7 +224,7 @@ def build_market_evidence(
                 "order_block.bearish",
             }:
                 continue
-            item = _latest_event(analysis, concept_id, timeframe)
+            item = _latest_event(analysis, concept_id, timeframe, base_timeframe=base_timeframe)
             if item is not None:
                 observations.append(item)
                 emitted = True
