@@ -142,7 +142,8 @@ def _expand_missing_context(
     frames: dict[str, pd.DataFrame],
     missing_context: tuple[str, ...],
     now_ms: int,
-) -> tuple[dict[str, pd.DataFrame], dict[str, int]]:
+    analyses: dict[str, pd.DataFrame],
+) -> tuple[dict[str, pd.DataFrame], dict[str, int], dict[str, pd.DataFrame]]:
     """Expand unresolved context until it stops changing or data is exhausted."""
     exhausted: set[str] = set()
     current_limits = dict(limits)
@@ -151,20 +152,14 @@ def _expand_missing_context(
     previous_signature: tuple[object, ...] | None = None
     expansion_passes = 0
     max_expansion_passes = 2
-    analyses: dict[str, pd.DataFrame] = {}
-    for timeframe, frame in current_frames.items():
-        completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
-        if not completed.empty:
-            timeframe_analysis = build_features(completed)
-            if not timeframe_analysis.empty:
-                analyses[timeframe] = timeframe_analysis
+    current_analyses = dict(analyses)
 
     while True:
         unresolved = {
             item.split(":", 1)[0] for item in current_missing if ":" in item
         } - exhausted
         if not unresolved:
-            return current_frames, current_limits
+            return current_frames, current_limits, current_analyses
 
         requested = {
             timeframe: current_limits[timeframe] * 2
@@ -188,16 +183,16 @@ def _expand_missing_context(
                 frame, timeframe=timeframe, now_ms=now_ms,
             )
             if completed.empty:
-                analyses.pop(timeframe, None)
+                current_analyses.pop(timeframe, None)
                 continue
             timeframe_analysis = build_features(completed)
             if timeframe_analysis.empty:
                 analyses.pop(timeframe, None)
             else:
-                analyses[timeframe] = timeframe_analysis
+                current_analyses[timeframe] = timeframe_analysis
 
         evidence = build_market_evidence_from_frames(
-            analyses, asset=symbol, timeframes=timeframes,
+            current_analyses, asset=symbol, timeframes=timeframes,
         )
         signature = _context_signature(evidence)
         expansion_passes += 1
@@ -267,7 +262,7 @@ def find_setup(
         timeframes=timeframes,
     )
     if market_evidence.missing_context and limit is None:
-        frames, limits = _expand_missing_context(
+        frames, limits, analyses = _expand_missing_context(
             provider,
             symbol=symbol,
             market_type=request.market_type,
@@ -276,23 +271,14 @@ def find_setup(
             frames=frames,
             missing_context=market_evidence.missing_context,
             now_ms=now_ms,
+            analyses=analyses,
         )
-        completed_frames = {}
-        analyses = {}
-        for timeframe, frame in frames.items():
-            completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
-            if completed.empty:
-                continue
-            completed_frames[timeframe] = completed
-            timeframe_analysis = build_features(completed)
-            if not timeframe_analysis.empty:
-                analyses[timeframe] = timeframe_analysis
         base_analysis = analyses.get("1m")
         if base_analysis is None:
             raise ValueError("AICFA analysis produced no completed 1m rows")
         analysis = base_analysis
         market_evidence = build_market_evidence_from_frames(
-            analyses, asset=symbol, timeframes=timeframes,
+            current_analyses, asset=symbol, timeframes=timeframes,
         )
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
