@@ -1876,3 +1876,37 @@ Multi-source architecture remains required: AICFA must be able to try providers 
 3. Then implement the adaptive context/depth resolver so additional temporary context is requested only when knowledge/analytical dependencies require it.
 4. Keep `limit=1000` diagnostic-only; never turn it into a production depth contract.
 5. After adaptive collection works, repair MarketEvidence's latest-row limitation.
+
+
+## 2026-10-01 — Repair of malformed knowledge-timeframe integration
+
+### Finding
+- The historical commit `27459460ff3ed6b7ffb1f37b9bf819836fb30d56` was inspected before deployment.
+- Its stored diff contains malformed literal `\\n` sequences and uses `timeframes` before defining it in `FindSetup`.
+- Therefore that commit is **not** suitable for deployment as-is and was not promoted to GREEN.
+
+### Forward repair on current `main`
+- Added the valid `src/aicfa/data_requirements.py` implementation.
+- Wired `FindSetup` to build `default_setup_requirements(symbol)` and use `requirements.required_timeframes` for snapshot/fetch/evidence flow.
+- Corrected `FindSetupResult.timeframes` to return the knowledge-derived timeframe tuple.
+- Added/updated regression tests without introducing fixed candle-depth fields.
+
+### Forward commits
+- `1dfd1523d54b9a233ac0e2bb1acb2c74cf287310` — Add knowledge-driven data requirement plan.
+- `a74f93e48c61514c5c200ae01f7f530a5ec6f6e3` — Fix and wire knowledge-driven FindSetup timeframes.
+- `677f0826ee65048e3222507e5b56e0d25517cfd3` — Update FindSetup tests for knowledge-driven timeframes.
+- `441d722c327178b70e7c7eb4200da3a0bdd146d1` — Add data requirement tests.
+
+### Verification
+- GitHub source state was inspected after the forward repair.
+- FrostDeploy deployment and mandatory full pytest have **not** been executed because no FrostDeploy/deployment or remote-shell tool is available in the current tool set.
+- No claim of GREEN is made.
+
+### Status
+**IMPLEMENTED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+1. Deploy current `main` to FrostDeploy.
+2. Run the mandatory full pytest suite.
+3. Run the real BTC FindSetup smoke and record the exact provider/timeframes/decision/evidence.
+4. Only after that begin the adaptive context/depth resolver.
