@@ -1,9 +1,4 @@
-"""Deterministic bridge from AICFA feature/state columns to MarketEvidence.
-
-This adapter never invents observations for unavailable timeframes. It emits
-causally relevant recent events and currently active lifecycle states from
-completed deterministic analysis frames.
-"""
+"""Deterministic bridge from AICFA feature/state columns to MarketEvidence."""
 from __future__ import annotations
 
 import pandas as pd
@@ -21,17 +16,32 @@ _DIRECTION_COLUMNS = {
     "liquidity.sweep": ("sweep_low", "sweep_high"),
 }
 
-_LIFECYCLE_COLUMNS = {
-    "imbalance.fvg": "fvg_active",
-    "order_block": "order_block_active",
-}
-
 
 def _active(value: object) -> bool:
     try:
         return bool(float(value))
     except (TypeError, ValueError):
         return False
+
+
+def _columns_for(
+    analysis: pd.DataFrame,
+    timeframe: str,
+    columns: tuple[str | None, str | None],
+) -> tuple[str | None, str | None]:
+    prefix = "" if timeframe == "1m" else f"mtf_{timeframe}_"
+    return tuple(
+        f"{prefix}{column}" if column is not None else None
+        for column in columns
+    )
+
+
+def _lifecycle_column(analysis: pd.DataFrame, timeframe: str, name: str) -> str | None:
+    candidates = (
+        name,
+        f"mtf_{timeframe}_{name}",
+    )
+    return next((column for column in candidates if column in analysis.columns), None)
 
 
 def _observation(
@@ -82,11 +92,8 @@ def _latest_event(
     concept_id: str,
     timeframe: str,
 ) -> MarketObservation | None:
-    columns = _DIRECTION_COLUMNS[concept_id]
-    available = [
-        column for column in columns
-        if column is not None and column in analysis.columns
-    ]
+    columns = _columns_for(analysis, timeframe, _DIRECTION_COLUMNS[concept_id])
+    available = [column for column in columns if column is not None and column in analysis.columns]
     if not available:
         return None
 
@@ -109,22 +116,20 @@ def _latest_active_event(
     timeframe: str,
     *,
     event_concepts: tuple[str, ...],
-    lifecycle_column: str,
+    lifecycle_name: str,
 ) -> MarketObservation | None:
-    if lifecycle_column not in analysis.columns:
+    lifecycle_column = _lifecycle_column(analysis, timeframe, lifecycle_name)
+    if lifecycle_column is None:
         return None
 
     latest = analysis.sort_values("timestamp").iloc[-1]
     if not _active(latest.get(lifecycle_column, 0)):
         return None
 
-    candidates: list[tuple[object, str, MarketObservation]] = []
+    candidates: list[tuple[object, MarketObservation]] = []
     for concept_id in event_concepts:
-        columns = _DIRECTION_COLUMNS[concept_id]
-        available = [
-            column for column in columns
-            if column is not None and column in analysis.columns
-        ]
+        columns = _columns_for(analysis, timeframe, _DIRECTION_COLUMNS[concept_id])
+        available = [column for column in columns if column is not None and column in analysis.columns]
         if not available:
             continue
         mask = analysis[available].fillna(0).astype(float).ne(0).any(axis=1)
@@ -139,12 +144,12 @@ def _latest_active_event(
             notes="currently active lifecycle state",
         )
         if item is not None:
-            candidates.append((row["timestamp"], concept_id, item))
+            candidates.append((row["timestamp"], item))
 
     if not candidates:
         return None
 
-    _, _, item = max(candidates, key=lambda value: value[0])
+    _, item = max(candidates, key=lambda value: value[0])
     return MarketObservation(
         concept_id=item.concept_id,
         timeframe=item.timeframe,
@@ -183,7 +188,7 @@ def build_market_evidence(
             analysis,
             timeframe,
             event_concepts=("imbalance.fvg",),
-            lifecycle_column="fvg_active",
+            lifecycle_name="fvg_active",
         )
         if fvg_active is not None:
             observations.append(fvg_active)
@@ -193,7 +198,7 @@ def build_market_evidence(
             analysis,
             timeframe,
             event_concepts=("order_block.bullish", "order_block.bearish"),
-            lifecycle_column="order_block_active",
+            lifecycle_name="order_block_active",
         )
         if ob_active is not None:
             observations.append(ob_active)
@@ -214,11 +219,7 @@ def build_market_evidence(
         if not emitted:
             missing.append(f"{timeframe}:no_active_supported_observation")
 
-    directions = {
-        item.direction
-        for item in observations
-        if item.direction in {"long", "short"}
-    }
+    directions = {item.direction for item in observations if item.direction in {"long", "short"}}
     conflicts = (
         ("explicit long and short observations coexist",)
         if directions == {"long", "short"}
@@ -263,11 +264,7 @@ def build_market_evidence_from_frames(
         observations.extend(item.observations)
         missing.extend(item.missing_context)
 
-    directions = {
-        item.direction
-        for item in observations
-        if item.direction in {"long", "short"}
-    }
+    directions = {item.direction for item in observations if item.direction in {"long", "short"}}
     conflicts = (
         ("explicit long and short observations coexist",)
         if directions == {"long", "short"}
