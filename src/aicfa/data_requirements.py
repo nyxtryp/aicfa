@@ -111,6 +111,12 @@ def _knowledge_requirement(entry: KnowledgeEntry) -> KnowledgeRequirement:
         TimeframeRole.HIGHER_STRUCTURE,
     }
 
+    if entry.domain == "microstructure":
+        if "trades" in evidence or "aggressor side" in evidence or "signed volume" in evidence:
+            data_kinds.add(DataKind.TRADES)
+        if "order book" in evidence or "best bid/ask" in evidence:
+            data_kinds.add(DataKind.ORDER_BOOK)
+
     if entry.domain == "derivatives" or "funding" in relationships or "liquidations" in relationships:
         data_kinds.update({
             DataKind.FUNDING,
@@ -208,5 +214,7 @@ def default_setup_requirements(asset: str) -> DataRequirementPlan:
             "price_action.rejection",
             "wyckoff.spring",
             "derivatives.price_oi",
+            "microstructure.order_flow",
+            "microstructure.order_book",
         ),
     )
