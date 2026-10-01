@@ -264,6 +264,10 @@ def _zone_levels(
         low_col, high_col, source = definition
         concept_zones: list[tuple[float, float, str, str]] = []
         for timeframe in ordered_timeframes:
+            # 1m is execution/microstructure only. It may confirm an entry,
+            # but it must never manufacture the setup zone itself.
+            if timeframe in _EXECUTION:
+                continue
             row = context.latest_rows.get(timeframe)
             if row is None:
                 continue
