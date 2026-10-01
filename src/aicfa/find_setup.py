@@ -21,7 +21,7 @@ from .evidence_reasoning import assess_market_evidence
 from .features import build_features
 from .market_data import MarketDataProvider, completed_ohlcv
 from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarketDataProvider
-from .order_flow import build_order_flow
+from .order_flow import build_trade_order_flow
 from .order_book import build_order_book
 from .market_evidence_adapter import build_market_evidence_from_frames
 from .scenario_reasoning import assess_scenarios
@@ -289,60 +289,27 @@ def find_setup(
     trade_fetch = getattr(provider, "fetch_trades_with_source", None)
     book_fetch = getattr(provider, "fetch_order_book_with_source", None)
 
-    trade_limits = (60, 120, 240, 480, 960)
-    trades = pd.DataFrame()
-    for trade_limit in trade_limits:
-        if trade_fetch is not None:
-            trades = trade_fetch(
-                symbol=symbol, market_type=request.market_type, limit=trade_limit
-            ).frame
-        else:
-            trades = provider.fetch_trades(
-                symbol=symbol, market_type=request.market_type, limit=trade_limit
-            )
-        if trades.empty:
-            continue
-        probe = trades.copy()
-        probe["timestamp"] = pd.to_datetime(probe["timestamp"], unit="ms", utc=True)
-        probe["interval"] = probe["timestamp"].dt.floor("min")
-        cutoff = pd.Timestamp(now_ms, unit="ms", tz="UTC")
-        completed_intervals = probe[
-            probe["interval"] + pd.Timedelta(minutes=1) <= cutoff
-        ]
-        if not completed_intervals.empty or trade_limit == trade_limits[-1]:
-            break
-
-    if book_fetch is not None:
-        order_book = book_fetch(
-            symbol=symbol, market_type=request.market_type, limit=1
+    trade_limit = 240
+    if trade_fetch is not None:
+        trades = trade_fetch(
+            symbol=symbol, market_type=request.market_type, limit=trade_limit
         ).frame
     else:
-        order_book = provider.fetch_order_book(
-            symbol=symbol, market_type=request.market_type, limit=1
+        trades = provider.fetch_trades(
+            symbol=symbol, market_type=request.market_type, limit=trade_limit
         )
 
-    trade_work = trades.copy()
-    trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
-    trade_work["price"] = pd.to_numeric(trade_work["price"], errors="coerce")
-    trade_work["volume"] = pd.to_numeric(trade_work["volume"], errors="coerce")
-    trade_work["side"] = pd.to_numeric(trade_work["side"], errors="coerce")
-    trade_work["interval"] = trade_work["timestamp"].dt.floor("min")
-    cutoff = pd.Timestamp(now_ms, unit="ms", tz="UTC")
-    trade_work = trade_work[trade_work["interval"] + pd.Timedelta(minutes=1) <= cutoff]
-    if trade_work.empty:
-        raise ValueError("no completed trade-flow interval available for microstructure analysis")
-    trade_flow = (
-        trade_work.assign(
-            taker_buy_volume=trade_work["volume"].where(trade_work["side"].eq(1), 0.0),
-            taker_sell_volume=trade_work["volume"].where(trade_work["side"].eq(-1), 0.0),
-        )
-        .groupby("interval", as_index=False)[["taker_buy_volume", "taker_sell_volume"]]
-        .sum()
-        .rename(columns={"interval": "timestamp"})
+    if trades.empty:
+        raise ValueError("no trade data available for microstructure analysis")
+    flow_base = pd.DataFrame({
+        "timestamp": pd.to_datetime(analysis["timestamp"], utc=True)
+    })
+    order_flow_analysis = build_trade_order_flow(
+        flow_base,
+        trades,
+        baseline_window=24,
+        event_window=60,
     )
-    trade_flow["timestamp"] = trade_flow["timestamp"] + pd.Timedelta(minutes=1) - pd.Timedelta(milliseconds=1)
-    flow_base = pd.DataFrame({"timestamp": trade_flow["timestamp"]})
-    order_flow_analysis = build_order_flow(flow_base, trade_flow, baseline_window=24)
 
     book_work = order_book.copy()
     book_work["timestamp"] = pd.to_datetime(book_work["timestamp"], unit="ms", utc=True)
