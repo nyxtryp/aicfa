@@ -1207,3 +1207,15 @@ Run the focused chart tests and full regression on the current server release.
 
 ### NEXT UNFINISHED
 Run the focused chart tests on FrostDeploy and record the real result; do not advance to the BTC smoke until that gate is GREEN.
+
+
+## 2026-10-02 — CHART VISUALIZATION: focused tests GREEN
+
+### Verification
+- Deployed release: `2026-10-01T18-45-25-cdc4f6f`.
+- Focused chart visualization suite: **5 passed, 0 failed, 2.74s**.
+- Warnings: 280 NumPy timedelta deprecation warnings in the synthetic test fixture and 1 existing FrostDeploy pytest-cache permission warning.
+- No test failures.
+
+### NEXT UNFINISHED
+Run the full AICFA regression suite on the same deployed release. If GREEN, perform the real BTC chart rendering smoke and inspect the generated chart.
