@@ -165,6 +165,72 @@ def test_setup_engine_can_use_causal_rolling_extreme_as_target_fallback():
     assert candidate.target_levels[0].source == "causal rolling high"
 
 
+def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    evidence = MarketEvidence(
+        asset="BTC/USDT",
+        observations=(
+            MarketObservation(
+                concept_id="market_structure.bos",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("bos_up=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="displacement",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("displacement_up=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="market_structure.choch",
+                timeframe="15m",
+                state="observed",
+                confidence=1.0,
+                evidence=("choch_up=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="liquidity.sweep",
+                timeframe="15m",
+                state="observed",
+                confidence=1.0,
+                evidence=("sweep_low=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="imbalance.fvg",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("fvg_bullish=1",),
+                direction="long",
+            ),
+        ),
+        timeframes=TFS,
+    )
+    assessment = assess_market_evidence(evidence)
+    scenarios = assess_scenarios(assessment)
+    result = analyze_setups(
+        assessment,
+        scenarios,
+        observations=evidence.observations,
+        analyses=frames,
+        timeframes=TFS,
+    )
+
+    assert len(result.candidates) == 1
+    assert result.candidates[0].scenario == "continuation"
+    assert any(
+        "reversal: same actionable geometry as continuation" in item
+        for item in result.missing_context
+    )
+
+
 def test_setup_engine_uses_scenario_specific_zone_family():
     frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
     for tf, frame in frames.items():
