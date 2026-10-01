@@ -690,3 +690,14 @@ Run focused SETUP ENGINE tests, then full regression, then repeat live BTC FindS
 
 ### NEXT UNFINISHED
 Run the full AICFA regression, then perform the live BTC FindSetup smoke and inspect the resulting target level.
+
+
+## 2026-10-01 — Full regression after target fallback
+
+- Server result: **342 passed, 0 failed, 21228 warnings in 56.39s**.
+- This is the new full green checkpoint.
+- The warnings remain non-fatal; the known `PytestCacheWarning` is due release-directory permissions.
+- Target fallback implementation is fully covered by the regression suite.
+
+### NEXT UNFINISHED
+Run the live BTC FindSetup smoke and inspect whether the current seven-timeframe market state now produces a geometrically valid causal target without relying on 1m.
