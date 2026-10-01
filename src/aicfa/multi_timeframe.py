@@ -84,25 +84,25 @@ def build_multi_timeframe_structure(
             "bos_up", "bos_down", "choch_up", "choch_down", "mss_up", "mss_down",
             "swing_high_price", "swing_low_price",
         ]
-        available = structure[state_columns].copy()
-        available.insert(0, "_available_at", source_ts + pd.Timedelta(minutes=minutes))
-        right = available.sort_values("_available_at").reset_index(drop=True)
-        right = right.rename(columns={column: f"mtf_{timeframe}_{column}" for column in state_columns})
+        # Source timestamps are sorted, so causal mapping only needs a
+        # backward lookup. searchsorted avoids a wide merge_asof frame and
+        # preserves the exact close-time boundary.
+        available_at = source_x["timestamp"].to_numpy(dtype="int64") + minutes * 60_000
+        base_millis = base_x["timestamp"].to_numpy(dtype="int64")
+        source_indices = np.searchsorted(available_at, base_millis, side="right") - 1
+        valid = source_indices >= 0
 
-        left = pd.DataFrame({"_base_ts": base_ts})
-        merged = pd.merge_asof(
-            left.sort_values("_base_ts"),
-            right,
-            left_on="_base_ts",
-            right_on="_available_at",
-            direction="backward",
-            allow_exact_matches=True,
-        ).sort_index()
+        mapped = {}
+        for column in state_columns:
+            values = structure[column].to_numpy()
+            if np.issubdtype(values.dtype, np.number):
+                mapped_values = np.full(len(base_x), np.nan, dtype=float)
+            else:
+                mapped_values = np.empty(len(base_x), dtype=object)
+                mapped_values[:] = np.nan
+            if valid.any():
+                mapped_values[valid] = values[source_indices[valid]]
+            mapped[f"mtf_{timeframe}_{column}"] = mapped_values
 
-        mapped = {
-            f"mtf_{timeframe}_{column}": merged[f"mtf_{timeframe}_{column}"].to_numpy()
-            for column in state_columns
-        }
         out = pd.concat([out, pd.DataFrame(mapped, index=out.index)], axis=1)
-
     return out
