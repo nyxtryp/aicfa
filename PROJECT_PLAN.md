@@ -155,3 +155,23 @@ If the chat is lost, resume from this exact section: **CVD + Absorption integrat
 3. Run live BTC Spot FindSetup smoke and verify real L1 history, provider provenance, CVD, and Absorption population.
 4. Inspect live Absorption output for causal timestamps and ensure no future observations are consumed.
 5. Record exact results and only then mark Absorption live GREEN.
+
+
+## 2026-10-01 — FindSetup Absorption integration regression repaired
+
+### Regression found
+- Focused server run after the test-fixture fix produced **9 passed, 10 failed, 16390 warnings**.
+- All 10 failures shared the same root cause: build_trade_order_flow() performed a causal merge but returned only feature columns, dropping the resulting timestamp.
+- New causal Absorption validation correctly requires that timestamp and therefore raised `ValueError: missing required flow columns: ['timestamp']`.
+- This was a production-code integration bug, not a test-fixture workaround.
+
+### Repair
+- Updated build_trade_order_flow() to preserve the source-availability timestamp alongside its calculated trade-flow features.
+- This keeps Absorption's causal contract intact and does not relax any validation.
+- Commit: 6354c30684d43ca225ee9819a801a8d4152da243 — fix: preserve timestamps in trade order flow.
+
+### NEXT UNFINISHED
+1. Re-run focused tests/test_find_setup.py tests/test_absorption.py on the deployed server.
+2. If GREEN, run the complete pytest suite after this repair.
+3. Run live BTC Spot FindSetup smoke and verify real L1 history, provenance, CVD, and Absorption population.
+4. Inspect causal timestamps before marking Absorption live GREEN.
