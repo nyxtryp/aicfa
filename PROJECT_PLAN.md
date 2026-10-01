@@ -379,8 +379,8 @@ Model training is deferred until the deterministic setup engine is sufficiently 
 
 ### NEXT UNFINISHED
 1. Unify current setup detection, scenario reasoning, setup analysis and decision into the coherent SETUP ENGINE.
-2. Make the engine consume the actual current multi-timeframe state and available microstructure evidence.
-3. Add explicit structured setup output: family, direction, entry condition, invalidation, targets, confirmation requirements and rationale.
+2. Make the engine consume the actual current **seven-timeframe** state (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`, `1w`) as one hierarchical context. `1m` is execution/microstructure context only; it must never be the sole source of market direction or setup levels.
+3. Add explicit structured setup output: family, direction, entry condition, invalidation, targets, confirmation requirements and rationale, with levels derived from the appropriate timeframe(s), never by defaulting to the 1m close.
 4. Add focused causal/conflict/no-invention tests.
 5. Run the focused tests and complete pytest.
 6. Run a live BTC FindSetup smoke and inspect the resulting setup object.
@@ -388,3 +388,19 @@ Model training is deferred until the deterministic setup engine is sufficiently 
 
 ### Continuity rule
 After a chat reset, start from this section. Do not jump to model training, do not redo completed analytical layers, and do not reopen closed local-model research.
+
+
+## 2026-10-01 — SETUP ENGINE correction: seven-timeframe context is mandatory
+
+The first implementation attempt incorrectly passed the `1m` analysis as the market context for setup levels/direction. This was rejected because AICFA's setup must be derived from the complete seven-timeframe hierarchy, not from the execution timeframe.
+
+### Correction
+- Reverted the incorrect 1m-only setup-level implementation.
+- `find_setup.py` no longer passes a 1m-specific analysis object into `analyze_setups()`.
+- Removed the invalid test that treated the 1m close as the setup entry price.
+- No setup direction, entry, invalidation, or target may be inferred solely from 1m.
+- The future SETUP ENGINE implementation must consume the complete seven-timeframe current state and resolve each piece from the timeframe where that evidence actually exists.
+
+### Current implementation checkpoint
+- Reversion commits: `56ab85d0a1ab9496d54eb19c567f3c9bf1adb4f2`, `4c1944067f361dc5c70b187a81f36d359e96e5e3`, `69ead87d751696d9fa79df1eb8e75bb03bef4ff0`.
+- Next code work remains the genuine multi-timeframe SETUP ENGINE, not a 1m shortcut.
