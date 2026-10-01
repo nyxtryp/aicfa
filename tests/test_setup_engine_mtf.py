@@ -135,3 +135,14 @@ def test_setup_engine_requires_directionally_coherent_levels():
     assert candidate.target_levels
     assert candidate.invalidation_level.value < entry_low
     assert candidate.target_levels[0].value > entry_high
+
+
+def test_setup_engine_does_not_use_lower_timeframe_target_than_entry_zone():
+    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1m=-1))
+    candidate = result.candidates[0]
+
+    assert candidate.entry_zone
+    entry_tf = candidate.entry_zone[0].timeframe
+    allowed = TFS[TFS.index(entry_tf):]
+    assert candidate.target_levels
+    assert candidate.target_levels[0].timeframe in allowed
