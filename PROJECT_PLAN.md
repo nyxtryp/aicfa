@@ -2045,3 +2045,67 @@ The two forward fixes are now committed to `main`. FrostDeploy verification has 
 
 ### Exact next step
 Deploy current `main` and rerun the mandatory full pytest. If the suite is green, rerun the live BTC FindSetup smoke without an explicit `limit`. Inspect the returned row counts and evidence/context. Do not modify MarketEvidence until the corrected adaptive-depth wiring is verified.
+
+
+## 2026-10-01 — Adaptive-depth live BTC smoke after router repair
+
+### Verification
+Current FrostDeploy release: `2026-10-01T07-46-06-5dbf8fb`.
+
+Mandatory full-project verification:
+```
+302 passed, 9983 warnings in 35.77s
+```
+
+The known immutable-release pytest-cache Permission denied warning remains non-blocking. No test failures.
+
+Live BTC FindSetup smoke was then run **without an explicit `limit=1000`**, using the production request path.
+
+Exact observed result:
+```
+SYMBOL: BTCUSDT
+TIMEFRAMES: ('1m', '5m', '15m', '1h', '4h', '1d', '1w')
+ROWS: {'1m': 60, '5m': 60, '15m': 60, '1h': 60, '4h': 60, '1d': 60, '1w': 60}
+DECISION: WAIT
+REASON: required context is missing; material evidence is contradictory
+```
+
+Evidence observed:
+- 15m bearish FVG;
+- 1w bullish BOS;
+- 1w bullish FVG.
+
+Missing context:
+- 1m:no_active_supported_observation
+- 5m:no_active_supported_observation
+- 1h:no_active_supported_observation
+- 4h:no_active_supported_observation
+- 1d:no_active_supported_observation
+
+Conflict:
+- explicit long and short observations coexist.
+
+### Interpretation
+The production default is now proven to use the dependency-derived 60-row minimum on all seven requested timeframes instead of the diagnostic 1000-row fetch.
+
+The deterministic analytical chain and Decision Layer are functioning correctly: the system returns WAIT when required context is missing and directional evidence conflicts.
+
+The 60-row minimum is therefore **not sufficient to establish all request-scoped SMC context** on this live BTC sample. This does not justify increasing depth to an arbitrary fixed number.
+
+### Status
+**GREEN / ACCEPTED** for corrected adaptive-depth router wiring and production default-depth activation.
+
+**PENDING** for adaptive context expansion and final context completeness.
+
+### Exact next step
+Implement the adaptive expansion loop driven by the missing context / analytical requirement state:
+1. Start from the dependency-derived minimum depth.
+2. Identify which required recent events or active lifecycle states remain unresolved.
+3. Expand only the affected timeframe/context requirement.
+4. Re-fetch temporary data through the existing multi-source router.
+5. Recompute the deterministic analytical state and reassess context.
+6. Stop when required context is established or a mechanically defined data-availability/expansion boundary is reached.
+7. Do not introduce arbitrary fixed production depth tables and do not modify MarketEvidence's latest-row behavior until this adaptive expansion path is implemented and verified.
+
+### Control rule
+This entry records the assistant's implementation direction and exact next action so the next session can resume from the plan without relying on chat history.
