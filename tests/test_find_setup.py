@@ -138,7 +138,7 @@ def test_find_setup_uses_dependency_depth_when_no_diagnostic_limit_is_given():
         resolver=lambda asset, market_type: asset,
         now_ms=120 * 60_000,
     )
-    assert [call[4] for call in provider.calls] == [60] * 7
+    assert [call[4] for call in provider.calls] == [60] * 7 + [120] * 7 + [240] * 7
 
 
 
@@ -161,3 +161,21 @@ def test_find_setup_expands_missing_context_until_provider_boundary():
     assert [call[4] for call in provider.calls if call[2] == "1m"] == [60, 120, 240]
     assert [call[4] for call in provider.calls if call[2] == "1w"] == [60, 120, 240]
     assert len(result.frames["1m"]) == 130
+
+
+class UnboundedNoContextProvider(FakeProvider):
+    """Provider boundary is intentionally absent; expansion must still terminate."""
+
+
+def test_find_setup_stops_expansion_when_context_signature_stalls():
+    provider = UnboundedNoContextProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+    )
+
+    assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
+    assert all(call[4] in {60, 120, 240} for call in provider.calls)
+    assert [call[4] for call in provider.calls if call[2] == "1m"] == [60, 120, 240]
