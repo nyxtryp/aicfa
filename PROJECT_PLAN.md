@@ -2277,3 +2277,22 @@ The three adaptive FindSetup tests were especially expensive because the initial
 
 ### Next step
 Deploy current `main` and run the full suite. Expected result is unchanged test count with materially lower runtime. If runtime remains high, profile again before further changes.
+
+
+## 2026-10-01 — Repair adaptive expansion return-contract regression
+
+### Finding
+Post-deploy verification of `1888abde0fd4345e8b3d11b5ff70f8054ad6e4a2` failed 3 adaptive FindSetup tests with `ValueError: not enough values to unpack (expected 3, got 2)`. Source inspection found the new three-value return contract was incomplete: one termination branch of `_expand_missing_context()` still returned only `(frames, limits)`. The same refactor also left one stale `analyses.pop()` target and one stale `current_analyses` reference in the caller.
+
+### Forward repair
+- `e3d182d1635f5a8064b3df7321eb6193c7119265` — Repair the adaptive expansion return contract and stale analysis references.
+- Every termination path now returns `(current_frames, current_limits, current_analyses)`.
+- Empty recomputed analyses are removed from `current_analyses`, not the original input mapping.
+- Final market evidence is rebuilt from the returned `analyses` mapping.
+- No analytical rules, depth values, expansion bounds, or causal logic were changed.
+
+### Verification status
+**FIXED IN GIT / PENDING FROSTDEPLOY VERIFICATION.**
+
+### Exact next step
+Deploy current `main` and rerun the mandatory full pytest. Expected test count remains 304. If GREEN, run `pytest -q --durations=20` to measure whether the duplicate-recomputation optimization actually reduced the adaptive FindSetup bottleneck.
