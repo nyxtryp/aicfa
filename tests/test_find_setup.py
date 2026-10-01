@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from aicfa.find_setup import CAUSAL_TIMEFRAMES, FindSetupRequest, find_setup, normalize_asset, parse_find_setup
+from aicfa.market_data_router import MarketFetchResult
 
 
 TIMEFRAME_MS = {
@@ -59,6 +60,17 @@ class FakeProvider:
             "ask_price": [100.1],
             "ask_size": [4.0],
         })
+
+    def fetch_order_book_history_with_source(self, *, symbol, market_type, snapshots, interval_seconds):
+        frame = self.fetch_order_book_history(
+            symbol=symbol, market_type=market_type,
+            snapshots=snapshots, interval_seconds=interval_seconds,
+        )
+        return MarketFetchResult(
+            provider="fakeprovider",
+            symbol=symbol,
+            frame=frame,
+        )
 
     def fetch_order_book_history(self, *, symbol, market_type, snapshots, interval_seconds):
         self.history_calls = getattr(self, "history_calls", [])
