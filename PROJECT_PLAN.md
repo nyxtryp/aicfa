@@ -679,3 +679,14 @@ Inspect the actual analytical level values from `r.analysis` / seven-timeframe `
 
 ### NEXT UNFINISHED
 Run focused SETUP ENGINE tests, then full regression, then repeat live BTC FindSetup smoke. The live smoke must verify that the target is an actual causal analytical level, remains at entry-TF or higher, and is not derived solely from 1m.
+
+
+## 2026-10-01 — SETUP ENGINE focused regression after target fallback
+
+- Server result: **8 passed, 0 failed, 1 warning in 0.55s**.
+- The warning is the known non-fatal `PytestCacheWarning` caused by release-directory permissions.
+- Target fallback regression is green.
+- No code change is required for the warning.
+
+### NEXT UNFINISHED
+Run the full AICFA regression, then perform the live BTC FindSetup smoke and inspect the resulting target level.
