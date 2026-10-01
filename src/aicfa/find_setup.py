@@ -14,6 +14,7 @@ import pandas as pd
 
 from .binance_market_data import BinanceMarketDataProvider
 from .bybit_market_data import BybitMarketDataProvider
+from .data_requirements import default_setup_requirements
 from .decision import decide
 from .evidence_reasoning import assess_market_evidence
 from .features import build_features
@@ -94,7 +95,7 @@ def find_setup(
     limit: int = 1000,
     resolver: Callable[[str, str], str] | None = None,
 ) -> FindSetupResult:
-    """Resolve the requested asset, fetch seven causal timeframes, and run AICFA."""
+    """Resolve the asset, collect knowledge-required context, and run AICFA."""
     if provider is None:
         provider = FallbackMarketDataProvider(
             (BinanceMarketDataProvider(), BybitMarketDataProvider())
@@ -106,13 +107,19 @@ def find_setup(
             asset, market_type=market_type
         )
     symbol = normalize_asset(resolver(request.asset, request.market_type))
+
+    requirements = default_setup_requirements(symbol)
+    timeframes = requirements.required_timeframes
+    if not timeframes:
+        raise ValueError("knowledge requirements produced no timeframes")
+
     frames: dict[str, pd.DataFrame] = {}
 
     if isinstance(provider, SharedSnapshotMarketDataProvider):
         snapshot = provider.fetch_ohlcv_snapshot(
             symbol=symbol,
             market_type=request.market_type,
-            timeframes=CAUSAL_TIMEFRAMES,
+            timeframes=timeframes,
             since_ms=None,
             limit=limit,
         )
@@ -122,7 +129,7 @@ def find_setup(
         # providers. Production fallback providers are wrapped above, so the
         # real FindSetup path still uses one all-timeframe snapshot.
         frames = {}
-        for timeframe in CAUSAL_TIMEFRAMES:
+        for timeframe in timeframes:
             result = provider.fetch_ohlcv(
                 symbol=symbol,
                 market_type=request.market_type,
@@ -155,7 +162,7 @@ def find_setup(
     market_evidence = build_market_evidence_from_frames(
         analyses,
         asset=symbol,
-        timeframes=CAUSAL_TIMEFRAMES,
+        timeframes=timeframes,
     )
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
@@ -168,7 +175,7 @@ def find_setup(
     return FindSetupResult(
         request=request,
         symbol=symbol,
-        timeframes=CAUSAL_TIMEFRAMES,
+        timeframes=timeframes,
         frames=frames,
         analysis=analysis,
         evidence=market_evidence,
