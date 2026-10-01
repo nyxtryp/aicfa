@@ -88,6 +88,84 @@ def parse_find_setup(text: str) -> FindSetupRequest:
     return FindSetupRequest(asset=normalize_asset(asset_match.group(1)))
 
 
+def _fetch_frames(
+    provider: MarketDataProvider,
+    *,
+    symbol: str,
+    market_type: str,
+    timeframes: tuple[str, ...],
+    limits: dict[str, int],
+) -> dict[str, pd.DataFrame]:
+    """Fetch one temporary request snapshot at the supplied per-TF depths."""
+    if isinstance(provider, SharedSnapshotMarketDataProvider):
+        snapshot = provider.fetch_ohlcv_snapshot(
+            symbol=symbol, market_type=market_type, timeframes=timeframes,
+            since_ms=None, limits=limits,
+        )
+        return {timeframe: result.frame for timeframe, result in snapshot.items()}
+    return {
+        timeframe: (result.frame if hasattr(result, "frame") else result)
+        for timeframe in timeframes
+        for result in (provider.fetch_ohlcv(
+            symbol=symbol, market_type=market_type, timeframe=timeframe,
+            since_ms=None, limit=limits[timeframe],
+        ),)
+    }
+
+
+def _expand_missing_context(
+    provider: MarketDataProvider,
+    *,
+    symbol: str,
+    market_type: str,
+    timeframes: tuple[str, ...],
+    limits: dict[str, int],
+    frames: dict[str, pd.DataFrame],
+    missing_context: tuple[str, ...],
+) -> tuple[dict[str, pd.DataFrame], dict[str, int]]:
+    """Double unresolved TF depth until provider data availability is the boundary."""
+    exhausted: set[str] = set()
+    current_limits = dict(limits)
+    current_frames = dict(frames)
+    current_missing = tuple(missing_context)
+
+    while True:
+        unresolved = {
+            item.split(":", 1)[0] for item in current_missing if ":" in item
+        } - exhausted
+        if not unresolved:
+            return current_frames, current_limits
+
+        requested = dict(current_limits)
+        for timeframe in unresolved:
+            requested[timeframe] = current_limits[timeframe] * 2
+
+        fetched = _fetch_frames(
+            provider, symbol=symbol, market_type=market_type,
+            timeframes=timeframes, limits=requested,
+        )
+        for timeframe in unresolved:
+            rows = len(fetched[timeframe])
+            current_frames[timeframe] = fetched[timeframe]
+            current_limits[timeframe] = requested[timeframe]
+            if rows < requested[timeframe]:
+                exhausted.add(timeframe)
+
+        analyses = {}
+        for timeframe, frame in current_frames.items():
+            completed = completed_ohlcv(
+                frame, timeframe=timeframe,
+                now_ms=int(frame["timestamp"].iloc[-1]) + 1,
+            )
+            if not completed.empty:
+                analyses[timeframe] = build_features(completed)
+
+        evidence = build_market_evidence_from_frames(
+            analyses, asset=symbol, timeframes=timeframes,
+        )
+        current_missing = evidence.missing_context
+
+
 def find_setup(
     request: FindSetupRequest,
     *,
@@ -118,31 +196,10 @@ def find_setup(
     if limit is not None:
         limits = {timeframe: int(limit) for timeframe in timeframes}
 
-    frames: dict[str, pd.DataFrame] = {}
-
-    if isinstance(provider, SharedSnapshotMarketDataProvider):
-        snapshot = provider.fetch_ohlcv_snapshot(
-            symbol=symbol,
-            market_type=request.market_type,
-            timeframes=timeframes,
-            since_ms=None,
-            limits=limits,
-        )
-        frames = {timeframe: result.frame for timeframe, result in snapshot.items()}
-    else:
-        # Preserve the base MarketDataProvider contract for injected test/custom
-        # providers. Production fallback providers are wrapped above, so the
-        # real FindSetup path still uses one all-timeframe snapshot.
-        frames = {}
-        for timeframe in timeframes:
-            result = provider.fetch_ohlcv(
-                symbol=symbol,
-                market_type=request.market_type,
-                timeframe=timeframe,
-                since_ms=None,
-                limit=limits[timeframe],
-            )
-            frames[timeframe] = result.frame if hasattr(result, "frame") else result
+    frames = _fetch_frames(
+        provider, symbol=symbol, market_type=request.market_type,
+        timeframes=timeframes, limits=limits,
+    )
 
     base = completed_ohlcv(frames["1m"], timeframe="1m", now_ms=now_ms)
     if base.empty:
@@ -169,6 +226,33 @@ def find_setup(
         asset=symbol,
         timeframes=timeframes,
     )
+    if market_evidence.missing_context:
+        frames, limits = _expand_missing_context(
+            provider,
+            symbol=symbol,
+            market_type=request.market_type,
+            timeframes=timeframes,
+            limits=limits,
+            frames=frames,
+            missing_context=market_evidence.missing_context,
+        )
+        completed_frames = {}
+        analyses = {}
+        for timeframe, frame in frames.items():
+            completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
+            if completed.empty:
+                continue
+            completed_frames[timeframe] = completed
+            timeframe_analysis = build_features(completed)
+            if not timeframe_analysis.empty:
+                analyses[timeframe] = timeframe_analysis
+        base_analysis = analyses.get("1m")
+        if base_analysis is None:
+            raise ValueError("AICFA analysis produced no completed 1m rows")
+        analysis = base_analysis
+        market_evidence = build_market_evidence_from_frames(
+            analyses, asset=symbol, timeframes=timeframes,
+        )
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
     setup_assessment = analyze_setups(evidence_assessment, scenario_assessment)
