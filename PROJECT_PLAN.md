@@ -233,3 +233,13 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - Test commits: `f82ab306814c05c15f95a1276cd1bbbf3974f061` (default requirement expectations) and `003834ebddcd4e4ac638a51b2cdeae3f1b2f1649` (FindSetup optional-feed expectations).
 - Server has NOT yet verified these test changes. Do not mark the regression gate GREEN and do not run live BTC smoke until the full suite passes.
 - Next step: deploy/update the current release from `main`, rerun `PYTHONPATH=src .venv/bin/python -m pytest -q`, and inspect any remaining failures before live validation.
+
+
+## 2026-10-02 — FULL SERVER REGRESSION GREEN AFTER TEST CONTRACT ALIGNMENT
+
+- Server result reported by user: `PYTHONPATH=src .venv/bin/python -m pytest -q` → **370 passed, 15866 warnings in 45.05s**.
+- The four stale default-microstructure expectations are now aligned with the chart-native default contract; full regression passes with zero failures.
+- The warning count is recorded, not treated as a test failure. Pytest cache permission warnings in immutable release directories remain a known infrastructure issue.
+- Regression gate is GREEN for the current deployed release. No claim is made here that live market behavior has been verified by this test run.
+- Next step: perform live BTC FindSetup smoke checks for the four internal modes, inspecting exact selected timeframes, data/evidence availability, hypotheses, decision and reason. End-user input remains asset-only; the four calls are internal validation.
+- Follow-up audit item: remove any test expectation that encodes a universal seven-timeframe default; each mode must use its authoritative mode-specific timeframe profile.
