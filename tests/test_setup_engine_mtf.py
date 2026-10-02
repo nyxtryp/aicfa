@@ -350,8 +350,8 @@ def test_setup_engine_prioritizes_active_liquidity_over_nearer_structural_extrem
         frame.loc[0, "previous_high"] = float("nan")
         frame.loc[0, "internal_previous_high"] = float("nan")
         frame.loc[0, "rolling_high_60"] = float("nan")
-    frames["15m"].loc[0, "active_buy_liquidity_price"] = 108.0
-    frames["15m"].loc[0, "previous_high"] = 106.0
+    frames["1h"].loc[0, "active_buy_liquidity_price"] = 108.0
+    frames["1h"].loc[0, "previous_high"] = 106.0
     result = _pipeline(frames)
     candidate = result.candidates[0]
     assert candidate.target_levels[0].value == 108.0
