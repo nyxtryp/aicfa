@@ -65,6 +65,116 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
     )
 
 
+def _merge_sources(
+    *,
+    funding_rows: list[dict],
+    oi_rows: list[dict],
+    mark_row: dict | None,
+    liquidation_rows: list[dict],
+) -> pd.DataFrame:
+    """Build a causal common timeline from independently timestamped sources.
+
+    Funding and OI endpoints do not normally publish at identical timestamps.
+    They therefore must not be joined by exact timestamp. OI is a state carried
+    forward from the latest known observation; funding is carried forward from
+    its latest known observation; the current mark is added at its own timestamp.
+    This preserves causality while producing rows accepted by build_derivatives.
+    """
+    oi = pd.DataFrame(oi_rows)
+    funding = pd.DataFrame(funding_rows)
+
+    if oi.empty:
+        return _frame([])
+
+    oi["timestamp"] = pd.to_numeric(oi["timestamp"], errors="coerce")
+    oi["open_interest"] = pd.to_numeric(oi["open_interest"], errors="coerce")
+    oi = (
+        oi.dropna(subset=["timestamp", "open_interest"])
+        .sort_values("timestamp")
+        .drop_duplicates("timestamp", keep="last")
+    )
+    if oi.empty:
+        return _frame([])
+
+    timeline = oi[["timestamp"]].copy()
+    if mark_row is not None:
+        mark_ts = pd.to_numeric(pd.Series([mark_row.get("timestamp")]), errors="coerce").iloc[0]
+        mark_price = pd.to_numeric(pd.Series([mark_row.get("mark_price")]), errors="coerce").iloc[0]
+        if pd.notna(mark_ts) and pd.notna(mark_price):
+            timeline = pd.concat(
+                [timeline, pd.DataFrame({"timestamp": [int(mark_ts)]})],
+                ignore_index=True,
+            )
+
+    timeline["timestamp"] = pd.to_numeric(timeline["timestamp"], errors="coerce")
+    timeline = (
+        timeline.dropna()
+        .astype({"timestamp": "int64"})
+        .drop_duplicates("timestamp")
+        .sort_values("timestamp")
+        .reset_index(drop=True)
+    )
+
+    oi_state = pd.merge_asof(
+        timeline,
+        oi[["timestamp", "open_interest"]].sort_values("timestamp"),
+        on="timestamp",
+        direction="backward",
+        allow_exact_matches=True,
+    )
+
+    if funding.empty:
+        return _frame([])
+    funding["timestamp"] = pd.to_numeric(funding["timestamp"], errors="coerce")
+    funding["funding_rate"] = pd.to_numeric(funding["funding_rate"], errors="coerce")
+    funding = (
+        funding.dropna(subset=["timestamp", "funding_rate"])
+        .sort_values("timestamp")
+        .drop_duplicates("timestamp", keep="last")
+    )
+    if funding.empty:
+        return _frame([])
+
+    aligned = pd.merge_asof(
+        oi_state.sort_values("timestamp"),
+        funding[["timestamp", "funding_rate"]].sort_values("timestamp"),
+        on="timestamp",
+        direction="backward",
+        allow_exact_matches=True,
+    )
+
+    if mark_row is not None:
+        mark_ts = pd.to_numeric(pd.Series([mark_row.get("timestamp")]), errors="coerce").iloc[0]
+        mark_price = pd.to_numeric(pd.Series([mark_row.get("mark_price")]), errors="coerce").iloc[0]
+        if pd.notna(mark_ts) and pd.notna(mark_price):
+            aligned["mark_price"] = pd.NA
+            aligned.loc[aligned["timestamp"] == int(mark_ts), "mark_price"] = float(mark_price)
+
+    if liquidation_rows:
+        liquidations = pd.DataFrame(liquidation_rows)
+        liquidations["timestamp"] = pd.to_numeric(liquidations["timestamp"], errors="coerce")
+        for column in (
+            "liquidation_volume",
+            "long_liquidation_volume",
+            "short_liquidation_volume",
+        ):
+            liquidations[column] = pd.to_numeric(liquidations[column], errors="coerce").fillna(0.0)
+        liquidations = (
+            liquidations.dropna(subset=["timestamp"])
+            .groupby("timestamp", as_index=False)[
+                [
+                    "liquidation_volume",
+                    "long_liquidation_volume",
+                    "short_liquidation_volume",
+                ]
+            ]
+            .sum()
+        )
+        aligned = aligned.merge(liquidations, on="timestamp", how="left", sort=True)
+
+    return _frame(aligned.to_dict("records"))
+
+
 def _collect_binance_liquidations(symbol: str, *, timeout_seconds: float) -> list[dict]:
     """Collect the public market liquidation stream for a short causal window."""
     ws = websocket.create_connection(
@@ -165,32 +275,39 @@ class BinanceDerivativesProvider:
             symbol, timeout_seconds=self.timeout_seconds
         )
 
-        rows: dict[int, dict] = {}
-        for item in funding if isinstance(funding, list) else []:
-            ts = int(item["fundingTime"])
-            rows.setdefault(ts, {})["funding_rate"] = float(item["fundingRate"])
-        for item in oi if isinstance(oi, list) else []:
-            ts = int(item["timestamp"])
-            rows.setdefault(ts, {})["open_interest"] = float(
-                item.get("sumOpenInterestValue", item.get("sumOpenInterest", 0.0))
-            )
+        funding_rows = [
+            {"timestamp": int(item["fundingTime"]), "funding_rate": float(item["fundingRate"])}
+            for item in funding
+            if isinstance(item, dict)
+        ]
+        oi_rows = [
+            {
+                "timestamp": int(item["timestamp"]),
+                "open_interest": float(
+                    item.get("sumOpenInterestValue", item.get("sumOpenInterest", 0.0))
+                ),
+            }
+            for item in oi
+            if isinstance(item, dict)
+        ]
+        mark_row = None
         if isinstance(mark, dict):
-            ts = int(mark.get("time") or time.time() * 1000)
-            rows.setdefault(ts, {})["mark_price"] = float(mark["markPrice"])
+            mark_row = {
+                "timestamp": int(mark.get("time") or time.time() * 1000),
+                "mark_price": float(mark["markPrice"]),
+            }
             if "lastFundingRate" in mark:
-                rows[ts].setdefault("funding_rate", float(mark["lastFundingRate"]))
+                funding_rows.append({
+                    "timestamp": mark_row["timestamp"],
+                    "funding_rate": float(mark["lastFundingRate"]),
+                })
 
-        for item in liquidation_rows:
-            ts = int(item["timestamp"])
-            row = rows.setdefault(ts, {})
-            for column in (
-                "liquidation_volume",
-                "long_liquidation_volume",
-                "short_liquidation_volume",
-            ):
-                row[column] = row.get(column, 0.0) + float(item[column])
-
-        return _frame([{"timestamp": ts, **values} for ts, values in rows.items()])
+        return _merge_sources(
+            funding_rows=funding_rows,
+            oi_rows=oi_rows,
+            mark_row=mark_row,
+            liquidation_rows=liquidation_rows,
+        )
 
 
 class BybitDerivativesProvider:
@@ -225,34 +342,42 @@ class BybitDerivativesProvider:
             symbol, timeout_seconds=self.timeout_seconds
         )
 
-        rows: dict[int, dict] = {}
-        for item in funding.get("result", {}).get("list", []):
-            ts = int(item["fundingRateTimestamp"])
-            rows.setdefault(ts, {})["funding_rate"] = float(item["fundingRate"])
-        for item in oi.get("result", {}).get("list", []):
-            ts = int(item["timestamp"])
-            rows.setdefault(ts, {})["open_interest"] = float(
-                item.get("openInterestValue", item.get("openInterest", 0.0))
-            )
+        funding_rows = [
+            {
+                "timestamp": int(item["fundingRateTimestamp"]),
+                "funding_rate": float(item["fundingRate"]),
+            }
+            for item in funding.get("result", {}).get("list", [])
+        ]
+        oi_rows = [
+            {
+                "timestamp": int(item["timestamp"]),
+                "open_interest": float(
+                    item.get("openInterestValue", item.get("openInterest", 0.0))
+                ),
+            }
+            for item in oi.get("result", {}).get("list", [])
+        ]
+        mark_row = None
         items = ticker.get("result", {}).get("list", [])
         if items:
             item = items[0]
-            ts = int(ticker.get("time") or time.time() * 1000)
-            rows.setdefault(ts, {})["mark_price"] = float(item["markPrice"])
+            mark_row = {
+                "timestamp": int(ticker.get("time") or time.time() * 1000),
+                "mark_price": float(item["markPrice"]),
+            }
             if item.get("fundingRate") is not None:
-                rows[ts].setdefault("funding_rate", float(item["fundingRate"]))
+                funding_rows.append({
+                    "timestamp": mark_row["timestamp"],
+                    "funding_rate": float(item["fundingRate"]),
+                })
 
-        for item in liquidation_rows:
-            ts = int(item["timestamp"])
-            row = rows.setdefault(ts, {})
-            for column in (
-                "liquidation_volume",
-                "long_liquidation_volume",
-                "short_liquidation_volume",
-            ):
-                row[column] = row.get(column, 0.0) + float(item[column])
-
-        return _frame([{"timestamp": ts, **values} for ts, values in rows.items()])
+        return _merge_sources(
+            funding_rows=funding_rows,
+            oi_rows=oi_rows,
+            mark_row=mark_row,
+            liquidation_rows=liquidation_rows,
+        )
 
 
 class FallbackDerivativesProvider:
