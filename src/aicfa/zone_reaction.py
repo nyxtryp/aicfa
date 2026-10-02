@@ -275,31 +275,17 @@ def build_zone_reaction(
         if not levels:
             return None
         pos = bisect.bisect_left(levels, (close, -1))
-        best = None
-        best_distance = np.inf
-        left = pos - 1
-        right = pos
-        while left >= 0 or right < len(levels):
-            if left >= 0:
-                level, zone_id = levels[left]
-                if zone_state[zone_id] not in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
-                    distance = abs(close - level)
-                    if distance < best_distance:
-                        best = (zone_id, level, distance)
-                        best_distance = distance
-                    elif best is not None and abs(close - level) >= best_distance:
-                        left = -1
-                left -= 1
-            if right < len(levels):
-                level, zone_id = levels[right]
-                if zone_state[zone_id] not in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
-                    distance = abs(close - level)
-                    if distance < best_distance:
-                        best = (zone_id, level, distance)
-                    elif best is not None and abs(close - level) >= best_distance:
-                        right = len(levels)
-                right += 1
-        return best
+        # Broken/cancelled zones are removed from the sorted index, so the
+        # nearest active level can only be one of the two immediate neighbors.
+        candidates = []
+        if pos:
+            candidates.append(levels[pos - 1])
+        if pos < len(levels):
+            candidates.append(levels[pos])
+        if not candidates:
+            return None
+        level, zone_id = min(candidates, key=lambda item: abs(close - item[0]))
+        return zone_id, level, abs(close - level)
 
     def _remove_level(levels, zone_id: int):
         level = float((zone_low[zone_id] + zone_high[zone_id]) / 2.0)
