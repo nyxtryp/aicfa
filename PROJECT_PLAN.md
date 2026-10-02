@@ -197,8 +197,7 @@ Every subsequent code/test/fix/verification movement for this task must be appen
   - `test_market_context_layers_become_causal_evidence` expected optional microstructure/context/liquidation observations to independently create continuation/reversal/range hypotheses.
   - `test_liquidations_participate_when_available` expected liquidation evidence by itself to create a reversal hypothesis.
 - Architectural rule confirmed: optional feeds may become causal observations and confirmations, but **scenario hypotheses require their defined chart/SMC support path**. Liquidations do not manufacture a reversal; microstructure does not manufacture continuation/range.
-- `ca57c616d72feb5eb93e4e226a850f2c4f893e1b`: aligned `test_market_context_evidence.py` with chart-native scenario support. The test still verifies all supplied optional layers become observations, but now verifies they do not independently manufacture scenarios.
-- `248f9de86dd84fbeddde4b0a755137b56972752d`: aligned `test_optional_liquidations.py` so available liquidations are verified as causal `derivatives.liquidations` evidence while remaining optional confirmation; reversal still requires chart/SMC reversal evidence.
+- `ca57c616d72feb5eb93e4e226a850f2c4f893e1b`: aligned `test_market_context_evidence.py` with chart-native scenario support. The test still verifies all supplied optional layers become observations, but now verifies they do not independently manufacture scenarios.- `248f9de86dd84fbeddde4b0a755137b56972752d`: aligned `test_optional_liquidations.py` so available liquidations are verified as causal `derivatives.liquidations` evidence while remaining optional confirmation; reversal still requires chart/SMC reversal evidence.
 - The two PytestCacheWarning PermissionDenied warnings remain non-blocking release-directory infrastructure warnings.
 - Server verification after these test commits is still required; these commits are **NOT GREEN yet** until the focused suite is rerun.
 - Next step: rerun:
@@ -397,7 +396,6 @@ The next implementation block adopts nine proven mechanisms from the reviewed ex
    - Preserve causal creation/confirmation and invalidation.
    - Expose lifecycle state to setup/scenario reasoning.
    - Volume confirmation remains metadata/evidence, never a mandatory gate that silently discards structurally valid OBs.
-
 5. **FVG / Imbalance Lifecycle**
    - Apply the same causal lifecycle discipline to FVGs: creation, active/unmitigated state, touch/partial fill, mitigation/fill and invalidation where applicable.
    - Preserve bounds, displacement linkage and timeframe role.
@@ -542,3 +540,13 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - Full regression has **not** yet been run after the Task 3 implementation.
 - Current implementation commits: `9accf9179e946285825c0dd2f6e988f7aa5c806b` (causal liquidity reaction lifecycle) and `9813326cadc36a105d7172abb0b267a67e741bca` (feature-pipeline integration).
 - **NEXT:** run the complete `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q`. Record the actual result before closing Task 3 or starting Task 4.
+
+## 2026-10-03 — TASK 3 LIQUIDITY LIFECYCLE: FULL REGRESSION GATE GREEN
+
+- Server verification reported by user: `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q` → **375 passed in 45.41s**.
+- Result: full regression is **GREEN** with zero test failures after the Liquidity Lifecycle implementation and feature-pipeline integration.
+- Task 3 verification gates are now both green: focused `tests/test_liquidity.py` → **8 passed in 0.58s**; full regression → **375 passed in 45.41s**.
+- Implementation commits remain `9accf9179e946285825c0dd2f6e988f7aa5c806b` (causal post-sweep reaction lifecycle) and `9813326cadc36a105d7172abb0b267a67e741bca` (feature-pipeline integration).
+- Current status: Task 3 — Liquidity Lifecycle is regression-green.
+- **NEXT:** begin Task 4 — Order Block Lifecycle. Audit the current OB implementation first, then implement causal states `UNTOUCHED → TOUCHED → PARTIAL → DEEP → INVALIDATED`, add focused regression tests, commit, and record the actual server verification before proceeding.
+
