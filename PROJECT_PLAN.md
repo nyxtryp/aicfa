@@ -4,11 +4,13 @@
 - `b182cf3`: added deterministic derivatives completeness/evidence bridge.
 - `0298f26`, `903ba73`, `8c69298`: connected derivatives collection and normalized evidence into live FindSetup while keeping injected test providers deterministic.
 - `476ec52`: added focused tests for schema normalization, completeness, causal alignment, missing-data behavior and Bybit normalization.
-- Live FindSetup now requests Funding + Open Interest + Liquidations + Mark Price when the knowledge requirement requires all four, computes existing `build_derivatives` analytics, and attaches a causal `derivatives.price_oi` observation. If the required derivatives source fails or is incomplete, the evidence path records explicit unavailable context instead of fabricating a setup.
+- `85f95cb`: fixed the live integration bug found by the first Scalping smoke. Funding and Open Interest were coming from independent endpoints with different timestamps, but the adapter previously combined them by exact timestamp; this produced rows with null funding/OI and caused `build_derivatives` to reject the live frame. The adapter now builds a causal common timeline: OI is carried forward from the latest known observation, funding is carried forward from the latest known observation, and the current mark price is retained at its own timestamp. No future values are backfilled.
+- `7db5cf6`: added a regression test proving funding/OI/mark alignment works when their source timestamps differ and that the resulting frame passes derivatives completeness.
+- Live FindSetup requests Funding + Open Interest + Liquidations + Mark Price when the knowledge requirement requires all four, computes existing `build_derivatives` analytics, and attaches a causal `derivatives.price_oi` observation. If the required derivatives source fails or is incomplete, the evidence path records explicit unavailable context instead of fabricating a setup.
 - Important implementation detail: Binance/Bybit liquidation data is collected from the public market liquidation websocket streams; REST `allForceOrders` is not treated as a valid current source.
 
 ### Verification state
-Code is committed, but the data block is **NOT GREEN yet** until FrostDeploy runs the focused tests and then full `pytest -q` successfully. Do not run the four live BTC mode smoke checks before that gate passes.
+Focused and full regression tests were previously green before the timestamp-alignment fix. The first live Scalping smoke exposed a real integration bug: `DERIVATIVES_PROVIDER: unavailable: funding_rate/open_interest must be numeric and non-null`, with zero derivative rows. This was caused by independent Funding/OI timestamps being merged without causal alignment. The fix is now committed and must be verified by focused tests, full `pytest -q`, then the four live BTC mode smoke checks again.
 
 ## 2026-10-02 — DATA PIPELINE COMPLETENESS BLOCK: REQUIRED BEFORE FOUR-MODE LIVE SMOKE
 
