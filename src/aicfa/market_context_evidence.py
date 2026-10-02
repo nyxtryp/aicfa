@@ -74,6 +74,7 @@ def append_market_context_evidence(
     """
     observations = list(evidence.observations)
     missing = list(evidence.missing_context)
+    optional_missing = list(evidence.optional_missing_context)
 
     if trades is None or trades.empty:
         missing.append("microstructure:trades:unavailable")
@@ -222,14 +223,14 @@ def append_market_context_evidence(
             missing.append(f"{timeframe}:wyckoff:unavailable")
 
     if derivatives is None or derivatives.empty:
-        missing.append("derivatives:liquidations:unavailable")
+        optional_missing.append("derivatives:liquidations:unavailable")
     else:
         row = _latest(derivatives)
         liquidation = _number(row.get("liquidation_volume"))
         long_liq = _number(row.get("long_liquidation_volume"))
         short_liq = _number(row.get("short_liquidation_volume"))
         if liquidation is None:
-            missing.append("derivatives:liquidations:volume_unavailable")
+            optional_missing.append("derivatives:liquidations:volume_unavailable")
         else:
             direction = (
                 "short" if long_liq is not None and short_liq is not None and long_liq > short_liq
@@ -259,4 +260,5 @@ def append_market_context_evidence(
         timeframes=evidence.timeframes,
         missing_context=tuple(dict.fromkeys(missing)),
         conflicts=evidence.conflicts,
+        optional_missing_context=tuple(dict.fromkeys(optional_missing)),
     )
