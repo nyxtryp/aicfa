@@ -108,3 +108,54 @@ The implementation must reuse the existing knowledge/SMC/evidence layers rather 
 
 If the chat is restarted, resume from this section. The active task is **mode-aware MTF analytical architecture**, not SetupLifecycle integration and not model training. Do not revert to the universal seven-timeframe FindSetup design.
 
+
+
+## 2026-10-02 — MTF MODE CONTRACT IMPLEMENTED: CODE CHECKPOINT
+
+Implemented the first production-code block of the authoritative MTF mode architecture.
+
+### Completed in code
+- Added explicit `TradingMode`: scalping, intraday, swing, position.
+- Added authoritative mode profiles:
+  - Scalping: 15m → 5m → 1m
+  - Intraday: 1d → 4h → 1h → 15m
+  - Swing: 1w → 1d → 4h → 1h
+  - Position: 1M → 1w → 1d → 4h
+- `FindSetupRequest` now carries a normalized trading mode; default is Intraday.
+- `default_setup_requirements(..., mode=...)` now returns only the selected mode's required timeframes.
+- FindSetup passes only the selected mode timeframes into adaptive analysis depth, data collection, feature analysis, evidence construction, and Setup Analysis.
+- Setup Analysis now receives the mode profile and derives context, structure, refinement and execution roles from that profile.
+- Direction authority now comes from the mode's structure timeframe; only the designated refinement timeframe may veto it. The final execution timeframe cannot override the higher-horizon direction.
+- Entry/invalidation/target discovery is restricted to the selected mode's timeframe set. The execution timeframe cannot manufacture structural setup zones, invalidation, or targets.
+- FindSetup result now exposes the selected mode.
+- Added calendar-month completion/cursor semantics for 1M.
+- Enabled 1M transport in Binance and mapped 1M to Bybit's monthly interval.
+- Added/updated regression tests for exact mode timeframe selection, Position exclusion of 1m, monthly candle semantics, and higher-horizon direction authority.
+
+### External transport note
+Binance's documented kline interval vocabulary includes `1M` as one-month candles; the previous AICFA restriction was an internal limitation, not a requirement of the exchange API. citeturn2search2
+
+### Commits
+- `4924fe85ea00bc6ca33917ae86d6046dddf5a272` — trading mode profiles
+- `46ff46c85678580debf0c16708d80b8e461a89c1` — FindSetup mode contract
+- `da90544f9545e17b502bfd1a4f50012f300feffa` — mode context in Setup Analysis
+- `bda625a7ea9ef68928b5518c2772497e608c22d5` — selected-mode context pipeline
+- `ce47e54b2664cd6c095d60519736470bd6be59dd` — mode-restricted setup levels
+- `1b7b0d5fb40d97c9a93b667f1466d2cbcb2efbcc` — calendar-month market data semantics
+- `fb33de276b0ebe09f547f5fb41ce0a815152dc55` — Binance 1M transport
+- `a4f4cb7beb0ef7de6cb23092dc449f40f7477cc1` — Bybit 1M transport
+- `cf9971298a665781b0e86e40b620154b20298321` — FindSetup mode regression tests
+- `582e9172f19b9440873b05b4e0984c51cd49a659` — requirement profile tests
+- `129b5080fa1c0c6c738a55f33e8b48b98c788780` — monthly market-data tests
+- `a240566af8a5974f5063b79c34230bae91c9ec43` — higher-horizon authority test
+
+### Verification status
+The code and tests have been committed to `main`, but the full pytest suite has **not yet been executed on the AICFA server in this checkpoint**. Do not call this block GREEN until server-side focused tests and full regression pass.
+
+### NEXT UNFINISHED
+1. Run focused tests on the server and fix any regressions.
+2. Run full pytest.
+3. Fix any remaining seven-TF assumptions uncovered by tests.
+4. Run live BTC FindSetup smoke for all four modes and inspect the actual returned timeframe set/roles.
+5. Complete the structured setup explanation: mode, scenario, per-TF role/result, setup TF, entry TF, Entry, Invalidation, TP1/TP2, RR, confirmation, rationale, invalidation conditions.
+6. Only after MTF mode architecture is GREEN continue to the next AICFA block.
