@@ -280,3 +280,25 @@ Required design:
 8. After implementation: focused tests → full `pytest -q` → live BTC four-mode smoke → record actual returned depths and decisions in this plan.
 
 Do not revert to the universal seven-timeframe model and do not require the user to select a trading mode.
+
+
+## 2026-10-02 — SMC ANALYSIS DEPTH IMPLEMENTED
+
+- Web research confirms there is **no canonical universal SMC candle count**. SMC/ICT analysis is hierarchical: higher timeframe establishes context/structure, intermediate timeframe identifies zones/structure, and lower timeframe refines/times execution. citeturn0search5turn0search1
+- Current implementation was therefore changed from the incorrect universal `60 rows per timeframe` rule to role-aware analysis history.
+- `e8e6b5fdadc091c1e2b7e2363f1ba0c47d6d01ab`: `analysis_depth.py` now uses these SMC analysis-history defaults by timeframe role:
+  - BROADER_CONTEXT: **120 candles**
+  - HIGHER_STRUCTURE: **180 candles**
+  - LOWER_CONFIRMATION: **240 candles**
+  - EXECUTION: **240 candles**
+- The existing feature dependency minimum remains **60 candles**, but it is now only a technical warm-up floor; it no longer determines the complete market-analysis depth.
+- `c6d14080a2a2c55ff0d192a215eaf899461fe652`: tests updated to assert the role-aware depth contract.
+- The selected depths remain below current Binance futures kline endpoint limits; Binance documents a maximum of 1500 records per kline request. citeturn1search0
+- This is an intentional engineering baseline rather than a claim that SMC itself mandates exactly 120/180/240. The system still retains adaptive expansion for recent-event/active-zone context when the current history is insufficient.
+
+### NEXT VERIFICATION GATE
+1. Deploy these commits to the AICFA server.
+2. Run the focused `tests/test_analysis_depth.py` suite.
+3. Run the full `pytest -q` regression.
+4. Run live BTC FindSetup for all four internal modes and inspect actual returned candle counts per timeframe.
+5. If the live result shows insufficient structure/zone context, tune the depth contract from observed evidence and tests rather than reverting to a universal candle count.
