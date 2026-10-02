@@ -59,6 +59,7 @@ def test_order_block_lifecycle_mitigation_invalidation_and_later_breaker():
     assert r.loc[2, "order_block_bullish"] == 1
     assert r.loc[2, "order_block_active"] == 1
     assert r.loc[3, "order_block_invalidated"] == 1
+    assert r.loc[3, "order_block_bullish_state"] == "INVALIDATED"
     assert r.loc[3, "breaker"] == 0
     assert r.loc[4, "breaker_bearish"] == 1
     assert r.loc[4, "breaker"] == 1
