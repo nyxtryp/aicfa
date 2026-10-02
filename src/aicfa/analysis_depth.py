@@ -77,6 +77,9 @@ def _dependency_minimum() -> int:
 
 def _role_depth(plan: DataRequirementPlan, timeframe: str) -> int:
     if plan.mode is None:
+        # Without a mode, timeframe-to-role mapping is ambiguous. Do not guess
+        # that a given timeframe is context/structure/execution; use the
+        # conservative depth. Live FindSetup requests always provide a mode.
         return max(_ROLE_DEPTH_ROWS.values())
     profile = plan.mode
     # Mode is normalized by DataRequirementPlan; required_timeframes and roles
