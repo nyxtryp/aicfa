@@ -17,6 +17,7 @@ from typing import Mapping
 import pandas as pd
 
 from aicfa.evidence_reasoning import EvidenceAssessment, EvidenceDecision
+from aicfa.data_requirements import TradingMode, mode_timeframe_profile, normalize_trading_mode
 from aicfa.knowledge_base import get_knowledge
 from aicfa.market_evidence import MarketObservation
 from aicfa.scenario_reasoning import ScenarioAssessment, ScenarioHypothesis
@@ -64,12 +65,17 @@ class SetupLevel:
 @dataclass(frozen=True)
 class MultiTimeframeContext:
     timeframes: tuple[str, ...]
+    mode: TradingMode
     latest_rows: Mapping[str, pd.Series]
     observations: tuple[MarketObservation, ...]
     missing_timeframes: tuple[str, ...] = ()
     structure_direction: str | None = None
     structure_timeframe: str | None = None
     confirmation_directions: tuple[str, ...] = ()
+    context_timeframe: str = ""
+    structure_timeframe: str = ""
+    refinement_timeframe: str | None = None
+    execution_timeframe: str = ""
 
 
 @dataclass(frozen=True)
