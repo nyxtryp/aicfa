@@ -136,6 +136,18 @@ def build_features(
                     "order_block_bullish_volume_confirmed","order_block_bearish_volume_confirmed"]:
         out[column]=order_blocks[column].to_numpy()
 
+    from .zone_reaction import build_zone_reaction
+    zone_reaction = build_zone_reaction(
+        x,
+        structure=structure,
+        fvg=fvg,
+        order_blocks=order_blocks,
+        liquidity=liquidity,
+    )
+    for column in zone_reaction.columns:
+        if column.startswith("zone_"):
+            out[column] = zone_reaction[column].to_numpy()
+
     from .price_action import build_price_action
     price_action = build_price_action(x)
     for column in price_action.columns:
