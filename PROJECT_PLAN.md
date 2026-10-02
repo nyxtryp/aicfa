@@ -157,3 +157,15 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - These are file-format/serialization fixes only; the optional-liquidation architecture is unchanged.
 - Server verification is still required; no test result is marked GREEN from these commits until the user reruns the focused test.
 - Next step: rerun `tests/test_optional_liquidations.py`. If it passes, run full `pytest -q`; then update this plan with the actual result before the live Scalping smoke.
+
+
+## 2026-10-02 — OPTIONAL LIQUIDATION TEST FAILURE / FIX
+
+- Server focused test result: `tests/test_optional_liquidations.py` → **1 passed, 1 failed, 2 warnings in 0.64s**.
+- Failure: `test_liquidations_participate_when_available` asserted that `derivatives.liquidations` was present in assessed observations, but `append_derivatives_evidence()` only exposed the core `derivatives.price_oi` observation.
+- Root cause: available liquidation data was treated as optional for completeness, but the derivatives evidence bridge did not yet materialize it as a separate causal `MarketObservation`.
+- `3e6bd73bd6d2674b720e074887078099af120ccf`: fixed `src/aicfa/derivatives_evidence.py` so available liquidation volume (+ long/short split when present) creates `derivatives.liquidations` evidence and direction is derived only from the observed split.
+- Architectural rule unchanged: liquidation data is optional confirmation/context; its absence remains non-blocking and is never fabricated.
+- The two pytest cache PermissionDenied warnings are non-blocking infrastructure warnings in the release directory.
+- Server verification is still required; this fix is **NOT GREEN** until the focused test is rerun.
+- Next step: rerun `tests/test_optional_liquidations.py`. If **2 passed**, run full `pytest -q`; then update this plan with the actual result before the live Scalping smoke.
