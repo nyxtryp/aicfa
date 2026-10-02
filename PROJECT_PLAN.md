@@ -130,3 +130,13 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - No setup was fabricated; scenario hypotheses were correctly withheld because required context was missing.
 - This smoke is **NOT GREEN**. Do not proceed to Intraday/Swing/Position until liquidation data is actually available and the Scalping smoke is re-run successfully.
 - Next step: inspect/fix the live Binance liquidation stream/collection path so `liquidation_volume` is populated causally, add/adjust regression coverage if needed, run focused + full pytest, then rerun the Scalping smoke with a compact output command.
+
+
+## 2026-10-02 — OPTIONAL LIQUIDATION CONTEXT FIX
+
+- `b22d8ba`: MarketEvidence now distinguishes blocking `missing_context` from non-blocking `optional_missing_context`.
+- `e3d1a36`, `323a1d4`: derivatives evidence now requires only core positioning state (Funding, Open Interest, Mark Price); liquidation volume is optional event context and is never fabricated.
+- `cb24cf4`: live market-context bridge records unavailable liquidation data as optional context instead of blocking evidence/scenario reasoning.
+- `0243589`: added regression tests proving missing liquidation data still allows core derivatives evidence/scenario reasoning, while available liquidation data becomes causal reversal evidence.
+- Architectural rule restored: AICFA analyzes the chart/market first. Liquidations are an additional confirmation layer, not a mandatory prerequisite for a setup.
+- Next step: run focused liquidation/evidence tests, then full `pytest -q`. Only after GREEN rerun the live BTC Scalping smoke.
