@@ -533,3 +533,12 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - Focused test added to `tests/test_liquidity.py` proving sweep → later reaction is causal.
 - **Server verification: PENDING.** These commits are on `main`, but no server test has been run after the Task 3 change yet.
 - **NEXT:** run `tests/test_liquidity.py` on the AICFA server. If green, run the full `pytest -q` regression and record the actual result before closing Task 3.
+
+
+## 2026-10-03 — TASK 3 LIQUIDITY LIFECYCLE: FOCUSED TEST GATE GREEN
+
+- Server verification reported by user: `tests/test_liquidity.py` → **8 passed in 0.58s**.
+- Result: Task 3 Liquidity Lifecycle focused test gate is **GREEN**. The focused liquidity tests pass with the new causal post-sweep reaction fields.
+- Full regression has **not** yet been run after the Task 3 implementation.
+- Current implementation commits: `9accf9179e946285825c0dd2f6e988f7aa5c806b` (causal liquidity reaction lifecycle) and `9813326cadc36a105d7172abb0b267a67e741bca` (feature-pipeline integration).
+- **NEXT:** run the complete `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q`. Record the actual result before closing Task 3 or starting Task 4.
