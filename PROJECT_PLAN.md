@@ -22,22 +22,23 @@
 ### Verification status
 - Server focused FVG regression: **9 passed in 0.52s**.
 - The focused failure was caused by lifecycle aggregation when a new active FVG appeared while an older FVG had already been touched; production logic was corrected in b3f7a9cc6bbf8aaa7f6c8602bd942e7f0e3a51dd.
-- Task 5 is **not GREEN yet** because the full server regression has not been run after the fix.
+- Full server regression after the FVG aggregation fix: **379 passed in 47.04s**.
+- Task 5 — FVG / Imbalance Lifecycle is **GREEN**.
 
 ### Current task
-Task 5 — FVG / Imbalance Lifecycle
+Task 6 — Zone Reaction + Support/Resistance
 
 ### Immediate next step
-1. Run the full server regression.
-2. Record the actual result here.
-3. If full regression is GREEN, close Task 5 and proceed to Task 6 — Zone Reaction + Support/Resistance.
+1. Audit the current zone-reaction and support/resistance implementation.
+2. Define the missing causal lifecycle: level/zone → distance → touch → reaction → retest/break → confirmation/cancellation.
+3. Add focused tests before changing production logic.
 
 ## Authoritative SMC integration sequence
 1. Confirmed Swing — GREEN.
 2. Causal BOS / CHoCH / MSS — GREEN.
 3. Liquidity Lifecycle — GREEN.
 4. Order Block Lifecycle — GREEN.
-5. FVG / Imbalance Lifecycle — ACTIVE.
+5. FVG / Imbalance Lifecycle — GREEN.
 6. Zone Reaction + Support/Resistance — NEXT.
 7. Volume Evidence.
 8. Structural Entry / SL / TP.
