@@ -143,6 +143,9 @@ def build_zone_reaction(
         if len(frame) != n:
             raise ValueError(f"{name} length must match input")
 
+    # Keep the hot loop entirely on NumPy arrays. Scalar pandas .at/.iloc
+    # operations are disproportionately expensive on the 10k-row integration
+    # path; assemble the DataFrame once after the causal loop finishes.
     out = x.copy()
     binary = [
         "zone_created_support", "zone_created_resistance",
@@ -154,21 +157,30 @@ def build_zone_reaction(
         "zone_created_fvg", "zone_created_order_block",
         "zone_created_liquidity",
     ]
-    for column in binary:
-        out[column] = 0
-
     numeric = [
         "zone_support_price", "zone_resistance_price",
         "zone_distance_to_support", "zone_distance_to_resistance",
         "zone_source_count",
     ]
-    for column in numeric:
-        out[column] = np.nan
+    result_binary = {column: np.zeros(n, dtype=np.int8) for column in binary}
+    result_numeric = {column: np.full(n, np.nan, dtype=float) for column in numeric}
+    result_state = {
+        "zone_support_state": np.full(n, ZONE_UNTOUCHED, dtype=object),
+        "zone_resistance_state": np.full(n, ZONE_UNTOUCHED, dtype=object),
+    }
+    result_active = {
+        "zone_active_support": np.zeros(n, dtype=np.int8),
+        "zone_active_resistance": np.zeros(n, dtype=np.int8),
+    }
 
-    out["zone_support_state"] = ZONE_UNTOUCHED
-    out["zone_resistance_state"] = ZONE_UNTOUCHED
-    out["zone_active_support"] = 0
-    out["zone_active_resistance"] = 0
+    highs = x["high"].to_numpy(dtype=float, copy=False)
+    lows = x["low"].to_numpy(dtype=float, copy=False)
+    closes = x["close"].to_numpy(dtype=float, copy=False)
+
+    def _column_array(frame: pd.DataFrame | None, column: str, default):
+        if frame is None or column not in frame.columns:
+            return np.full(n, default)
+        return frame[column].to_numpy(copy=False)
 
     # Store zone state in fixed NumPy-backed arrays.  Lifecycle queries are
     # spatially indexed by logarithmic price buckets instead of scanning all
@@ -271,6 +283,33 @@ def build_zone_reaction(
         ("order_block", "order_block_bearish", "order_block_bearish_low", "order_block_bearish_high", "resistance"),
     )
 
+    structure_arrays = {
+        "swing_high": _column_array(structure, "swing_high", 0),
+        "swing_high_price": _column_array(structure, "swing_high_price", np.nan),
+        "swing_low": _column_array(structure, "swing_low", 0),
+        "swing_low_price": _column_array(structure, "swing_low_price", np.nan),
+    }
+    fvg_arrays = {
+        "fvg_bullish": _column_array(fvg, "fvg_bullish", 0),
+        "fvg_bullish_low": _column_array(fvg, "fvg_bullish_low", np.nan),
+        "fvg_bullish_high": _column_array(fvg, "fvg_bullish_high", np.nan),
+        "fvg_bearish": _column_array(fvg, "fvg_bearish", 0),
+        "fvg_bearish_low": _column_array(fvg, "fvg_bearish_low", np.nan),
+        "fvg_bearish_high": _column_array(fvg, "fvg_bearish_high", np.nan),
+    }
+    order_block_arrays = {
+        "order_block_bullish": _column_array(order_blocks, "order_block_bullish", 0),
+        "order_block_bullish_low": _column_array(order_blocks, "order_block_bullish_low", np.nan),
+        "order_block_bullish_high": _column_array(order_blocks, "order_block_bullish_high", np.nan),
+        "order_block_bearish": _column_array(order_blocks, "order_block_bearish", 0),
+        "order_block_bearish_low": _column_array(order_blocks, "order_block_bearish_low", np.nan),
+        "order_block_bearish_high": _column_array(order_blocks, "order_block_bearish_high", np.nan),
+    }
+    liquidity_arrays = {
+        "liquidity_pool_created_low": _column_array(liquidity, "liquidity_pool_created_low", np.nan),
+        "liquidity_pool_created_high": _column_array(liquidity, "liquidity_pool_created_high", np.nan),
+    }
+
     def _active_level(levels, close: float):
         if not levels:
             return None
@@ -297,51 +336,46 @@ def build_zone_reaction(
         created_count = 0
 
         if structure is not None:
-            s = structure.iloc[i]
-            if int(_value(s, "swing_high", 0) or 0) == 1:
-                price = _value(s, "swing_high_price")
+            if int(structure_arrays["swing_high"][i] or 0) == 1:
+                price = float(structure_arrays["swing_high_price"][i])
                 if _append_zone(source="resistance", side="resistance", low=price, high=price, created=i):
-                    out.at[i, "zone_created_resistance"] = 1
-                    out.at[i, "zone_resistance_price"] = price
+                    result_binary["zone_created_resistance"][i] = 1
+                    result_numeric["zone_resistance_price"][i] = price
                     created_count += 1
-            if int(_value(s, "swing_low", 0) or 0) == 1:
-                price = _value(s, "swing_low_price")
+            if int(structure_arrays["swing_low"][i] or 0) == 1:
+                price = float(structure_arrays["swing_low_price"][i])
                 if _append_zone(source="support", side="support", low=price, high=price, created=i):
-                    out.at[i, "zone_created_support"] = 1
-                    out.at[i, "zone_support_price"] = price
+                    result_binary["zone_created_support"][i] = 1
+                    result_numeric["zone_support_price"][i] = price
                     created_count += 1
 
         for source, flag, low_col, high_col, side in source_specs:
-            frame = frames.get("fvg" if source == "fvg" else "order_blocks")
-            if frame is None:
+            arrays = fvg_arrays if source == "fvg" else order_block_arrays
+            if int(arrays[flag][i] or 0) != 1:
                 continue
-            row = frame.iloc[i]
-            if int(_value(row, flag, 0) or 0) != 1:
-                continue
-            lo, hi = _value(row, low_col), _value(row, high_col)
+            lo, hi = float(arrays[low_col][i]), float(arrays[high_col][i])
             if _append_zone(source=source, side=side, low=lo, high=hi, created=i):
-                out.at[i, "zone_created_fvg" if source == "fvg" else "zone_created_order_block"] += 1
+                result_binary["zone_created_fvg" if source == "fvg" else "zone_created_order_block"][i] += 1
                 created_count += 1
 
         if liquidity is not None:
-            row = liquidity.iloc[i]
             for col, side in (
                 ("liquidity_pool_created_low", "support"),
                 ("liquidity_pool_created_high", "resistance"),
             ):
-                price = _value(row, col)
+                price = float(liquidity_arrays[col][i])
                 if np.isfinite(price):
                     _append_zone(source="liquidity", side=side, low=price, high=price, created=i)
-                    out.at[i, "zone_created_liquidity"] += 1
+                    result_binary["zone_created_liquidity"][i] += 1
                     created_count += 1
 
-        out.at[i, "zone_source_count"] = created_count
+        result_numeric["zone_source_count"][i] = created_count
         if zone_count == 0:
             continue
 
-        h = float(x["high"].iloc[i])
-        l = float(x["low"].iloc[i])
-        close = float(x["close"].iloc[i])
+        h = highs[i]
+        l = lows[i]
+        close = closes[i]
 
         # Breaks are only possible after retest.  Use the retest heaps so a
         # large candle can break distant zones without a global zone scan.
@@ -420,22 +454,22 @@ def build_zone_reaction(
                     if zone_state[zone_id] != STATE_CODE[ZONE_BROKEN]:
                         zone_state[zone_id] = STATE_CODE[ZONE_BROKEN]
                         _remove_level(support_levels if zone_side[zone_id] == 1 else resistance_levels, zone_id)
-                out.at[i, "zone_break_support"] |= int(np.any(zone_side[break_idx] == 1))
-                out.at[i, "zone_break_resistance"] |= int(np.any(zone_side[break_idx] == -1))
+                result_binary["zone_break_support"][i] |= int(np.any(zone_side[break_idx] == 1))
+                result_binary["zone_break_resistance"][i] |= int(np.any(zone_side[break_idx] == -1))
 
             if touch_mask.any():
                 touch_idx = idx[touch_mask]
                 zone_touched[touch_idx] = True
                 zone_state[touch_idx] = STATE_CODE[ZONE_TOUCHED]
-                out.at[i, "zone_touch_support"] |= int(np.any(zone_side[touch_idx] == 1))
-                out.at[i, "zone_touch_resistance"] |= int(np.any(zone_side[touch_idx] == -1))
+                result_binary["zone_touch_support"][i] |= int(np.any(zone_side[touch_idx] == 1))
+                result_binary["zone_touch_resistance"][i] |= int(np.any(zone_side[touch_idx] == -1))
 
             if reaction_mask.any():
                 reaction_idx = idx[reaction_mask]
                 zone_reacted[reaction_idx] = True
                 zone_state[reaction_idx] = STATE_CODE[ZONE_REACTED]
-                out.at[i, "zone_reaction_support"] |= int(np.any(zone_side[reaction_idx] == 1))
-                out.at[i, "zone_reaction_resistance"] |= int(np.any(zone_side[reaction_idx] == -1))
+                result_binary["zone_reaction_support"][i] |= int(np.any(zone_side[reaction_idx] == 1))
+                result_binary["zone_reaction_resistance"][i] |= int(np.any(zone_side[reaction_idx] == -1))
 
             if retest_mask.any():
                 retest_idx = idx[retest_mask]
@@ -447,31 +481,39 @@ def build_zone_reaction(
                         heapq.heappush(support_break_heap, (-float(zone_low[zone_id]), zone_id))
                     else:
                         heapq.heappush(resistance_break_heap, (float(zone_high[zone_id]), zone_id))
-                out.at[i, "zone_retest_support"] |= int(np.any(zone_side[retest_idx] == 1))
-                out.at[i, "zone_retest_resistance"] |= int(np.any(zone_side[retest_idx] == -1))
+                result_binary["zone_retest_support"][i] |= int(np.any(zone_side[retest_idx] == 1))
+                result_binary["zone_retest_resistance"][i] |= int(np.any(zone_side[retest_idx] == -1))
 
         best_support = _active_level(support_levels, close)
         best_resistance = _active_level(resistance_levels, close)
         if best_support is not None:
             zone_id, level, distance = best_support
-            out.at[i, "zone_support_price"] = level
-            out.at[i, "zone_distance_to_support"] = distance / max(abs(close), 1e-12)
-            out.at[i, "zone_support_state"] = STATE_NAME[zone_state[zone_id]]
-            out.at[i, "zone_active_support"] = 1
+            result_numeric["zone_support_price"][i] = level
+            result_numeric["zone_distance_to_support"][i] = distance / max(abs(close), 1e-12)
+            result_state["zone_support_state"][i] = STATE_NAME[zone_state[zone_id]]
+            result_active["zone_active_support"][i] = 1
         if best_resistance is not None:
             zone_id, level, distance = best_resistance
-            out.at[i, "zone_resistance_price"] = level
-            out.at[i, "zone_distance_to_resistance"] = distance / max(abs(close), 1e-12)
-            out.at[i, "zone_resistance_state"] = STATE_NAME[zone_state[zone_id]]
-            out.at[i, "zone_active_resistance"] = 1
+            result_numeric["zone_resistance_price"][i] = level
+            result_numeric["zone_distance_to_resistance"][i] = distance / max(abs(close), 1e-12)
+            result_state["zone_resistance_state"][i] = STATE_NAME[zone_state[zone_id]]
+            result_active["zone_active_resistance"][i] = 1
 
         if break_support:
-            out.at[i, "zone_break_support"] = 1
-            out.at[i, "zone_support_state"] = ZONE_BROKEN
-            out.at[i, "zone_active_support"] = 0
+            result_binary["zone_break_support"][i] = 1
+            result_state["zone_support_state"][i] = ZONE_BROKEN
+            result_active["zone_active_support"][i] = 0
         if break_resistance:
             out.at[i, "zone_break_resistance"] = 1
-            out.at[i, "zone_resistance_state"] = ZONE_BROKEN
-            out.at[i, "zone_active_resistance"] = 0
+            result_state["zone_resistance_state"][i] = ZONE_BROKEN
+            result_active["zone_active_resistance"][i] = 0
 
+    for column, values in result_binary.items():
+        out[column] = values
+    for column, values in result_numeric.items():
+        out[column] = values
+    for column, values in result_state.items():
+        out[column] = values
+    for column, values in result_active.items():
+        out[column] = values
     return out
