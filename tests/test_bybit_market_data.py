@@ -95,16 +95,22 @@ def test_bybit_maps_kline_to_common_ohlcv_contract():
     assert frame.iloc[0].tolist() == ["1700000000000", "100", "105", "99", "103", "123.4"]
 
 
-def test_bybit_rejects_unsupported_timeframe():
-    provider = BybitMarketDataProvider()
-    with pytest.raises(ValueError, match="Unsupported Bybit timeframe"):
-        provider.fetch_ohlcv(
-            symbol="BTCUSDT",
-            market_type="spot",
-            timeframe="1M",
-            since_ms=None,
-            limit=1,
-        )
+def test_bybit_accepts_monthly_timeframe_transport():
+    provider = BybitMarketDataProvider(
+        opener=lambda request, timeout: JsonResponse({
+            "retCode": 0,
+            "retMsg": "OK",
+            "result": {"list": [["1700000000000", "100", "105", "99", "103", "123.4", "0"]]},
+        })
+    )
+    frame = provider.fetch_ohlcv(
+        symbol="BTCUSDT",
+        market_type="spot",
+        timeframe="1M",
+        since_ms=None,
+        limit=1,
+    )
+    assert len(frame) == 1
 
 
 def test_bybit_api_rate_limit_is_retryable():
