@@ -55,6 +55,12 @@ def _swing_layer(
     }
     result["swing_high_price"] = np.full(n, np.nan)
     result["swing_low_price"] = np.full(n, np.nan)
+    # Explicit causal availability metadata. The pivot is at the pivot index,
+    # but it is not usable until the confirmation index.
+    result["swing_high_pivot_index"] = np.full(n, -1, dtype="int64")
+    result["swing_low_pivot_index"] = np.full(n, -1, dtype="int64")
+    result["swing_high_confirmation_index"] = np.full(n, -1, dtype="int64")
+    result["swing_low_confirmation_index"] = np.full(n, -1, dtype="int64")
     result["structure_direction"] = np.zeros(n, dtype="int8")
 
     last_high: float | None = None
@@ -79,6 +85,8 @@ def _swing_layer(
         if is_high:
             result["swing_high"][confirmation] = 1
             result["swing_high_price"][confirmation] = highs[pivot]
+            result["swing_high_pivot_index"][confirmation] = pivot
+            result["swing_high_confirmation_index"][confirmation] = confirmation
             if last_high is not None:
                 if highs[pivot] > last_high * (1 + equal_tolerance):
                     result["hh"][confirmation] = 1
@@ -89,6 +97,8 @@ def _swing_layer(
         if is_low:
             result["swing_low"][confirmation] = 1
             result["swing_low_price"][confirmation] = lows[pivot]
+            result["swing_low_pivot_index"][confirmation] = pivot
+            result["swing_low_confirmation_index"][confirmation] = confirmation
             if last_low is not None:
                 if lows[pivot] > last_low * (1 + equal_tolerance):
                     result["hl"][confirmation] = 1
@@ -241,5 +251,20 @@ def build_structure(
             out.at[row, "protected_low_price"] = protected_low
         out.at[row, "protected_high_active"] = int(protected_high_active)
         out.at[row, "protected_low_active"] = int(protected_low_active)
+
+    # Preserve both sides of the causal contract: pivot time is descriptive,
+    # confirmation time is the first time downstream logic may use the swing.
+    timestamps = x["timestamp"].to_numpy()
+    for side in ("high", "low"):
+        pivot_index = out[f"swing_{side}_pivot_index"].to_numpy()
+        confirmation_index = out[f"swing_{side}_confirmation_index"].to_numpy()
+        pivot_ts = np.full(n, np.nan)
+        confirmation_ts = np.full(n, np.nan)
+        known = pivot_index >= 0
+        pivot_ts[known] = timestamps[pivot_index[known]]
+        known_confirmation = confirmation_index >= 0
+        confirmation_ts[known_confirmation] = timestamps[confirmation_index[known_confirmation]]
+        out[f"swing_{side}_pivot_timestamp"] = pivot_ts
+        out[f"swing_{side}_confirmation_timestamp"] = confirmation_ts
 
     return out
