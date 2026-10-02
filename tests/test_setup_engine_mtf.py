@@ -376,8 +376,17 @@ def test_setup_engine_can_return_second_distinct_target_after_primary_draw():
 
 def test_setup_engine_reports_rejected_rr_geometry():
     frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
-    frames["4h"].loc[0, "active_buy_liquidity_price"] = 104.0
-    frames["4h"].loc[0, "smc_sweep_low_level"] = 100.0
+    # Keep this fixture's target geometry deterministic across all TFs.
+    # Other frames normally carry active liquidity at 130, which can make
+    # the candidate pass RR even when the 4h liquidity is too close.
+    for frame in frames.values():
+        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
+        frame.loc[0, "liquidity_breakout_high"] = float("nan")
+        frame.loc[0, "previous_high"] = float("nan")
+        frame.loc[0, "internal_previous_high"] = float("nan")
+        frame.loc[0, "rolling_high_60"] = float("nan")
+    frames["4h"].loc[0, "active_buy_liquidity_price"] = 106.0
+    frames["4h"].loc[0, "smc_sweep_low_level"] = 99.0
 
     result = _pipeline(frames)
 
