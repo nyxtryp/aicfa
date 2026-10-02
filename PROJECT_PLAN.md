@@ -1,3 +1,15 @@
+### Implementation progress — derivatives integration
+- `64160be`: added normalized derivatives adapter path for Binance/Bybit.
+- `cbc408e`: switched liquidation collection to the public Binance/Bybit market liquidation streams; no fabricated liquidation values.
+- `b182cf3`: added deterministic derivatives completeness/evidence bridge.
+- `0298f26`, `903ba73`, `8c69298`: connected derivatives collection and normalized evidence into live FindSetup while keeping injected test providers deterministic.
+- `476ec52`: added focused tests for schema normalization, completeness, causal alignment, missing-data behavior and Bybit normalization.
+- Live FindSetup now requests Funding + Open Interest + Liquidations + Mark Price when the knowledge requirement requires all four, computes existing `build_derivatives` analytics, and attaches a causal `derivatives.price_oi` observation. If the required derivatives source fails or is incomplete, the evidence path records explicit unavailable context instead of fabricating a setup.
+- Important implementation detail: Binance/Bybit liquidation data is collected from the public market liquidation websocket streams; REST `allForceOrders` is not treated as a valid current source.
+
+### Verification state
+Code is committed, but the data block is **NOT GREEN yet** until FrostDeploy runs the focused tests and then full `pytest -q` successfully. Do not run the four live BTC mode smoke checks before that gate passes.
+
 ## 2026-10-02 — DATA PIPELINE COMPLETENESS BLOCK: REQUIRED BEFORE FOUR-MODE LIVE SMOKE
 
 ### User-confirmed execution order
