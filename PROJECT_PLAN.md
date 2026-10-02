@@ -317,3 +317,16 @@ Do not revert to the universal seven-timeframe model and do not require the user
 - `6fa2a72a901ffc37427b371201d8de052d3c0d6b`: documented the intentional conservative fallback in `analysis_depth.py`. No production depth behavior was loosened to make the test pass.
 - **Verification status: PENDING.** These commits have been pushed to `main`; the server must deploy them before focused and full regression tests can confirm the fix.
 - Next step: run `tests/test_analysis_depth.py` on the deployed release. If green, run the full suite. Do not claim the tests are green until the server returns the result.
+
+
+## 2026-10-02 — FULL REGRESSION: STALE FINDSETUP DEPTH TESTS
+
+- Server full regression result reported by user: **3 failed, 368 passed, 15880 warnings in 45.06s**.
+- All three failures were stale test expectations from the old universal 60/120/240 dependency-depth contract:
+  - test_find_setup_uses_dependency_depth_when_no_diagnostic_limit_is_given
+  - test_find_setup_expands_missing_context_until_provider_boundary
+  - test_find_setup_stops_expansion_when_context_signature_stalls
+- Production FindSetup is already using the new role-aware mode depth. Its default Intraday request starts at **1d=120, 4h=180, 1h=240, 15m=240**. Adaptive missing-context expansion may then double only unresolved timeframes, so values can exceed the baseline 240 when additional history is requested.
+- a47c35437d012187b978d208393453d4ec3ec90a: updated these tests to assert the actual role-aware initial depths and deterministic adaptive expansion behavior. No production analysis-depth logic was changed.
+- **Server verification is PENDING.** The test fix is committed but has not yet been executed on the deployed release.
+- Next step: deploy/update the current release from main and rerun the full pytest -q. Only after the full suite is green should live depth validation continue.
