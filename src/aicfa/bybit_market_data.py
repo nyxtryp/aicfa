@@ -24,6 +24,7 @@ _BYBIT_INTERVALS = {
     "4h": "240",
     "1d": "D",
     "1w": "W",
+    "1M": "M",
 }
 _BASE_URL = "https://api.bybit.com/v5/market"
 _OHLCV_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
