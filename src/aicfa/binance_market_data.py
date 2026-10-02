@@ -135,8 +135,6 @@ class BinanceMarketDataProvider:
     def fetch_ohlcv(self, *, symbol: str, market_type: str, timeframe: str, since_ms: int | None, limit: int) -> pd.DataFrame:
         if timeframe not in _BINANCE_INTERVALS:
             raise ValueError(f"Unsupported Binance timeframe: {timeframe}")
-        if timeframe == "1M":
-            raise ValueError("1M requires provider-specific scanner semantics")
         if since_ms is not None and int(since_ms) < 0:
             raise ValueError("since_ms must be non-negative")
 
