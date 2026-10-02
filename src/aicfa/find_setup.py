@@ -15,7 +15,7 @@ import pandas as pd
 from .binance_market_data import BinanceMarketDataProvider
 from .bybit_market_data import BybitMarketDataProvider
 from .analysis_depth import resolve_analysis_depth
-from .data_requirements import default_setup_requirements
+from .data_requirements import TradingMode, default_setup_requirements, mode_timeframe_profile, normalize_trading_mode
 from .decision import decide
 from .evidence_reasoning import assess_market_evidence
 from .features import build_features
@@ -38,12 +38,14 @@ class FindSetupRequest:
 
     asset: str
     market_type: str = "spot"
+    mode: TradingMode | str = TradingMode.INTRADAY
 
     def __post_init__(self) -> None:
         if not self.asset.strip():
             raise ValueError("asset must not be empty")
         if self.market_type not in {"spot", "futures"}:
             raise ValueError("market_type must be spot or futures")
+        object.__setattr__(self, "mode", normalize_trading_mode(self.mode))
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,7 @@ class FindSetupResult:
     """Complete deterministic result for one requested asset."""
 
     request: FindSetupRequest
+    mode: TradingMode
     symbol: str
     timeframes: tuple[str, ...]
     frames: dict[str, pd.DataFrame]
@@ -236,7 +239,8 @@ def find_setup(
         )
     symbol = normalize_asset(resolver(request.asset, request.market_type))
 
-    requirements = default_setup_requirements(symbol)
+    profile = mode_timeframe_profile(request.mode)
+    requirements = default_setup_requirements(symbol, mode=request.mode)
     timeframes = requirements.required_timeframes
     if not timeframes:
         raise ValueError("knowledge requirements produced no timeframes")
@@ -250,9 +254,12 @@ def find_setup(
         timeframes=timeframes, limits=limits,
     )
 
-    base = completed_ohlcv(frames["1m"], timeframe="1m", now_ms=now_ms)
+    execution_timeframe = profile.execution_timeframe
+    base = completed_ohlcv(
+        frames[execution_timeframe], timeframe=execution_timeframe, now_ms=now_ms
+    )
     if base.empty:
-        raise ValueError("no completed 1m candle available for decision")
+        raise ValueError(f"no completed {execution_timeframe} candle available for decision")
 
     completed_frames: dict[str, pd.DataFrame] = {}
     analyses: dict[str, pd.DataFrame] = {}
@@ -265,9 +272,9 @@ def find_setup(
         if not timeframe_analysis.empty:
             analyses[timeframe] = timeframe_analysis
 
-    base_analysis = analyses.get("1m")
+    base_analysis = analyses.get(execution_timeframe)
     if base_analysis is None:
-        raise ValueError("AICFA analysis produced no completed 1m rows")
+        raise ValueError(f"AICFA analysis produced no completed {execution_timeframe} rows")
     analysis = base_analysis
 
     market_evidence = build_market_evidence_from_frames(
@@ -287,9 +294,9 @@ def find_setup(
             now_ms=now_ms,
             analyses=analyses,
         )
-        base_analysis = analyses.get("1m")
+        base_analysis = analyses.get(execution_timeframe)
         if base_analysis is None:
-            raise ValueError("AICFA analysis produced no completed 1m rows")
+            raise ValueError(f"AICFA analysis produced no completed {execution_timeframe} rows")
         analysis = base_analysis
         market_evidence = build_market_evidence_from_frames(
             analyses, asset=symbol, timeframes=timeframes,
@@ -409,6 +416,7 @@ def find_setup(
         observations=evidence_assessment.observations,
         analyses=analyses,
         timeframes=timeframes,
+        mode=request.mode,
     )
     decision_assessment = decide(
         setup_assessment,
@@ -417,6 +425,7 @@ def find_setup(
 
     return FindSetupResult(
         request=request,
+        mode=request.mode,
         symbol=symbol,
         timeframes=timeframes,
         frames=frames,
