@@ -220,3 +220,16 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - The remaining warning is a non-blocking PytestCacheWarning: the service user cannot create pytest cache files inside the immutable release directory.
 - Focused verification is GREEN. This confirms the test expectations now match the chart-native scenario architecture and optional auxiliary-feed contract.
 - Next step: run full server regression `PYTHONPATH=src .venv/bin/python -m pytest -q`. Do not run live BTC smoke until the full regression result is green.
+
+
+## 2026-10-02 — FULL REGRESSION FAILURES: TEST CONTRACT ALIGNMENT
+
+- Server full regression result: **4 failed, 366 passed, 15867 warnings in 45.96s**.
+- The four failures were stale tests still asserting the previous universal-microstructure behavior, which conflicts with the intended chart-native default contract:
+  - `test_setup_requirements_are_knowledge_driven` expected TRADES and ORDER_BOOK in the default requirements, although these feeds must be requested only by explicit knowledge concepts.
+  - Two FindSetup tests expected default trade/order-book/history/absorption collection and then referenced counters that were never created because the feeds were correctly not requested.
+  - The CVD test expected default trade-derived CVD even though no explicit TRADES requirement was active.
+- Updated tests only; production behavior was not weakened and optional feeds were not reintroduced into the default path.
+- Test commits: `f82ab306814c05c15f95a1276cd1bbbf3974f061` (default requirement expectations) and `003834ebddcd4e4ac638a51b2cdeae3f1b2f1649` (FindSetup optional-feed expectations).
+- Server has NOT yet verified these test changes. Do not mark the regression gate GREEN and do not run live BTC smoke until the full suite passes.
+- Next step: deploy/update the current release from `main`, rerun `PYTHONPATH=src .venv/bin/python -m pytest -q`, and inspect any remaining failures before live validation.
