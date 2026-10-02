@@ -188,3 +188,19 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - This is the intended architecture: **do not fetch or retain data just because an exchange exposes it; use a datum only when it has a defined analytical role for the active hypothesis.**
 - Current state: code changes are committed, but **server verification is NOT GREEN yet**.
 - Next step: run the focused affected tests and then full `pytest -q`. If green, run the live BTC Scalping smoke and confirm that unavailable derivatives/microstructure feeds no longer force WAIT when the core chart/SMC evidence is sufficient.
+
+
+## 2026-10-02 — FOCUSED TESTS ALIGNED WITH CHART-NATIVE ARCHITECTURE
+
+- Server focused result after the data-requirement correction: **2 failed, 7 passed, 2 warnings in 0.83s**.
+- The two failures were stale expectations in tests, not evidence that auxiliary feeds must become mandatory:
+  - `test_market_context_layers_become_causal_evidence` expected optional microstructure/context/liquidation observations to independently create continuation/reversal/range hypotheses.
+  - `test_liquidations_participate_when_available` expected liquidation evidence by itself to create a reversal hypothesis.
+- Architectural rule confirmed: optional feeds may become causal observations and confirmations, but **scenario hypotheses require their defined chart/SMC support path**. Liquidations do not manufacture a reversal; microstructure does not manufacture continuation/range.
+- `ca57c616d72feb5eb93e4e226a850f2c4f893e1b`: aligned `test_market_context_evidence.py` with chart-native scenario support. The test still verifies all supplied optional layers become observations, but now verifies they do not independently manufacture scenarios.
+- `248f9de86dd84fbeddde4b0a755137b56972752d`: aligned `test_optional_liquidations.py` so available liquidations are verified as causal `derivatives.liquidations` evidence while remaining optional confirmation; reversal still requires chart/SMC reversal evidence.
+- The two PytestCacheWarning PermissionDenied warnings remain non-blocking release-directory infrastructure warnings.
+- Server verification after these test commits is still required; these commits are **NOT GREEN yet** until the focused suite is rerun.
+- Next step: rerun:
+  `PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_derivatives_market_data.py tests/test_market_context_evidence.py tests/test_optional_liquidations.py`
+- If focused tests are green, run full `pytest -q`. Only after full regression is green, run the live BTC Scalping smoke and verify that auxiliary feeds no longer block a chart-native setup.
