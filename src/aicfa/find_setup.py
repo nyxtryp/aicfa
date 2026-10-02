@@ -234,6 +234,7 @@ def find_setup(
     derivatives_provider: object | None = None,
 ) -> FindSetupResult:
     """Resolve the asset, collect knowledge-required context, and run AICFA."""
+    use_live_derivatives = provider is None
     if provider is None:
         provider = FallbackMarketDataProvider(
             (BinanceMarketDataProvider(), BybitMarketDataProvider())
@@ -311,7 +312,7 @@ def find_setup(
     derivatives_frame = pd.DataFrame()
     derivatives_analysis = pd.DataFrame()
     derivatives_source = ""
-    if all(
+    if (use_live_derivatives or derivatives_provider is not None) and all(
         requirements.requires(kind)
         for kind in (
             DataKind.FUNDING,
