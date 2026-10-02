@@ -14,7 +14,10 @@ def test_depth_is_derived_from_feature_dependencies_not_provider_limit():
     resolved = resolve_analysis_depth(plan)
 
     assert tuple(resolved) == plan.required_timeframes
-    assert {item.minimum_rows for item in resolved.values()} == {60}
+    assert {item.minimum_rows for item in resolved.values()} == {120, 180, 240}
+    assert resolved["1w"].minimum_rows == 120
+    assert resolved["1d"].minimum_rows == 180
+    assert resolved["1h"].minimum_rows == 240
     assert all(item.minimum_rows < 1000 for item in resolved.values())
     assert all(
         any(dep.name == "feature.rolling" and dep.rows == 60 for dep in item.dependencies)
