@@ -33,6 +33,36 @@ class ContextNeed(str, Enum):
     POSITIONING_CONTEXT = "positioning_context"
 
 
+class TradingMode(str, Enum):
+    SCALPING = "scalping"
+    INTRADAY = "intraday"
+    SWING = "swing"
+    POSITION = "position"
+
+
+@dataclass(frozen=True)
+class ModeTimeframeProfile:
+    mode: TradingMode
+    timeframes: tuple[str, ...]
+    roles: tuple[tuple[str, "TimeframeRole"], ...]
+
+    @property
+    def context_timeframe(self) -> str:
+        return self.roles[0][0]
+
+    @property
+    def structure_timeframe(self) -> str:
+        return self.roles[1][0]
+
+    @property
+    def refinement_timeframe(self) -> str | None:
+        return self.roles[2][0] if len(self.roles) > 2 else None
+
+    @property
+    def execution_timeframe(self) -> str:
+        return self.roles[-1][0]
+
+
 class TimeframeRole(str, Enum):
     EXECUTION = "execution"
     LOWER_CONFIRMATION = "lower_confirmation"
@@ -60,6 +90,7 @@ class DataRequirementPlan:
     context_needs: frozenset[ContextNeed]
     timeframe_roles: frozenset[TimeframeRole]
     requirements: tuple[KnowledgeRequirement, ...]
+    mode: TradingMode | None = None
 
     def requires(self, kind: DataKind) -> bool:
         return kind in self.data_kinds
@@ -72,24 +103,38 @@ class DataRequirementPlan:
 
     @property
     def required_timeframes(self) -> tuple[str, ...]:
-        """Resolve semantic timeframe roles into the canonical causal chain.
-
-        The mapping is based on analytical role, not candle depth. Collection
-        depth remains a separate adaptive requirement to be resolved later.
-        """
+        if self.mode is not None:
+            return mode_timeframe_profile(self.mode).timeframes
         role_timeframes = {
             TimeframeRole.EXECUTION: ("1m",),
             TimeframeRole.LOWER_CONFIRMATION: ("5m", "15m"),
             TimeframeRole.HIGHER_STRUCTURE: ("1h", "4h"),
             TimeframeRole.BROADER_CONTEXT: ("1d", "1w"),
         }
-        selected = {
-            timeframe
-            for role in self.timeframe_roles
-            for timeframe in role_timeframes[role]
-        }
+        selected = {timeframe for role in self.timeframe_roles for timeframe in role_timeframes[role]}
         causal_order = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
         return tuple(timeframe for timeframe in causal_order if timeframe in selected)
+
+
+_MODE_PROFILES = {
+    TradingMode.SCALPING: ModeTimeframeProfile(TradingMode.SCALPING, ("15m", "5m", "1m"), (("15m", TimeframeRole.BROADER_CONTEXT), ("5m", TimeframeRole.HIGHER_STRUCTURE), ("1m", TimeframeRole.EXECUTION))),
+    TradingMode.INTRADAY: ModeTimeframeProfile(TradingMode.INTRADAY, ("1d", "4h", "1h", "15m"), (("1d", TimeframeRole.BROADER_CONTEXT), ("4h", TimeframeRole.HIGHER_STRUCTURE), ("1h", TimeframeRole.LOWER_CONFIRMATION), ("15m", TimeframeRole.EXECUTION))),
+    TradingMode.SWING: ModeTimeframeProfile(TradingMode.SWING, ("1w", "1d", "4h", "1h"), (("1w", TimeframeRole.BROADER_CONTEXT), ("1d", TimeframeRole.HIGHER_STRUCTURE), ("4h", TimeframeRole.LOWER_CONFIRMATION), ("1h", TimeframeRole.EXECUTION))),
+    TradingMode.POSITION: ModeTimeframeProfile(TradingMode.POSITION, ("1M", "1w", "1d", "4h"), (("1M", TimeframeRole.BROADER_CONTEXT), ("1w", TimeframeRole.HIGHER_STRUCTURE), ("1d", TimeframeRole.LOWER_CONFIRMATION), ("4h", TimeframeRole.EXECUTION))),
+}
+
+
+def normalize_trading_mode(mode: TradingMode | str) -> TradingMode:
+    if isinstance(mode, TradingMode):
+        return mode
+    try:
+        return TradingMode(str(mode).strip().lower())
+    except ValueError as exc:
+        raise ValueError("mode must be scalping, intraday, swing, or position") from exc
+
+
+def mode_timeframe_profile(mode: TradingMode | str) -> ModeTimeframeProfile:
+    return _MODE_PROFILES[normalize_trading_mode(mode)]
 
 
 def _unique(values: Iterable[str]) -> tuple[str, ...]:
@@ -168,6 +213,8 @@ _REQUIREMENTS_BY_CONCEPT = {
 def requirements_for_concepts(
     asset: str,
     concepts: Iterable[str],
+    *,
+    mode: TradingMode | str | None = None,
 ) -> DataRequirementPlan:
     """Build a request-scoped plan from explicit knowledge concepts.
 
@@ -193,10 +240,11 @@ def requirements_for_concepts(
         context_needs=context_needs,
         timeframe_roles=timeframe_roles,
         requirements=tuple(requirements),
+        mode=None if mode is None else normalize_trading_mode(mode),
     )
 
 
-def default_setup_requirements(asset: str) -> DataRequirementPlan:
+def default_setup_requirements(asset: str, *, mode: TradingMode | str | None = None) -> DataRequirementPlan:
     """Return the knowledge-driven baseline for an unconstrained setup search.
 
     This is a concept set, not a fixed candle-depth recipe. Additional
@@ -217,4 +265,5 @@ def default_setup_requirements(asset: str) -> DataRequirementPlan:
             "microstructure.order_flow",
             "microstructure.order_book",
         ),
+        mode=mode,
     )
