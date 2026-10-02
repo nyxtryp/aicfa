@@ -85,9 +85,35 @@ def append_derivatives_evidence(
             direction = "short"
 
     liquidation = pd.to_numeric(pd.Series([row.get("liquidation_volume")]), errors="coerce").iloc[0]
+    long_liq = pd.to_numeric(pd.Series([row.get("long_liquidation_volume")]), errors="coerce").iloc[0]
+    short_liq = pd.to_numeric(pd.Series([row.get("short_liquidation_volume")]), errors="coerce").iloc[0]
     if pd.isna(liquidation):
         optional_missing.append("derivatives:liquidation_volume:unavailable")
         optional_missing.append("derivatives:liquidations:volume_unavailable")
+    else:
+        liquidation_direction = None
+        if pd.notna(long_liq) and pd.notna(short_liq):
+            if long_liq > short_liq:
+                liquidation_direction = "short"
+            elif short_liq > long_liq:
+                liquidation_direction = "long"
+        observations.append(
+            MarketObservation(
+                concept_id="derivatives.liquidations",
+                timeframe=timeframe,
+                state="observed",
+                confidence=1.0,
+                evidence=tuple(
+                    value for value in (
+                        f"liquidation_volume={float(liquidation):.12g}",
+                        None if pd.isna(long_liq) else f"long_liquidation_volume={float(long_liq):.12g}",
+                        None if pd.isna(short_liq) else f"short_liquidation_volume={float(short_liq):.12g}",
+                    ) if value is not None
+                ),
+                direction=liquidation_direction,
+                notes="latest causal liquidation-stream event context; optional and never required for core derivatives evidence",
+            )
+        )
 
     observations.append(
         MarketObservation(
