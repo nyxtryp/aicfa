@@ -330,3 +330,21 @@ Do not revert to the universal seven-timeframe model and do not require the user
 - a47c35437d012187b978d208393453d4ec3ec90a: updated these tests to assert the actual role-aware initial depths and deterministic adaptive expansion behavior. No production analysis-depth logic was changed.
 - **Server verification is PENDING.** The test fix is committed but has not yet been executed on the deployed release.
 - Next step: deploy/update the current release from main and rerun the full pytest -q. Only after the full suite is green should live depth validation continue.
+
+
+## 2026-10-02 — FULL REGRESSION GREEN: ADAPTIVE FINDSETUP DEPTH TESTS
+
+- Test fix committed: `8a0b490eb9f52063b1168a909f6430abf190a12d` — `test: account for adaptive FindSetup depth expansion`.
+- The stale FindSetup depth assertions were updated to reflect the actual role-aware baseline plus deterministic adaptive expansion. Production analysis-depth logic was not changed.
+- Server verification reported by user after deployment: `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q` → **371 passed in 43.50s**.
+- Regression gate is now **GREEN** with zero failures.
+- The current architecture therefore has verified mode-aware SMC depth plus adaptive expansion when context is missing/stalls.
+- End-user contract remains: the user enters **only the asset**; AICFA internally evaluates Scalping, Intraday, Swing and Position. The four modes are not user-selected.
+- Next active task: audit and implement a dedicated **Support/Resistance** analysis layer. Current feature inspection shows no explicit `support`/`resistance` feature. Existing related inputs include swing highs/lows, rolling highs/lows, previous highs/lows, liquidity levels/pools, Order Blocks, FVG, dealing ranges, premium/discount, breakouts and sweeps. These are related but are not a dedicated classic S/R layer.
+- Required S/R work: implement causally, distinguish local vs higher-timeframe levels, account for repeated reactions/strength, break/retest/rejection behavior, distance to price, and feed the resulting evidence into scenario/setup reasoning rather than leaving S/R as an implicit side effect.
+
+## PROJECT CONTINUITY RULE
+
+- After every meaningful implementation/test/deploy step, update this file with: **what changed, commit SHA, server verification result, current status, and next step**.
+- Never claim a test or live verification is green until the server result has actually been reported or directly executed.
+- Treat this file as the continuity/source-of-truth record for the AICFA build sequence.
