@@ -272,3 +272,26 @@ Commits:
 No production trading logic was changed.
 
 **NEXT:** rerun the full `pytest -q`. If clean, proceed to four-mode live BTC FindSetup smoke. Do not mark MTF architecture GREEN before that smoke passes.
+
+
+### 2026-10-02 — Full regression: 3 remaining MTF fixture-role mismatches
+
+Server full regression result:
+- **358 passed**
+- **3 failed**
+- **15,881 warnings**
+
+The remaining failures were confined to `tests/test_setup_engine_mtf.py` and came from fixtures still modeling the old seven-TF role semantics:
+1. confirmation conflict placed the bearish direction on 15m, while Intraday confirmation/refinement is 1H and 15m is execution;
+2. scenario-specific OB geometry was placed on 15m execution, although execution must not manufacture setup zones;
+3. active buy-side liquidity used for target selection was placed on 15m execution, although execution must not manufacture structural targets.
+
+Fix committed:
+- `461984a3775b03210c995a634748dfd369e6f714` — migrate these fixtures to the authoritative Intraday roles.
+- conflict test: 4H bullish + 1H bearish + 15m execution bullish;
+- scenario-zone OB: 1H refinement;
+- active target liquidity: 1H refinement.
+
+No production trading logic was changed.
+
+**NEXT:** rerun the full `pytest -q`. If clean, proceed to four-mode live BTC FindSetup smoke. Do not mark MTF architecture GREEN before that smoke passes.
