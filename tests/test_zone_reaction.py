@@ -33,7 +33,8 @@ def structure_frame(n=10):
     out["swing_high_price"] = np.nan
     out["swing_low_price"] = np.nan
     out.loc[2, ["swing_high", "swing_high_price"]] = [1, 105.0]
-    out.loc[4, ["swing_low", "swing_low_price"]] = [1, 95.0]
+    if n > 4:
+        out.loc[4, ["swing_low", "swing_low_price"]] = [1, 95.0]
     return out
 
 
