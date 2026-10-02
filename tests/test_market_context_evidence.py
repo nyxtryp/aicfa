@@ -95,11 +95,14 @@ def test_market_context_layers_become_causal_evidence():
     assessment = assess_market_evidence(evidence)
     assert assessment.decision is EvidenceDecision.PROCEED
 
+    # Optional feeds are causal observations, but they do not independently
+    # manufacture a scenario. Scenario hypotheses must be grounded in the
+    # chart/SMC support rules.
     scenarios = assess_scenarios(assessment)
-    names = {item.scenario for item in scenarios.hypotheses}
-    assert "continuation" in names
-    assert "reversal" in names
-    assert "range" in names
+    assert scenarios.hypotheses == ()
+    assert "continuation" in scenarios.unsupported_scenarios
+    assert "reversal" in scenarios.unsupported_scenarios
+    assert "range" in scenarios.unsupported_scenarios
 
 
 def test_missing_context_is_explicit_instead_of_fabricated():
