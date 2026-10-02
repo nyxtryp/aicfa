@@ -110,7 +110,6 @@ def test_order_block_is_causal_under_future_changes():
 
 
 def test_invalid_parameters_and_validation():
-    df = frame([100, 101], [102, 103], [99, 100], [101, 102])
     with pytest.raises(ValueError):
         build_order_blocks(pd.DataFrame({
             "timestamp": [1, 2],
@@ -122,10 +121,9 @@ def test_invalid_parameters_and_validation():
         }))
 
 
-
 def test_order_block_lifecycle_tracks_touch_partial_deep_and_invalidation():
     df = frame(
-        [100, 102, 99, 104, 104, 104],
+        [100, 102, 99, 104, 102, 104],
         [103, 103, 104, 105, 105, 105],
         [99, 100, 98, 103, 102, 100.5],
         [102, 101, 103, 104, 103, 101],
@@ -133,6 +131,7 @@ def test_order_block_lifecycle_tracks_touch_partial_deep_and_invalidation():
     r = build_order_blocks(df, require_displacement=False)
 
     # Bullish OB is recognized at row 2 from the bearish source candle at row 1.
+    # Row 4 is deliberately bullish so row 5 does not replace the bullish OB.
     assert r.loc[2, "order_block_bullish_state"] == "UNTOUCHED"
     assert r.loc[3, "order_block_bullish_state"] == "TOUCHED"
     assert r.loc[4, "order_block_bullish_state"] == "PARTIAL"
