@@ -18,6 +18,14 @@ FVG_PARTIAL = "PARTIAL"
 FVG_FILLED = "FILLED"
 FVG_INVALIDATED = "INVALIDATED"
 
+_LIFECYCLE_RANK = {
+    FVG_UNTOUCHED: 0,
+    FVG_TOUCHED: 1,
+    FVG_PARTIAL: 2,
+    FVG_FILLED: 3,
+    FVG_INVALIDATED: 4,
+}
+
 
 def _validate(df: pd.DataFrame) -> pd.DataFrame:
     required = ["timestamp", "open", "high", "low", "close", "volume"]
@@ -60,6 +68,20 @@ def _lifecycle_state(*, low, high, gap_low, gap_high, bullish):
     if touched:
         return FVG_TOUCHED, 0.0
     return FVG_UNTOUCHED, 0.0
+
+
+def _aggregate_active_state(zones):
+    if not zones:
+        return FVG_UNTOUCHED, 0.0
+    zone = max(
+        zones,
+        key=lambda item: (
+            _LIFECYCLE_RANK[item["state"]],
+            item["penetration"],
+            item["creation_index"],
+        ),
+    )
+    return zone["state"], zone["penetration"]
 
 
 def build_fvg(
@@ -162,6 +184,7 @@ def build_fvg(
                         bullish_zones.append({
                             "low": gap_low, "high": gap_high,
                             "state": FVG_UNTOUCHED, "penetration": 0.0,
+                            "creation_index": i,
                         })
                         out.at[i, "fvg_active"] = 1
 
@@ -183,6 +206,7 @@ def build_fvg(
                         bearish_zones.append({
                             "low": gap_low, "high": gap_high,
                             "state": FVG_UNTOUCHED, "penetration": 0.0,
+                            "creation_index": i,
                         })
                         out.at[i, "fvg_active"] = 1
 
@@ -190,12 +214,12 @@ def build_fvg(
         out.at[i, "fvg_active_bearish_count"] = len(bearish_zones)
 
         if bullish_zones:
-            zone = bullish_zones[-1]
-            out.at[i, "fvg_bullish_state"] = zone["state"]
-            out.at[i, "fvg_bullish_penetration"] = zone["penetration"]
+            state, penetration = _aggregate_active_state(bullish_zones)
+            out.at[i, "fvg_bullish_state"] = state
+            out.at[i, "fvg_bullish_penetration"] = penetration
         if bearish_zones:
-            zone = bearish_zones[-1]
-            out.at[i, "fvg_bearish_state"] = zone["state"]
-            out.at[i, "fvg_bearish_penetration"] = zone["penetration"]
+            state, penetration = _aggregate_active_state(bearish_zones)
+            out.at[i, "fvg_bearish_state"] = state
+            out.at[i, "fvg_bearish_penetration"] = penetration
 
     return out
