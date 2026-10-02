@@ -6,10 +6,10 @@ from aicfa.scenario_reasoning import assess_scenarios
 from aicfa.setup_analysis import SetupDecision, analyze_setups
 
 
-TFS = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
+TFS = ("1d", "4h", "1h", "15m")
 
 
-def _frames(*, structure_4h=1, structure_15m=1, structure_1m=-1):
+def _frames(*, structure_4h=1, structure_15m=1, structure_1h=-1):
     frames = {}
     for tf in TFS:
         direction = 0
@@ -17,8 +17,8 @@ def _frames(*, structure_4h=1, structure_15m=1, structure_1m=-1):
             direction = structure_4h
         elif tf == "15m":
             direction = structure_15m
-        elif tf == "1m":
-            direction = structure_1m
+        elif tf == "1h":
+            direction = structure_1h
         frame = pd.DataFrame(
             [{
                 "timestamp": 1000,
@@ -114,14 +114,14 @@ def test_setup_engine_levels_come_from_relevant_timeframe_not_1m():
     assert candidate.target_levels[0].timeframe == "4h"
 
 
-def test_setup_engine_requires_all_seven_timeframes():
+def test_setup_engine_requires_all_mode_timeframes():
     frames = _frames()
-    frames.pop("1w")
+    frames.pop("1d")
 
     result = _pipeline(frames)
 
     assert result.decision is SetupDecision.NEED_MORE_EVIDENCE
-    assert "required timeframe: 1w" in result.missing_context
+    assert "required timeframe: 1d" in result.missing_context
 
 
 def test_setup_engine_requires_directionally_coherent_levels():
