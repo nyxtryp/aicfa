@@ -6,8 +6,9 @@ displacement candle, never backdated to the source candle.
 
 Lifecycle is causal:
 - creation/recognition at the displacement candle;
-- mitigation when a later candle trades into the zone;
+- lifecycle depth when later candles touch and penetrate the zone;
 - invalidation when a later close crosses the opposite zone boundary;
+- prior-volume comparison is metadata only, never a mandatory OB filter;
 - breaker transition on a later retest from the invalidated side followed by
   a close rejecting back through the original boundary.
 """
@@ -76,16 +77,29 @@ def build_order_blocks(
     for column in [
         "order_block_bullish_low", "order_block_bullish_high",
         "order_block_bearish_low", "order_block_bearish_high",
+        "order_block_bullish_penetration", "order_block_bearish_penetration",
+        "order_block_bullish_volume_ratio", "order_block_bearish_volume_ratio",
     ]:
         out[column] = np.nan
+    for column in ["order_block_bullish_state", "order_block_bearish_state"]:
+        out[column] = "NONE"
+    for column in ["order_block_bullish_volume_confirmed", "order_block_bearish_volume_confirmed"]:
+        out[column] = 0
 
     from .displacement import build_displacement
 
     displacement = build_displacement(x) if require_displacement else None
 
-    # Active state: (low, high, mitigated).
+    # Active state: (low, high, lifecycle_state).
     active_bullish = None
     active_bearish = None
+    last_bullish_state = "NONE"
+    last_bearish_state = "NONE"
+    # Compare event volume only with prior candles; the current candle is
+    # excluded from its own baseline. Confirmation is descriptive evidence.
+    prior_volume_mean = x["volume"].shift(1).rolling(20, min_periods=5).mean()
+    volume = x["volume"].to_numpy()
+    volume_baseline = prior_volume_mean.to_numpy()
     # Invalidated state: (low, high, breaker_already_emitted).
     invalidated_bullish = None
     invalidated_bearish = None
@@ -115,33 +129,55 @@ def build_order_blocks(
 
         # Existing active bullish OB lifecycle.
         if active_bullish is not None:
-            low_bound, high_bound, mitigated = active_bullish
-            if not mitigated and lows[i] <= high_bound and highs[i] >= low_bound:
-                mitigated = True
-                out.at[i, "order_block_mitigated"] = 1
-
+            low_bound, high_bound, state = active_bullish
+            width = max(high_bound - low_bound, 1e-12)
+            touched = lows[i] <= high_bound and highs[i] >= low_bound
+            penetration = float(np.clip((high_bound - max(low_bound, lows[i])) / width, 0.0, 1.0)) if touched else 0.0
             if closes[i] < low_bound:
+                state = "INVALIDATED"
                 out.at[i, "order_block_invalidated"] = 1
                 invalidated_bullish = (low_bound, high_bound, False)
                 active_bullish = None
             else:
-                active_bullish = (low_bound, high_bound, mitigated)
+                if touched:
+                    out.at[i, "order_block_mitigated"] = int(state == "UNTOUCHED")
+                    if penetration <= 0.0:
+                        state = "TOUCHED"
+                    elif penetration < 0.5:
+                        state = "PARTIAL"
+                    else:
+                        state = "DEEP"
+                active_bullish = (low_bound, high_bound, state)
                 out.at[i, "order_block_active"] = 1
+            last_bullish_state = state
+            out.at[i, "order_block_bullish_state"] = state
+            out.at[i, "order_block_bullish_penetration"] = penetration
 
         # Existing active bearish OB lifecycle.
         if active_bearish is not None:
-            low_bound, high_bound, mitigated = active_bearish
-            if not mitigated and lows[i] <= high_bound and highs[i] >= low_bound:
-                mitigated = True
-                out.at[i, "order_block_mitigated"] = 1
-
+            low_bound, high_bound, state = active_bearish
+            width = max(high_bound - low_bound, 1e-12)
+            touched = lows[i] <= high_bound and highs[i] >= low_bound
+            penetration = float(np.clip((min(high_bound, highs[i]) - low_bound) / width, 0.0, 1.0)) if touched else 0.0
             if closes[i] > high_bound:
+                state = "INVALIDATED"
                 out.at[i, "order_block_invalidated"] = 1
                 invalidated_bearish = (low_bound, high_bound, False)
                 active_bearish = None
             else:
-                active_bearish = (low_bound, high_bound, mitigated)
+                if touched:
+                    out.at[i, "order_block_mitigated"] = int(state == "UNTOUCHED")
+                    if penetration <= 0.0:
+                        state = "TOUCHED"
+                    elif penetration < 0.5:
+                        state = "PARTIAL"
+                    else:
+                        state = "DEEP"
+                active_bearish = (low_bound, high_bound, state)
                 out.at[i, "order_block_active"] = 1
+            last_bearish_state = state
+            out.at[i, "order_block_bearish_state"] = state
+            out.at[i, "order_block_bearish_penetration"] = penetration
 
         if i < 1:
             continue
@@ -159,7 +195,14 @@ def build_order_blocks(
             out.at[i, "order_block_bullish_low"] = low_bound
             out.at[i, "order_block_bullish_high"] = high_bound
             out.at[i, "order_block_displacement_bullish"] = int(require_displacement)
-            active_bullish = (low_bound, high_bound, False)
+            active_bullish = (low_bound, high_bound, "UNTOUCHED")
+            last_bullish_state = "UNTOUCHED"
+            out.at[i, "order_block_bullish_state"] = "UNTOUCHED"
+            baseline = volume_baseline[i]
+            if np.isfinite(baseline) and baseline > 0:
+                ratio = float(volume[i] / baseline)
+                out.at[i, "order_block_bullish_volume_ratio"] = ratio
+                out.at[i, "order_block_bullish_volume_confirmed"] = int(ratio >= 1.5)
             out.at[i, "order_block_active"] = 1
 
         if opens[i - 1] < closes[i - 1] and disp_down:
@@ -170,7 +213,14 @@ def build_order_blocks(
             out.at[i, "order_block_bearish_low"] = low_bound
             out.at[i, "order_block_bearish_high"] = high_bound
             out.at[i, "order_block_displacement_bearish"] = int(require_displacement)
-            active_bearish = (low_bound, high_bound, False)
+            active_bearish = (low_bound, high_bound, "UNTOUCHED")
+            last_bearish_state = "UNTOUCHED"
+            out.at[i, "order_block_bearish_state"] = "UNTOUCHED"
+            baseline = volume_baseline[i]
+            if np.isfinite(baseline) and baseline > 0:
+                ratio = float(volume[i] / baseline)
+                out.at[i, "order_block_bearish_volume_ratio"] = ratio
+                out.at[i, "order_block_bearish_volume_confirmed"] = int(ratio >= 1.5)
             out.at[i, "order_block_active"] = 1
 
     return out
