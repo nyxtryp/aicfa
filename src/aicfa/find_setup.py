@@ -15,7 +15,7 @@ import pandas as pd
 from .binance_market_data import BinanceMarketDataProvider
 from .bybit_market_data import BybitMarketDataProvider
 from .analysis_depth import resolve_analysis_depth
-from .data_requirements import TradingMode, default_setup_requirements, mode_timeframe_profile, normalize_trading_mode
+from .data_requirements import DataKind, TradingMode, default_setup_requirements, mode_timeframe_profile, normalize_trading_mode
 from .decision import decide
 from .evidence_reasoning import assess_market_evidence
 from .features import build_features
@@ -28,6 +28,9 @@ from .absorption import build_absorption
 from .market_evidence_adapter import build_market_evidence_from_frames
 from .scenario_reasoning import assess_scenarios
 from .setup_analysis import analyze_setups
+from .derivatives import build_derivatives
+from .derivatives_evidence import append_derivatives_evidence
+from .derivatives_market_data import FallbackDerivativesProvider
 
 CAUSAL_TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
 
@@ -72,6 +75,9 @@ class FindSetupResult:
     order_book_history: pd.DataFrame
     order_book_history_provider: str
     trades_provider: str
+    derivatives: pd.DataFrame
+    derivatives_analysis: pd.DataFrame
+    derivatives_provider: str
     order_book_provider: str
     decision: str
     reason: str
@@ -301,6 +307,39 @@ def find_setup(
         market_evidence = build_market_evidence_from_frames(
             analyses, asset=symbol, timeframes=timeframes,
         )
+    derivatives_frame = pd.DataFrame()
+    derivatives_analysis = pd.DataFrame()
+    derivatives_provider = ""
+    if all(
+        requirements.requires(kind)
+        for kind in (
+            DataKind.FUNDING,
+            DataKind.OPEN_INTEREST,
+            DataKind.LIQUIDATIONS,
+            DataKind.MARK_PRICE,
+        )
+    ):
+        try:
+            derivatives_frame, derivatives_provider = FallbackDerivativesProvider().fetch_derivatives(
+                symbol=symbol,
+                limit=200,
+            )
+            derivatives_analysis = build_derivatives(
+                base,
+                derivatives_frame,
+                baseline_window=24,
+            )
+        except Exception as exc:
+            derivatives_frame = pd.DataFrame()
+            derivatives_analysis = pd.DataFrame()
+            derivatives_provider = f"unavailable: {exc}"
+
+        market_evidence = append_derivatives_evidence(
+            market_evidence,
+            derivatives_frame,
+            timeframe=profile.context_timeframe,
+        )
+
     trade_fetch = getattr(provider, "fetch_trades_with_source", None)
     book_fetch = getattr(provider, "fetch_order_book_with_source", None)
 
@@ -445,6 +484,9 @@ def find_setup(
         order_book_history_provider=order_book_history_provider,
         trades_provider=trades_provider,
         order_book_provider=order_book_provider,
+        derivatives=derivatives_frame,
+        derivatives_analysis=derivatives_analysis,
+        derivatives_provider=derivatives_provider,
         decision=decision_assessment.action.value.upper().replace("_", " "),
         reason="; ".join(decision_assessment.reasons),
     )
