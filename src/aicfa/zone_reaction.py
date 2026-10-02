@@ -300,18 +300,24 @@ def build_zone_reaction(
         )
 
         retest_touch = touched_now
+        # A retest is the post-reaction re-interaction with the level.
+        # It is allowed to occur on the same candle that first closes across
+        # the level; the actual break is confirmed on a subsequent candle.
         retest_now = (
             reacted_before
             & retest_touch
             & np.where(
                 sides == -1,
-                (close > highs) & ~break_now,
-                (close < lows) & ~break_now,
+                close > highs,
+                close < lows,
             )
         )
 
-        # Lifecycle precedence matches the contract:
-        # break after retest -> first touch -> reaction -> retest.
+        # Lifecycle precedence:
+        # 1) an already-retested zone may break;
+        # 2) otherwise first touch;
+        # 3) otherwise first reaction;
+        # 4) otherwise post-reaction retest.
         break_mask = retested_before & break_now
         touch_mask = ~touched_before & touched_now & ~break_mask
         reaction_mask = touched_before & ~reacted_before & reaction_now & ~break_mask & ~touch_mask
