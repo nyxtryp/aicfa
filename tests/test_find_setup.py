@@ -256,7 +256,7 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
     assert [call[4] for call in provider.calls if call[2] == "1d"] == [60, 120, 240]
 
 
-def test_find_setup_feeds_request_scoped_microstructure_data():
+def test_find_setup_does_not_fetch_optional_microstructure_by_default():
     provider = FakeProvider()
     result = find_setup(
         FindSetupRequest("BTC/USDT"),
@@ -266,18 +266,18 @@ def test_find_setup_feeds_request_scoped_microstructure_data():
         limit=120,
     )
 
-    assert provider.trade_calls == [("BTC/USDT", "spot", 60)]
-    assert provider.book_calls == [("BTC/USDT", "spot", 1)]
-    assert not result.trades.empty
-    assert not result.order_book.empty
-    assert not result.order_flow_analysis.empty
-    assert result.order_flow_analysis["taker_net_volume"].notna().any()
-    assert not result.order_book_analysis.empty
-    assert result.trades_provider
-    assert result.order_book_provider
+    assert getattr(provider, "trade_calls", []) == []
+    assert getattr(provider, "book_calls", []) == []
+    assert getattr(provider, "history_calls", []) == []
+    assert result.trades.empty
+    assert result.order_book.empty
+    assert result.order_flow_analysis.empty
+    assert result.order_book_analysis.empty
+    assert result.cvd_analysis.empty
+    assert result.absorption_analysis.empty
 
 
-def test_find_setup_integrates_causal_l1_history_and_absorption():
+def test_find_setup_does_not_fetch_l1_history_or_absorption_by_default():
     provider = FakeProvider("buy")
     result = find_setup(
         FindSetupRequest("BTC/USDT"),
@@ -287,14 +287,13 @@ def test_find_setup_integrates_causal_l1_history_and_absorption():
         limit=120,
     )
 
-    assert provider.history_calls == [("BTC/USDT", "spot", 8, 1.0)]
-    assert result.order_book_history_provider == "fakeprovider"
-    assert len(result.order_book_history) == 8
-    assert not result.absorption_analysis.empty
-    assert result.absorption_analysis["timestamp"].is_monotonic_increasing
+    assert getattr(provider, "history_calls", []) == []
+    assert result.order_book_history.empty
+    assert result.order_book_history_provider == ""
+    assert result.absorption_analysis.empty
 
 
-def test_find_setup_exposes_causal_trade_cvd():
+def test_find_setup_does_not_expose_trade_cvd_without_explicit_requirement():
     provider = FakeProvider()
     result = find_setup(
         FindSetupRequest("BTC/USDT"),
@@ -304,6 +303,5 @@ def test_find_setup_exposes_causal_trade_cvd():
         limit=120,
     )
 
-    assert not result.cvd_analysis.empty
-    assert result.cvd_analysis["cvd"].notna().any()
-    assert np.isclose(result.cvd_analysis.iloc[-1]["cvd"], 0.0)
+    assert result.cvd_analysis.empty
+    assert getattr(provider, "trade_calls", []) == []
