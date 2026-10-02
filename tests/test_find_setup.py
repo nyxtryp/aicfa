@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from aicfa.data_requirements import TradingMode
 from aicfa.find_setup import CAUSAL_TIMEFRAMES, FindSetupRequest, find_setup, normalize_asset, parse_find_setup
 from aicfa.market_data_router import MarketFetchResult
 
@@ -19,9 +20,13 @@ TIMEFRAME_MS = {
 
 def candles(n=120, start=0, timeframe="1m"):
     close = np.arange(n, dtype=float) + 100
-    step = TIMEFRAME_MS[timeframe]
+    if timeframe == "1M":
+        timestamps = [int(ts.timestamp() * 1000) for ts in pd.date_range("1970-01-01", periods=n, freq="MS", tz="UTC")]
+    else:
+        step = TIMEFRAME_MS[timeframe]
+        timestamps = [start + i * step for i in range(n)]
     return pd.DataFrame({
-        "timestamp": [start + i * step for i in range(n)],
+        "timestamp": timestamps,
         "open": close - 0.5,
         "high": close + 1,
         "low": close - 1,
@@ -105,22 +110,46 @@ def test_parse_find_setup_rejects_empty_request():
         parse_find_setup("")
 
 
-def test_find_setup_fetches_exactly_seven_causal_timeframes():
+def test_find_setup_fetches_only_selected_intraday_timeframes():
     provider = FakeProvider()
     result = find_setup(
-        FindSetupRequest("BTC/USDT"),
+        FindSetupRequest("BTC/USDT", mode="intraday"),
         provider=provider,
         resolver=lambda asset, market_type: asset,
         now_ms=120 * 60_000,
         limit=120,
     )
 
-    assert result.timeframes == CAUSAL_TIMEFRAMES
+    assert result.mode is TradingMode.INTRADAY
+    assert result.timeframes == ("1d", "4h", "1h", "15m")
     assert result.timeframes == tuple(call[2] for call in provider.calls)
-    assert tuple(call[2] for call in provider.calls) == CAUSAL_TIMEFRAMES
+    assert tuple(call[2] for call in provider.calls) == ("1d", "4h", "1h", "15m")
     assert all(call[0] == "BTC/USDT" for call in provider.calls)
     assert all(call[1] == "spot" for call in provider.calls)
     assert result.analysis["timestamp"].is_monotonic_increasing
+
+
+@pytest.mark.parametrize("mode, expected", [
+    ("scalping", ("15m", "5m", "1m")),
+    ("intraday", ("1d", "4h", "1h", "15m")),
+    ("swing", ("1w", "1d", "4h", "1h")),
+    ("position", ("1M", "1w", "1d", "4h")),
+])
+def test_find_setup_timeframes_match_exact_mode_contract(mode, expected):
+    provider = FakeProvider()
+    now_ms = 400 * 24 * 60 * 60_000 if mode == "position" else 120 * 60_000
+    result = find_setup(
+        FindSetupRequest("BTC/USDT", mode=mode),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=now_ms,
+        limit=120,
+    )
+    assert result.timeframes == expected
+    assert tuple(call[2] for call in provider.calls) == expected
+    if mode != "scalping":
+        assert "1m" not in result.timeframes
+        assert all(call[2] != "1m" for call in provider.calls)
 
 
 def test_find_setup_does_not_decide_from_an_open_latest_candle():
@@ -184,7 +213,7 @@ def test_find_setup_uses_dependency_depth_when_no_diagnostic_limit_is_given():
         resolver=lambda asset, market_type: asset,
         now_ms=120 * 60_000,
     )
-    assert [call[4] for call in provider.calls] == [60] * 7 + [120] * 7 + [240] * 7
+    assert [call[4] for call in provider.calls] == [60] * 4 + [120] * 4 + [240] * 4
 
 
 
@@ -204,7 +233,7 @@ def test_find_setup_expands_missing_context_until_provider_boundary():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    assert [call[4] for call in provider.calls if call[2] == "1m"] == [60, 120, 240]
+    assert [call[4] for call in provider.calls if call[2] == "1d"] == [60, 120, 240]
     assert [call[4] for call in provider.calls if call[2] == "1w"] == [60, 120, 240]
     assert len(result.frames["1m"]) == 130
 
