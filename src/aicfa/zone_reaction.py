@@ -170,13 +170,21 @@ def build_zone_reaction(
     out["zone_active_support"] = 0
     out["zone_active_resistance"] = 0
 
+    # Keep every source zone independently, but evaluate the lifecycle in
+    # vectorized batches.  The previous implementation walked and sorted the
+    # Python zone list for every candle, which became O(n^2) Python work on
+    # long feature frames (e.g. the 10,080-row MTF integration test).
     zones = []
-    source_specs = (
-        ("fvg", "fvg_bullish", "fvg_bullish_low", "fvg_bullish_high", "support"),
-        ("fvg", "fvg_bearish", "fvg_bearish_low", "fvg_bearish_high", "resistance"),
-        ("order_block", "order_block_bullish", "order_block_bullish_low", "order_block_bullish_high", "support"),
-        ("order_block", "order_block_bearish", "order_block_bearish_low", "order_block_bearish_high", "resistance"),
-    )
+
+    def _state_rank(state):
+        return {
+            ZONE_UNTOUCHED: 0,
+            ZONE_TOUCHED: 1,
+            ZONE_REACTED: 2,
+            ZONE_RETESTED: 3,
+            ZONE_BROKEN: 4,
+            ZONE_CANCELLED: 5,
+        }[state]
 
     for i in range(n):
         created_count = 0
@@ -227,48 +235,129 @@ def build_zone_reaction(
 
         out.at[i, "zone_source_count"] = created_count
 
-        # Existing zones are evaluated only after their creation row. New zones
-        # therefore cannot react to their own creation candle.
-        active = [z for z in zones if z["state"] not in {ZONE_BROKEN, ZONE_CANCELLED}]
-        support = [z for z in active if z["side"] == "support"]
-        resistance = [z for z in active if z["side"] == "resistance"]
+        # Only pre-existing active zones may react on row i.  We still update
+        # every active zone, not just the nearest one, so concurrent source
+        # lifecycles remain independent and causal.
+        active_indices = [
+            j for j, z in enumerate(zones)
+            if z["created"] < i and z["state"] not in {ZONE_BROKEN, ZONE_CANCELLED}
+        ]
 
-        for side, candidates in (("support", support), ("resistance", resistance)):
-            if not candidates:
-                continue
-            candidates.sort(key=lambda z: (abs(float(x["close"].iloc[i]) - (z["low"] + z["high"]) / 2.0), z["created"]))
-            z = candidates[0]
-            level = (z["low"] + z["high"]) / 2.0
-            distance = abs(float(x["close"].iloc[i]) - level) / max(abs(float(x["close"].iloc[i])), 1e-12)
-            out.at[i, f"zone_{side}_price"] = level
-            out.at[i, f"zone_distance_to_{side}"] = distance
-            out.at[i, f"zone_{side}_state"] = z["state"]
-            out.at[i, f"zone_active_{side}"] = 1
+        if not active_indices:
+            continue
 
-            if z["created"] >= i:
-                continue
+        lows = np.fromiter((zones[j]["low"] for j in active_indices), dtype=float)
+        highs = np.fromiter((zones[j]["high"] for j in active_indices), dtype=float)
+        sides = np.fromiter(
+            (1 if zones[j]["side"] == "support" else -1 for j in active_indices),
+            dtype=np.int8,
+        )
+        touched_before = np.fromiter(
+            (zones[j]["touched"] for j in active_indices), dtype=bool
+        )
+        reacted_before = np.fromiter(
+            (zones[j]["reacted"] for j in active_indices), dtype=bool
+        )
+        retested_before = np.fromiter(
+            (zones[j]["retested"] for j in active_indices), dtype=bool
+        )
 
-            h = float(x["high"].iloc[i])
-            l = float(x["low"].iloc[i])
-            c = float(x["close"].iloc[i])
+        h = float(x["high"].iloc[i])
+        l = float(x["low"].iloc[i])
+        close = float(x["close"].iloc[i])
 
-            if z["retested"] and _break(z, close=c, threshold=break_threshold_pct):
+        widths = np.maximum(highs - lows, 0.0)
+        pads = np.maximum(
+            np.abs(np.where(sides == -1, highs, lows)) * reaction_threshold_pct,
+            1e-12,
+        )
+        overlap = (
+            (h >= lows - pads)
+            & (l <= highs + pads)
+        )
+        point_touch = np.where(
+            sides == -1,
+            h >= highs - pads,
+            l <= lows + pads,
+        )
+        touched_now = np.where(widths > 0.0, overlap, point_touch)
+
+        reaction_now = np.where(
+            sides == -1,
+            close <= highs * (1.0 + reaction_threshold_pct),
+            close >= lows * (1.0 - reaction_threshold_pct),
+        )
+        break_now = np.where(
+            sides == -1,
+            close > highs * (1.0 + break_threshold_pct),
+            close < lows * (1.0 - break_threshold_pct),
+        )
+
+        retest_touch = touched_now
+        retest_now = (
+            reacted_before
+            & retest_touch
+            & np.where(
+                sides == -1,
+                (close > highs) & ~break_now,
+                (close < lows) & ~break_now,
+            )
+        )
+
+        # Lifecycle precedence matches the contract:
+        # break after retest -> first touch -> reaction -> retest.
+        break_mask = retested_before & break_now
+        touch_mask = ~touched_before & touched_now & ~break_mask
+        reaction_mask = touched_before & ~reacted_before & reaction_now & ~break_mask & ~touch_mask
+        retest_mask = retest_now & ~break_mask & ~touch_mask & ~reaction_mask
+
+        for local, zone_index in enumerate(active_indices):
+            z = zones[zone_index]
+            side_name = z["side"]
+
+            if break_mask[local]:
                 z["state"] = ZONE_BROKEN
-                out.at[i, f"zone_break_{side}"] = 1
-            elif not z["touched"] and _touch(z, high=h, low=l, threshold=reaction_threshold_pct):
+                out.at[i, f"zone_break_{side_name}"] = 1
+            elif touch_mask[local]:
                 z["touched"] = True
                 z["state"] = ZONE_TOUCHED
-                out.at[i, f"zone_touch_{side}"] = 1
-            elif z["touched"] and not z["reacted"] and _reaction(z, close=c, threshold=reaction_threshold_pct):
+                out.at[i, f"zone_touch_{side_name}"] = 1
+            elif reaction_mask[local]:
                 z["reacted"] = True
                 z["state"] = ZONE_REACTED
-                out.at[i, f"zone_reaction_{side}"] = 1
-            elif _retest(z, high=h, low=l, close=c, threshold=reaction_threshold_pct):
+                out.at[i, f"zone_reaction_{side_name}"] = 1
+            elif retest_mask[local]:
                 z["retested"] = True
                 z["state"] = ZONE_RETESTED
-                out.at[i, f"zone_retest_{side}"] = 1
+                out.at[i, f"zone_retest_{side_name}"] = 1
 
-            out.at[i, f"zone_{side}_state"] = z["state"]
-            out.at[i, f"zone_active_{side}"] = int(z["state"] not in {ZONE_BROKEN, ZONE_CANCELLED})
+        # Aggregate the nearest currently active zone for the scalar price,
+        # distance and state fields.  The underlying list still retains every
+        # source zone and its independent lifecycle.
+        active_after = [
+            j for j, z in enumerate(zones)
+            if z["state"] not in {ZONE_BROKEN, ZONE_CANCELLED}
+        ]
+        for side_name, side_value in (("support", 1), ("resistance", -1)):
+            candidates = [
+                j for j in active_after if (1 if zones[j]["side"] == "support" else -1) == side_value
+            ]
+            if not candidates:
+                continue
+            best = min(
+                candidates,
+                key=lambda j: (
+                    abs(close - (zones[j]["low"] + zones[j]["high"]) / 2.0),
+                    zones[j]["created"],
+                ),
+            )
+            z = zones[best]
+            level = (z["low"] + z["high"]) / 2.0
+            distance = abs(close - level) / max(abs(close), 1e-12)
+            out.at[i, f"zone_{side_name}_price"] = level
+            out.at[i, f"zone_distance_to_{side_name}"] = distance
+            out.at[i, f"zone_{side_name}_state"] = z["state"]
+            out.at[i, f"zone_active_{side_name}"] = 1
+
 
     return out
