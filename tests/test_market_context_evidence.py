@@ -99,10 +99,13 @@ def test_market_context_layers_become_causal_evidence():
     # manufacture a scenario. Scenario hypotheses must be grounded in the
     # chart/SMC support rules.
     scenarios = assess_scenarios(assessment)
-    assert scenarios.hypotheses == ()
+    # The fixture also contains premium/discount evidence, which legitimately
+    # supports the range hypothesis. Optional feeds must not create additional
+    # scenarios on their own.
+    assert {item.scenario for item in scenarios.hypotheses} == {"range"}
+    assert "premium_discount.dealing_range" in scenarios.hypotheses[0].supporting_concepts
     assert "continuation" in scenarios.unsupported_scenarios
     assert "reversal" in scenarios.unsupported_scenarios
-    assert "range" in scenarios.unsupported_scenarios
 
 
 def test_missing_context_is_explicit_instead_of_fabricated():
