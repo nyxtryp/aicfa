@@ -45,3 +45,35 @@ def test_invalid_parameters():
     with pytest.raises(ValueError): build_structure(frame([1,2,1]),left=0)
     with pytest.raises(ValueError): build_structure(frame([1,2,1]),right=0)
     with pytest.raises(ValueError): build_structure(frame([1,2,1]),internal_left=0)
+
+def test_swing_confirmation_contract_exposes_pivot_and_availability_time():
+    df = frame(
+        [100, 101, 105, 102, 101, 103, 100],
+        [100.5, 101.5, 106, 102.5, 101.5, 103.5, 100.5],
+        [99.5, 100.5, 104.5, 101.5, 100.5, 102.5, 99.5],
+    )
+    r = build_structure(df, left=2, right=2)
+
+    assert r.loc[4, "swing_high"] == 1
+    assert r.loc[4, "swing_high_pivot_index"] == 2
+    assert r.loc[4, "swing_high_confirmation_index"] == 4
+    assert r.loc[4, "swing_high_pivot_timestamp"] == df.loc[2, "timestamp"]
+    assert r.loc[4, "swing_high_confirmation_timestamp"] == df.loc[4, "timestamp"]
+
+    # The pivot candle itself is descriptive only; availability starts at
+    # the confirmation row.
+    assert r.loc[2, "swing_high"] == 0
+    assert r.loc[2, "swing_high_confirmation_index"] == -1
+
+
+def test_swing_confirmation_delay_is_configurable():
+    df = frame(
+        [100, 101, 105, 102, 101, 103, 100],
+        [100.5, 101.5, 106, 102.5, 101.5, 103.5, 100.5],
+        [99.5, 100.5, 104.5, 101.5, 100.5, 102.5, 99.5],
+    )
+    r = build_structure(df, left=2, right=3)
+
+    assert r.loc[5, "swing_high"] == 1
+    assert r.loc[5, "swing_high_pivot_index"] == 2
+    assert r.loc[5, "swing_high_confirmation_index"] == 5
