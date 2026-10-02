@@ -237,8 +237,8 @@ def _ordered_source_timeframes(
         for item in context.observations
         if item.concept_id in concepts and getattr(item, "timeframe", None)
     }
-    ordered.extend(tf for tf in SETUP_TIMEFRAMES if tf in observed and tf not in ordered)
-    ordered.extend(tf for tf in SETUP_TIMEFRAMES[::-1] if tf not in ordered)
+    ordered.extend(tf for tf in context.timeframes if tf in observed and tf not in ordered)
+    ordered.extend(tf for tf in reversed(context.timeframes) if tf not in ordered)
     return tuple(ordered)
 
 
@@ -274,7 +274,7 @@ def _zone_levels(
         for timeframe in ordered_timeframes:
             # 1m is execution/microstructure only. It may confirm an entry,
             # but it must never manufacture the setup zone itself.
-            if timeframe in _EXECUTION:
+            if timeframe == context.execution_timeframe:
                 continue
             row = context.latest_rows.get(timeframe)
             if row is None:
@@ -360,7 +360,7 @@ def _invalidation_level(
     candidates: list[SetupLevel] = []
     # Invalidation is tied to the structural premise, not mechanically to
     # the entry zone timeframe. Inspect every non-execution structural layer.
-    allowed = tuple(tf for tf in SETUP_TIMEFRAMES if tf != "1m")
+    allowed = tuple(tf for tf in context.timeframes if tf != context.execution_timeframe)
     ordered_timeframes = tuple(
         tf for tf in source_timeframes if tf in allowed
     ) + tuple(
@@ -480,7 +480,7 @@ def _target_levels(
     # Target discovery is independent of the entry zone timeframe.
     # A setup may draw liquidity/objectives from any relevant MTF layer;
     # only the 1m execution layer must never manufacture the setup objective.
-    allowed = tuple(tf for tf in SETUP_TIMEFRAMES if tf != "1m")
+    allowed = tuple(tf for tf in context.timeframes if tf != context.execution_timeframe)
 
     ordered = tuple(
         tf for tf in preferred_timeframes if tf in allowed
@@ -506,7 +506,7 @@ def _target_levels(
             candidates.append((
                 source_priority,
                 distance,
-                -SETUP_TIMEFRAMES.index(timeframe),
+                -context.timeframes.index(timeframe),
                 timeframe,
                 source,
                 value,
