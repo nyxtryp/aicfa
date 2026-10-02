@@ -27,8 +27,6 @@ def timeframe_ms(timeframe: str) -> int:
         "1d": 24 * 60 * 60_000,
         "1w": 7 * 24 * 60 * 60_000,
     }
-    if timeframe == "1M":
-        raise ValueError("1M has variable calendar duration and needs provider-specific handling")
     if timeframe not in durations:
         raise ValueError(f"Unsupported fixed timeframe: {timeframe}")
     return durations[timeframe]
@@ -140,7 +138,10 @@ def completed_ohlcv(
     """Keep only candles whose full interval ended at or before now_ms."""
     out = validate_ohlcv(df)
     if timeframe == "1M":
-        raise ValueError("1M completion requires provider-specific calendar semantics")
+        opened = pd.to_datetime(out["timestamp"], unit="ms", utc=True)
+        closes = opened + pd.offsets.MonthBegin(1)
+        completed = out.loc[closes.astype("int64") // 1_000_000 <= int(now_ms)]
+        return completed.reset_index(drop=True)
     duration = timeframe_ms(timeframe)
     return out.loc[out["timestamp"] + duration <= int(now_ms)].reset_index(drop=True)
 
@@ -167,5 +168,6 @@ def next_since_ms(
     if existing is None or existing.empty:
         return None
     if timeframe == "1M":
-        raise ValueError("1M incremental cursor requires provider-specific calendar semantics")
+        last = pd.to_datetime(int(existing["timestamp"].max()), unit="ms", utc=True)
+        return int((last + pd.offsets.MonthBegin(1)).timestamp() * 1000)
     return int(existing["timestamp"].max()) + timeframe_ms(timeframe)
