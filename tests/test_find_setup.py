@@ -213,8 +213,14 @@ def test_find_setup_uses_mode_aware_analysis_depth_when_no_diagnostic_limit_is_g
         resolver=lambda asset, market_type: asset,
         now_ms=120 * 60_000,
     )
-    # FindSetup defaults to Intraday, whose role-aware depth is 1d=120, 4h=180, 1h=240, 15m=240.
-    assert [call[4] for call in provider.calls] == [120, 180, 240, 240]
+    # FindSetup defaults to Intraday: the first pass uses the role-aware
+    # baseline 1d=120, 4h=180, 1h=240, 15m=240. Missing context may
+    # trigger up to two adaptive expansion passes.
+    limits = [call[4] for call in provider.calls]
+    assert limits[:4] == [120, 180, 240, 240]
+    assert len(limits) <= 12
+    assert all(limit >= baseline for limit, baseline in zip(limits[:4], [120, 180, 240, 240]))
+    assert limits[4:] == [240, 360, 480, 480, 480, 720, 960, 960]
 
 
 
@@ -253,8 +259,8 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    assert all(call[4] in {120, 180, 240, 360, 480} for call in provider.calls)
-    assert [call[4] for call in provider.calls if call[2] == "1d"] == [120, 240]
+    assert all(call[4] in {120, 180, 240, 360, 480, 720, 960} for call in provider.calls)
+    assert [call[4] for call in provider.calls if call[2] == "1d"] == [120, 240, 480]
 
 
 def test_find_setup_does_not_fetch_optional_microstructure_by_default():
