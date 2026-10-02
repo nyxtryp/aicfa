@@ -169,3 +169,22 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - The two pytest cache PermissionDenied warnings are non-blocking infrastructure warnings in the release directory.
 - Server verification is still required; this fix is **NOT GREEN** until the focused test is rerun.
 - Next step: rerun `tests/test_optional_liquidations.py`. If **2 passed**, run full `pytest -q`; then update this plan with the actual result before the live Scalping smoke.
+
+
+## 2026-10-02 — DATA REQUIREMENT ARCHITECTURE CORRECTION
+
+- Full regression result from server: **2 failed, 368 passed, 15881 warnings in 47.75s**.
+- The two failures exposed the wrong global data contract:
+  - `test_derivatives_completeness_rejects_missing_required_source_fields` still treated liquidation volume as a required derivative field.
+  - `test_missing_context_is_explicit_instead_of_fabricated` still treated absent liquidation data as blocking.
+- Architectural correction: AICFA's **core setup analysis is chart-native**. The mandatory analytical substrate is OHLCV/volume plus the derived structural/SMC layers: market structure, liquidity, BOS/CHoCH, FVG/imbalance, order blocks, premium/discount, price action and Wyckoff context.
+- Funding, Open Interest, Mark Price, Liquidations, Trades, CVD, Order Flow, Order Book and Absorption are **not universal prerequisites**. They are auxiliary evidence and are collected/used only when the active knowledge/hypothesis requires them or when explicitly supplied as confirmation data.
+- `ae402290fa148f1d3938475a8c34499cfcc2c96b`: removed derivatives and microstructure concepts from the default setup collection plan.
+- `f961781e8df405a2ada298194c4ba6c4c79fea6c`: FindSetup no longer requires derivatives completeness for the core path and no longer treats missing trades as fatal; auxiliary feeds are collected only when required by the plan.
+- `778f7658ae1eff3b0333c15d543bd48ab5b6ac40`: missing microstructure feeds are now diagnostic `optional_missing_context`, not blocking context.
+- `7e5d8f6294f74412ed309c9a91f70e692d5690f0`: scenario hypotheses now have chart/SMC support paths and do not depend on auxiliary derivatives/microstructure observations.
+- `f7484804d50b0ad25d2835c6f1c6aef852f4b37a`: derivatives completeness regression updated so liquidation absence is optional when the derivatives module is explicitly used.
+- `d616370e39bcbc16be4034c0bcedf8b026fb1e6d`: market-context regression updated so auxiliary-feed absence is explicitly non-blocking.
+- This is the intended architecture: **do not fetch or retain data just because an exchange exposes it; use a datum only when it has a defined analytical role for the active hypothesis.**
+- Current state: code changes are committed, but **server verification is NOT GREEN yet**.
+- Next step: run the focused affected tests and then full `pytest -q`. If green, run the live BTC Scalping smoke and confirm that unavailable derivatives/microstructure feeds no longer force WAIT when the core chart/SMC evidence is sufficient.
