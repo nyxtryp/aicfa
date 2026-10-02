@@ -9,7 +9,7 @@ from aicfa.setup_analysis import SetupDecision, analyze_setups
 TFS = ("1d", "4h", "1h", "15m")
 
 
-def _frames(*, structure_4h=1, structure_15m=1, structure_1h=-1):
+def _frames(*, structure_4h=1, structure_15m=1, structure_1h=1):
     frames = {}
     for tf in TFS:
         direction = 0
@@ -85,8 +85,8 @@ def _pipeline(frames):
     )
 
 
-def test_setup_engine_uses_higher_timeframe_direction_not_1m():
-    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1m=-1))
+def test_setup_engine_uses_higher_timeframe_direction_not_execution_tf():
+    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1h=1))
 
     assert result.decision is SetupDecision.READY
     assert result.candidates
@@ -94,7 +94,7 @@ def test_setup_engine_uses_higher_timeframe_direction_not_1m():
 
 
 def test_setup_engine_waits_when_confirmation_conflicts_with_higher_structure():
-    result = _pipeline(_frames(structure_4h=1, structure_15m=-1, structure_1m=-1))
+    result = _pipeline(_frames(structure_4h=1, structure_15m=-1, structure_1h=1))
 
     assert result.decision is SetupDecision.WAIT
     assert result.candidates == ()
@@ -102,7 +102,7 @@ def test_setup_engine_waits_when_confirmation_conflicts_with_higher_structure():
 
 
 def test_setup_engine_levels_come_from_relevant_timeframe_not_1m():
-    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1m=-1))
+    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1h=1))
 
     candidate = result.candidates[0]
     assert candidate.direction == "long"
@@ -125,7 +125,7 @@ def test_setup_engine_requires_all_mode_timeframes():
 
 
 def test_setup_engine_requires_directionally_coherent_levels():
-    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1m=-1))
+    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1h=1))
 
     candidate = result.candidates[0]
     entry_low = min(level.value for level in candidate.entry_zone)
@@ -137,8 +137,8 @@ def test_setup_engine_requires_directionally_coherent_levels():
     assert candidate.target_levels[0].value > entry_high
 
 
-def test_setup_engine_does_not_use_lower_timeframe_target_than_entry_zone():
-    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1m=-1))
+def test_setup_engine_does_not_use_execution_target_than_entry_zone():
+    result = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1h=1))
     candidate = result.candidates[0]
 
     assert candidate.entry_zone
@@ -149,7 +149,7 @@ def test_setup_engine_does_not_use_lower_timeframe_target_than_entry_zone():
 
 
 def test_setup_engine_can_use_causal_rolling_extreme_as_target_fallback():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     for tf, frame in frames.items():
         frame.loc[0, "active_buy_liquidity_price"] = float("nan")
         frame.loc[0, "liquidity_breakout_high"] = float("nan")
@@ -166,7 +166,7 @@ def test_setup_engine_can_use_causal_rolling_extreme_as_target_fallback():
 
 
 def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     evidence = MarketEvidence(
         asset="BTC/USDT",
         observations=(
@@ -232,7 +232,7 @@ def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
 
 
 def test_setup_engine_uses_scenario_specific_zone_family():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     for tf, frame in frames.items():
         frame.loc[0, "order_block_bullish_low"] = 101.0 if tf == "15m" else float("nan")
         frame.loc[0, "order_block_bullish_high"] = 103.0 if tf == "15m" else float("nan")
@@ -311,7 +311,7 @@ def test_setup_engine_uses_scenario_specific_zone_family():
 
 
 def test_setup_engine_prioritizes_active_liquidity_over_nearer_structural_extreme():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     for tf, frame in frames.items():
         frame.loc[0, "active_buy_liquidity_price"] = float("nan")
         frame.loc[0, "previous_high"] = float("nan")
@@ -327,7 +327,7 @@ def test_setup_engine_prioritizes_active_liquidity_over_nearer_structural_extrem
 
 
 def test_setup_engine_can_return_second_distinct_target_after_primary_draw():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     for tf, frame in frames.items():
         frame.loc[0, "active_buy_liquidity_price"] = float("nan")
         frame.loc[0, "previous_high"] = float("nan")
@@ -344,7 +344,7 @@ def test_setup_engine_can_return_second_distinct_target_after_primary_draw():
 
 
 def test_setup_engine_prioritizes_active_liquidity_over_nearer_structural_extreme():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     for tf, frame in frames.items():
         frame.loc[0, "active_buy_liquidity_price"] = float("nan")
         frame.loc[0, "previous_high"] = float("nan")
@@ -359,7 +359,7 @@ def test_setup_engine_prioritizes_active_liquidity_over_nearer_structural_extrem
 
 
 def test_setup_engine_can_return_second_distinct_target_after_primary_draw():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     for tf, frame in frames.items():
         frame.loc[0, "active_buy_liquidity_price"] = float("nan")
         frame.loc[0, "previous_high"] = float("nan")
@@ -375,7 +375,7 @@ def test_setup_engine_can_return_second_distinct_target_after_primary_draw():
 
 
 def test_setup_engine_reports_rejected_rr_geometry():
-    frames = _frames(structure_4h=1, structure_15m=1, structure_1m=-1)
+    frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     # Keep this fixture's target geometry deterministic across all TFs.
     # Other frames normally carry active liquidity at 130, which can make
     # the candidate pass RR even when the 4h liquidity is too close.
