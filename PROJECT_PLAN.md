@@ -1,3 +1,31 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 PERFORMANCE BASELINE + REWORK
+
+### Server baseline before the new optimization
+- User ran full regression on the current Task 6 implementation:
+- `tests/test_features.py`: **10 passed in 70.14s**.
+- Full suite: **384 passed in 105.05s (1:45)**.
+- This is GREEN functionally, but materially slower than the pre-Task-6 baseline (~45–50s full suite).
+- Therefore Task 6 is **not accepted as performance-final** yet.
+
+### Diagnosis
+- The remaining cost was the per-candle scan of all accumulated zones. NumPy vectorization reduced Python-level work but did not change the underlying O(n × total_zones) lifecycle search.
+- The implementation has now been reworked to use:
+  - logarithmic price buckets for local zone lifecycle queries;
+  - sorted active support/resistance indexes for nearest-level lookup;
+  - heaps for retested-zone break detection;
+  - explicit handling for very wide zones so the index remains causal/correct.
+
+### New commits
+- `fb9010cb9fa9f1b2b9b2223fb06b6b7e8796cfd3` — `perf: index zone lifecycle by price buckets`
+- `010c2c8bdcd8c8db982d2e5a9fadc733d8b95b8b` — `fix: key zone break heaps by zone boundaries`
+
+### Verification
+- New optimization has **not yet been server-tested**.
+- Do not treat the new implementation as GREEN until focused + integration tests pass.
+
+### Next step
+Run only the focused zone contract first, then the 10,080-row feature integration. If both pass, run the full regression again and compare against the 384/105.05s baseline.
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 INTEGRATION GREEN
 
 ### Verification
