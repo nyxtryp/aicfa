@@ -1371,3 +1371,78 @@ Run the updated deployed BTC smoke and read the new RR diagnostics. Use those ex
 
 ### NEXT UNFINISHED
 Run `tests/test_setup_engine_mtf.py::test_setup_engine_reports_rejected_rr_geometry`, then `tests/test_setup_lifecycle.py`, then the full repository regression on FrostDeploy. Record actual results before integrating the lifecycle into serving.
+## 2026-10-02 — BTC LONG #1 → LONG #2 → WAIT: historical market-sequence investigation
+
+### Evidence recovered from the conversation
+
+The user supplied the exact sequence that must be investigated rather than treated as an assumed lifecycle bug:
+
+**LONG #1**
+- 15m bullish FVG Entry: **84,412.01–84,432.90**
+- 5m sell-side liquidity Invalidation: **84,101.62**
+- TP1: **85,649.95** (4h previous high)
+- TP2: **87,395.67** (1d previous high)
+- Confirmation: **15m + 5m**
+- All seven causal timeframes present.
+- 1m did not form Entry/SL/TP.
+- Reversal was a duplicate of the same actionable geometry.
+- Breakout failure was not accepted because evidence was incomplete.
+
+**LONG #2**
+- 15m bullish FVG Entry: **84,486.01–84,772.38**
+- Invalidation remained **84,101.62**
+- TP1 remained **85,649.95**
+- TP2 remained **87,395.67**
+- Confirmation remained **15m + 5m**
+- All seven timeframes processed.
+- Reversal was again rejected as a duplicate.
+- Breakout failure remained insufficiently evidenced.
+
+Therefore LONG #2 was not a fundamentally different target/stop structure: the Entry zone moved upward, while the same invalidation and target ladder remained in force.
+
+### Market reconstruction available so far
+
+External hourly BTC data for 2026-10-01/02 shows:
+- 17:00 UTC Oct 1: high **85,078.85**, low **84,198.00**, close **84,908.01**.
+- 18:00 UTC: high **85,273.65**, low **84,671.01**, close **84,802.02**.
+- 19:00 UTC: high **84,892.01**, low **84,585.81**, close **84,675.36**.
+- 20:00 UTC: high **84,860.05**, low **84,563.54**, close **84,634.00**.
+- 21:00 UTC: high **84,687.40**, low **84,493.35**, close **84,544.99**.
+- 22:00 UTC: high **84,788.01**, low **84,537.12**, close **84,749.73**.
+- 23:00 UTC: high **84,900.00**, low **84,644.69**, close **84,880.05**.
+- 00:00 UTC Oct 2: high **84,958.48**, low **84,705.04**, close **84,784.89**.
+- 01:00 UTC: high **84,986.39**, low **84,520.00**, close **84,910.00**.
+- 02:00 UTC: high **85,189.97**, low **84,866.51**, close **85,188.00**.
+- 03:00 UTC: high **85,569.00**, low **85,187.99**, close **85,512.90**.
+- 04:00 UTC: high **86,912.75**, low **85,453.36**, close **86,652.12**.
+
+This establishes that TP1 **85,649.95** was not reached during the 01:00–03:00 UTC candles, but was exceeded during the **04:00 UTC** candle. Source: StatMuse hourly BTC data.
+
+### Important timing limitation
+
+The conversation context currently preserves the assistant-message timestamp around the LONG #2 / WAIT discussion as **2026-10-02 08:26:50 UTC**, but the exact server/runtime timestamp embedded in the user's pasted smoke output was not recoverable from the available conversation index. Therefore that timestamp must **not** be treated as the exact FindSetup execution time until the raw server output is recovered.
+
+### Current analytical conclusion
+
+The historical market path does **not** support the earlier simplistic explanation that the setup merely disappeared because price moved away from Entry.
+
+The same invalidation/target geometry survived across LONG #1 and LONG #2, and BTC subsequently moved through the target region. In particular, the market eventually traded above TP1 **85,649.95** during the 04:00 UTC candle.
+
+Therefore the key unresolved question is now precise:
+
+1. Was the WAIT generated **before TP1 was reached**, while the original LONG was still potentially active?
+2. Or was the WAIT generated **after TP1/another lifecycle event had already occurred**?
+3. If it was before TP1, which exact 7-TF evidence changed enough to reject continuation/reversal?
+4. Did the stateless FindSetup recomputation replace an existing actionable setup before its original geometry was invalidated/completed?
+
+No RR threshold, target-selection rule, Entry rule, or market logic is changed based on this investigation.
+
+### NEXT UNFINISHED
+
+Recover the exact server/runtime timestamp and full FindSetup diagnostic for the WAIT, then compare the seven timeframe states against LONG #2 at the immediately preceding run. The comparison must include Entry, Invalidation, TP1, TP2, RR, structure, liquidity, FVG, scenario evidence, conflicts and current price.
+
+Only after that comparison may we classify the transition as:
+- legitimate new-setup WAIT,
+- lifecycle/state handling issue,
+- or analytical/data inconsistency.
+
