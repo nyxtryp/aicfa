@@ -295,3 +295,24 @@ Fix committed:
 No production trading logic was changed.
 
 **NEXT:** rerun the full `pytest -q`. If clean, proceed to four-mode live BTC FindSetup smoke. Do not mark MTF architecture GREEN before that smoke passes.
+
+
+### 2026-10-02 — Full regression: duplicate MTF target fixture remained stale
+
+Server full regression after the previous fixture migration:
+- **360 passed**
+- **1 failed**
+- **15,881 warnings**
+
+The only remaining failure was:
+- `tests/test_setup_engine_mtf.py::test_setup_engine_prioritizes_active_liquidity_over_nearer_structural_extreme`
+- `IndexError: tuple index out of range`
+
+Root cause was confirmed by inspecting the committed test file: the test name existed twice. The earlier definition had already been migrated to place active buy-side liquidity on the 1H refinement timeframe, but the later duplicate definition (the one Python actually executes) still placed it on 15m execution. The later definition therefore produced no eligible target under the new rule that execution timeframe cannot manufacture structural targets.
+
+Fix committed:
+- `c9b52623cfb07b42cbcc3175f44b69fcc5755e8b` — move the active-liquidity/previous-high fixture in the executed duplicate test from 15m to 1H.
+
+No production trading logic changed.
+
+**NEXT:** rerun the full `pytest -q`. If clean, proceed to the four-mode live BTC FindSetup smoke. Do not mark MTF architecture GREEN before that smoke passes.
