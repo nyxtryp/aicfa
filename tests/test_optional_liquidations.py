@@ -90,9 +90,15 @@ def test_liquidations_participate_when_available():
     assert liquidation
     assert liquidation[0].direction == "short"
 
+    # Liquidations are optional confirmation/context. Their presence must not
+    # manufacture a reversal hypothesis without chart/SMC reversal evidence.
     scenarios = assess_scenarios(assessment)
     reversal = [
         item for item in scenarios.hypotheses if item.scenario == "reversal"
     ]
-    assert reversal
-    assert "derivatives.liquidations" in reversal[0].supporting_concepts
+    assert not reversal
+    continuation = [
+        item for item in scenarios.hypotheses if item.scenario == "continuation"
+    ]
+    assert continuation
+    assert "derivatives.liquidations" not in continuation[0].supporting_concepts
