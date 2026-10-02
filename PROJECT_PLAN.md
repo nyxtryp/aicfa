@@ -1,3 +1,12 @@
+### Task 6 — Zone Reaction + Support/Resistance — test contract started
+
+- Re-read the repository documentation before continuing, including README, AICFA_TZ and the current docs for Price Action, Evidence/Scenario/Setup/Decision, Market State, Live Market Data, Knowledge Base, Labels, CVD, Wyckoff and visual evidence boundaries.
+- Confirmed current Price Action already exposes causal prior support/resistance levels and breakout retests, but there is no dedicated unified zone lifecycle for S/R + OB/FVG/liquidity.
+- Defined the missing causal lifecycle contract: `level/zone → distance → touch → reaction → retest/break → confirmation/cancellation`.
+- Added focused contract tests before production changes:
+  - `7ab1352462580458ae3d2d540ad3cd33ae44c047` — test: define causal zone reaction lifecycle contract
+- Tests intentionally target the future `build_zone_reaction` API and cover S/R lifecycle, distance-before-touch, separate OB/FVG/liquidity sources, future-candle causality, and parameter validation.
+- **Server verification pending** — no production implementation has been changed yet.
 # AICFA PROJECT PLAN / CONTINUITY
 
 ## Continuity checkpoint — 2026-10-03 — TASK 5 FVG / IMBALANCE LIFECYCLE
@@ -28,7 +37,6 @@
 ### Current task
 Task 6 — Zone Reaction + Support/Resistance
 
-### Immediate next step
 1. Audit the current zone-reaction and support/resistance implementation.
 2. Define the missing causal lifecycle: level/zone → distance → touch → reaction → retest/break → confirmation/cancellation.
 3. Add focused tests before changing production logic.
