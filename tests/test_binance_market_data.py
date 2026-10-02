@@ -63,12 +63,16 @@ def test_binance_adapter_rejects_invalid_limit(limit):
 
 
 def test_binance_adapter_accepts_monthly_timeframe_transport():
-    provider = BinanceMarketDataProvider()
-    with pytest.raises(Exception) as exc_info:
-        provider.fetch_ohlcv(
-            symbol="BTCUSDT", market_type="spot", timeframe="1M", since_ms=None, limit=10
-        )
-    assert not isinstance(exc_info.value, ValueError)
+    payload = [[1700000000000, "100", "110", "90", "105", "12"]]
+
+    def opener(request, timeout):
+        assert "interval=1M" in request.full_url
+        return FakeResponse(payload)
+
+    frame = BinanceMarketDataProvider(opener=opener).fetch_ohlcv(
+        symbol="BTCUSDT", market_type="spot", timeframe="1M", since_ms=None, limit=10
+    )
+    assert len(frame) == 1
 
 
 def test_binance_adapter_retries_transient_network_failure():
