@@ -25,7 +25,7 @@ def test_derivative_frame_normalizes_numeric_schema():
     assert frame.iloc[0]["mark_price"] == 50000.0
 
 
-def test_derivatives_completeness_rejects_missing_required_source_fields():
+def test_derivatives_completeness_allows_missing_optional_liquidations():
     frame = pd.DataFrame({
         "timestamp": [1000],
         "funding_rate": [0.001],
@@ -34,8 +34,8 @@ def test_derivatives_completeness_rejects_missing_required_source_fields():
         "liquidation_volume": [None],
     })
     complete, missing = derivatives_completeness(frame)
-    assert not complete
-    assert "derivatives:liquidation_volume:unavailable" in missing
+    assert complete, missing
+    assert missing == ()
 
 
 def test_build_derivatives_is_causal_and_does_not_use_future_observation():
