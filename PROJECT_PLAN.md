@@ -1,3 +1,20 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 INTEGRATION GREEN
+
+### Verification
+- Server integration test after zone lifecycle performance fix:
+- `tests/test_features.py`: **10 passed in 70.14s**.
+- This confirms the unified `zone_*` feature layer integrates successfully through the full feature pipeline on the current MTF test coverage.
+- Performance is improved from the previous hang/non-completion, but the 10,080-row integration path still takes about 70 seconds and should be treated as a performance observation, not as a reason to claim the task fully GREEN yet.
+
+### Current status
+- Focused zone contract: **5 passed in 0.49s**.
+- Feature integration: **10 passed in 70.14s**.
+- Full regression: **not run yet**.
+- Task 6: **implementation/integration GREEN; final regression pending**.
+
+### Next step
+Run the full server regression. If it remains GREEN, finalize Task 6 documentation/status and move to Task 7 — Volume Evidence.
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 ZONE REACTION PERFORMANCE FIX
 
 ### What changed
@@ -22,7 +39,6 @@ Run the server integration test `tests/test_features.py`. If GREEN, run the full
 - Defined the missing causal lifecycle contract: `level/zone → distance → touch → reaction → retest/break → confirmation/cancellation`.
 - Added focused contract tests before production changes:
   - `7ab1352462580458ae3d2d540ad3cd33ae44c047` — test: define causal zone reaction lifecycle contract
-- Tests intentionally target the future `build_zone_reaction` API and cover S/R lifecycle, distance-before-touch, separate OB/FVG/liquidity sources, future-candle causality, and parameter validation.
 - **Server verification pending** — no production implementation has been changed yet.
 # AICFA PROJECT PLAN / CONTINUITY
 
@@ -42,7 +58,7 @@ Run the server integration test `tests/test_features.py`. If GREEN, run the full
 - Added FVG creation provenance fields.
 - Multiple simultaneously active bullish/bearish FVG zones are tracked independently instead of a newer zone overwriting an older active zone.
 - Existing binary fields are retained for compatibility.
-- Added focused regression coverage for creation, touch/partial/fill, invalidation, concurrent active zones and causal provenance.
+- Added causal regression coverage for creation, touch/partial/fill, invalidation, concurrent active zones and causal provenance.
 - Fixed concurrent-zone aggregation so a newer UNTOUCHED FVG does not erase the lifecycle state of an older reacted active FVG.
 
 ### Verification status
