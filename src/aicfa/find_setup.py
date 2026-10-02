@@ -231,6 +231,7 @@ def find_setup(
     now_ms: int,
     limit: int | None = None,
     resolver: Callable[[str, str], str] | None = None,
+    derivatives_provider: object | None = None,
 ) -> FindSetupResult:
     """Resolve the asset, collect knowledge-required context, and run AICFA."""
     if provider is None:
@@ -309,7 +310,7 @@ def find_setup(
         )
     derivatives_frame = pd.DataFrame()
     derivatives_analysis = pd.DataFrame()
-    derivatives_provider = ""
+    derivatives_source = ""
     if all(
         requirements.requires(kind)
         for kind in (
@@ -320,7 +321,8 @@ def find_setup(
         )
     ):
         try:
-            derivatives_frame, derivatives_provider = FallbackDerivativesProvider().fetch_derivatives(
+            derivatives_source_provider = derivatives_provider or FallbackDerivativesProvider()
+            derivatives_frame, derivatives_source = derivatives_source_provider.fetch_derivatives(
                 symbol=symbol,
                 limit=200,
             )
@@ -332,7 +334,7 @@ def find_setup(
         except Exception as exc:
             derivatives_frame = pd.DataFrame()
             derivatives_analysis = pd.DataFrame()
-            derivatives_provider = f"unavailable: {exc}"
+            derivatives_source = f"unavailable: {exc}"
 
         market_evidence = append_derivatives_evidence(
             market_evidence,
@@ -486,7 +488,7 @@ def find_setup(
         order_book_provider=order_book_provider,
         derivatives=derivatives_frame,
         derivatives_analysis=derivatives_analysis,
-        derivatives_provider=derivatives_provider,
+        derivatives_provider=derivatives_source,
         decision=decision_assessment.action.value.upper().replace("_", " "),
         reason="; ".join(decision_assessment.reasons),
     )
