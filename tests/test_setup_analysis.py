@@ -1,3 +1,4 @@
+import pandas as pd
 from aicfa.evidence_reasoning import EvidenceDecision, assess_visual_evidence
 from aicfa.scenario_reasoning import assess_scenarios
 from aicfa.setup_analysis import SetupDecision, analyze_setups
