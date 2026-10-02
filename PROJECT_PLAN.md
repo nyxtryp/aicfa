@@ -497,8 +497,7 @@ Verification after this correction is pending. The single remaining failure is s
 The deterministic repository regression gate is GREEN at **336 passed**. The seven-timeframe SETUP ENGINE implementation is therefore regression-verified against the full test suite.
 
 ### NEXT UNFINISHED
-1. Run the live BTC FindSetup smoke against the deployed current release.
-2. Inspect the returned setup object and verify the seven-timeframe context is actually populated in production.
+1. Run the live BTC FindSetup smoke against the deployed current release.2. Inspect the returned setup object and verify the seven-timeframe context is actually populated in production.
 3. Verify direction, setup family, entry condition/zone, invalidation, targets, confirmation requirements and source timeframes; no 1m-only inference and no fabricated numeric levels.
 4. Record the exact live output and any production-path regression here.
 5. Only after the live setup object is verified GREEN, advance to the next analytical block.
@@ -997,8 +996,7 @@ Live BTC setup geometry: **GREEN**.
 4. корректно обрабатывать достижение Entry, SL, TP1, TP2, отсутствие активации и неоднозначные случаи;
 5. не использовать данные, которые были недоступны на момент setup;
 6. работать на forward/out-of-sample данных;
-7. считать фактические outcome-метрики по большой выборке;
-8. отдельно учитывать комиссии/slippage, когда будет определён execution protocol;
+7. считать фактические outcome-метрики по большой выборке;8. отдельно учитывать комиссии/slippage, когда будет определён execution protocol;
 9. не менять setup rules задним числом ради улучшения метрики.
 
 Только после появления этого evaluator можно объективно проверять, насколько AICFA приближается к продуктовой цели ~80% прибыльных реализованных setup.
@@ -1446,3 +1444,17 @@ Only after that comparison may we classify the transition as:
 - lifecycle/state handling issue,
 - or analytical/data inconsistency.
 
+## 2026-10-02 — FINDSETUP DIAGNOSTIC: FindSetupResult exposes exact setup rejection details
+
+### Diagnostic action completed
+- Inspected `src/aicfa/find_setup.py` in deployed release `2026-10-02T08-35-35-4678fb0`.
+- Confirmed that `FindSetupResult` already exposes the complete `setup_assessment` object.
+- Confirmed that `find_setup()` builds `market_evidence`, `evidence_assessment`, `scenario_assessment`, `setup_assessment`, and `decision_assessment` before returning the result.
+- Therefore the generic smoke output `CANDIDATES: 0 / REASON: setup conditions are not sufficiently specified` does not require changing Setup Analysis to obtain the detailed rejection context: the existing `setup_assessment.missing_context` is already available in the returned result.
+- Confirmed that this diagnostic step changed **no production code and no trading logic**.
+
+### Important finding
+The next diagnostic must print the existing `setup_assessment.missing_context` from the same BTC FindSetup result. This will identify whether continuation/reversal are rejected because of supporting concepts, scenario evidence, zone availability, entry/invalidation/target geometry, or the existing RR >= 2.0 gate.
+
+### NEXT UNFINISHED
+Run a one-off BTC FindSetup diagnostic that prints `setup_assessment.decision`, `candidates`, `missing_context`, `conflicts`, and the candidate geometry when present. Do not modify production logic until the exact rejection reason is observed.
