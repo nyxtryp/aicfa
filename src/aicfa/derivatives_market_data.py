@@ -1,7 +1,10 @@
 """Public derivatives market-data adapters for AICFA.
 
 Normalizes funding, open interest, liquidations and mark price from real
-exchange endpoints into one causal schema. No API keys are required.
+exchange endpoints/market streams into one causal schema. No API keys are
+required. A zero-liquidation observation is only emitted when the public
+liquidation stream was successfully connected and observed for the polling
+window; it is not treated as liquidation evidence.
 """
 from __future__ import annotations
 
@@ -11,6 +14,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import pandas as pd
+import websocket
 
 
 DERIVATIVE_COLUMNS = (
@@ -61,6 +65,79 @@ def _frame(rows: list[dict]) -> pd.DataFrame:
     )
 
 
+def _collect_binance_liquidations(symbol: str, *, timeout_seconds: float) -> list[dict]:
+    """Collect the public market liquidation stream for a short causal window."""
+    ws = websocket.create_connection(
+        f"wss://fstream.binance.com/ws/{symbol.lower()}@forceOrder",
+        timeout=min(float(timeout_seconds), 2.0),
+    )
+    rows: list[dict] = []
+    deadline = time.monotonic() + min(float(timeout_seconds), 2.0)
+    try:
+        while time.monotonic() < deadline:
+            try:
+                raw = ws.recv()
+            except Exception:
+                break
+            if not raw:
+                continue
+            payload = json.loads(raw)
+            order = payload.get("o", {})
+            ts = int(order.get("T") or payload.get("E") or 0)
+            if not ts:
+                continue
+            qty = float(order.get("z") or order.get("q") or 0.0)
+            price = float(order.get("ap") or order.get("p") or 0.0)
+            volume = qty * price if price > 0 else qty
+            side = str(order.get("S", "")).upper()
+            rows.append({
+                "timestamp": ts,
+                "liquidation_volume": volume,
+                "long_liquidation_volume": volume if side == "SELL" else 0.0,
+                "short_liquidation_volume": volume if side == "BUY" else 0.0,
+            })
+    finally:
+        ws.close()
+    return rows
+
+
+def _collect_bybit_liquidations(symbol: str, *, timeout_seconds: float) -> list[dict]:
+    """Collect the public Bybit all-liquidation stream for a short window."""
+    ws = websocket.create_connection(
+        "wss://stream.bybit.com/v5/public/linear",
+        timeout=min(float(timeout_seconds), 2.0),
+    )
+    rows: list[dict] = []
+    try:
+        ws.send(json.dumps({"op": "subscribe", "args": [f"allLiquidation.{symbol}"]}))
+        deadline = time.monotonic() + min(float(timeout_seconds), 2.0)
+        while time.monotonic() < deadline:
+            try:
+                raw = ws.recv()
+            except Exception:
+                break
+            if not raw:
+                continue
+            payload = json.loads(raw)
+            for item in payload.get("data", []) if isinstance(payload.get("data"), list) else []:
+                ts = int(item.get("T") or payload.get("ts") or 0)
+                if not ts:
+                    continue
+                qty = float(item.get("v") or 0.0)
+                price = float(item.get("p") or 0.0)
+                volume = qty * price if price > 0 else qty
+                side = str(item.get("S", "")).upper()
+                rows.append({
+                    "timestamp": ts,
+                    "liquidation_volume": volume,
+                    "long_liquidation_volume": volume if side == "SELL" else 0.0,
+                    "short_liquidation_volume": volume if side == "BUY" else 0.0,
+                })
+    finally:
+        ws.close()
+    return rows
+
+
 class BinanceDerivativesProvider:
     exchange = "binance"
 
@@ -84,10 +161,8 @@ class BinanceDerivativesProvider:
             + urlencode({"symbol": symbol}),
             timeout_seconds=self.timeout_seconds,
         )
-        liquidations = _request_json(
-            "https://fapi.binance.com/fapi/v1/allForceOrders?"
-            + urlencode({"symbol": symbol, "limit": min(int(limit), 1000)}),
-            timeout_seconds=self.timeout_seconds,
+        liquidation_rows = _collect_binance_liquidations(
+            symbol, timeout_seconds=self.timeout_seconds
         )
 
         rows: dict[int, dict] = {}
@@ -105,20 +180,15 @@ class BinanceDerivativesProvider:
             if "lastFundingRate" in mark:
                 rows[ts].setdefault("funding_rate", float(mark["lastFundingRate"]))
 
-        for item in liquidations if isinstance(liquidations, list) else []:
-            ts = int(item.get("time") or item.get("T") or 0)
-            if not ts:
-                continue
-            qty = float(item.get("origQty") or item.get("executedQty") or item.get("qty") or 0.0)
-            price = float(item.get("price") or 0.0)
-            volume = qty * price if price > 0 else qty
+        for item in liquidation_rows:
+            ts = int(item["timestamp"])
             row = rows.setdefault(ts, {})
-            row["liquidation_volume"] = row.get("liquidation_volume", 0.0) + volume
-            side = str(item.get("side", "")).upper()
-            if side == "SELL":
-                row["long_liquidation_volume"] = row.get("long_liquidation_volume", 0.0) + volume
-            elif side == "BUY":
-                row["short_liquidation_volume"] = row.get("short_liquidation_volume", 0.0) + volume
+            for column in (
+                "liquidation_volume",
+                "long_liquidation_volume",
+                "short_liquidation_volume",
+            ):
+                row[column] = row.get(column, 0.0) + float(item[column])
 
         return _frame([{"timestamp": ts, **values} for ts, values in rows.items()])
 
@@ -150,12 +220,11 @@ class BybitDerivativesProvider:
             "open-interest",
             {"category": "linear", "symbol": symbol, "intervalTime": "5min", "limit": min(int(limit), 200)},
         )
-        ticker = self._get(
-            "tickers", {"category": "linear", "symbol": symbol}
+        ticker = self._get("tickers", {"category": "linear", "symbol": symbol})
+        liquidation_rows = _collect_bybit_liquidations(
+            symbol, timeout_seconds=self.timeout_seconds
         )
-        # Public REST does not expose the all-liquidation stream as a historical
-        # endpoint. Liquidations therefore remain unavailable here until a
-        # websocket/event collector is attached; we never fabricate them.
+
         rows: dict[int, dict] = {}
         for item in funding.get("result", {}).get("list", []):
             ts = int(item["fundingRateTimestamp"])
@@ -172,6 +241,17 @@ class BybitDerivativesProvider:
             rows.setdefault(ts, {})["mark_price"] = float(item["markPrice"])
             if item.get("fundingRate") is not None:
                 rows[ts].setdefault("funding_rate", float(item["fundingRate"]))
+
+        for item in liquidation_rows:
+            ts = int(item["timestamp"])
+            row = rows.setdefault(ts, {})
+            for column in (
+                "liquidation_volume",
+                "long_liquidation_volume",
+                "short_liquidation_volume",
+            ):
+                row[column] = row.get(column, 0.0) + float(item[column])
+
         return _frame([{"timestamp": ts, **values} for ts, values in rows.items()])
 
 
@@ -179,9 +259,13 @@ class FallbackDerivativesProvider:
     """Capability-aware Binance -> Bybit fallback with no fabricated fields."""
 
     def __init__(self, providers=None) -> None:
-        self.providers = tuple(providers or (BinanceDerivativesProvider(), BybitDerivativesProvider()))
+        self.providers = tuple(
+            providers or (BinanceDerivativesProvider(), BybitDerivativesProvider())
+        )
 
-    def fetch_derivatives(self, *, symbol: str, limit: int = 200) -> tuple[pd.DataFrame, str]:
+    def fetch_derivatives(
+        self, *, symbol: str, limit: int = 200
+    ) -> tuple[pd.DataFrame, str]:
         attempts: list[str] = []
         for provider in self.providers:
             try:
@@ -191,4 +275,6 @@ class FallbackDerivativesProvider:
                 return frame, provider.exchange
             except Exception as exc:
                 attempts.append(f"{provider.exchange}: {exc}")
-        raise RuntimeError("all derivatives providers failed: " + "; ".join(attempts))
+        raise RuntimeError(
+            "all derivatives providers failed: " + "; ".join(attempts)
+        )
