@@ -217,3 +217,31 @@ The remaining warnings include the known pytest cache permission warning in Fros
 **Status:** focused mode-aware MTF tests are GREEN.
 
 **NEXT:** run the full repository regression `pytest -q`. Do not mark the complete MTF architecture GREEN until full regression passes and the four-mode live BTC FindSetup smoke verifies the actual timeframe/role contract.
+
+
+### 2026-10-02 — Full regression: 5 legacy MTF/monthly-contract test assumptions
+
+Server full regression:
+- **356 passed**
+- **5 failed**
+- **15,881 warnings**
+
+Failures were identified as test-contract mismatches introduced by the new mode architecture, not five independent production regressions:
+1. Binance test still expected `1M` to be rejected, while the mode architecture explicitly enabled monthly transport.
+2. Bybit test still expected `1M` to be rejected, while `1M -> M` was explicitly enabled.
+3. Setup-engine confirmation test still treated 15m as the confirmation layer; for Intraday the authoritative refinement layer is 1H and execution is 15m.
+4. Setup-engine scenario-zone fixture still used the old seven-TF fixture.
+5. Setup-engine target fixture likewise relied on the old seven-TF fixture.
+
+Test contracts were migrated to the authoritative Intraday profile:
+- `1d -> 4h -> 1h -> 15m`
+- 1H is the refinement/confirmation timeframe.
+- 15m is execution.
+- monthly Binance/Bybit transport is tested as supported behavior.
+
+Fix commits:
+- `953776566502834b56a5c44e51152ace3f9093cb`
+- `35ff1f9c9a567ed865afd1fdc074a2f2f01c347f`
+- `a27f1b61f92629bf1b3b0efeafbdf05ad7ce1c1c`
+
+**NEXT:** rerun the full `pytest -q`. If clean, proceed to the four-mode live BTC FindSetup smoke. Do not weaken production mode authority to satisfy the obsolete seven-TF tests.
