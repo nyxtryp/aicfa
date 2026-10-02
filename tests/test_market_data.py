@@ -66,6 +66,16 @@ def test_next_since_uses_next_candle_open():
     assert next_since_ms(frame, timeframe="1m") == 120000
 
 
-def test_variable_month_timeframe_requires_provider_semantics():
-    with pytest.raises(ValueError):
-        timeframe_ms("1M")
+def test_month_timeframe_uses_calendar_completion_and_cursor():
+    frame = candles([
+        int(pd.Timestamp("2026-01-01", tz="UTC").timestamp() * 1000),
+        int(pd.Timestamp("2026-02-01", tz="UTC").timestamp() * 1000),
+    ])
+    february_start = int(pd.Timestamp("2026-02-15", tz="UTC").timestamp() * 1000)
+    out = completed_ohlcv(frame, timeframe="1M", now_ms=february_start)
+    assert out["timestamp"].tolist() == [
+        int(pd.Timestamp("2026-01-01", tz="UTC").timestamp() * 1000)
+    ]
+    assert next_since_ms(frame.iloc[[0]], timeframe="1M") == int(
+        pd.Timestamp("2026-02-01", tz="UTC").timestamp() * 1000
+    )
