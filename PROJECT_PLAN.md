@@ -343,6 +343,17 @@ Do not revert to the universal seven-timeframe model and do not require the user
 - Next active task: audit and implement a dedicated **Support/Resistance** analysis layer. Current feature inspection shows no explicit `support`/`resistance` feature. Existing related inputs include swing highs/lows, rolling highs/lows, previous highs/lows, liquidity levels/pools, Order Blocks, FVG, dealing ranges, premium/discount, breakouts and sweeps. These are related but are not a dedicated classic S/R layer.
 - Required S/R work: implement causally, distinguish local vs higher-timeframe levels, account for repeated reactions/strength, break/retest/rejection behavior, distance to price, and feed the resulting evidence into scenario/setup reasoning rather than leaving S/R as an implicit side effect.
 
+## 2026-10-03 — TASK 1: CONFIRMED SWING — IMPLEMENTED, SERVER VERIFICATION PENDING
+
+- Audit result: the existing swing detector was already causal in practice: with `right=R`, pivot index `i` was emitted only at confirmation row `i+R`. Downstream protected-structure logic already consumed the confirmed row.
+- Implementation commit: `682095cb62028c2c89a87f665c4f4fd18da5de19` — `feat: expose causal swing confirmation metadata`.
+- The structure layer now explicitly exposes, for external and internal swings: pivot index, confirmation index, pivot timestamp, and confirmation timestamp.
+- The contract is explicit: pivot timestamp is descriptive; confirmation timestamp is the first time downstream logic may use the swing.
+- Focused regression commit: `a20675674850abadc5142eaf770e7874053da0c1` — `test: verify causal swing confirmation contract`.
+- Added tests for exact `pivot -> confirmation` mapping and configurable `right` confirmation delay.
+- No full regression or live BTC verification has been claimed yet. Server verification is pending.
+- **NEXT:** run focused `tests/test_structure.py`; if green, run full `pytest -q`, then validate live BTC before marking Task 1 complete and moving to Task 2 (causal BOS/CHoCH/MSS).
+
 ## PROJECT CONTINUITY RULE
 
 - After every meaningful implementation/test/deploy step, update this file with: **what changed, commit SHA, server verification result, current status, and next step**.
