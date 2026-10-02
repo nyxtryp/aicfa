@@ -204,3 +204,11 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - Next step: rerun:
   `PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_derivatives_market_data.py tests/test_market_context_evidence.py tests/test_optional_liquidations.py`
 - If focused tests are green, run full `pytest -q`. Only after full regression is green, run the live BTC Scalping smoke and verify that auxiliary feeds no longer block a chart-native setup.
+
+
+### Follow-up: focused test correction
+- Server result: **1 failed, 8 passed, 2 warnings in 0.64s**.
+- The remaining failure was a test expectation issue: the fixture intentionally supplies `premium_discount.dealing_range`, and the scenario engine correctly maps that core concept to the **range** hypothesis.
+- `93c6dadd71eb74975fbe20cc99986c765c2c163e`: corrected the test to require exactly the legitimate `range` hypothesis from `premium_discount.dealing_range`, while still asserting that optional feeds do not create continuation/reversal hypotheses.
+- No architecture rollback. The core rule remains: optional feeds are confirmations/observations; chart/SMC support rules generate hypotheses.
+- Server verification for this new commit is pending.
