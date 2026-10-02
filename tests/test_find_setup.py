@@ -205,7 +205,7 @@ def test_find_setup_resolves_user_asset_before_market_data_fetch():
 
 
 
-def test_find_setup_uses_dependency_depth_when_no_diagnostic_limit_is_given():
+def test_find_setup_uses_mode_aware_analysis_depth_when_no_diagnostic_limit_is_given():
     provider = FakeProvider()
     find_setup(
         FindSetupRequest("BTC/USDT"),
@@ -213,7 +213,8 @@ def test_find_setup_uses_dependency_depth_when_no_diagnostic_limit_is_given():
         resolver=lambda asset, market_type: asset,
         now_ms=120 * 60_000,
     )
-    assert [call[4] for call in provider.calls] == [60] * 4 + [120] * 4 + [240] * 4
+    # FindSetup defaults to Intraday, whose role-aware depth is 1d=120, 4h=180, 1h=240, 15m=240.
+    assert [call[4] for call in provider.calls] == [120, 180, 240, 240]
 
 
 
@@ -233,8 +234,8 @@ def test_find_setup_expands_missing_context_until_provider_boundary():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    assert [call[4] for call in provider.calls if call[2] == "1d"] == [60, 120, 240]
-    assert [call[4] for call in provider.calls if call[2] == "4h"] == [60, 120, 240]
+    assert [call[4] for call in provider.calls if call[2] == "1d"] == [120, 240]
+    assert [call[4] for call in provider.calls if call[2] == "4h"] == [180, 360]
     assert len(result.frames["15m"]) == 130
 
 
@@ -252,8 +253,8 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    assert all(call[4] in {60, 120, 240} for call in provider.calls)
-    assert [call[4] for call in provider.calls if call[2] == "1d"] == [60, 120, 240]
+    assert all(call[4] in {120, 180, 240, 360, 480} for call in provider.calls)
+    assert [call[4] for call in provider.calls if call[2] == "1d"] == [120, 240]
 
 
 def test_find_setup_does_not_fetch_optional_microstructure_by_default():
