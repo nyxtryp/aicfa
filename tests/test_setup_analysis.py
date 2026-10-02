@@ -116,3 +116,30 @@ def test_setup_has_no_execution_fields():
     assert not hasattr(result, "quantity")
     assert not hasattr(result, "leverage")
 
+
+
+
+def test_lower_refinement_conflict_cannot_become_a_new_direction():
+    from aicfa.setup_analysis import build_multi_timeframe_context, _resolve_direction
+
+    def frame(direction):
+        return pd.DataFrame({
+            "timestamp": [1],
+            "smc_structure_direction": [direction],
+        })
+
+    analyses = {
+        "1d": frame(1),
+        "4h": frame(1),
+        "1h": frame(-1),
+        "15m": frame(-1),
+    }
+    context = build_multi_timeframe_context(
+        (),
+        analyses,
+        timeframes=("1d", "4h", "1h", "15m"),
+        mode="intraday",
+    )
+    direction, conflict = _resolve_direction(context)
+    assert direction is None
+    assert conflict == "lower confirmation conflicts with higher-timeframe structure"
