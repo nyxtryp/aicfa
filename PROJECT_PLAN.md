@@ -1355,3 +1355,19 @@ Run the updated deployed BTC smoke and read the new RR diagnostics. Use those ex
 3. Add live BTC repeated-call smoke: LONG → temporary WAIT/new-setup degradation → still LONG, then verify closure only on invalidation/TP2.
 4. Define durable state persistence for process restarts before calling lifecycle production-ready.
 5. Only after lifecycle behavior is GREEN, continue to the causal setup outcome evaluator.
+
+
+## 2026-10-02 — RR geometry regression: fixture correction pending server verification
+
+### Failure observed
+- Latest full deployed regression: **354 passed, 1 failed** in 54.76s.
+- Failing test: `tests/test_setup_engine_mtf.py::test_setup_engine_reports_rejected_rr_geometry`.
+- The test expected no candidate after setting 4h active buy-side liquidity to 104, but helper fixture still exposed active buy-side liquidity at 130 on the other timeframes. Target discovery correctly considers eligible higher-timeframe liquidity, so the test did not isolate the intended low-RR geometry.
+
+### Correction made
+- Updated only the test fixture: clear alternative target columns across all timeframes, set the sole valid TP1 to 106, and set the structural invalidation to 99.
+- This yields entry 101–103, risk 2, reward 3, RR 1.5; expected behavior remains rejection under the unchanged RR >= 2.0 gate.
+- No production logic, RR threshold, or target-selection priority was changed.
+
+### NEXT UNFINISHED
+Run `tests/test_setup_engine_mtf.py::test_setup_engine_reports_rejected_rr_geometry`, then `tests/test_setup_lifecycle.py`, then the full repository regression on FrostDeploy. Record actual results before integrating the lifecycle into serving.
