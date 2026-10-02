@@ -574,3 +574,10 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - `73c3381bdf38eb0adebe0ad1b235ecfc31b5c9f0` — adjusted the fixture so row 4 is bullish, preventing a new bullish OB from replacing the original zone on row 5. The lifecycle expectations remain unchanged; production lifecycle code was not altered.
 - This is a test-fixture correction, **not yet verified on the server**.
 - **NEXT:** rerun `tests/test_order_blocks.py`. If green, run full `pytest -q`; update this plan with the actual server results before closing Task 4 or proceeding to Task 5 — FVG / Imbalance Lifecycle.
+
+## 2026-10-03 — TASK 4 ORDER BLOCK LIFECYCLE: FOCUSED TEST GATE GREEN
+
+- Server verification reported by user: `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_order_blocks.py` → **9 passed in 0.60s**.
+- Result: the Order Block lifecycle focused test gate is **GREEN**. The fixture correction prevented a newly recognized OB from replacing the lifecycle under test; production logic was unchanged by the fix.
+- Task 4 full regression has not yet been run after these changes. Task 4 is not fully GREEN until the complete suite passes.
+- **NEXT:** run the complete server regression: `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q`. Record the actual result before closing Task 4 or starting Task 5 — FVG / Imbalance Lifecycle.
