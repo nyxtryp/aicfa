@@ -1492,3 +1492,38 @@ Run a one-off BTC FindSetup diagnostic that prints `setup_assessment.decision`, 
 1. Capture the candidate geometry from this successful LONG (Entry, Invalidation, TP1, TP2, RR, confirmation) in the same diagnostic context.
 2. Recover/compare the exact earlier WAIT run timestamp and seven-timeframe state against this successful LONG state.
 3. Only after that comparison decide whether a production change is justified.
+
+
+## 2026-10-02 — FINDSETUP DIAGNOSTIC: current LONG geometry captured
+
+### Exact candidate geometry
+- Scenario: `continuation`.
+- Direction: `long`.
+- Entry zone: **84,900.00–85,453.36** from 4h active bullish FVG.
+- Invalidation: **84,548.57** from 15m sell-side liquidity.
+- TP1: **86,474.01** from 5m previous high.
+- TP2: **86,640.61** from 15m previous high.
+- Confirmation timeframes: **15m + 5m**.
+- Source timeframes: **1m, 5m, 15m, 1h, 4h, 1d, 1w**.
+- Higher-timeframe direction: **1w = long**.
+- Directional evidence is mixed across lower/middle frames: 1m long, 5m short, 15m long, 1h short, 4h short, 1d long, 1w long. This is observed evidence, not a reason by itself to reject the candidate because the Setup Engine still found sufficient supporting structure.
+
+### RR calculation under the existing production rule
+For LONG the existing gate uses entry high, invalidation and TP1:
+- Risk = 85,453.36 − 84,548.57 = **904.79**.
+- Reward to TP1 = 86,474.01 − 85,453.36 = **1,020.65**.
+- RR = **1.1280**, therefore this candidate is **below the configured 2.0 minimum** if evaluated by the current RR gate.
+
+### Critical inconsistency to investigate
+The live result reports `SetupDecision.READY` with one candidate even though the captured candidate geometry yields RR ≈ **1.128**, below the documented RR >= 2.0 gate. This is a concrete discrepancy requiring code-path inspection; it is not yet evidence that the RR rule itself should change.
+
+Possible explanations to inspect before changing production logic:
+1. the printed candidate was produced by a path that does not apply the same RR gate described in the inspected Setup Analysis code;
+2. the RR calculation uses a different geometry representation than the displayed candidate levels;
+3. the deployed release differs from the source inspected on `main`; or
+4. the candidate construction/selection path contains a genuine regression.
+
+No production rule was changed based on this finding.
+
+### NEXT UNFINISHED
+Inspect the exact deployed `setup_analysis.py` candidate/RR path around candidate construction and compare it byte-for-byte/functionally with `main`. Reproduce the RR calculation from the deployed code on this exact candidate before making any fix.
