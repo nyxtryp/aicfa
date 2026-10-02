@@ -550,3 +550,18 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - Current status: Task 3 — Liquidity Lifecycle is regression-green.
 - **NEXT:** begin Task 4 — Order Block Lifecycle. Audit the current OB implementation first, then implement causal states `UNTOUCHED → TOUCHED → PARTIAL → DEEP → INVALIDATED`, add focused regression tests, commit, and record the actual server verification before proceeding.
 
+
+
+## 2026-10-03 — TASK 4: ORDER BLOCK LIFECYCLE — IMPLEMENTATION COMMITTED, SERVER VERIFICATION PENDING
+
+- Audit of `src/aicfa/order_blocks.py` found a causal OB recognition/invalidation/breaker engine, but only a binary mitigation flag. It did not expose penetration depth or the planned lifecycle state.
+- `ca892f898f162facc49e73787c72ac76cba4ce95` — `feat: add causal order block lifecycle depth`.
+  - Added separate bullish/bearish lifecycle states: `UNTOUCHED`, `TOUCHED`, `PARTIAL`, `DEEP`, `INVALIDATED`.
+  - Added normalized penetration depth (0–1); boundary-only contact is `TOUCHED`, penetration below 50% is `PARTIAL`, and penetration at/above 50% is `DEEP`. Invalidation by close through the far zone boundary takes precedence.
+  - Added prior-candle volume baseline (20 candles, minimum 5 observations), event-volume ratio and a 1.5x descriptive confirmation flag. Volume remains metadata only and does not gate OB creation.
+  - The current event candle is excluded from its own volume baseline. OB creation remains on the displacement candle; lifecycle changes are emitted causally.
+- `8238a48416129bfb24335c042f1522c07aab969a` — added focused tests for the lifecycle depth sequence and prior-volume metadata.
+- `5b3d386922029163589d9e95b0f65687aa5e2caa` — propagated lifecycle state, penetration and volume fields through `build_features`.
+- A follow-up focused-test commit asserts the explicit `INVALIDATED` state (see the immediately following test commit on `main`).
+- **Server verification: PENDING.** These changes have not yet been tested on the deployed release; no focused or full-regression GREEN status is claimed.
+- **NEXT:** run `tests/test_order_blocks.py` on the server. If green, run the full regression suite and report the actual result before closing Task 4. Then audit and implement Task 5 — FVG / Imbalance Lifecycle.
