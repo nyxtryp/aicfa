@@ -4,6 +4,7 @@ from aicfa.data_requirements import (
     TimeframeRole,
     default_setup_requirements,
     requirements_for_concepts,
+    TradingMode,
 )
 
 
@@ -20,6 +21,20 @@ def test_setup_requirements_are_knowledge_driven():
     assert TimeframeRole.LOWER_CONFIRMATION in plan.timeframe_roles
     assert len(plan.concepts) >= 8
     assert plan.required_timeframes == ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
+
+
+def test_mode_profiles_match_authoritative_timeframe_hierarchies():
+    expected = {
+        TradingMode.SCALPING: ("15m", "5m", "1m"),
+        TradingMode.INTRADAY: ("1d", "4h", "1h", "15m"),
+        TradingMode.SWING: ("1w", "1d", "4h", "1h"),
+        TradingMode.POSITION: ("1M", "1w", "1d", "4h"),
+    }
+    for mode, timeframes in expected.items():
+        plan = default_setup_requirements("BTC", mode=mode)
+        assert plan.mode is mode
+        assert plan.required_timeframes == timeframes
+
 
 
 def test_derivatives_knowledge_expands_data_requirements():
