@@ -115,9 +115,10 @@ def test_missing_context_is_explicit_instead_of_fabricated():
         derivatives=pd.DataFrame(),
     )
 
-    assert "microstructure:trades:unavailable" in evidence.missing_context
-    assert "microstructure:order_flow:unavailable" in evidence.missing_context
-    assert "microstructure:cvd:unavailable" in evidence.missing_context
-    assert "microstructure:order_book:unavailable" in evidence.missing_context
-    assert "microstructure:absorption:unavailable" in evidence.missing_context
-    assert "derivatives:liquidations:unavailable" in evidence.missing_context
+    assert "microstructure:trades:unavailable" in evidence.optional_missing_context
+    assert "microstructure:order_flow:unavailable" in evidence.optional_missing_context
+    assert "microstructure:cvd:unavailable" in evidence.optional_missing_context
+    assert "microstructure:order_book:unavailable" in evidence.optional_missing_context
+    assert "microstructure:absorption:unavailable" in evidence.optional_missing_context
+    assert "derivatives:liquidations:unavailable" in evidence.optional_missing_context
+    assert "derivatives:liquidations:unavailable" not in evidence.missing_context
