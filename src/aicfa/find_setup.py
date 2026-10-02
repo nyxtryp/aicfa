@@ -313,15 +313,7 @@ def find_setup(
     derivatives_frame = pd.DataFrame()
     derivatives_analysis = pd.DataFrame()
     derivatives_source = ""
-    if (use_live_derivatives or derivatives_provider is not None) and all(
-        requirements.requires(kind)
-        for kind in (
-            DataKind.FUNDING,
-            DataKind.OPEN_INTEREST,
-            DataKind.LIQUIDATIONS,
-            DataKind.MARK_PRICE,
-        )
-    ):
+    if use_live_derivatives or derivatives_provider is not None:
         try:
             derivatives_source_provider = derivatives_provider or FallbackDerivativesProvider()
             derivatives_frame, derivatives_source = derivatives_source_provider.fetch_derivatives(
@@ -360,8 +352,9 @@ def find_setup(
         )
         trades_provider = provider.__class__.__name__
 
-    if trades.empty:
-        raise ValueError("no trade data available for microstructure analysis")
+    # Trades and order-book data are confirmation layers, not prerequisites
+    # for the core chart/SMC analysis. Their absence must not invalidate a
+    # valid chart-based analysis.
 
     history_fetch = getattr(provider, "fetch_order_book_history_with_source", None)
     if history_fetch is not None:
