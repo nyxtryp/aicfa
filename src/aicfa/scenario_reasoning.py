@@ -32,22 +32,22 @@ def _unique(values: list[str]) -> tuple[str, ...]:
 
 _SCENARIO_RULES = {
     "continuation": {
-        "support": {"market_structure.bos", "displacement", "order_block.bullish", "order_block.bearish"},
+        "support": {"market_structure.bos", "displacement", "order_block.bullish", "order_block.bearish", "microstructure.order_flow", "microstructure.cvd", "derivatives.price_oi"},
         "confirm": ("follow-through displacement", "structure remains intact"),
         "invalidate": ("decisive structural failure", "acceptance against the active leg"),
     },
     "reversal": {
-        "support": {"market_structure.choch", "liquidity.sweep", "price_action.rejection", "wyckoff.spring"},
+        "support": {"market_structure.choch", "liquidity.sweep", "price_action.rejection", "wyckoff.spring", "wyckoff.state", "microstructure.absorption", "derivatives.liquidations"},
         "confirm": ("structural follow-through", "rejection of the prior state"),
         "invalidate": ("acceptance in the prior direction", "failed structural transition"),
     },
     "range": {
-        "support": {"market_structure.range", "wyckoff.trading_range", "price_action.compression"},
+        "support": {"market_structure.range", "wyckoff.trading_range", "price_action.compression", "microstructure.order_book", "premium_discount.dealing_range"},
         "confirm": ("repeated reactions at range boundaries", "lack of sustained expansion"),
         "invalidate": ("sustained acceptance outside the range", "structural expansion"),
     },
     "breakout_failure": {
-        "support": {"market_structure.bos", "liquidity.sweep", "price_action.rejection"},
+        "support": {"market_structure.bos", "liquidity.sweep", "price_action.rejection", "microstructure.order_flow", "microstructure.order_book", "microstructure.absorption", "derivatives.liquidations"},
         "confirm": ("failed acceptance beyond the level", "return through the broken area"),
         "invalidate": ("sustained acceptance beyond the breakout level",),
     },
