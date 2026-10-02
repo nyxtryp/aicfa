@@ -369,7 +369,6 @@ def build_zone_reaction(
                 _remove_level(support_levels, zone_id)
 
         break_resistance = []
-        resistance_limit = close / max(1.0 + break_threshold_pct, 1e-12)
         while resistance_break_heap and resistance_break_heap[0][0] * (1.0 + break_threshold_pct) < close:
             _, zone_id = heapq.heappop(resistance_break_heap)
             if zone_state[zone_id] == STATE_CODE[ZONE_RETESTED] and close > zone_high[zone_id] * (1.0 + break_threshold_pct):
@@ -459,9 +458,9 @@ def build_zone_reaction(
                 for zone_id in retest_idx.tolist():
                     level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
                     if zone_side[zone_id] == 1:
-                        heapq.heappush(support_break_heap, (-level, zone_id))
+                        heapq.heappush(support_break_heap, (-float(zone_low[zone_id]), zone_id))
                     else:
-                        heapq.heappush(resistance_break_heap, (level, zone_id))
+                        heapq.heappush(resistance_break_heap, (float(zone_high[zone_id]), zone_id))
                 out.at[i, "zone_retest_support"] |= int(np.any(zone_side[retest_idx] == 1))
                 out.at[i, "zone_retest_resistance"] |= int(np.any(zone_side[retest_idx] == -1))
 
