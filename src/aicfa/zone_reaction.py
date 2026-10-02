@@ -170,27 +170,64 @@ def build_zone_reaction(
     out["zone_active_support"] = 0
     out["zone_active_resistance"] = 0
 
-    # Keep every source zone independently, but evaluate the lifecycle in
-    # vectorized batches.  The previous implementation walked and sorted the
-    # Python zone list for every candle, which became O(n^2) Python work on
-    # long feature frames (e.g. the 10,080-row MTF integration test).
-    zones = []
+    # Store zones in fixed NumPy-backed arrays.  The previous implementation
+    # rebuilt Python lists of active zones and then iterated every active zone
+    # on every candle.  On long MTF frames that created avoidable Python-level
+    # O(n * zones) work.  A bounded array keeps the lifecycle work in NumPy.
+    max_zones = max(1, n * 8)
+    zone_low = np.full(max_zones, np.nan, dtype=float)
+    zone_high = np.full(max_zones, np.nan, dtype=float)
+    zone_created = np.full(max_zones, -1, dtype=np.int32)
+    zone_side = np.zeros(max_zones, dtype=np.int8)
+    zone_state = np.zeros(max_zones, dtype=np.int8)
+    zone_touched = np.zeros(max_zones, dtype=bool)
+    zone_reacted = np.zeros(max_zones, dtype=bool)
+    zone_retested = np.zeros(max_zones, dtype=bool)
+    zone_source = np.empty(max_zones, dtype=object)
+    zone_count = 0
+
+    STATE_CODE = {
+        ZONE_UNTOUCHED: 0,
+        ZONE_TOUCHED: 1,
+        ZONE_REACTED: 2,
+        ZONE_RETESTED: 3,
+        ZONE_BROKEN: 4,
+        ZONE_CANCELLED: 5,
+    }
+    STATE_NAME = np.array(
+        [
+            ZONE_UNTOUCHED,
+            ZONE_TOUCHED,
+            ZONE_REACTED,
+            ZONE_RETESTED,
+            ZONE_BROKEN,
+            ZONE_CANCELLED,
+        ],
+        dtype=object,
+    )
+
+    def _append_zone(*, source, side, low, high, created):
+        nonlocal zone_count
+        if zone_count >= max_zones:
+            raise RuntimeError("zone capacity exceeded")
+        if not np.isfinite(low) or not np.isfinite(high):
+            return False
+        lo, hi = sorted((float(low), float(high)))
+        zone_low[zone_count] = lo
+        zone_high[zone_count] = hi
+        zone_created[zone_count] = created
+        zone_side[zone_count] = 1 if side == "support" else -1
+        zone_state[zone_count] = STATE_CODE[ZONE_UNTOUCHED]
+        zone_source[zone_count] = source
+        zone_count += 1
+        return True
+
     source_specs = (
         ("fvg", "fvg_bullish", "fvg_bullish_low", "fvg_bullish_high", "support"),
         ("fvg", "fvg_bearish", "fvg_bearish_low", "fvg_bearish_high", "resistance"),
         ("order_block", "order_block_bullish", "order_block_bullish_low", "order_block_bullish_high", "support"),
         ("order_block", "order_block_bearish", "order_block_bearish_low", "order_block_bearish_high", "resistance"),
     )
-
-    def _state_rank(state):
-        return {
-            ZONE_UNTOUCHED: 0,
-            ZONE_TOUCHED: 1,
-            ZONE_REACTED: 2,
-            ZONE_RETESTED: 3,
-            ZONE_BROKEN: 4,
-            ZONE_CANCELLED: 5,
-        }[state]
 
     for i in range(n):
         created_count = 0
@@ -199,17 +236,19 @@ def build_zone_reaction(
             s = structure.iloc[i]
             if int(_value(s, "swing_high", 0) or 0) == 1:
                 price = _value(s, "swing_high_price")
-                if np.isfinite(price):
-                    _add_zone(zones, source="resistance", side="resistance",
-                              low=price, high=price, created=i)
+                if _append_zone(
+                    source="resistance", side="resistance",
+                    low=price, high=price, created=i
+                ):
                     out.at[i, "zone_created_resistance"] = 1
                     out.at[i, "zone_resistance_price"] = price
                     created_count += 1
             if int(_value(s, "swing_low", 0) or 0) == 1:
                 price = _value(s, "swing_low_price")
-                if np.isfinite(price):
-                    _add_zone(zones, source="support", side="support",
-                              low=price, high=price, created=i)
+                if _append_zone(
+                    source="support", side="support",
+                    low=price, high=price, created=i
+                ):
                     out.at[i, "zone_created_support"] = 1
                     out.at[i, "zone_support_price"] = price
                     created_count += 1
@@ -222,8 +261,15 @@ def build_zone_reaction(
             if int(_value(row, flag, 0) or 0) != 1:
                 continue
             lo, hi = _value(row, low_col), _value(row, high_col)
-            if _add_zone(zones, source=source, side=side, low=lo, high=hi, created=i):
-                out.at[i, "zone_created_fvg" if source == "fvg" else "zone_created_order_block"] += 1
+            if _append_zone(
+                source=source, side=side, low=lo, high=hi, created=i
+            ):
+                out.at[
+                    i,
+                    "zone_created_fvg"
+                    if source == "fvg"
+                    else "zone_created_order_block",
+                ] += 1
                 created_count += 1
 
         if liquidity is not None:
@@ -234,53 +280,42 @@ def build_zone_reaction(
             ):
                 price = _value(row, col)
                 if np.isfinite(price):
-                    _add_zone(zones, source="liquidity", side=side,
-                              low=price, high=price, created=i)
+                    _append_zone(
+                        source="liquidity", side=side,
+                        low=price, high=price, created=i
+                    )
                     out.at[i, "zone_created_liquidity"] += 1
                     created_count += 1
 
         out.at[i, "zone_source_count"] = created_count
 
-        # Only pre-existing active zones may react on row i.  We still update
-        # every active zone, not just the nearest one, so concurrent source
-        # lifecycles remain independent and causal.
-        active_indices = [
-            j for j, z in enumerate(zones)
-            if z["created"] < i and z["state"] not in {ZONE_BROKEN, ZONE_CANCELLED}
-        ]
-
-        if not active_indices:
+        if zone_count == 0:
             continue
-
-        lows = np.fromiter((zones[j]["low"] for j in active_indices), dtype=float)
-        highs = np.fromiter((zones[j]["high"] for j in active_indices), dtype=float)
-        sides = np.fromiter(
-            (1 if zones[j]["side"] == "support" else -1 for j in active_indices),
-            dtype=np.int8,
-        )
-        touched_before = np.fromiter(
-            (zones[j]["touched"] for j in active_indices), dtype=bool
-        )
-        reacted_before = np.fromiter(
-            (zones[j]["reacted"] for j in active_indices), dtype=bool
-        )
-        retested_before = np.fromiter(
-            (zones[j]["retested"] for j in active_indices), dtype=bool
-        )
 
         h = float(x["high"].iloc[i])
         l = float(x["low"].iloc[i])
         close = float(x["close"].iloc[i])
 
+        active = (
+            (zone_created[:zone_count] < i)
+            & (zone_state[:zone_count] != STATE_CODE[ZONE_BROKEN])
+            & (zone_state[:zone_count] != STATE_CODE[ZONE_CANCELLED])
+        )
+        if not active.any():
+            continue
+
+        idx = np.flatnonzero(active)
+        lows = zone_low[idx]
+        highs = zone_high[idx]
+        sides = zone_side[idx]
+
         widths = np.maximum(highs - lows, 0.0)
         pads = np.maximum(
-            np.abs(np.where(sides == -1, highs, lows)) * reaction_threshold_pct,
+            np.abs(np.where(sides == -1, highs, lows))
+            * reaction_threshold_pct,
             1e-12,
         )
-        overlap = (
-            (h >= lows - pads)
-            & (l <= highs + pads)
-        )
+        overlap = (h >= lows - pads) & (l <= highs + pads)
         point_touch = np.where(
             sides == -1,
             h >= highs - pads,
@@ -299,85 +334,84 @@ def build_zone_reaction(
             close < lows * (1.0 - break_threshold_pct),
         )
 
-        retest_touch = touched_now
-        # A retest is the post-reaction re-interaction with the level.
-        # It is allowed to occur on the same candle that first closes across
-        # the level; the actual break is confirmed on a subsequent candle.
-        retest_now = (
+        touched_before = zone_touched[idx]
+        reacted_before = zone_reacted[idx]
+        retested_before = zone_retested[idx]
+
+        break_mask = retested_before & break_now
+        touch_mask = ~touched_before & touched_now & ~break_mask
+        reaction_mask = (
+            touched_before
+            & ~reacted_before
+            & reaction_now
+            & ~break_mask
+            & ~touch_mask
+        )
+        retest_mask = (
             reacted_before
-            & retest_touch
+            & touched_now
             & np.where(
                 sides == -1,
                 close > highs,
                 close < lows,
             )
+            & ~break_mask
+            & ~touch_mask
+            & ~reaction_mask
         )
 
-        # Lifecycle precedence:
-        # 1) an already-retested zone may break;
-        # 2) otherwise first touch;
-        # 3) otherwise first reaction;
-        # 4) otherwise post-reaction retest.
-        break_mask = retested_before & break_now
-        touch_mask = ~touched_before & touched_now & ~break_mask
-        reaction_mask = touched_before & ~reacted_before & reaction_now & ~break_mask & ~touch_mask
-        retest_mask = retest_now & ~break_mask & ~touch_mask & ~reaction_mask
+        if break_mask.any():
+            break_idx = idx[break_mask]
+            zone_state[break_idx] = STATE_CODE[ZONE_BROKEN]
+            out.at[i, "zone_break_support"] |= int(np.any(zone_side[break_idx] == 1))
+            out.at[i, "zone_break_resistance"] |= int(np.any(zone_side[break_idx] == -1))
 
-        for local, zone_index in enumerate(active_indices):
-            z = zones[zone_index]
-            side_name = z["side"]
+        if touch_mask.any():
+            touch_idx = idx[touch_mask]
+            zone_touched[touch_idx] = True
+            zone_state[touch_idx] = STATE_CODE[ZONE_TOUCHED]
+            out.at[i, "zone_touch_support"] |= int(np.any(zone_side[touch_idx] == 1))
+            out.at[i, "zone_touch_resistance"] |= int(np.any(zone_side[touch_idx] == -1))
 
-            if break_mask[local]:
-                z["state"] = ZONE_BROKEN
-                out.at[i, f"zone_break_{side_name}"] = 1
-            elif touch_mask[local]:
-                z["touched"] = True
-                z["state"] = ZONE_TOUCHED
-                out.at[i, f"zone_touch_{side_name}"] = 1
-            elif reaction_mask[local]:
-                z["reacted"] = True
-                z["state"] = ZONE_REACTED
-                out.at[i, f"zone_reaction_{side_name}"] = 1
-            elif retest_mask[local]:
-                z["retested"] = True
-                z["state"] = ZONE_RETESTED
-                out.at[i, f"zone_retest_{side_name}"] = 1
+        if reaction_mask.any():
+            reaction_idx = idx[reaction_mask]
+            zone_reacted[reaction_idx] = True
+            zone_state[reaction_idx] = STATE_CODE[ZONE_REACTED]
+            out.at[i, "zone_reaction_support"] |= int(np.any(zone_side[reaction_idx] == 1))
+            out.at[i, "zone_reaction_resistance"] |= int(np.any(zone_side[reaction_idx] == -1))
 
-        # Aggregate the nearest currently active zone for the scalar price,
-        # distance and state fields.  The underlying list still retains every
-        # source zone and its independent lifecycle.
-        active_after = [
-            j for j, z in enumerate(zones)
-            if z["state"] not in {ZONE_BROKEN, ZONE_CANCELLED}
-        ]
+        if retest_mask.any():
+            retest_idx = idx[retest_mask]
+            zone_retested[retest_idx] = True
+            zone_state[retest_idx] = STATE_CODE[ZONE_RETESTED]
+            out.at[i, "zone_retest_support"] |= int(np.any(zone_side[retest_idx] == 1))
+            out.at[i, "zone_retest_resistance"] |= int(np.any(zone_side[retest_idx] == -1))
+
+        active_after = (
+            (zone_created[:zone_count] < i)
+            & (zone_state[:zone_count] != STATE_CODE[ZONE_BROKEN])
+            & (zone_state[:zone_count] != STATE_CODE[ZONE_CANCELLED])
+        )
         for side_name, side_value in (("support", 1), ("resistance", -1)):
-            candidates = [
-                j for j in active_after if (1 if zones[j]["side"] == "support" else -1) == side_value
-            ]
-            if not candidates:
-                continue
-            best = min(
-                candidates,
-                key=lambda j: (
-                    abs(close - (zones[j]["low"] + zones[j]["high"]) / 2.0),
-                    zones[j]["created"],
-                ),
+            candidates = np.flatnonzero(
+                active_after & (zone_side[:zone_count] == side_value)
             )
-            z = zones[best]
-            level = (z["low"] + z["high"]) / 2.0
+            if candidates.size == 0:
+                continue
+            levels = (zone_low[candidates] + zone_high[candidates]) / 2.0
+            distances = np.abs(close - levels)
+            best_local = int(np.argmin(distances))
+            best = candidates[best_local]
+            level = float(levels[best_local])
             distance = abs(close - level) / max(abs(close), 1e-12)
             out.at[i, f"zone_{side_name}_price"] = level
             out.at[i, f"zone_distance_to_{side_name}"] = distance
-            out.at[i, f"zone_{side_name}_state"] = z["state"]
+            out.at[i, f"zone_{side_name}_state"] = STATE_NAME[zone_state[best]]
             out.at[i, f"zone_active_{side_name}"] = 1
 
-        # If the nearest zone was broken on this candle it is no longer an
-        # active candidate for aggregation, but the event/state on this row
-        # must still expose the terminal BROKEN transition.
         for side_name in ("support", "resistance"):
             if out.at[i, f"zone_break_{side_name}"] == 1:
                 out.at[i, f"zone_{side_name}_state"] = ZONE_BROKEN
                 out.at[i, f"zone_active_{side_name}"] = 0
-
 
     return out
