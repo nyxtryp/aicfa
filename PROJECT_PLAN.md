@@ -110,3 +110,11 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 
 ---
 ---
+
+## 2026-10-02 — FULL REGRESSION GATE GREEN
+
+- Server verification completed after the market-context evidence integration: `PYTHONPATH=src .venv/bin/python -m pytest -q` → **368 passed, 15880 warnings in 45.91s**.
+- Result: full regression passes with zero test failures. The warning count is non-blocking for this gate.
+- Verification gate is now GREEN for the market-context/data-sufficiency block.
+- Code baseline at this verification: `4ff738674d0dbab168c64e818744c0910a05d419`.
+- Next step: run the four separate live BTC FindSetup smoke checks for internal validation only: Scalping (15m→5m→1m), Intraday (1d→4h→1h→15m), Swing (1w→1d→4h→1h), Position (1M→1w→1d→4h). Inspect exact mode/timeframes, evidence completeness, derivatives provider/data, scenario hypotheses, decision and reason. End-user UX remains asset-only.
