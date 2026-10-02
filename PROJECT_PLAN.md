@@ -243,3 +243,40 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - Regression gate is GREEN for the current deployed release. No claim is made here that live market behavior has been verified by this test run.
 - Next step: perform live BTC FindSetup smoke checks for the four internal modes, inspecting exact selected timeframes, data/evidence availability, hypotheses, decision and reason. End-user input remains asset-only; the four calls are internal validation.
 - Follow-up audit item: remove any test expectation that encodes a universal seven-timeframe default; each mode must use its authoritative mode-specific timeframe profile.
+
+
+## 2026-10-02 — FOUR-MODE LIVE BTC FINDSETUP SMOKE GREEN
+
+- Live BTC validation completed for all four internal trading modes after the full regression gate.
+- Scalping: exact timeframes **15m→5m→1m**; decision **WAIT**; reason: **higher-timeframe structure and lower-timeframe confirmation conflict**; no blocking missing context.
+- Intraday: exact timeframes **1d→4h→1h→15m**; decision **WAIT**; continuation/reversal structural RR was **1.255 < 2.000**; range support was insufficient and breakout-failure evidence incomplete.
+- Swing: exact timeframes **1w→1d→4h→1h**; decision **WAIT**; continuation/reversal structural RR was **0.560 < 2.000**; range support was insufficient and breakout-failure evidence incomplete.
+- Position: exact timeframes **1M→1w→1d→4h**; decision **WAIT**; continuation/reversal structural RR was **0.289 < 2.000**; range support was insufficient and breakout-failure evidence incomplete.
+- Result: all four mode profiles select their authoritative mode-specific timeframe sets. The system does not fall back to a universal seven-timeframe grid.
+- End-user contract remains unchanged: the user supplies only the asset; the eventual orchestrator evaluates Scalping, Intraday, Swing and Position automatically. The four separate calls above are internal validation only.
+
+## 2026-10-02 — ANALYSIS DEPTH AUDIT: UNIVERSAL 60-CANDLE BASE IDENTIFIED
+
+- Live inspection showed the current Position request received exactly **60 candles on every selected timeframe**: `1M=60, 1w=60, 1d=60, 4h=60`.
+- Repository audit explains the current behavior: `analysis_depth.py` derives a global technical minimum from the largest current feature dependency, `feature.rolling=60`, and applies that minimum to every selected timeframe.
+- Important architectural finding: **60 is a technical feature/warmup minimum, not a validated SMC market-context requirement**.
+- The same 60-row depth represents radically different historical context by timeframe: 60×1m=1h, 60×5m=5h, 60×15m=15h, 60×1h=2.5d, 60×4h=10d, 60×1d=60d, 60×1w=60w, 60×1M=5y.
+- Therefore the current rule `every timeframe = 60 rows` must not be treated as the final SMC data-depth design.
+- Current adaptive expansion only doubles a timeframe when blocking `missing_context` remains unresolved, up to two expansion passes. It does not yet define sufficient historical depth for SMC structure, liquidity, Order Block/FVG lifecycle, HTF context, MTF context and LTF confirmation.
+- This is an **architecture audit finding**, not yet a production code change. No arbitrary replacement such as 500 or 1000 candles is being introduced.
+
+## NEXT ACTIVE TASK — ADAPTIVE SMC ANALYSIS DEPTH
+
+Goal: replace the universal 60-candle assumption with a concept-driven, mode-aware and timeframe-aware depth model.
+
+Required design:
+1. Separate **technical feature warmup** from **SMC market-context history**.
+2. Define explicit depth requirements for market structure, liquidity, BOS/CHoCH/MSS, HH/HL/LH/LL, FVG/imbalance, Order Blocks, premium/discount, displacement, Wyckoff and price action.
+3. Account for each mode's role hierarchy: Scalping **15m→5m→1m**; Intraday **1d→4h→1h→15m**; Swing **1w→1d→4h→1h**; Position **1M→1w→1d→4h**.
+4. Do not choose a single arbitrary candle count for all timeframes.
+5. Make depth adaptive: if the required structure/context cannot be established from the current history, AICFA must request more historical candles for the affected timeframe instead of silently analyzing an insufficient slice.
+6. Preserve causal/no-future-leakage behavior.
+7. Add tests proving the selected depth follows analytical requirements and that adaptive expansion is deterministic.
+8. After implementation: focused tests → full `pytest -q` → live BTC four-mode smoke → record actual returned depths and decisions in this plan.
+
+Do not revert to the universal seven-timeframe model and do not require the user to select a trading mode.
