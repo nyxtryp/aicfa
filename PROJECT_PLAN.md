@@ -302,3 +302,18 @@ Do not revert to the universal seven-timeframe model and do not require the user
 3. Run the full `pytest -q` regression.
 4. Run live BTC FindSetup for all four internal modes and inspect actual returned candle counts per timeframe.
 5. If the live result shows insufficient structure/zone context, tune the depth contract from observed evidence and tests rather than reverting to a universal candle count.
+
+
+## 2026-10-02 — ANALYSIS DEPTH TEST FAILURE AND CONTRACT FIX
+
+- Server focused test result reported by user: `tests/test_analysis_depth.py` → **1 failed, 3 passed**. The failing test constructed `default_setup_requirements("BTCUSDT")` without a trading mode, then expected mode-specific mixed depths `{120, 180, 240}`.
+- Root cause: a mode-less plan has no authoritative timeframe-to-role mapping. The resolver intentionally uses the conservative 240-row depth rather than guessing the role for each timeframe. The user's diagnostic command also omitted `mode`, so its all-240 result did not represent live mode-specific FindSetup requests.
+- `90fcddd6facc680edb142136ee310310c947a829`: corrected regression coverage to verify the exact role-aware depths for **all four explicit modes**:
+  - Scalping: 15m=120, 5m=180, 1m=240
+  - Intraday: 1d=120, 4h=180, 1h=240, 15m=240
+  - Swing: 1w=120, 1d=180, 4h=240, 1h=240
+  - Position: 1M=120, 1w=180, 1d=240, 4h=240
+  - Added a separate assertion that a mode-less generic plan conservatively resolves to 240 rows because roles are ambiguous.
+- `6fa2a72a901ffc37427b371201d8de052d3c0d6b`: documented the intentional conservative fallback in `analysis_depth.py`. No production depth behavior was loosened to make the test pass.
+- **Verification status: PENDING.** These commits have been pushed to `main`; the server must deploy them before focused and full regression tests can confirm the fix.
+- Next step: run `tests/test_analysis_depth.py` on the deployed release. If green, run the full suite. Do not claim the tests are green until the server returns the result.
