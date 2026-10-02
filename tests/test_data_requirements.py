@@ -12,8 +12,8 @@ def test_setup_requirements_are_knowledge_driven():
     plan = default_setup_requirements("BTC")
     assert plan.asset == "BTC"
     assert DataKind.OHLCV in plan.data_kinds
-    assert DataKind.TRADES in plan.data_kinds
-    assert DataKind.ORDER_BOOK in plan.data_kinds
+    assert DataKind.TRADES not in plan.data_kinds
+    assert DataKind.ORDER_BOOK not in plan.data_kinds
     assert ContextNeed.STRUCTURAL_ANCHORS in plan.context_needs
     assert ContextNeed.CROSS_TIMEFRAME_CONTEXT in plan.context_needs
     assert TimeframeRole.EXECUTION in plan.timeframe_roles
