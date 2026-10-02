@@ -61,10 +61,21 @@ def _swing_layer(
     result["swing_low_pivot_index"] = np.full(n, -1, dtype="int64")
     result["swing_high_confirmation_index"] = np.full(n, -1, dtype="int64")
     result["swing_low_confirmation_index"] = np.full(n, -1, dtype="int64")
+    # Structural-break provenance: the reference swing is recorded at the
+    # confirmed row that made the level causally available. Event time remains
+    # the current break row; pivot time is never used as availability time.
+    result["bos_up_reference_pivot_index"] = np.full(n, -1, dtype="int64")
+    result["bos_up_reference_confirmation_index"] = np.full(n, -1, dtype="int64")
+    result["bos_down_reference_pivot_index"] = np.full(n, -1, dtype="int64")
+    result["bos_down_reference_confirmation_index"] = np.full(n, -1, dtype="int64")
     result["structure_direction"] = np.zeros(n, dtype="int8")
 
     last_high: float | None = None
     last_low: float | None = None
+    last_high_pivot_index = -1
+    last_low_pivot_index = -1
+    last_high_confirmation_index = -1
+    last_low_confirmation_index = -1
     direction = 0
     broken_high: float | None = None
     broken_low: float | None = None
@@ -93,6 +104,8 @@ def _swing_layer(
                 elif highs[pivot] < last_high * (1 - equal_tolerance):
                     result["lh"][confirmation] = 1
             last_high = highs[pivot]
+            last_high_pivot_index = pivot
+            last_high_confirmation_index = confirmation
 
         if is_low:
             result["swing_low"][confirmation] = 1
@@ -105,6 +118,8 @@ def _swing_layer(
                 elif lows[pivot] < last_low * (1 - equal_tolerance):
                     result["ll"][confirmation] = 1
             last_low = lows[pivot]
+            last_low_pivot_index = pivot
+            last_low_confirmation_index = confirmation
 
         if (
             last_high is not None
@@ -112,6 +127,8 @@ def _swing_layer(
             and broken_high != last_high
         ):
             result["bos_up"][confirmation] = 1
+            result["bos_up_reference_pivot_index"][confirmation] = last_high_pivot_index
+            result["bos_up_reference_confirmation_index"][confirmation] = last_high_confirmation_index
             if direction < 0:
                 result["choch_up"][confirmation] = 1
             direction = 1
@@ -123,6 +140,8 @@ def _swing_layer(
             and broken_low != last_low
         ):
             result["bos_down"][confirmation] = 1
+            result["bos_down_reference_pivot_index"][confirmation] = last_low_pivot_index
+            result["bos_down_reference_confirmation_index"][confirmation] = last_low_confirmation_index
             if direction > 0:
                 result["choch_down"][confirmation] = 1
             direction = -1
