@@ -77,7 +77,7 @@ def append_market_context_evidence(
     optional_missing = list(evidence.optional_missing_context)
 
     if trades is None or trades.empty:
-        missing.append("microstructure:trades:unavailable")
+        optional_missing.append("microstructure:trades:unavailable")
     else:
         latest_trade = _latest(trades)
         _append(
@@ -90,7 +90,7 @@ def append_market_context_evidence(
 
     flow = _latest(order_flow)
     if flow is None:
-        missing.append("microstructure:order_flow:unavailable")
+        optional_missing.append("microstructure:order_flow:unavailable")
     else:
         imbalance = _number(flow.get("taker_imbalance"))
         net = _number(flow.get("taker_net_volume"))
@@ -111,11 +111,11 @@ def append_market_context_evidence(
             notes="causal taker order-flow state derived from venue-provided trades",
         )
         if imbalance is None:
-            missing.append("microstructure:order_flow:direction_unavailable")
+            optional_missing.append("microstructure:order_flow:direction_unavailable")
 
     cvd_row = _latest(cvd)
     if cvd_row is None:
-        missing.append("microstructure:cvd:unavailable")
+        optional_missing.append("microstructure:cvd:unavailable")
     else:
         cvd_delta = _number(cvd_row.get("cvd_delta"))
         direction = "long" if cvd_delta is not None and cvd_delta > 0 else "short" if cvd_delta is not None and cvd_delta < 0 else None
@@ -135,11 +135,11 @@ def append_market_context_evidence(
             notes="causal cumulative volume delta derived from venue-provided trades",
         )
         if cvd_delta is None:
-            missing.append("microstructure:cvd:delta_unavailable")
+            optional_missing.append("microstructure:cvd:delta_unavailable")
 
     book = _latest(order_book)
     if book is None:
-        missing.append("microstructure:order_book:unavailable")
+        optional_missing.append("microstructure:order_book:unavailable")
     else:
         imbalance = _number(book.get("bid_ask_imbalance"))
         spread = _number(book.get("spread"))
@@ -160,11 +160,11 @@ def append_market_context_evidence(
             notes="causal top-of-book state derived from venue-provided order-book snapshot",
         )
         if imbalance is None:
-            missing.append("microstructure:order_book:imbalance_unavailable")
+            optional_missing.append("microstructure:order_book:imbalance_unavailable")
 
     absorption_row = _latest(absorption)
     if absorption_row is None:
-        missing.append("microstructure:absorption:unavailable")
+        optional_missing.append("microstructure:absorption:unavailable")
     else:
         active = bool(absorption_row.get("absorption", False))
         side = str(absorption_row.get("absorption_side", "")).lower()
