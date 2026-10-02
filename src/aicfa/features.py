@@ -129,7 +129,11 @@ def build_features(
                     "breaker_bullish","breaker_bearish","breaker",
                     "order_block_displacement_bullish","order_block_displacement_bearish",
                     "order_block_bullish_low","order_block_bullish_high",
-                    "order_block_bearish_low","order_block_bearish_high"]:
+                    "order_block_bearish_low","order_block_bearish_high",
+                    "order_block_bullish_state","order_block_bearish_state",
+                    "order_block_bullish_penetration","order_block_bearish_penetration",
+                    "order_block_bullish_volume_ratio","order_block_bearish_volume_ratio",
+                    "order_block_bullish_volume_confirmed","order_block_bearish_volume_confirmed"]:
         out[column]=order_blocks[column].to_numpy()
 
     from .price_action import build_price_action
