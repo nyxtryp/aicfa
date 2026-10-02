@@ -261,9 +261,6 @@ def default_setup_requirements(asset: str, *, mode: TradingMode | str | None = N
             "premium_discount.dealing_range",
             "price_action.rejection",
             "wyckoff.spring",
-            "derivatives.price_oi",
-            "microstructure.order_flow",
-            "microstructure.order_book",
         ),
         mode=mode,
     )
