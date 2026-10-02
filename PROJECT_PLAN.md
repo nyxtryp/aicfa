@@ -354,6 +354,14 @@ Do not revert to the universal seven-timeframe model and do not require the user
 - No full regression or live BTC verification has been claimed yet. Server verification is pending.
 - **NEXT:** run focused `tests/test_structure.py`; if green, run full `pytest -q`, then validate live BTC before marking Task 1 complete and moving to Task 2 (causal BOS/CHoCH/MSS).
 
+## 2026-10-03 — TASK 1 FOCUSED TEST GATE GREEN
+
+- Server verification reported by user: `tests/test_structure.py` → **10 passed in 0.76s**.
+- Result: Confirmed Swing focused regression gate is **GREEN**.
+- The causal swing contract and new pivot/confirmation metadata pass the full structure test module.
+- Full regression has not yet been run after these changes.
+- **NEXT:** run the complete `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q`. If green, perform the planned live BTC validation for Task 1 before moving to Task 2.
+
 ## PROJECT CONTINUITY RULE
 
 - After every meaningful implementation/test/deploy step, update this file with: **what changed, commit SHA, server verification result, current status, and next step**.
