@@ -12,6 +12,12 @@ import pandas as pd
 
 EPS = 1e-12
 
+FVG_UNTOUCHED = "UNTOUCHED"
+FVG_TOUCHED = "TOUCHED"
+FVG_PARTIAL = "PARTIAL"
+FVG_FILLED = "FILLED"
+FVG_INVALIDATED = "INVALIDATED"
+
 
 def _validate(df: pd.DataFrame) -> pd.DataFrame:
     required = ["timestamp", "open", "high", "low", "close", "volume"]
@@ -38,6 +44,24 @@ def _validate(df: pd.DataFrame) -> pd.DataFrame:
     return x
 
 
+def _lifecycle_state(*, low, high, gap_low, gap_high, bullish):
+    width = max(gap_high - gap_low, EPS)
+    if bullish:
+        penetration = float(np.clip((gap_high - low) / width, 0.0, 1.0))
+        touched = low <= gap_high
+    else:
+        penetration = float(np.clip((high - gap_low) / width, 0.0, 1.0))
+        touched = high >= gap_low
+
+    if penetration >= 1.0 - EPS:
+        return FVG_FILLED, penetration
+    if penetration > EPS:
+        return FVG_PARTIAL, penetration
+    if touched:
+        return FVG_TOUCHED, 0.0
+    return FVG_UNTOUCHED, 0.0
+
+
 def build_fvg(
     df: pd.DataFrame,
     *,
@@ -50,12 +74,8 @@ def build_fvg(
     - bullish FVG at t when low[t] > high[t-2];
     - bearish FVG at t when high[t] < low[t-2].
 
-    The gap bounds are fixed at creation. Mitigation is the first later candle
-    that trades into the gap. A fill occurs when price fully crosses the gap
-    boundary. Invalidation is defined as a close through the opposite side.
-
-    If require_displacement is enabled, the current candle must be a
-    displacement candle from the causal displacement engine.
+    Gap bounds are fixed at creation. Every active zone is tracked separately,
+    so a new FVG cannot erase an older still-active FVG.
     """
     if min_gap_pct < 0:
         raise ValueError("min_gap_pct must be non-negative")
@@ -65,98 +85,117 @@ def build_fvg(
     n = len(x)
 
     for column in [
-        "fvg_bullish", "fvg_bearish", "fvg",
-        "fvg_size", "fvg_size_pct",
-        "fvg_displacement_bullish", "fvg_displacement_bearish",
-        "fvg_mitigated", "fvg_filled", "fvg_invalidated",
-        "fvg_active",
-        "fvg_bullish_low", "fvg_bullish_high",
-        "fvg_bearish_low", "fvg_bearish_high",
+        "fvg_bullish", "fvg_bearish", "fvg", "fvg_mitigated", "fvg_filled",
+        "fvg_invalidated", "fvg_active", "fvg_displacement_bullish",
+        "fvg_displacement_bearish", "fvg_active_bullish_count",
+        "fvg_active_bearish_count",
     ]:
-        out[column] = 0 if column not in {
-            "fvg_size", "fvg_size_pct",
-            "fvg_bullish_low", "fvg_bullish_high",
-            "fvg_bearish_low", "fvg_bearish_high",
-        } else np.nan
+        out[column] = 0
+    for column in [
+        "fvg_size", "fvg_size_pct", "fvg_bullish_low", "fvg_bullish_high",
+        "fvg_bearish_low", "fvg_bearish_high", "fvg_bullish_penetration",
+        "fvg_bearish_penetration", "fvg_bullish_creation_index",
+        "fvg_bearish_creation_index", "fvg_bullish_creation_timestamp",
+        "fvg_bearish_creation_timestamp",
+    ]:
+        out[column] = np.nan
+    out["fvg_bullish_state"] = FVG_UNTOUCHED
+    out["fvg_bearish_state"] = FVG_UNTOUCHED
 
     low = x["low"].to_numpy()
     high = x["high"].to_numpy()
     close = x["close"].to_numpy()
+    timestamps = x["timestamp"].to_numpy()
 
     displacement = None
     if require_displacement:
         from .displacement import build_displacement
         displacement = build_displacement(x)
 
-    active_bullish = None
-    active_bearish = None
+    bullish_zones = []
+    bearish_zones = []
 
     for i in range(n):
-        # First update the existing lifecycle using the current candle.
-        if active_bullish is not None:
-            low_bound, high_bound = active_bullish
-            if not out.at[i, "fvg_mitigated"] and low[i] <= high_bound:
-                out.at[i, "fvg_mitigated"] = 1
-            if low[i] <= low_bound:
-                out.at[i, "fvg_filled"] = 1
-                active_bullish = None
-            elif close[i] < low_bound:
-                out.at[i, "fvg_invalidated"] = 1
-                active_bullish = None
-            elif active_bullish is not None:
-                out.at[i, "fvg_active"] = 1
+        for zones, bullish in ((bullish_zones, True), (bearish_zones, False)):
+            for zone in list(zones):
+                state, penetration = _lifecycle_state(
+                    low=low[i], high=high[i],
+                    gap_low=zone["low"], gap_high=zone["high"],
+                    bullish=bullish,
+                )
+                if bullish and close[i] < zone["low"] and low[i] < zone["low"]:
+                    state = FVG_INVALIDATED
+                elif not bullish and close[i] > zone["high"] and high[i] > zone["high"]:
+                    state = FVG_INVALIDATED
 
-        if active_bearish is not None:
-            low_bound, high_bound = active_bearish
-            if not out.at[i, "fvg_mitigated"] and high[i] >= low_bound:
-                out.at[i, "fvg_mitigated"] = 1
-            if high[i] >= high_bound:
-                out.at[i, "fvg_filled"] = 1
-                active_bearish = None
-            elif close[i] > high_bound:
-                out.at[i, "fvg_invalidated"] = 1
-                active_bearish = None
-            elif active_bearish is not None:
-                out.at[i, "fvg_active"] = 1
+                zone["state"] = state
+                zone["penetration"] = penetration
 
-        if i < 2:
-            continue
+                if state in {FVG_TOUCHED, FVG_PARTIAL, FVG_FILLED}:
+                    out.at[i, "fvg_mitigated"] = 1
+                if state == FVG_FILLED:
+                    out.at[i, "fvg_filled"] = 1
+                    zones.remove(zone)
+                elif state == FVG_INVALIDATED:
+                    out.at[i, "fvg_invalidated"] = 1
+                    zones.remove(zone)
 
-        bullish = low[i] > high[i - 2] + EPS
-        bearish = high[i] < low[i - 2] - EPS
+        if i >= 2:
+            bullish = low[i] > high[i - 2] + EPS
+            bearish = high[i] < low[i - 2] - EPS
 
-        if bullish:
-            gap_low = high[i - 2]
-            gap_high = low[i]
-            gap = gap_high - gap_low
-            if gap / max(abs(close[i]), EPS) >= min_gap_pct:
-                disp_ok = True if displacement is None else displacement.at[i, "displacement_up"] == 1
-                if disp_ok:
-                    out.at[i, "fvg_bullish"] = 1
-                    out.at[i, "fvg"] = 1
-                    out.at[i, "fvg_size"] = gap
-                    out.at[i, "fvg_size_pct"] = gap / max(abs(close[i]), EPS)
-                    out.at[i, "fvg_bullish_low"] = gap_low
-                    out.at[i, "fvg_bullish_high"] = gap_high
-                    out.at[i, "fvg_displacement_bullish"] = int(displacement is not None)
-                    active_bullish = (gap_low, gap_high)
-                    out.at[i, "fvg_active"] = 1
+            if bullish:
+                gap_low, gap_high = high[i - 2], low[i]
+                gap = gap_high - gap_low
+                if gap / max(abs(close[i]), EPS) >= min_gap_pct:
+                    disp_ok = True if displacement is None else displacement.at[i, "displacement_up"] == 1
+                    if disp_ok:
+                        out.at[i, "fvg_bullish"] = 1
+                        out.at[i, "fvg"] = 1
+                        out.at[i, "fvg_size"] = gap
+                        out.at[i, "fvg_size_pct"] = gap / max(abs(close[i]), EPS)
+                        out.at[i, "fvg_bullish_low"] = gap_low
+                        out.at[i, "fvg_bullish_high"] = gap_high
+                        out.at[i, "fvg_bullish_creation_index"] = i
+                        out.at[i, "fvg_bullish_creation_timestamp"] = timestamps[i]
+                        out.at[i, "fvg_displacement_bullish"] = int(displacement is not None)
+                        bullish_zones.append({
+                            "low": gap_low, "high": gap_high,
+                            "state": FVG_UNTOUCHED, "penetration": 0.0,
+                        })
+                        out.at[i, "fvg_active"] = 1
 
-        if bearish:
-            gap_low = high[i]
-            gap_high = low[i - 2]
-            gap = gap_high - gap_low
-            if gap / max(abs(close[i]), EPS) >= min_gap_pct:
-                disp_ok = True if displacement is None else displacement.at[i, "displacement_down"] == 1
-                if disp_ok:
-                    out.at[i, "fvg_bearish"] = 1
-                    out.at[i, "fvg"] = 1
-                    out.at[i, "fvg_size"] = gap
-                    out.at[i, "fvg_size_pct"] = gap / max(abs(close[i]), EPS)
-                    out.at[i, "fvg_bearish_low"] = gap_low
-                    out.at[i, "fvg_bearish_high"] = gap_high
-                    out.at[i, "fvg_displacement_bearish"] = int(displacement is not None)
-                    active_bearish = (gap_low, gap_high)
-                    out.at[i, "fvg_active"] = 1
+            if bearish:
+                gap_low, gap_high = high[i], low[i - 2]
+                gap = gap_high - gap_low
+                if gap / max(abs(close[i]), EPS) >= min_gap_pct:
+                    disp_ok = True if displacement is None else displacement.at[i, "displacement_down"] == 1
+                    if disp_ok:
+                        out.at[i, "fvg_bearish"] = 1
+                        out.at[i, "fvg"] = 1
+                        out.at[i, "fvg_size"] = gap
+                        out.at[i, "fvg_size_pct"] = gap / max(abs(close[i]), EPS)
+                        out.at[i, "fvg_bearish_low"] = gap_low
+                        out.at[i, "fvg_bearish_high"] = gap_high
+                        out.at[i, "fvg_bearish_creation_index"] = i
+                        out.at[i, "fvg_bearish_creation_timestamp"] = timestamps[i]
+                        out.at[i, "fvg_displacement_bearish"] = int(displacement is not None)
+                        bearish_zones.append({
+                            "low": gap_low, "high": gap_high,
+                            "state": FVG_UNTOUCHED, "penetration": 0.0,
+                        })
+                        out.at[i, "fvg_active"] = 1
+
+        out.at[i, "fvg_active_bullish_count"] = len(bullish_zones)
+        out.at[i, "fvg_active_bearish_count"] = len(bearish_zones)
+
+        if bullish_zones:
+            zone = bullish_zones[-1]
+            out.at[i, "fvg_bullish_state"] = zone["state"]
+            out.at[i, "fvg_bullish_penetration"] = zone["penetration"]
+        if bearish_zones:
+            zone = bearish_zones[-1]
+            out.at[i, "fvg_bearish_state"] = zone["state"]
+            out.at[i, "fvg_bearish_penetration"] = zone["penetration"]
 
     return out
