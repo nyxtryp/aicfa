@@ -180,3 +180,20 @@ Fix commits:
 - `cfd5470d058dd24db006a1ef723e37727052fbc9`
 
 **NEXT:** rerun the same focused test command. Do not proceed to full regression until it is clean.
+
+
+### 2026-10-02 — Focused suite result: one remaining test-import regression
+
+Server-side focused suite result:
+- **40 passed**
+- **1 failed**
+- **10,768 warnings**
+- remaining failure: `tests/test_setup_analysis.py::test_lower_refinement_conflict_cannot_become_a_new_direction`
+- failure: `NameError: name 'pd' is not defined`
+
+The higher-horizon test itself reached the expected code path; the remaining failure was only the missing pandas test import.
+
+Fix committed:
+- `d75e6cf4aaae80b361f3b4b5150967bc94800fdd` — restore `import pandas as pd` in `tests/test_setup_analysis.py`.
+
+**NEXT:** rerun the same focused suite. If it is clean, proceed to the full `pytest -q` regression. Do not mark MTF mode architecture GREEN until full regression and the four-mode BTC smoke are also clean.
