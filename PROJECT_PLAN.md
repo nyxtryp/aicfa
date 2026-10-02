@@ -159,3 +159,24 @@ The code and tests have been committed to `main`, but the full pytest suite has 
 4. Run live BTC FindSetup smoke for all four modes and inspect the actual returned timeframe set/roles.
 5. Complete the structured setup explanation: mode, scenario, per-TF role/result, setup TF, entry TF, Entry, Invalidation, TP1/TP2, RR, confirmation, rationale, invalidation conditions.
 6. Only after MTF mode architecture is GREEN continue to the next AICFA block.
+
+
+### 2026-10-02 — Focused-test fixes after first mode-contract run
+The first server focused run exposed 7 regressions caused by the initial mode migration:
+- two FindSetup expansion tests still asserted the old universal 7-TF/1m contract;
+- legacy Setup Analysis tests accessed mode-only context fields when running without a frame map;
+- the new higher-horizon test was missing its pandas import;
+- MultiTimeframeContext contained a duplicate `structure_timeframe` declaration.
+
+Fixes committed:
+- preserve legacy Setup Analysis behavior when `analyses is None`;
+- remove duplicate context field;
+- update expansion assertions to the explicit default Intraday contract;
+- add missing pandas test import.
+
+Fix commits:
+- `931fcbd307d37283ceded598f251c17171e12d12`
+- `5bbcb2274dde0fd3e971523e62e8a4b7b53db6b3`
+- `cfd5470d058dd24db006a1ef723e37727052fbc9`
+
+**NEXT:** rerun the same focused test command. Do not proceed to full regression until it is clean.
