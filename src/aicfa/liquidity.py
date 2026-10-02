@@ -73,7 +73,6 @@ def build_liquidity(
         "liquidity_pool_created_high", "liquidity_pool_created_low",
         "liquidity_pool_swept_high", "liquidity_pool_swept_low",
         "liquidity_pool_invalidated_high", "liquidity_pool_invalidated_low",
-        "liquidity_pool_reaction_high", "liquidity_pool_reaction_low",
     ]
     for column in binary:
         out[column] = 0
@@ -84,7 +83,6 @@ def build_liquidity(
         "previous_high", "previous_low",
         "internal_previous_high", "internal_previous_low",
         "active_buy_liquidity_price", "active_sell_liquidity_price",
-        "last_swept_buy_liquidity_price", "last_swept_sell_liquidity_price",
     ]
     for column in numeric:
         out[column] = np.nan
@@ -112,7 +110,6 @@ def build_liquidity(
     int_low_by_row = {i: p for i, p in int_lows}
 
     pools = []
-    swept_pool_reaction_candidates = []
     last_ext_high = last_ext_low = None
     last_int_high = last_int_low = None
     prev_ext_high = prev_ext_low = None
@@ -135,18 +132,7 @@ def build_liquidity(
             add_pool(row=row, side=side, level=(price + previous_price) / 2.0, external=external)
 
     for row in range(n):
-        for candidate in swept_pool_reaction_candidates:
-            if candidate["state"] != "pending" or candidate["row"] >= row:
-                continue
-            level = candidate["level"]
-            if candidate["side"] == "buy" and closes[row] < level:
-                out.at[row, "liquidity_pool_reaction_high"] = 1
-                candidate["state"] = "reacted"
-            elif candidate["side"] == "sell" and closes[row] > level:
-                out.at[row, "liquidity_pool_reaction_low"] = 1
-                candidate["state"] = "reacted"
-
-        for pool in pools
+        for pool in pools:
             if pool["state"] != "active" or pool["created"] >= row:
                 continue
             side = pool["side"]
@@ -158,8 +144,6 @@ def build_liquidity(
                     out.at[row, "sweep_high_reclaim"] = 1
                     out.at[row, "sweep_high_level"] = level
                     out.at[row, "liquidity_pool_swept_high"] = 1
-                    out.at[row, "last_swept_buy_liquidity_price"] = level
-                    swept_pool_reaction_candidates.append({"side": "buy", "level": level, "row": row, "state": "pending"})
                 elif closes[row] > level:
                     pool["state"] = "broken"
                     out.at[row, "sweep_high_level"] = level
@@ -172,8 +156,6 @@ def build_liquidity(
                     out.at[row, "sweep_low_reclaim"] = 1
                     out.at[row, "sweep_low_level"] = level
                     out.at[row, "liquidity_pool_swept_low"] = 1
-                    out.at[row, "last_swept_sell_liquidity_price"] = level
-                    swept_pool_reaction_candidates.append({"side": "sell", "level": level, "row": row, "state": "pending"})
                 elif closes[row] < level:
                     pool["state"] = "broken"
                     out.at[row, "sweep_low_level"] = level

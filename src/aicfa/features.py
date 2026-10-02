@@ -102,6 +102,8 @@ def build_features(
         "liquidity_pool_created_high","liquidity_pool_created_low",
         "liquidity_pool_swept_high","liquidity_pool_swept_low",
         "liquidity_pool_invalidated_high","liquidity_pool_invalidated_low",
+        "liquidity_pool_reaction_high","liquidity_pool_reaction_low",
+        "last_swept_buy_liquidity_price","last_swept_sell_liquidity_price",
     ]:
         out[column]=liquidity[column].to_numpy()
 
