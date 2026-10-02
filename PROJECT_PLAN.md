@@ -581,3 +581,12 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - Result: the Order Block lifecycle focused test gate is **GREEN**. The fixture correction prevented a newly recognized OB from replacing the lifecycle under test; production logic was unchanged by the fix.
 - Task 4 full regression has not yet been run after these changes. Task 4 is not fully GREEN until the complete suite passes.
 - **NEXT:** run the complete server regression: `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q`. Record the actual result before closing Task 4 or starting Task 5 — FVG / Imbalance Lifecycle.
+
+
+## 2026-10-03 — TASK 4 ORDER BLOCK LIFECYCLE: FULL REGRESSION GATE GREEN
+
+- Server verification reported by user: `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q` → **377 passed in 44.89s**.
+- Result: Task 4 — Order Block Lifecycle is **regression-green** with zero test failures.
+- Focused gate was already GREEN: `tests/test_order_blocks.py` → **9 passed in 0.60s**.
+- The full suite confirms the causal OB lifecycle/depth, invalidation state, volume metadata, and feature-pipeline integration do not regress the broader AICFA system.
+- **NEXT:** begin Task 5 — **FVG / Imbalance Lifecycle**. First audit the current FVG implementation, then implement/verify causal creation → active/unmitigated → touch/partial fill → mitigation/fill → invalidation where applicable, preserve bounds/displacement/timeframe provenance, add focused tests, commit, and only then run the full regression gate.
