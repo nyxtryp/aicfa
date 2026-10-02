@@ -313,7 +313,7 @@ def find_setup(
     derivatives_frame = pd.DataFrame()
     derivatives_analysis = pd.DataFrame()
     derivatives_source = ""
-    if use_live_derivatives or derivatives_provider is not None:
+    if requirements.requires(DataKind.FUNDING) or derivatives_provider is not None:
         try:
             derivatives_source_provider = derivatives_provider or FallbackDerivativesProvider()
             derivatives_frame, derivatives_source = derivatives_source_provider.fetch_derivatives(
@@ -336,113 +336,108 @@ def find_setup(
             timeframe=profile.context_timeframe,
         )
 
-    trade_fetch = getattr(provider, "fetch_trades_with_source", None)
-    book_fetch = getattr(provider, "fetch_order_book_with_source", None)
+    trades = pd.DataFrame()
+    order_book = pd.DataFrame()
+    order_flow_analysis = pd.DataFrame()
+    order_book_analysis = pd.DataFrame()
+    cvd_analysis = pd.DataFrame()
+    absorption_analysis = pd.DataFrame()
+    order_book_history = pd.DataFrame()
+    order_book_history_provider = ""
+    trades_provider = ""
+    order_book_provider = ""
 
-    trade_limit = 60
-    if trade_fetch is not None:
-        trade_result = trade_fetch(
-            symbol=symbol, market_type=request.market_type, limit=trade_limit
-        )
-        trades = trade_result.frame
-        trades_provider = trade_result.provider
-    else:
-        trades = provider.fetch_trades(
-            symbol=symbol, market_type=request.market_type, limit=trade_limit
-        )
-        trades_provider = provider.__class__.__name__
+    # Collect auxiliary market feeds only when the active knowledge plan
+    # explicitly requires them. Core chart/SMC analysis does not pay the
+    # collection/storage cost for feeds it does not need.
+    if requirements.requires(DataKind.TRADES):
+        trade_fetch = getattr(provider, "fetch_trades_with_source", None)
+        trade_limit = 60
+        if trade_fetch is not None:
+            trade_result = trade_fetch(
+                symbol=symbol, market_type=request.market_type, limit=trade_limit
+            )
+            trades = trade_result.frame
+            trades_provider = trade_result.provider
+        else:
+            trades = provider.fetch_trades(
+                symbol=symbol, market_type=request.market_type, limit=trade_limit
+            )
+            trades_provider = provider.__class__.__name__
 
-    # Trades and order-book data are confirmation layers, not prerequisites
-    # for the core chart/SMC analysis. Their absence must not invalidate a
-    # valid chart-based analysis.
+        if not trades.empty:
+            trade_work = trades.copy()
+            trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
+            latest_trade_timestamp = trade_work["timestamp"].max()
+            flow_base = pd.DataFrame({"timestamp": [latest_trade_timestamp]})
+            order_flow_analysis = build_trade_order_flow(
+                flow_base, trades, baseline_window=24, event_window=60
+            )
+            cvd_analysis = build_trade_cvd(
+                pd.DataFrame({"timestamp": [latest_trade_timestamp]}), trades
+            )
 
-    history_fetch = getattr(provider, "fetch_order_book_history_with_source", None)
-    if history_fetch is not None:
-        history_result = history_fetch(
-            symbol=symbol,
-            market_type=request.market_type,
-            snapshots=8,
-            interval_seconds=1.0,
-        )
-        order_book_history = history_result.frame
-        order_book_history_provider = history_result.provider
-    else:
-        order_book_history = pd.DataFrame()
-        order_book_history_provider = ""
-    if book_fetch is not None:
-        book_result = book_fetch(
-            symbol=symbol, market_type=request.market_type, limit=1
-        )
-        order_book = book_result.frame
-        order_book_provider = book_result.provider
-    else:
-        order_book = provider.fetch_order_book(
-            symbol=symbol, market_type=request.market_type, limit=1
-        )
-        order_book_provider = provider.__class__.__name__
+    if requirements.requires(DataKind.ORDER_BOOK):
+        history_fetch = getattr(provider, "fetch_order_book_history_with_source", None)
+        if history_fetch is not None:
+            history_result = history_fetch(
+                symbol=symbol,
+                market_type=request.market_type,
+                snapshots=8,
+                interval_seconds=1.0,
+            )
+            order_book_history = history_result.frame
+            order_book_history_provider = history_result.provider
 
-    trade_work = trades.copy()
-    trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
-    latest_trade_timestamp = trade_work["timestamp"].max()
-    history_work = order_book_history.copy()
-    if not history_work.empty:
-        history_work["timestamp"] = pd.to_datetime(history_work["timestamp"], unit="ms", utc=True)
-        for column in ("bid_price", "bid_size", "ask_price", "ask_size"):
-            history_work[column] = pd.to_numeric(history_work[column], errors="raise")
-        latest_book_timestamp = history_work["timestamp"].max()
-    else:
-        latest_book_timestamp = latest_trade_timestamp
-    observation_timestamp = min(latest_trade_timestamp, latest_book_timestamp)
-    flow_base = pd.DataFrame({"timestamp": [observation_timestamp]})
-    order_flow_analysis = build_trade_order_flow(
-        flow_base,
-        trades,
-        baseline_window=24,
-        event_window=60,
-    )
+        book_fetch = getattr(provider, "fetch_order_book_with_source", None)
+        if book_fetch is not None:
+            book_result = book_fetch(
+                symbol=symbol, market_type=request.market_type, limit=1
+            )
+            order_book = book_result.frame
+            order_book_provider = book_result.provider
+        else:
+            order_book = provider.fetch_order_book(
+                symbol=symbol, market_type=request.market_type, limit=1
+            )
+            order_book_provider = provider.__class__.__name__
 
-    book_work = order_book.copy()
-    book_work["timestamp"] = pd.to_datetime(book_work["timestamp"], unit="ms", utc=True)
-    order_book_analysis = build_order_book(
-        pd.DataFrame({"timestamp": book_work["timestamp"]}), order_book
-    )
-    cvd_analysis = build_trade_cvd(
-        pd.DataFrame({"timestamp": [observation_timestamp]}), trades
-    )
+        if not order_book.empty:
+            book_work = order_book.copy()
+            book_work["timestamp"] = pd.to_datetime(book_work["timestamp"], unit="ms", utc=True)
+            order_book_analysis = build_order_book(
+                pd.DataFrame({"timestamp": book_work["timestamp"]}), order_book
+            )
 
-    if not history_work.empty:
-        levels = pd.concat(
-            [
-                history_work[["timestamp", "bid_price", "bid_size"]].rename(
-                    columns={"bid_price": "price", "bid_size": "size"}
-                ).assign(side="bid"),
-                history_work[["timestamp", "ask_price", "ask_size"]].rename(
-                    columns={"ask_price": "price", "ask_size": "size"}
-                ).assign(side="ask"),
-            ],
-            ignore_index=True,
-        )
-        mids = (history_work["bid_price"] + history_work["ask_price"]) / 2.0
-        price_frame = pd.DataFrame({"timestamp": history_work["timestamp"], "mid": mids})
-        price_frame = price_frame.sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
-        price_frame["open"] = price_frame["mid"].shift(1).fillna(price_frame["mid"])
-        price_frame["close"] = price_frame["mid"]
-        price_frame["high"] = price_frame[["open", "close"]].max(axis=1)
-        price_frame["low"] = price_frame[["open", "close"]].min(axis=1)
-        absorption_base = price_frame[["timestamp", "open", "high", "low", "close"]]
-        absorption_flow = build_trade_order_flow(
-            flow_base,
-            trades,
-            baseline_window=24,
-            event_window=60,
-        )
-        absorption_analysis = build_absorption(
-            absorption_base,
-            absorption_flow,
-            levels,
-        )
-    else:
-        absorption_analysis = pd.DataFrame()
+        if not order_book_history.empty and not trades.empty:
+            history_work = order_book_history.copy()
+            history_work["timestamp"] = pd.to_datetime(history_work["timestamp"], unit="ms", utc=True)
+            for column in ("bid_price", "bid_size", "ask_price", "ask_size"):
+                history_work[column] = pd.to_numeric(history_work[column], errors="raise")
+
+            levels = pd.concat(
+                [
+                    history_work[["timestamp", "bid_price", "bid_size"]].rename(
+                        columns={"bid_price": "price", "bid_size": "size"}
+                    ).assign(side="bid"),
+                    history_work[["timestamp", "ask_price", "ask_size"]].rename(
+                        columns={"ask_price": "price", "ask_size": "size"}
+                    ).assign(side="ask"),
+                ],
+                ignore_index=True,
+            )
+            mids = (history_work["bid_price"] + history_work["ask_price"]) / 2.0
+            price_frame = pd.DataFrame({"timestamp": history_work["timestamp"], "mid": mids})
+            price_frame = price_frame.sort_values("timestamp").drop_duplicates("timestamp").reset_index(drop=True)
+            price_frame["open"] = price_frame["mid"].shift(1).fillna(price_frame["mid"])
+            price_frame["close"] = price_frame["mid"]
+            price_frame["high"] = price_frame[["open", "close"]].max(axis=1)
+            price_frame["low"] = price_frame[["open", "close"]].min(axis=1)
+            absorption_analysis = build_absorption(
+                price_frame[["timestamp", "open", "high", "low", "close"]],
+                order_flow_analysis,
+                levels,
+            )
 
     # Feed every collected microstructure/context layer into the same causal
     # evidence graph used by scenario, setup and final decision reasoning.
