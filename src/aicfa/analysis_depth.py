@@ -1,12 +1,8 @@
 """Knowledge-derived adaptive analysis-depth contract.
 
-This module describes why temporary OHLCV context is required. It does not
-choose an exchange limit and it does not persist market history.
-
-The initial minimum is derived from the causal dependencies currently used by
-the deterministic feature graph. Active lifecycle state and recent events are
-not bounded by an arbitrary row count, so the contract marks them for adaptive
-context expansion.
+This module separates feature warm-up from the market-history depth needed by
+SMC/price-action analysis. The returned row counts are analysis defaults, not
+exchange limits; providers may return fewer rows when history is unavailable.
 """
 from __future__ import annotations
 
@@ -14,7 +10,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Mapping, Sequence
 
-from .data_requirements import ContextNeed, DataRequirementPlan
+from .data_requirements import (
+    ContextNeed,
+    DataRequirementPlan,
+    TimeframeRole,
+)
 
 
 class ContextResolution(str, Enum):
@@ -47,8 +47,18 @@ class AnalysisDepthRequirement:
         return ContextResolution.ACTIVE_LIFECYCLE_STATE in self.resolutions
 
 
-# These values are dependency facts of the current causal feature graph, not
-# production fetch limits. The largest explicit rolling dependency is 60.
+# These are analysis-history defaults, not exchange/provider limits.
+# SMC does not define one universal candle count: HTF establishes broad
+# context, the structure timeframe defines the active swing, and lower
+# timeframes refine/execute. We therefore give each role a different history
+# budget while keeping enough rows for the current causal feature graph.
+_ROLE_DEPTH_ROWS: Mapping[TimeframeRole, int] = {
+    TimeframeRole.BROADER_CONTEXT: 120,
+    TimeframeRole.HIGHER_STRUCTURE: 180,
+    TimeframeRole.LOWER_CONFIRMATION: 240,
+    TimeframeRole.EXECUTION: 240,
+}
+
 _FEATURE_DEPENDENCIES: tuple[DependencyRequirement, ...] = (
     DependencyRequirement("feature.rolling", 60, "features.py uses a 60-row causal rolling baseline"),
     DependencyRequirement("displacement.baseline", 21, "20 prior candles plus the current candle"),
@@ -65,24 +75,32 @@ def _dependency_minimum() -> int:
     return max(item.rows for item in _FEATURE_DEPENDENCIES)
 
 
+def _role_depth(plan: DataRequirementPlan, timeframe: str) -> int:
+    if plan.mode is None:
+        return max(_ROLE_DEPTH_ROWS.values())
+    profile = plan.mode
+    # Mode is normalized by DataRequirementPlan; required_timeframes and roles
+    # remain the authoritative mapping for the active analysis.
+    from .data_requirements import mode_timeframe_profile
+
+    roles = dict(mode_timeframe_profile(profile).roles)
+    role = roles.get(timeframe)
+    if role is None:
+        return max(_ROLE_DEPTH_ROWS.values())
+    return _ROLE_DEPTH_ROWS[role]
+
+
 def resolve_analysis_depth(
     plan: DataRequirementPlan,
     *,
     timeframes: Sequence[str] | None = None,
 ) -> Mapping[str, AnalysisDepthRequirement]:
-    """Resolve minimum temporary context from the active knowledge plan.
-
-    The result deliberately separates dependency warm-up from lifecycle
-    history. A finite warm-up proves that the feature graph can initialize;
-    it cannot prove that an arbitrarily old FVG/OB/liquidity state is inactive.
-    Such state requires adaptive expansion until the relevant causal anchor is
-    established or the provider's available context is exhausted.
-    """
+    """Resolve mode/role-aware SMC history plus technical warm-up context."""
     selected = tuple(plan.required_timeframes if timeframes is None else timeframes)
     if not selected:
         raise ValueError("analysis depth requires at least one timeframe")
 
-    minimum = _dependency_minimum()
+    dependency_minimum = _dependency_minimum()
     resolutions = [ContextResolution.MINIMUM_DEPENDENCY_CONTEXT]
     if plan.needs(ContextNeed.RECENT_EVENTS):
         resolutions.append(ContextResolution.RECENT_EVENTS)
@@ -100,7 +118,7 @@ def resolve_analysis_depth(
     return {
         timeframe: AnalysisDepthRequirement(
             timeframe=timeframe,
-            minimum_rows=minimum,
+            minimum_rows=max(dependency_minimum, _role_depth(plan, timeframe)),
             resolutions=tuple(dict.fromkeys(resolutions)),
             dependencies=_FEATURE_DEPENDENCIES,
             adaptive=adaptive,
