@@ -234,8 +234,8 @@ def test_find_setup_expands_missing_context_until_provider_boundary():
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
     assert [call[4] for call in provider.calls if call[2] == "1d"] == [60, 120, 240]
-    assert [call[4] for call in provider.calls if call[2] == "1w"] == [60, 120, 240]
-    assert len(result.frames["1m"]) == 130
+    assert [call[4] for call in provider.calls if call[2] == "4h"] == [60, 120, 240]
+    assert len(result.frames["15m"]) == 130
 
 
 class UnboundedNoContextProvider(FakeProvider):
@@ -253,7 +253,7 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
     assert all(call[4] in {60, 120, 240} for call in provider.calls)
-    assert [call[4] for call in provider.calls if call[2] == "1m"] == [60, 120, 240]
+    assert [call[4] for call in provider.calls if call[2] == "1d"] == [60, 120, 240]
 
 
 def test_find_setup_feeds_request_scoped_microstructure_data():
