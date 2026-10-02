@@ -1,3 +1,20 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 ZONE REACTION PERFORMANCE FIX
+
+### What changed
+- Audited the active Task 6 plan and current zone-reaction implementation.
+- Confirmed the focused zone contract is already GREEN: **5 passed in 0.49s** on the server.
+- Found the integration bottleneck in `zone_reaction.py`: the lifecycle rebuilt/scanned Python zone lists on every candle, which remained effectively O(n × zones) Python work on the 10,080-row MTF integration path.
+- Reworked lifecycle storage/evaluation to NumPy-backed fixed arrays, removing the per-candle Python active-zone list construction and per-zone lifecycle loop while preserving causal creation and state-transition precedence.
+- Commit: `dea1d542574d9c00ce72a24cefed40ec4087934b` — `perf: remove Python zone lifecycle scans`
+
+### Verification status
+- Server focused `tests/test_zone_reaction.py`: **5 passed in 0.49s**.
+- Server `tests/test_features.py`: **pending after performance fix**.
+- Full regression: **not run yet**.
+
+### Next step
+Run the server integration test `tests/test_features.py`. If GREEN, run the full regression, then finalize Task 6 documentation and move to the next planned task.
+
 ### Task 6 — Zone Reaction + Support/Resistance — test contract started
 
 - Re-read the repository documentation before continuing, including README, AICFA_TZ and the current docs for Price Action, Evidence/Scenario/Setup/Decision, Market State, Live Market Data, Knowledge Base, Labels, CVD, Wyckoff and visual evidence boundaries.
