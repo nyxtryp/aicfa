@@ -252,7 +252,7 @@ def build_zone_reaction(
             l = float(x["low"].iloc[i])
             c = float(x["close"].iloc[i])
 
-            if _break(z, close=c, threshold=break_threshold_pct):
+            if z["retested"] and _break(z, close=c, threshold=break_threshold_pct):
                 z["state"] = ZONE_BROKEN
                 out.at[i, f"zone_break_{side}"] = 1
             elif not z["touched"] and _touch(z, high=h, low=l, threshold=reaction_threshold_pct):
