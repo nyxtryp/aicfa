@@ -1,3 +1,26 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 INTEGRATION STILL TOO SLOW
+
+### Latest server verification
+- Focused `tests/test_zone_reaction.py`: **5 passed in 0.45s**.
+- Feature integration `tests/test_features.py`: **10 passed in 86.00s (1:26)**.
+- Full regression: **384 passed in 105.05s (1:45)**.
+
+### Status
+- Functional correctness remains GREEN on the focused zone contract and full regression.
+- Performance is **NOT acceptable / not final**. The new indexing work did not reduce the feature integration path; it is now slower than the previous 70.14s result.
+- Task 6 therefore remains OPEN. Do not move to Task 7 yet.
+
+### Current optimization target
+The next pass must profile/fix the actual hot path in `zone_reaction.py`, especially:
+- `_active_level()` outward scanning of sorted levels;
+- per-row pandas `.iloc/.at` operations;
+- Python `set`/bucket construction and scalar logarithm calls on every candle.
+
+The next implementation should preserve the same causal lifecycle and focused contract while removing avoidable Python/pandas overhead from the 10,080-row integration path.
+
+### Next step
+Optimize the zone-reaction hot path first. After the code change, rerun **only** `tests/test_zone_reaction.py` and then `tests/test_features.py`; do not spend another full-suite run until integration runtime is materially improved.
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 FOCUSED ZONE CONTRACT GREEN
 
 ### Verification
