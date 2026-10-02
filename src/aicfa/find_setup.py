@@ -26,6 +26,7 @@ from .cvd import build_trade_cvd
 from .order_book import build_order_book
 from .absorption import build_absorption
 from .market_evidence_adapter import build_market_evidence_from_frames
+from .market_context_evidence import append_market_context_evidence
 from .scenario_reasoning import assess_scenarios
 from .setup_analysis import analyze_setups
 from .derivatives import build_derivatives
@@ -449,6 +450,20 @@ def find_setup(
         )
     else:
         absorption_analysis = pd.DataFrame()
+
+    # Feed every collected microstructure/context layer into the same causal
+    # evidence graph used by scenario, setup and final decision reasoning.
+    market_evidence = append_market_context_evidence(
+        market_evidence,
+        timeframe=profile.execution_timeframe,
+        trades=trades,
+        order_flow=order_flow_analysis,
+        cvd=cvd_analysis,
+        order_book=order_book_analysis,
+        absorption=absorption_analysis,
+        analysis=base_analysis,
+        derivatives=derivatives_frame,
+    )
 
     evidence_assessment = assess_market_evidence(market_evidence)
     scenario_assessment = assess_scenarios(evidence_assessment)
