@@ -510,3 +510,12 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - The new causal BOS provenance tests and existing structure regression all pass together.
 - Full regression has not yet been run after Task 2.
 - NEXT: run the complete PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q. If green, inspect/validate the full Task 2 behavior before moving to Task 3 — Liquidity Lifecycle.
+
+
+## 2026-10-03 — TASK 2 FULL REGRESSION GATE GREEN
+
+- Server verification reported by user: `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q` → **375 passed in 46.25s**.
+- Result: Task 2 full regression gate is **GREEN** with zero failures.
+- Focused Task 2 gate was already GREEN: `tests/test_structure.py` → **12 passed in 0.95s**.
+- Current status: Task 2 — Causal BOS / CHoCH / MSS is regression-green.
+- **NEXT:** targeted Task 2 behavior review, then proceed to **Task 3 — Liquidity Lifecycle**: causal creation/active/sweep/invalidation/reaction states, equal-high/equal-low grouping/tolerance, and integration with S/R, BOS/CHoCH/MSS and scenario reasoning.
