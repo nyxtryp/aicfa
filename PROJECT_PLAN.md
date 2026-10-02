@@ -489,3 +489,15 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - This confirms the Confirmed Swing metadata/causal contract does not regress the broader AICFA test suite.
 - Current code/plan baseline at the start of this verification was commit `ddc6421f4357273b7fb920dff3e0e7367aa49801`; this plan update records the server result and becomes the next continuity checkpoint.
 - **NEXT:** run the planned live BTC validation for Task 1 and inspect that swing pivot timestamps remain descriptive while confirmation timestamps are the causal availability time. If live validation is clean, close Task 1 and move to **Task 2 — Causal BOS / CHoCH / MSS**.
+
+
+## 2026-10-03 — TASK 2: CAUSAL BOS / CHoCH / MSS — IMPLEMENTATION READY FOR SERVER VERIFICATION
+
+- Task 2 audit confirmed the existing BOS/CHoCH calculation already waits for confirmed swing rows: the structure engine updates the active swing level only on its confirmation row, then evaluates structural breaks causally on the current row.
+- 6300259a75a9e15b1b447a43784c501831f15bf8 — feat: expose causal BOS and CHoCH provenance.
+- The structure layer now records, for each BOS event, the reference swing pivot index and the reference swing confirmation index. This makes the distinction explicit: the BOS/CHoCH event occurs on the current break row, while the referenced swing became usable only at its confirmation row.
+- Existing stale-level protection remains in place through the consumed-level state (broken_high / broken_low), preventing repeated BOS events against the same consumed structural level.
+- 4fa95378a814bf8c89a436bb6de0dad99df7b621 — test: verify causal BOS and CHoCH provenance.
+- Added focused coverage proving a BOS references a confirmed swing (pivot 2 → confirmation 4 → break 6) and that consumed levels do not generate duplicate BOS rows.
+- Server verification is PENDING. No GREEN status is claimed until the user runs the focused structure suite.
+- NEXT: run tests/test_structure.py. If green, run the full pytest -q; then inspect the causal BOS/CHoCH/MSS behavior before closing Task 2.
