@@ -9,24 +9,39 @@ from aicfa.data_requirements import (
 )
 
 
-def test_depth_is_derived_from_feature_dependencies_not_provider_limit():
+def test_depth_follows_mode_timeframe_roles_not_provider_limit():
+    expected_by_mode = {
+        "scalping": {"15m": 120, "5m": 180, "1m": 240},
+        "intraday": {"1d": 120, "4h": 180, "1h": 240, "15m": 240},
+        "swing": {"1w": 120, "1d": 180, "4h": 240, "1h": 240},
+        "position": {"1M": 120, "1w": 180, "1d": 240, "4h": 240},
+    }
+
+    for mode, expected in expected_by_mode.items():
+        plan = default_setup_requirements("BTCUSDT", mode=mode)
+        resolved = resolve_analysis_depth(plan)
+
+        assert tuple(resolved) == plan.required_timeframes
+        assert {timeframe: item.minimum_rows for timeframe, item in resolved.items()} == expected
+        assert all(item.minimum_rows < 1000 for item in resolved.values())
+        assert all(
+            any(dep.name == "feature.rolling" and dep.rows == 60 for dep in item.dependencies)
+            for item in resolved.values()
+        )
+
+
+def test_mode_less_plan_uses_conservative_depth_when_roles_are_ambiguous():
     plan = default_setup_requirements("BTCUSDT")
     resolved = resolve_analysis_depth(plan)
 
+    # Without a trading mode, a timeframe-to-role mapping is ambiguous.
+    # The resolver deliberately avoids guessing and uses the conservative depth.
     assert tuple(resolved) == plan.required_timeframes
-    assert {item.minimum_rows for item in resolved.values()} == {120, 180, 240}
-    assert resolved["1w"].minimum_rows == 120
-    assert resolved["1d"].minimum_rows == 180
-    assert resolved["1h"].minimum_rows == 240
-    assert all(item.minimum_rows < 1000 for item in resolved.values())
-    assert all(
-        any(dep.name == "feature.rolling" and dep.rows == 60 for dep in item.dependencies)
-        for item in resolved.values()
-    )
+    assert {item.minimum_rows for item in resolved.values()} == {240}
 
 
 def test_setup_requirements_request_adaptive_event_and_active_state_context():
-    plan = default_setup_requirements("BTCUSDT")
+    plan = default_setup_requirements("BTCUSDT", mode="intraday")
     resolved = resolve_analysis_depth(plan)
 
     assert all(item.requires_event_context for item in resolved.values())
