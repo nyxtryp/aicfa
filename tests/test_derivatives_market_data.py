@@ -97,7 +97,12 @@ def test_bybit_provider_aligns_independent_funding_oi_and_mark_timestamps(monkey
     monkeypatch.setattr(provider, "_get", fake_get)
     monkeypatch.setattr(
         "aicfa.derivatives_market_data._collect_bybit_liquidations",
-        lambda symbol, timeout_seconds: [],
+        lambda symbol, timeout_seconds: [{
+            "timestamp": 1200,
+            "liquidation_volume": 2500.0,
+            "long_liquidation_volume": 2500.0,
+            "short_liquidation_volume": 0.0,
+        }],
     )
     frame = provider.fetch_derivatives(symbol="BTCUSDT", limit=10)
 
