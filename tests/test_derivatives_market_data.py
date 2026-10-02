@@ -69,7 +69,7 @@ def test_derivatives_evidence_marks_unavailable_data_without_fabrication():
     assert "derivatives: no observations" in result.missing_context
 
 
-def test_bybit_provider_normalizes_funding_oi_mark(monkeypatch):
+def test_bybit_provider_aligns_independent_funding_oi_and_mark_timestamps(monkeypatch):
     provider = BybitDerivativesProvider()
     responses = {
         "funding/history": {
@@ -81,12 +81,12 @@ def test_bybit_provider_normalizes_funding_oi_mark(monkeypatch):
         "open-interest": {
             "retCode": 0,
             "result": {"list": [
-                {"timestamp": "1000", "openInterestValue": "123456"}
+                {"timestamp": "1100", "openInterestValue": "123456"}
             ]},
         },
         "tickers": {
             "retCode": 0,
-            "time": 1100,
+            "time": 1200,
             "result": {"list": [{"markPrice": "50000", "fundingRate": "0.0012"}]},
         },
     }
@@ -100,6 +100,9 @@ def test_bybit_provider_normalizes_funding_oi_mark(monkeypatch):
         lambda symbol, timeout_seconds: [],
     )
     frame = provider.fetch_derivatives(symbol="BTCUSDT", limit=10)
-    assert set(frame["funding_rate"].dropna()) == {0.001, 0.0012}
-    assert 123456.0 in set(frame["open_interest"].dropna())
-    assert 50000.0 in set(frame["mark_price"].dropna())
+
+    assert frame.iloc[-1]["funding_rate"] == 0.0012
+    assert frame.iloc[-1]["open_interest"] == 123456.0
+    assert frame.iloc[-1]["mark_price"] == 50000.0
+    complete, missing = derivatives_completeness(frame)
+    assert complete, missing
