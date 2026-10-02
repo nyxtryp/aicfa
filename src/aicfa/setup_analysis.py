@@ -70,10 +70,9 @@ class MultiTimeframeContext:
     observations: tuple[MarketObservation, ...]
     missing_timeframes: tuple[str, ...] = ()
     structure_direction: str | None = None
-    structure_timeframe: str | None = None
+    structure_timeframe: str = ""
     confirmation_directions: tuple[str, ...] = ()
     context_timeframe: str = ""
-    structure_timeframe: str = ""
     refinement_timeframe: str | None = None
     execution_timeframe: str = ""
 
@@ -755,7 +754,7 @@ def analyze_setups(
                 entry_zone=entry_levels,
                 invalidation_level=invalidation_level,
                 target_levels=target_levels,
-                confirmation_timeframes=tuple(tf for tf in (context.refinement_timeframe, context.execution_timeframe) if tf is not None and tf in context.latest_rows),
+                confirmation_timeframes=(() if legacy_mode else tuple(tf for tf in (context.refinement_timeframe, context.execution_timeframe) if tf is not None and tf in context.latest_rows)),
                 source_timeframes=source_tfs,
             )
         )
