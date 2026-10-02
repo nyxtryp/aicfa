@@ -197,3 +197,23 @@ Fix committed:
 - `d75e6cf4aaae80b361f3b4b5150967bc94800fdd` — restore `import pandas as pd` in `tests/test_setup_analysis.py`.
 
 **NEXT:** rerun the same focused suite. If it is clean, proceed to the full `pytest -q` regression. Do not mark MTF mode architecture GREEN until full regression and the four-mode BTC smoke are also clean.
+
+
+### 2026-10-02 — Focused MTF suite GREEN
+
+Server-side focused suite completed successfully:
+- **41 passed**
+- **10,767 warnings**
+- no test failures.
+
+The remaining pandas import regression was fixed in:
+- `d75e6cf4aaae80b361f3b4b5150967bc94800fdd`
+
+The plan update for that fix is:
+- `3768e0e3d00b6c96925956b2e1c460eed2e66ff5`
+
+The remaining warnings include the known pytest cache permission warning in FrostDeploy release directories. This does not affect the test result.
+
+**Status:** focused mode-aware MTF tests are GREEN.
+
+**NEXT:** run the full repository regression `pytest -q`. Do not mark the complete MTF architecture GREEN until full regression passes and the four-mode live BTC FindSetup smoke verifies the actual timeframe/role contract.
