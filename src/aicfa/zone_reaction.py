@@ -371,5 +371,13 @@ def build_zone_reaction(
             out.at[i, f"zone_{side_name}_state"] = z["state"]
             out.at[i, f"zone_active_{side_name}"] = 1
 
+        # If the nearest zone was broken on this candle it is no longer an
+        # active candidate for aggregation, but the event/state on this row
+        # must still expose the terminal BROKEN transition.
+        for side_name in ("support", "resistance"):
+            if out.at[i, f"zone_break_{side_name}"] == 1:
+                out.at[i, f"zone_{side_name}_state"] = ZONE_BROKEN
+                out.at[i, f"zone_active_{side_name}"] = 0
+
 
     return out
