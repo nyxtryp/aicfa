@@ -212,3 +212,11 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - `93c6dadd71eb74975fbe20cc99986c765c2c163e`: corrected the test to require exactly the legitimate `range` hypothesis from `premium_discount.dealing_range`, while still asserting that optional feeds do not create continuation/reversal hypotheses.
 - No architecture rollback. The core rule remains: optional feeds are confirmations/observations; chart/SMC support rules generate hypotheses.
 - Server verification for this new commit is pending.
+
+
+## 2026-10-02 — FOCUSED DATA-REQUIREMENT REGRESSION GREEN
+
+- Server verification after commit `93c6dadd71eb74975fbe20cc99986c765c2c163e`: focused suite `tests/test_derivatives_market_data.py tests/test_market_context_evidence.py tests/test_optional_liquidations.py` → **9 passed, 1 warning in 0.57s**.
+- The remaining warning is a non-blocking PytestCacheWarning: the service user cannot create pytest cache files inside the immutable release directory.
+- Focused verification is GREEN. This confirms the test expectations now match the chart-native scenario architecture and optional auxiliary-feed contract.
+- Next step: run full server regression `PYTHONPATH=src .venv/bin/python -m pytest -q`. Do not run live BTC smoke until the full regression result is green.
