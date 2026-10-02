@@ -519,3 +519,17 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - Focused Task 2 gate was already GREEN: `tests/test_structure.py` → **12 passed in 0.95s**.
 - Current status: Task 2 — Causal BOS / CHoCH / MSS is regression-green.
 - **NEXT:** targeted Task 2 behavior review, then proceed to **Task 3 — Liquidity Lifecycle**: causal creation/active/sweep/invalidation/reaction states, equal-high/equal-low grouping/tolerance, and integration with S/R, BOS/CHoCH/MSS and scenario reasoning.
+
+
+## 2026-10-03 — TASK 3: LIQUIDITY LIFECYCLE — IMPLEMENTATION COMMITTED
+
+- Audit found that AICFA already had causal liquidity-pool creation, active-pool tracking, equal-high/equal-low tolerance, sweep/break handling, invalidation flags, and internal/external pool separation.
+- Gap identified: the lifecycle did not expose a distinct post-sweep **reaction** event; sweep/reclaim was present but reaction was not represented as a later causal state transition.
+- `9accf9179e946285825c0dd2f6e988f7aa5c806b` — added explicit causal liquidity reaction tracking after a pool is swept.
+  - `liquidity_pool_reaction_high/low` event flags.
+  - `last_swept_buy/sell_liquidity_price` provenance fields.
+  - Reaction is emitted only on a later candle, never on the same sweep row.
+- `9813326cadc36a105d7172abb0b267a67e741bca` — exposed the new lifecycle fields through the main `build_features` pipeline.
+- Focused test added to `tests/test_liquidity.py` proving sweep → later reaction is causal.
+- **Server verification: PENDING.** These commits are on `main`, but no server test has been run after the Task 3 change yet.
+- **NEXT:** run `tests/test_liquidity.py` on the AICFA server. If green, run the full `pytest -q` regression and record the actual result before closing Task 3.
