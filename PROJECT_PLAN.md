@@ -565,3 +565,12 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - A follow-up focused-test commit asserts the explicit `INVALIDATED` state (see the immediately following test commit on `main`).
 - **Server verification: PENDING.** These changes have not yet been tested on the deployed release; no focused or full-regression GREEN status is claimed.
 - **NEXT:** run `tests/test_order_blocks.py` on the server. If green, run the full regression suite and report the actual result before closing Task 4. Then audit and implement Task 5 — FVG / Imbalance Lifecycle.
+
+
+## 2026-10-03 — TASK 4 FOCUSED TEST FAILURE / FIXTURE CORRECTION
+
+- Server result for `tests/test_order_blocks.py`: **1 failed, 8 passed in 0.77s**.
+- The failure was in the new lifecycle test fixture: row 4 was bearish, so on row 5 the engine correctly recognized a newer bullish Order Block from that immediately preceding candle and replaced the previously tracked bullish OB. The test unintentionally tested replacement by a new OB instead of continued penetration of the original zone.
+- `73c3381bdf38eb0adebe0ad1b235ecfc31b5c9f0` — adjusted the fixture so row 4 is bullish, preventing a new bullish OB from replacing the original zone on row 5. The lifecycle expectations remain unchanged; production lifecycle code was not altered.
+- This is a test-fixture correction, **not yet verified on the server**.
+- **NEXT:** rerun `tests/test_order_blocks.py`. If green, run full `pytest -q`; update this plan with the actual server results before closing Task 4 or proceeding to Task 5 — FVG / Imbalance Lifecycle.
