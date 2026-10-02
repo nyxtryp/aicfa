@@ -123,7 +123,7 @@ def test_decision_has_no_execution_fields():
 def test_mtf_resolved_direction_ignores_opposite_lower_timeframe_evidence():
     from tests.test_setup_engine_mtf import _frames, _pipeline
 
-    setup = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1m=-1))
+    setup = _pipeline(_frames(structure_4h=1, structure_15m=1, structure_1h=1))
     result = decide(
         setup,
         observations=(
