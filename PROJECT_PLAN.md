@@ -61,4 +61,43 @@ If the chat is restarted, resume from this section first.
 ACTIVE TASK: complete the real market-data/derivatives integration and data-sufficiency gate.
 NEXT AFTER GREEN: four-mode live BTC FindSetup smoke.
 
+## 2026-10-02 — MARKET CONTEXT → EVIDENCE/REASONING INTEGRATION
+
+### Implementation completed
+- f02055f: added src/aicfa/market_context_evidence.py, a causal bridge that converts collected Trades, Order Flow, CVD, Order Book, Absorption, Premium/Discount, Wyckoff and liquidation data into MarketObservation objects. Missing layers are recorded explicitly; values are never fabricated.
+- d28bb62: connected that bridge inside live FindSetup immediately before evidence assessment, so the collected microstructure/context data now enters the same evidence graph consumed by scenario/setup/decision reasoning.
+- fff9847: expanded scenario support rules so Order Flow, CVD, Order Book, Absorption, Premium/Discount, Wyckoff and derivatives liquidation/positioning observations can materially support continuation, reversal, range and breakout-failure hypotheses.
+- 94d1a0f: added integration tests proving the mandatory market-context layers become causal evidence, affect scenario hypotheses, and produce explicit missing-context state when unavailable.
+
+### Mandatory foundation status
+The previously identified gap was that microstructure was calculated but stopped at FindSetupResult fields. This block closes that gap for the following layers:
+- Trades
+- Order Flow
+- CVD
+- Order Book
+- Absorption
+- Premium / Discount
+- Wyckoff
+- Liquidations
+
+They now participate in the evidence/scenario path rather than being metadata-only outputs.
+
+Derivatives Funding + Open Interest + Mark Price remain connected through derivatives.price_oi; liquidation magnitude is now also represented separately as derivatives.liquidations.
+
+### Verification status
+Code changes are committed, but server-side pytest has NOT yet been run after this block. Do not mark this block GREEN until:
+1. focused market-context tests pass;
+2. full pytest -q passes;
+3. live BTC four-mode smoke checks are run only after the regression gate;
+4. each smoke result is inspected for mode, selected timeframes, evidence completeness, decision and reason.
+
+### Required next action
+Run on the AICFA server:
+`sudo -u fd-aicfa bash -lc 'cd "$(readlink -f /srv/frostdeploy/aicfa/current)" && PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_market_context_evidence.py'`
+Then full pytest -q. If failures appear, fix them and append the fix/commit to this plan before proceeding.
+
+### Continuity rule
+Every subsequent code/test/fix/verification movement for this task must be appended to PROJECT_PLAN.md with commit SHA, result, and next step before moving to the next stage.
+
+---
 ---
