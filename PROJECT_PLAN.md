@@ -1458,3 +1458,37 @@ The next diagnostic must print the existing `setup_assessment.missing_context` f
 
 ### NEXT UNFINISHED
 Run a one-off BTC FindSetup diagnostic that prints `setup_assessment.decision`, `candidates`, `missing_context`, `conflicts`, and the candidate geometry when present. Do not modify production logic until the exact rejection reason is observed.
+
+
+## 2026-10-02 — FINDSETUP DIAGNOSTIC: current BTC state is READY, not WAIT
+
+### Live diagnostic result
+- Deployed release tested: `2026-10-02T08-35-35-4678fb0`.
+- A real BTC/USDT FindSetup request completed successfully.
+- Top-level decision: `LONG`.
+- Reason: `direction and setup structure are both supported by current evidence`.
+- Setup Analysis: `SetupDecision.READY`.
+- Candidates: `1`.
+- Scenario decision: `EvidenceDecision.PROCEED`.
+- Hypotheses: `3`.
+- Evidence observations: `38`.
+- Evidence missing: empty.
+- Evidence conflicts: empty.
+- Setup conflicts: empty.
+- Setup reasons: `one or more conditional setups are sufficiently specified by the current seven-timeframe state`.
+
+### Rejection context in the same request
+- `breakout_failure`: required scenario evidence is incomplete.
+- `reversal`: same actionable geometry as continuation; not emitted as a separate setup.
+- These are conditional hypothesis rejections only; they do not prevent the continuation setup from being emitted.
+
+### Conclusion
+- The current deployed Setup Analysis path is demonstrably capable of producing an actionable LONG from the seven-timeframe state.
+- The previous generic WAIT output cannot be treated as a persistent/current behavior of this release based on this diagnostic alone.
+- No production logic, RR threshold, target selection, lifecycle rule, or chart logic was changed in this diagnostic.
+- The earlier unresolved historical question remains: recover the exact timestamp and state of the separate WAIT run before classifying that transition as legitimate WAIT, lifecycle/state handling, or analytical/data inconsistency.
+
+### NEXT UNFINISHED
+1. Capture the candidate geometry from this successful LONG (Entry, Invalidation, TP1, TP2, RR, confirmation) in the same diagnostic context.
+2. Recover/compare the exact earlier WAIT run timestamp and seven-timeframe state against this successful LONG state.
+3. Only after that comparison decide whether a production change is justified.
