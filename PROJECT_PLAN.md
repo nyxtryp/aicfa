@@ -99,7 +99,6 @@ Then full pytest -q. If failures appear, fix them and append the fix/commit to t
 ### Continuity rule
 Every subsequent code/test/fix/verification movement for this task must be appended to PROJECT_PLAN.md with commit SHA, result, and next step before moving to the next stage.
 
-
 ## 2026-10-02 — MARKET CONTEXT FOCUSED TEST GATE
 
 - Server verification completed: `tests/test_market_context_evidence.py` → **2 passed, 1 warning in 0.39s**.
@@ -109,6 +108,7 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - Four-mode live BTC smoke remains blocked until the full regression passes.
 
 ---
+
 ---
 
 ## 2026-10-02 — FULL REGRESSION GATE GREEN
@@ -118,3 +118,15 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - Verification gate is now GREEN for the market-context/data-sufficiency block.
 - Code baseline at this verification: `4ff738674d0dbab168c64e818744c0910a05d419`.
 - Next step: run the four separate live BTC FindSetup smoke checks for internal validation only: Scalping (15m→5m→1m), Intraday (1d→4h→1h→15m), Swing (1w→1d→4h→1h), Position (1M→1w→1d→4h). Inspect exact mode/timeframes, evidence completeness, derivatives provider/data, scenario hypotheses, decision and reason. End-user UX remains asset-only.
+
+## 2026-10-02 — LIVE BTC SCALPING SMOKE RESULT
+
+- Live command executed for `FindSetupRequest(asset="BTC", mode="scalping")`.
+- Result: **mode=SCALPING**, **symbol=BTCUSDT**, exact timeframes **15m→5m→1m**.
+- Live derivatives provider: **binance**; **201 rows** received with all required columns: funding_rate, open_interest, liquidation_volume, long_liquidation_volume, short_liquidation_volume, mark_price.
+- Trades/order-book/order-flow/CVD/absorption were received: 60 / 1 / 1 / 1 / 8 rows.
+- Evidence path correctly included SMC, microstructure, premium/discount and Wyckoff observations.
+- However the live evidence assessment returned **NEED_MORE_EVIDENCE** and decision **WAIT** because liquidation volume was unavailable in the collected derivative data. Missing context was explicit: `derivatives:liquidation_volume:unavailable` and `derivatives:liquidations:volume_unavailable`.
+- No setup was fabricated; scenario hypotheses were correctly withheld because required context was missing.
+- This smoke is **NOT GREEN**. Do not proceed to Intraday/Swing/Position until liquidation data is actually available and the Scalping smoke is re-run successfully.
+- Next step: inspect/fix the live Binance liquidation stream/collection path so `liquidation_volume` is populated causally, add/adjust regression coverage if needed, run focused + full pytest, then rerun the Scalping smoke with a compact output command.
