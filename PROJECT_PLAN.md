@@ -245,3 +245,30 @@ Fix commits:
 - `a27f1b61f92629bf1b3b0efeafbdf05ad7ce1c1c`
 
 **NEXT:** rerun the full `pytest -q`. If clean, proceed to the four-mode live BTC FindSetup smoke. Do not weaken production mode authority to satisfy the obsolete seven-TF tests.
+
+
+### 2026-10-02 — Full regression: remaining stale execution-timeframe test arguments
+
+Server full regression result:
+- **349 passed**
+- **12 failed**
+- **15,881 warnings**
+- all 12 failures were `TypeError` because migrated Intraday tests still passed the removed `structure_1m` keyword to `_frames()`.
+
+Root cause:
+- authoritative Intraday hierarchy is `1d -> 4h -> 1h -> 15m`;
+- `_frames()` had already been migrated to those four timeframes, but several old calls still used `structure_1m`;
+- this is a test-fixture migration issue, not a production mode-authority failure.
+
+Fixes:
+- `tests/test_setup_engine_mtf.py` migrated all remaining `structure_1m` calls to the explicit Intraday contract and renamed the affected test wording away from the obsolete 1m assumption.
+- `tests/test_decision.py` migrated its MTF fixture call to the Intraday contract.
+- The helper default now keeps 1H refinement direction coherent by default; the dedicated conflict test explicitly sets 1H bearish against 4H bullish.
+
+Commits:
+- `38bddaf7edf4d4badb5a94c15c01b73cd1c97dec` — MTF test fixture migration
+- `97f35411a976c4959d86c6d4c8b5658129546c6d` — decision test migration
+
+No production trading logic was changed.
+
+**NEXT:** rerun the full `pytest -q`. If clean, proceed to four-mode live BTC FindSetup smoke. Do not mark MTF architecture GREEN before that smoke passes.
