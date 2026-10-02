@@ -27,6 +27,30 @@ def test_protected_levels_follow_bos_and_have_lifecycle():
     assert r.loc[6,"bos_down"]==1; assert r.loc[6,"protected_high_created"]==1; assert r.loc[6,"protected_high_active"]==1; assert r.loc[6,"protected_high_price"]==pytest.approx(101.5)
     assert r.loc[8,"bos_up"]==1; assert r.loc[8,"protected_low_created"]==1; assert r.loc[8,"protected_low_active"]==1; assert r.loc[8,"protected_low_price"]==pytest.approx(97.5); assert r.loc[8,"protected_high_broken"]==1
 
+def test_bos_and_choch_reference_only_confirmed_swings():
+    # With right=2, the swing high at pivot 2 is unavailable until row 4.
+    # The later break must reference confirmation row 4, never pivot row 2.
+    close = [100, 102, 105, 102, 101, 103, 107]
+    highs = [100.5, 102.5, 106, 102.5, 101.5, 103.5, 108]
+    lows = [99.5, 101.5, 104, 101.5, 100.5, 102.5, 106]
+    r = build_structure(frame(close, highs, lows), left=2, right=2)
+
+    assert r.loc[4, "swing_high"] == 1
+    assert r.loc[6, "bos_up"] == 1
+    assert r.loc[6, "bos_up_reference_pivot_index"] == 2
+    assert r.loc[6, "bos_up_reference_confirmation_index"] == 4
+    assert r.loc[6, "bos_up_reference_confirmation_index"] > r.loc[6, "bos_up_reference_pivot_index"]
+
+
+def test_bos_does_not_repeat_a_consumed_level():
+    close = [100, 102, 105, 102, 101, 103, 107, 106, 107.5, 108]
+    r = build_structure(frame(close), left=1, right=1)
+
+    bos_rows = r.index[r["bos_up"] == 1].tolist()
+    assert bos_rows
+    assert len(bos_rows) == len(set(bos_rows))
+
+
 def test_mss_requires_displacement_and_is_not_choch_rename():
     close=[100,102,105,102,99,101,98,100,104]; df=frame(close); displacement=pd.DataFrame({"displacement_up":[0,0,0,0,0,0,0,0,1],"displacement_down":[0]*9})
     without=build_structure(df,left=1,right=1); with_displacement=build_structure(df,left=1,right=1,displacement=displacement)
