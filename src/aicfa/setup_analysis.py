@@ -144,42 +144,44 @@ def build_multi_timeframe_context(
     analyses: Mapping[str, pd.DataFrame],
     *,
     timeframes: tuple[str, ...] = SETUP_TIMEFRAMES,
+    mode: TradingMode | str = TradingMode.INTRADAY,
 ) -> MultiTimeframeContext:
-    """Build one causal current-state object from all required timeframes."""
+    """Build current state using only the selected mode hierarchy."""
+    normalized_mode = normalize_trading_mode(mode)
+    profile = mode_timeframe_profile(normalized_mode)
     rows = _latest_rows(analyses)
     missing = tuple(tf for tf in timeframes if tf not in rows)
 
+    structure_timeframe = profile.structure_timeframe
     structure_direction = None
-    structure_timeframe = None
-    for timeframe in _HIGHER_STRUCTURE:
-        row = rows.get(timeframe)
-        if row is None:
-            continue
+    row = rows.get(structure_timeframe)
+    if row is not None:
         direction = _structure_direction(row)
         if direction:
             structure_direction = "long" if direction > 0 else "short"
-            structure_timeframe = timeframe
-            break
 
     confirmations: list[str] = []
-    for timeframe in _CONFIRMATION:
-        row = rows.get(timeframe)
-        if row is None:
-            continue
-        direction = _structure_direction(row)
-        if direction:
-            confirmations.append("long" if direction > 0 else "short")
+    refinement = profile.refinement_timeframe
+    if refinement is not None:
+        row = rows.get(refinement)
+        if row is not None:
+            direction = _structure_direction(row)
+            if direction:
+                confirmations.append("long" if direction > 0 else "short")
 
     return MultiTimeframeContext(
         timeframes=timeframes,
+        mode=normalized_mode,
         latest_rows=rows,
         observations=observations,
         missing_timeframes=missing,
         structure_direction=structure_direction,
         structure_timeframe=structure_timeframe,
         confirmation_directions=tuple(confirmations),
+        context_timeframe=profile.context_timeframe,
+        refinement_timeframe=refinement,
+        execution_timeframe=profile.execution_timeframe,
     )
-
 
 def _zone_data(observations: tuple) -> tuple[tuple[str, ...], tuple[str, ...]]:
     concepts: list[str] = []
@@ -559,6 +561,7 @@ def analyze_setups(
     observations: tuple[MarketObservation, ...] | None = None,
     analyses: Mapping[str, pd.DataFrame] | None = None,
     timeframes: tuple[str, ...] = SETUP_TIMEFRAMES,
+    mode: TradingMode | str = TradingMode.INTRADAY,
 ) -> SetupAssessment:
     """Run setup analysis over the complete current multi-timeframe state."""
     if evidence_assessment.decision is EvidenceDecision.WAIT:
@@ -603,6 +606,7 @@ def analyze_setups(
         evidence_observations,
         analyses or {},
         timeframes=timeframes,
+        mode=mode,
     ) if not legacy_mode else None
     if not legacy_mode and context.missing_timeframes:
         return SetupAssessment(
@@ -612,7 +616,7 @@ def analyze_setups(
                 f"required timeframe: {tf}" for tf in context.missing_timeframes
             ),
             conflicts=evidence_assessment.conflicts,
-            reasons=("complete seven-timeframe current state is required",),
+            reasons=(f"complete {context.mode.value} timeframe state is required",),
         )
 
     direction, direction_conflict = (
@@ -672,7 +676,7 @@ def analyze_setups(
             entry_conditions = _unique(list(hypothesis.confirmations) + list(confirmations))
             rationale = _unique(list(hypothesis.rationale) + [f"setup zone observed on {tf}" for tf in source_tfs])
         else:
-            current_row = context.latest_rows.get("1m")
+            current_row = context.latest_rows.get(context.execution_timeframe)
             current_price = _numeric(current_row, "close") if current_row is not None else None
             scenario_zones = _scenario_zone_concepts(
                 hypothesis.scenario,
@@ -751,7 +755,7 @@ def analyze_setups(
                 entry_zone=entry_levels,
                 invalidation_level=invalidation_level,
                 target_levels=target_levels,
-                confirmation_timeframes=_CONFIRMATION,
+                confirmation_timeframes=tuple(tf for tf in (context.refinement_timeframe, context.execution_timeframe) if tf is not None and tf in context.latest_rows),
                 source_timeframes=source_tfs,
             )
         )
