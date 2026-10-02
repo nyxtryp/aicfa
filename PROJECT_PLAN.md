@@ -481,3 +481,11 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - Do not fabricate missing evidence.
 - Do not import the external project's strategy wholesale.
 - Do not claim any of these nine tasks are complete until code/tests/server verification prove it.
+
+## 2026-10-03 — TASK 1 FULL REGRESSION GATE GREEN
+
+- Server verification reported by user after the Confirmed Swing implementation/test commits: `PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q` → **373 passed in 47.48s**.
+- Result: full regression is **GREEN** with zero failures.
+- This confirms the Confirmed Swing metadata/causal contract does not regress the broader AICFA test suite.
+- Current code/plan baseline at the start of this verification was commit `ddc6421f4357273b7fb920dff3e0e7367aa49801`; this plan update records the server result and becomes the next continuity checkpoint.
+- **NEXT:** run the planned live BTC validation for Task 1 and inspect that swing pivot timestamps remain descriptive while confirmation timestamps are the causal availability time. If live validation is clean, close Task 1 and move to **Task 2 — Causal BOS / CHoCH / MSS**.
