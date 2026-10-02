@@ -147,3 +147,13 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - `a36bb63`: fixed the newly added `tests/test_optional_liquidations.py` file; it had been committed with literal `\\n` sequences, causing pytest collection `SyntaxError`.
 - The server-side error was test-file syntax only; the liquidation architecture fix remains unchanged.
 - Next: rerun the focused optional-liquidation test.
+
+## 2026-10-02 — SERVER COLLECTION ERROR ROOT CAUSE FIX
+
+- Server focused test exposed a second repository serialization defect: `src/aicfa/derivatives_evidence.py` contained literal `\\n` characters instead of real newlines, so Python raised `SyntaxError: unexpected character after line continuation character` during import.
+- Repository audit also found the same literal-newline corruption in `src/aicfa/market_evidence.py`; it was repaired before rerunning tests.
+- `df76e1b193e5103f3d41e6739c61465a87247111`: restored real newlines in `src/aicfa/market_evidence.py`.
+- `b0d964888eba2523c557c6aae71c21dbd1dbc3e9`: restored real newlines in `src/aicfa/derivatives_evidence.py`.
+- These are file-format/serialization fixes only; the optional-liquidation architecture is unchanged.
+- Server verification is still required; no test result is marked GREEN from these commits until the user reruns the focused test.
+- Next step: rerun `tests/test_optional_liquidations.py`. If it passes, run full `pytest -q`; then update this plan with the actual result before the live Scalping smoke.
