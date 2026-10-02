@@ -99,5 +99,14 @@ Then full pytest -q. If failures appear, fix them and append the fix/commit to t
 ### Continuity rule
 Every subsequent code/test/fix/verification movement for this task must be appended to PROJECT_PLAN.md with commit SHA, result, and next step before moving to the next stage.
 
+
+## 2026-10-02 — MARKET CONTEXT FOCUSED TEST GATE
+
+- Server verification completed: `tests/test_market_context_evidence.py` → **2 passed, 1 warning in 0.39s**.
+- Result: the new market-context evidence bridge passes both causal-evidence and explicit-missing-context integration tests.
+- This focused block is GREEN.
+- Next step: run the full server regression `PYTHONPATH=src .venv/bin/python -m pytest -q`.
+- Four-mode live BTC smoke remains blocked until the full regression passes.
+
 ---
 ---
