@@ -10,26 +10,27 @@
 - Task 5 implementation committed:
 - 76257aa — feat: add causal FVG lifecycle depth
 - 82d6dde — test: cover FVG lifecycle states and concurrent zones
-- FVG lifecycle now distinguishes UNTOUCHED, TOUCHED, PARTIAL, FILLED, INVALIDATED.
+- b3f7a9cc6bbf8aaa7f6c8602bd942e7f0e3a51dd — fix: preserve strongest active FVG lifecycle state
+- FVG lifecycle distinguishes UNTOUCHED, TOUCHED, PARTIAL, FILLED, INVALIDATED.
 - Added causal penetration ratio 0..1.
 - Added FVG creation provenance fields.
 - Multiple simultaneously active bullish/bearish FVG zones are tracked independently instead of a newer zone overwriting an older active zone.
 - Existing binary fields are retained for compatibility.
 - Added focused regression coverage for creation, touch/partial/fill, invalidation, concurrent active zones and causal provenance.
+- Fixed concurrent-zone aggregation so a newer UNTOUCHED FVG does not erase the lifecycle state of an older reacted active FVG.
 
 ### Verification status
-- Server focused FVG test has NOT yet been run.
-- No Task 5 GREEN status is claimed yet.
-- Exact command: sudo -u fd-aicfa bash -lc 'cd "$(readlink -f /srv/frostdeploy/aicfa/current)" && PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_fvg.py'
+- Server focused FVG regression: **9 passed in 0.52s**.
+- The focused failure was caused by lifecycle aggregation when a new active FVG appeared while an older FVG had already been touched; production logic was corrected in b3f7a9cc6bbf8aaa7f6c8602bd942e7f0e3a51dd.
+- Task 5 is **not GREEN yet** because the full server regression has not been run after the fix.
 
 ### Current task
 Task 5 — FVG / Imbalance Lifecycle
 
 ### Immediate next step
-1. Run tests/test_fvg.py on the server.
-2. If focused tests pass, run full PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q.
-3. Record actual server results here.
-4. Only after full regression is GREEN, close Task 5 and proceed to Task 6 — Zone Reaction + Support/Resistance.
+1. Run the full server regression.
+2. Record the actual result here.
+3. If full regression is GREEN, close Task 5 and proceed to Task 6 — Zone Reaction + Support/Resistance.
 
 ## Authoritative SMC integration sequence
 1. Confirmed Swing — GREEN.
