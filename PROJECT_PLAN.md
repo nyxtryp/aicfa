@@ -501,3 +501,12 @@ Do not copy the external project's fixed strategy, scoring, timeframe hierarchy,
 - Added focused coverage proving a BOS references a confirmed swing (pivot 2 → confirmation 4 → break 6) and that consumed levels do not generate duplicate BOS rows.
 - Server verification is PENDING. No GREEN status is claimed until the user runs the focused structure suite.
 - NEXT: run tests/test_structure.py. If green, run the full pytest -q; then inspect the causal BOS/CHoCH/MSS behavior before closing Task 2.
+
+
+## 2026-10-03 — TASK 2 FOCUSED TEST GATE GREEN
+
+- Server verification reported by user: tests/test_structure.py → 12 passed in 0.95s.
+- Result: Task 2 causal BOS/CHoCH/MSS focused structure gate is GREEN.
+- The new causal BOS provenance tests and existing structure regression all pass together.
+- Full regression has not yet been run after Task 2.
+- NEXT: run the complete PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q. If green, inspect/validate the full Task 2 behavior before moving to Task 3 — Liquidity Lifecycle.
