@@ -414,26 +414,26 @@ def build_zone_reaction(
             idx = np.empty(0, dtype=np.intp)
 
         if idx.size:
-            lows = zone_low[idx]
-            highs = zone_high[idx]
+            zone_lows = zone_low[idx]
+            zone_highs = zone_high[idx]
             sides = zone_side[idx]
-            widths = np.maximum(highs - lows, 0.0)
+            widths = np.maximum(zone_highs - zone_lows, 0.0)
             pads = np.maximum(
-                np.abs(np.where(sides == -1, highs, lows)) * reaction_threshold_pct,
+                np.abs(np.where(sides == -1, zone_highs, zone_lows)) * reaction_threshold_pct,
                 1e-12,
             )
-            overlap = (h >= lows - pads) & (l <= highs + pads)
-            point_touch = np.where(sides == -1, h >= highs - pads, l <= lows + pads)
+            overlap = (h >= zone_lows - pads) & (l <= zone_highs + pads)
+            point_touch = np.where(sides == -1, h >= zone_highs - pads, l <= zone_lows + pads)
             touched_now = np.where(widths > 0.0, overlap, point_touch)
             reaction_now = np.where(
                 sides == -1,
-                close <= highs * (1.0 + reaction_threshold_pct),
-                close >= lows * (1.0 - reaction_threshold_pct),
+                close <= zone_highs * (1.0 + reaction_threshold_pct),
+                close >= zone_lows * (1.0 - reaction_threshold_pct),
             )
             break_now = np.where(
                 sides == -1,
-                close > highs * (1.0 + break_threshold_pct),
-                close < lows * (1.0 - break_threshold_pct),
+                close > zone_highs * (1.0 + break_threshold_pct),
+                close < zone_lows * (1.0 - break_threshold_pct),
             )
             touched_before = zone_touched[idx]
             reacted_before = zone_reacted[idx]
@@ -444,7 +444,7 @@ def build_zone_reaction(
             reaction_mask = touched_before & ~reacted_before & reaction_now & ~break_mask & ~touch_mask
             retest_mask = (
                 reacted_before & touched_now
-                & np.where(sides == -1, close > highs, close < lows)
+                & np.where(sides == -1, close > zone_highs, close < zone_lows)
                 & ~break_mask & ~touch_mask & ~reaction_mask
             )
 
@@ -504,7 +504,7 @@ def build_zone_reaction(
             result_state["zone_support_state"][i] = ZONE_BROKEN
             result_active["zone_active_support"][i] = 0
         if break_resistance:
-            out.at[i, "zone_break_resistance"] = 1
+            result_binary["zone_break_resistance"][i] = 1
             result_state["zone_resistance_state"][i] = ZONE_BROKEN
             result_active["zone_active_resistance"][i] = 0
 
