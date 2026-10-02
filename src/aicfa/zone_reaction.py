@@ -175,6 +175,12 @@ def build_zone_reaction(
     # Python zone list for every candle, which became O(n^2) Python work on
     # long feature frames (e.g. the 10,080-row MTF integration test).
     zones = []
+    source_specs = (
+        ("fvg", "fvg_bullish", "fvg_bullish_low", "fvg_bullish_high", "support"),
+        ("fvg", "fvg_bearish", "fvg_bearish_low", "fvg_bearish_high", "resistance"),
+        ("order_block", "order_block_bullish", "order_block_bullish_low", "order_block_bullish_high", "support"),
+        ("order_block", "order_block_bearish", "order_block_bearish_low", "order_block_bearish_high", "resistance"),
+    )
 
     def _state_rank(state):
         return {
