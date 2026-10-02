@@ -140,3 +140,10 @@ Every subsequent code/test/fix/verification movement for this task must be appen
 - `0243589`: added regression tests proving missing liquidation data still allows core derivatives evidence/scenario reasoning, while available liquidation data becomes causal reversal evidence.
 - Architectural rule restored: AICFA analyzes the chart/market first. Liquidations are an additional confirmation layer, not a mandatory prerequisite for a setup.
 - Next step: run focused liquidation/evidence tests, then full `pytest -q`. Only after GREEN rerun the live BTC Scalping smoke.
+
+
+## 2026-10-02 — TEST FIX
+
+- `a36bb63`: fixed the newly added `tests/test_optional_liquidations.py` file; it had been committed with literal `\\n` sequences, causing pytest collection `SyntaxError`.
+- The server-side error was test-file syntax only; the liquidation architecture fix remains unchanged.
+- Next: rerun the focused optional-liquidation test.
