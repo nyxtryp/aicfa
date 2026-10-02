@@ -105,3 +105,13 @@ def test_invalid_parameters():
         build_liquidity(frame([2, 3, 2], [0, 1, 0]), equal_tolerance=-1)
     with pytest.raises(ValueError):
         build_liquidity(frame([2, 3, 2], [0, 1, 0]), internal_left=0)
+
+
+def test_swept_pool_records_later_causal_reaction():
+    highs = [101, 103, 106, 103, 101, 103, 106, 103, 101, 108, 104, 103]
+    lows = [99, 101, 104, 101, 99, 101, 104, 101, 99, 102, 100, 99]
+    closes = [100, 102, 105, 102, 100, 102, 105, 102, 100, 104, 103, 102]
+    r = build_liquidity(frame(highs, lows, closes), swing_left=1, swing_right=1, equal_tolerance=0.001)
+    assert r.loc[9, "liquidity_pool_swept_high"] == 1
+    assert r.loc[10, "liquidity_pool_reaction_high"] == 1
+    assert r.loc[10, "last_swept_buy_liquidity_price"] == r.loc[9, "sweep_high_level"]
