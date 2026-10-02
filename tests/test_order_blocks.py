@@ -119,3 +119,40 @@ def test_invalid_parameters_and_validation():
             "close": [1, 1],
             "volume": [-1, 1],
         }))
+
+
+
+def test_order_block_lifecycle_tracks_touch_partial_deep_and_invalidation():
+    df = frame(
+        [100, 102, 99, 104, 104, 104],
+        [103, 103, 104, 105, 105, 105],
+        [99, 100, 98, 103, 102, 100.5],
+        [102, 101, 103, 104, 103, 101],
+    )
+    r = build_order_blocks(df, require_displacement=False)
+
+    # Bullish OB is recognized at row 2 from the bearish source candle at row 1.
+    assert r.loc[2, "order_block_bullish_state"] == "UNTOUCHED"
+    assert r.loc[3, "order_block_bullish_state"] == "TOUCHED"
+    assert r.loc[4, "order_block_bullish_state"] == "PARTIAL"
+    assert r.loc[5, "order_block_bullish_state"] == "DEEP"
+    assert r.loc[4, "order_block_bullish_penetration"] == pytest.approx(1 / 3)
+    assert r.loc[5, "order_block_bullish_penetration"] == pytest.approx(5 / 6)
+
+
+def test_order_block_volume_confirmation_is_metadata_and_uses_prior_baseline():
+    base_n = 22
+    df = frame(
+        [100] * base_n,
+        [101] * base_n,
+        [99] * base_n,
+        [100.5] * base_n,
+        [10] * base_n,
+    )
+    df.loc[20, ["open", "high", "low", "close", "volume"]] = [101, 102, 98, 99, 10]
+    df.loc[21, ["open", "high", "low", "close", "volume"]] = [99, 105, 98.5, 104.5, 20]
+
+    r = build_order_blocks(df, require_displacement=True)
+    assert r.loc[21, "order_block_bullish"] == 1
+    assert r.loc[21, "order_block_bullish_volume_ratio"] == pytest.approx(2.0)
+    assert r.loc[21, "order_block_bullish_volume_confirmed"] == 1
