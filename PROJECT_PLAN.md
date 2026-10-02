@@ -133,7 +133,7 @@ Implemented the first production-code block of the authoritative MTF mode archit
 - Added/updated regression tests for exact mode timeframe selection, Position exclusion of 1m, monthly candle semantics, and higher-horizon direction authority.
 
 ### External transport note
-Binance's documented kline interval vocabulary includes `1M` as one-month candles; the previous AICFA restriction was an internal limitation, not a requirement of the exchange API. citeturn2search2
+Binance's documented kline interval vocabulary includes `1M` as one-month candles; the previous AICFA restriction was an internal limitation, not a requirement of the exchange API.
 
 ### Commits
 - `4924fe85ea00bc6ca33917ae86d6046dddf5a272` — trading mode profiles
