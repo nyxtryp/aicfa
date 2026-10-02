@@ -348,3 +348,117 @@ Do not revert to the universal seven-timeframe model and do not require the user
 - After every meaningful implementation/test/deploy step, update this file with: **what changed, commit SHA, server verification result, current status, and next step**.
 - Never claim a test or live verification is green until the server result has actually been reported or directly executed.
 - Treat this file as the continuity/source-of-truth record for the AICFA build sequence.
+
+
+## 2026-10-02 — NEW SMC/SETUP ENGINE INTEGRATION BLOCK: 9 TASKS
+
+The next implementation block adopts nine proven mechanisms from the reviewed external SMC analyzer, but reimplements them inside AICFA's existing causal/evidence architecture. The external project's strategy, scoring, timeframe assumptions and fixed trade rules are NOT copied.
+
+### Authoritative 9-task sequence
+
+1. **Confirmed Swing**
+   - Make swing timestamps explicitly causal: a pivot at index `i` becomes usable only at `confirmed_at_index = i + swing_length`.
+   - Downstream structure/liquidity logic must use confirmation time, never treat the pivot timestamp itself as the availability time.
+   - Preserve causal MTF rules and current role-aware depth/adaptive expansion.
+
+2. **Causal BOS / CHoCH / MSS**
+   - Rework structural-break detection so a swing can participate only after confirmation.
+   - Preserve HH/HL/LH/LL and distinguish structural event time from pivot time.
+   - Prevent stale or already-consumed structural levels from generating repeated false breaks.
+   - MSS/CHoCH/BOS must remain evidence for scenario reasoning, not standalone trade commands.
+
+3. **Liquidity Lifecycle**
+   - Make liquidity levels/pools explicitly causal and stateful.
+   - Support creation, active state, sweep/break, invalidation and relevant reaction.
+   - Verify equal-high/equal-low grouping and tolerance logic rather than assuming ordinary swing highs/lows are equivalent to equal liquidity.
+   - Keep liquidity as a structural layer that interacts with S/R, BOS/CHoCH/MSS and scenario reasoning.
+
+4. **Order Block Lifecycle**
+   - Replace binary OB state with a lifecycle such as: `UNTOUCHED → TOUCHED → PARTIAL → DEEP → INVALIDATED`.
+   - Preserve causal creation/confirmation and invalidation.
+   - Expose lifecycle state to setup/scenario reasoning.
+   - Volume confirmation remains metadata/evidence, never a mandatory gate that silently discards structurally valid OBs.
+
+5. **FVG / Imbalance Lifecycle**
+   - Apply the same causal lifecycle discipline to FVGs: creation, active/unmitigated state, touch/partial fill, mitigation/fill and invalidation where applicable.
+   - Preserve bounds, displacement linkage and timeframe role.
+   - Ensure downstream setup logic distinguishes a fresh FVG from an already mitigated/filled imbalance.
+
+6. **Zone Reaction + Support/Resistance**
+   - Implement the dedicated S/R layer already identified as the previous active task and combine it with OB/FVG/liquidity zones.
+   - Model the sequence:
+     `level/zone → distance → touch → reaction → retest/break → confirmation/cancellation`.
+   - Distinguish local vs higher-timeframe levels, repeated reactions/strength, break/retest/rejection and distance to current price.
+   - Feed zone-reaction evidence into scenario/setup reasoning; do not leave S/R as implicit rolling/swing data.
+
+7. **Volume Evidence**
+   - Treat volume as contextual evidence attached to structural events/zones, not as an unconditional filter.
+   - For OB/FVG/structure reactions, record whether volume confirms or does not confirm the event.
+   - Avoid self-influenced volume baselines where the event candle is included in its own comparison when a prior-candle baseline is intended.
+   - Missing volume-derived auxiliary evidence must remain diagnostic/non-blocking unless a specific hypothesis explicitly requires it.
+
+8. **Structural Entry / SL / TP**
+   - Derive entry/invalidation/targets from the actual structural zone and market context, not from arbitrary current-price offsets.
+   - For OB-based setups, preserve the structural chain:
+     `OB boundary → ATR/structural buffer → SL → entry → risk`.
+   - Targets should use valid opposing liquidity / structural targets and respect direction, current price and entry semantics.
+   - Keep the existing AICFA risk/reward gate and do not import an external fixed RR value without validation.
+   - Structural SL/TP are setup outputs/evidence, not guarantees of execution or outcome.
+
+9. **Conservative Backtest / Evaluation**
+   - Use one deterministic setup logic for live analysis and historical evaluation wherever architecture permits.
+   - Resolve same-candle SL+TP ambiguity conservatively: if both are touched and intrabar ordering is unknown, count SL first.
+   - Make evaluation explicitly causal and prevent future data from influencing setup generation.
+   - Separate in-sample tuning from out-of-sample evaluation; do not treat tiny trade counts as reliable confidence.
+   - Ensure backtest results are actually wired into evaluation/reporting rather than remaining an unused side structure.
+
+### Integration rule
+
+These nine tasks become one coherent AICFA chain:
+
+`confirmed swing → causal BOS/CHoCH/MSS → liquidity → OB/FVG lifecycle → zone reaction/SR → volume evidence → structural entry/SL/TP → conservative evaluation`
+
+They must operate together with AICFA's existing:
+- Market Structure / HH-HL-LH-LL
+- Liquidity
+- SMC
+- Premium/Discount
+- Displacement
+- Price Action
+- Wyckoff
+- MTF context
+- optional Trades/CVD/Order Flow/Order Book/Absorption
+- optional Funding/OI/Mark Price/Liquidations
+- scenario/evidence/decision pipeline
+
+Optional feeds remain auxiliary evidence. They do not independently manufacture scenarios or setups, and missing optional data must not block chart-native analysis.
+
+### Implementation/verification gate
+
+For each task:
+1. inspect current AICFA implementation before changing it;
+2. implement the smallest causal change;
+3. add focused regression tests;
+4. commit the implementation and tests;
+5. update this plan with commit SHA and actual verification;
+6. run full `pytest -q` after the task block reaches a stable checkpoint;
+7. only after regression is GREEN, perform live BTC validation and inspect the returned evidence/setup behavior.
+
+Do not copy the external project's fixed strategy, scoring, timeframe hierarchy, killzones, RR target, or trade labels into AICFA.
+
+### Current status
+
+- Existing regression baseline: **371 passed in 43.50s**, reported by the user after commit `8a0b490eb9f52063b1168a909f6430abf190a12d`.
+- Existing dedicated S/R work is now incorporated into **Task 6: Zone Reaction + Support/Resistance** rather than being a disconnected side layer.
+- No implementation from these nine tasks is claimed yet.
+- **ACTIVE TASK: 1 — Confirmed Swing.**
+- **NEXT: audit current swing implementation, define causal confirmation contract, implement + focused tests, then record the commit and server result here.**
+
+### Do not do
+
+- Do not revert to universal seven-timeframe analysis.
+- Do not require the user to select a trading mode.
+- Do not make optional derivatives/microstructure feeds universal prerequisites.
+- Do not fabricate missing evidence.
+- Do not import the external project's strategy wholesale.
+- Do not claim any of these nine tasks are complete until code/tests/server verification prove it.
