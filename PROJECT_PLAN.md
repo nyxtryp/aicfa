@@ -1,3 +1,18 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 FOCUSED ZONE CONTRACT GREEN
+
+### Verification
+- Server focused `tests/test_zone_reaction.py`: **5 passed in 0.45s**.
+- The latest bucket/index/heap implementation preserves the focused causal lifecycle contract.
+
+### Current status
+- Focused zone contract: **GREEN**.
+- Feature integration: pending after the latest optimization.
+- Full regression: not run yet.
+- Task 6 remains open pending integration performance verification.
+
+### Next step
+Run `tests/test_features.py` and record the exact runtime. Do not run the full suite until the integration result is known.
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 PERFORMANCE BASELINE + REWORK
 
 ### Server baseline before the new optimization
