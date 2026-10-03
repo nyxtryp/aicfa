@@ -3,7 +3,12 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from aicfa.evaluation import EvaluationOutcome, evaluate_setup
+from aicfa.evaluation import (
+    EvaluationOutcome,
+    evaluate_setup,
+    evaluate_setups,
+    purge_training_labels,
+)
 
 
 def candles(rows: list[tuple[float, float, float]]) -> pd.DataFrame:
@@ -74,3 +79,89 @@ def test_invalid_geometry_is_rejected() -> None:
         evaluate_setup(candles([(100, 101, 99), (100, 106, 94)]),
             setup_timestamp="2026-01-01T00:00:00Z", direction="long",
             entry_price=100, stop_price=105, target_price=95)
+
+
+def test_batch_evaluation_returns_individual_results_and_counts() -> None:
+    setups = [
+        {
+            "setup_timestamp": "2026-01-01T00:00:00Z",
+            "direction": "long",
+            "entry_price": 100,
+            "stop_price": 95,
+            "target_price": 105,
+        },
+        {
+            "setup_timestamp": "2026-01-01T00:01:00Z",
+            "direction": "short",
+            "entry_price": 100,
+            "stop_price": 105,
+            "target_price": 95,
+        },
+    ]
+    result = evaluate_setups(
+        candles([(100, 101, 99), (100, 106, 99), (100, 101, 94), (100, 101, 94)]),
+        setups,
+    )
+    assert [item.outcome for item in result.results] == [
+        EvaluationOutcome.TP, EvaluationOutcome.TP
+    ]
+    assert result.counts == {
+        EvaluationOutcome.TP.value: 2,
+        EvaluationOutcome.SL.value: 0,
+        EvaluationOutcome.TIMEOUT.value: 0,
+        EvaluationOutcome.AMBIGUOUS.value: 0,
+    }
+    assert result.resolved_count == 2
+    assert result.tp_rate == 1.0
+    assert result.mean_gross_return > 0
+
+
+def test_batch_statistics_do_not_treat_ambiguous_as_resolved() -> None:
+    setups = [{
+        "setup_timestamp": "2026-01-01T00:00:00Z",
+        "direction": "long",
+        "entry_price": 100,
+        "stop_price": 95,
+        "target_price": 105,
+    }]
+    result = evaluate_setups(
+        candles([(100, 101, 99), (100, 106, 94)]),
+        setups,
+    )
+    assert result.resolved_count == 0
+    assert result.tp_rate is None
+    assert result.mean_gross_return is None
+
+
+def test_purge_removes_training_labels_reaching_validation_start() -> None:
+    start = pd.Timestamp("2026-01-01T00:03:00Z")
+    frame = pd.DataFrame({
+        "timestamp": pd.to_datetime([
+            "2026-01-01T00:00:00Z", "2026-01-01T00:01:00Z",
+            "2026-01-01T00:02:00Z", "2026-01-01T00:03:00Z",
+        ]),
+        "label_end_timestamp_5": pd.to_datetime([
+            "2026-01-01T00:02:00Z", "2026-01-01T00:03:00Z",
+            "2026-01-01T00:04:00Z", "2026-01-01T00:05:00Z",
+        ]),
+    })
+    purged = purge_training_labels(frame, validation_start=start)
+    assert purged["timestamp"].tolist() == [
+        pd.Timestamp("2026-01-01T00:00:00Z")
+    ]
+
+
+def test_purge_requires_label_end_column_and_drops_missing_intervals() -> None:
+    frame = pd.DataFrame({
+        "timestamp": pd.to_datetime([
+            "2026-01-01T00:00:00Z", "2026-01-01T00:01:00Z"
+        ]),
+        "label_end_timestamp_5": pd.to_datetime([
+            "2026-01-01T00:02:00Z", None
+        ]),
+    })
+    with pytest.raises(ValueError, match="label end"):
+        purge_training_labels(frame, validation_start="2026-01-01T00:03:00Z",
+            label_end_column="missing")
+    purged = purge_training_labels(frame, validation_start="2026-01-01T00:03:00Z")
+    assert len(purged) == 1
