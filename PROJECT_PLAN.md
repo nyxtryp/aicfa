@@ -500,3 +500,27 @@ Profile the complete 10,080-row `build_features()` path to identify the remainin
 Run the feature regression:
 `tests/test_features.py`.
 After that, run the full suite and record the actual result here before closing Task 7.
+
+
+## 2026-10-03 — TASK 7 FINAL REGRESSION GREEN / HANDOFF TO TASK 8
+
+### Server verification
+- `tests/test_volume_evidence.py`: **9 passed in 1.29s**.
+- `tests/test_features.py`: **10 passed in 49.05s**.
+- Full regression: **393 passed in 81.69s (1:21)**.
+- Result: **0 failed, 0 skipped** in the current automated test suite.
+
+### Task 7 status
+- Volume Evidence is fully integrated into `features.py` and `unified_smc.py`.
+- Causal evidence includes relative volume, z-score, expansion/dry-up, BOS/breakout, rejection, liquidity sweep and displacement observations.
+- No artificial directional volume score or BUY/SELL verdict was introduced.
+- Prior-only baseline and no-future-rewrite behavior remain covered by tests.
+- **Task 7 — Volume Evidence: GREEN / CLOSED.**
+
+### Next task
+**Task 8 — Structural Entry / SL / TP.**
+
+Task 8 must build structural entry conditions from already-established causal evidence (structure, liquidity, OB/FVG, zone reaction, volume evidence), then derive structural stop-loss and take-profit levels without importing a fixed strategy, fixed RR, future information or fabricated data.
+
+### Next exact action
+Audit the existing entry/setup/SL/TP implementation and tests before changing production logic. Define the Task 8 causal contract first, then add focused regression tests before implementation.
