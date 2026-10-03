@@ -734,3 +734,16 @@ Run the full server regression and record the exact pass/fail count and runtime.
 
 ### Next exact action
 Continue Task 9 with the next leakage-aware chronological validation/fold layer required by the existing plan. Preserve strict causal boundaries using label_end_timestamp_<horizon>; analyze RR as an observed setup attribute alongside actual TP/SL/TIMEOUT/AMBIGUOUS outcomes rather than turning it into a fixed filter.
+
+## 2026-10-03 — TASK 9 — CHRONOLOGICAL PURGED FOLDS CONTRACT IMPLEMENTED
+
+- Added focused chronological validation-fold coverage in `tests/test_evaluation.py`.
+- Test commit: `02c1569b2db41e7d1b28f5150f947263b84d7457` — `test: define chronological purged fold contract`.
+- Added `build_chronological_folds()` to `src/aicfa/evaluation.py`.
+- Production commit: `c36f241b78c5ae7780ee30064719efcf167b8d7f` — `feat: add chronological purged validation folds`.
+- Contract: validation windows are chronological and consecutive; each training set contains only rows before its validation start; training labels whose causal interval reaches validation start are purged; validation rows are never used to build training data; invalid window sizes and duplicate timestamps are rejected.
+- This is an evaluation/validation layer only. It does not train a model, generate setups, add a confidence score, or make a performance claim.
+- **Server validation pending.**
+
+### Next exact action
+Run `tests/test_evaluation.py` on the server. If GREEN, run the full regression and record the exact result before continuing Task 9 with RR/outcome analysis on causally separated folds.
