@@ -295,3 +295,12 @@ End-user UX remains asset-only: user enters an asset such as BTC; AICFA internal
 - All structural/lifecycle logic must remain causal; no future leakage.
 - Do not import external fixed strategy, scoring, timeframe hierarchy, killzones, fixed RR or trade labels.
 - Every meaningful implementation/test/deploy step must be recorded here with commit SHA, actual server result, status and next step.
+
+
+### 2026-10-03 — Task 6 performance: zone nearest-level index
+- `tests/test_liquidity.py`: 8 passed in 0.52s after liquidity active-pool bookkeeping optimization.
+- `tests/test_features.py` still stalls at the 4th test (`test_feature_integration_exposes_required_higher_timeframes`), so the long 10,080-row MTF integration path remains the active bottleneck.
+- Root cause identified in `zone_reaction.py`: every new zone used Python `bisect.insort` and every broken zone used list removal for sorted support/resistance levels. Those operations are O(n) per mutation and can become quadratic as zones accumulate.
+- Replaced sorted level maintenance with the existing spatial bucket index for exact nearest-active lookup; wide zones remain explicitly checked. Zone lifecycle creation/touch/reaction/retest/break rules were not intentionally changed.
+- Commit: `392606125317356839f4f2c6cb240e8782f57948` — `perf: remove O(n) sorted zone level maintenance`.
+- Next: focused `tests/test_zone_reaction.py`, then rerun `tests/test_features.py`.
