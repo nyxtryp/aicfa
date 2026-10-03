@@ -584,3 +584,29 @@ Run focused tests first, then implement only the missing production behavior, th
 
 ### Next exact action
 Run the MTF/setup-engine regression together with the structural-entry contract, then run the full suite. If GREEN, close Task 8 with the exact full-suite result and move to Task 9 — Conservative Backtest / Evaluation. No production Target/TP change is justified unless regression exposes a real behavioral gap.
+
+
+## 2026-10-03 — TASK 8 TARGET/TP — MTF + STRUCTURAL ENTRY GREEN
+
+- Server validation after the focused Target/TP contract: `tests/test_setup_engine_mtf.py` + `tests/test_structural_entry.py` = **21 passed in 0.71s**.
+- Result: **0 failed** in the combined MTF/setup-engine + Structural Entry contract slice.
+- Structural Entry, Structural SL and causal Target/TP focused contracts are now jointly verified.
+- No production Target/TP change was required; the existing `_target_levels()` behavior satisfies the newly defined causal contract.
+- Full regression after this final Target/TP test slice is still pending.
+
+### Current Task 8 status
+- Structural Entry: **GREEN**.
+- Structural SL: **GREEN**.
+- Target/TP focused contract: **GREEN — 9/9**.
+- MTF + Structural Entry regression: **GREEN — 21/21**.
+- Task 8 remains **ACTIVE** only until the full suite is rerun and recorded.
+
+### Next exact action
+Run the full server regression:
+```bash
+sudo -u fd-aicfa bash -lc '
+cd "$(readlink -f /srv/frostdeploy/aicfa/current)" &&
+PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q
+'
+```
+If GREEN, record the exact result, close Task 8, and move to **Task 9 — Conservative Backtest / Evaluation**. Do not make unrelated production changes before the full regression.
