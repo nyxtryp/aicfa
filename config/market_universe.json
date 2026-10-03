@@ -129,14 +129,6 @@
       "market_type": "spot"
     },
     {
-      "asset": "ALGO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "VET/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "XLM/USDT",
       "market_type": "spot"
     },
@@ -161,54 +153,6 @@
       "market_type": "spot"
     },
     {
-      "asset": "NEO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "JASMY/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "SAND/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "MANA/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "AXS/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "GALA/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ENJ/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "CHZ/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "RON/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "BEAM/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "MAGIC/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ILV/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "RPL/USDT",
       "market_type": "spot"
     },
@@ -226,10 +170,6 @@
     },
     {
       "asset": "COMP/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "SNX/USDT",
       "market_type": "spot"
     },
     {
@@ -269,18 +209,6 @@
       "market_type": "spot"
     },
     {
-      "asset": "1INCH/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "APE/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "DEGEN/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "POPCAT/USDT",
       "market_type": "spot"
     },
@@ -305,35 +233,11 @@
       "market_type": "spot"
     },
     {
-      "asset": "NEIRO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "COQ/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "PONKE/USDT",
       "market_type": "spot"
     },
     {
       "asset": "MYRO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "GIGA/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "GOAT/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "SPX/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ACT/USDT",
       "market_type": "spot"
     },
     {
@@ -357,22 +261,6 @@
       "market_type": "spot"
     },
     {
-      "asset": "FWOG/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "MICHI/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "SLERF/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "MANEKI/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "PENGU/USDT",
       "market_type": "spot"
     },
@@ -382,14 +270,6 @@
     },
     {
       "asset": "WLD/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "WOO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "TWT/USDT",
       "market_type": "spot"
     },
     {
@@ -413,35 +293,7 @@
       "market_type": "spot"
     },
     {
-      "asset": "DASH/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "ZEC/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "QTUM/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ICX/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ZIL/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "RVN/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "SATS/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "MASK/USDT",
       "market_type": "spot"
     },
     {
@@ -525,22 +377,6 @@
       "market_type": "spot"
     },
     {
-      "asset": "CFG/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "MPL/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "TRU/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "AXL/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "ENS/USDT",
       "market_type": "spot"
     },
@@ -554,46 +390,6 @@
     },
     {
       "asset": "FET/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "KAVA/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "MINA/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "EGLD/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "FLOW/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ROSE/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "KDA/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ONE/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "CKB/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "FLUX/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "IOTX/USDT",
       "market_type": "spot"
     },
     {
@@ -645,31 +441,7 @@
       "market_type": "spot"
     },
     {
-      "asset": "JOE/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "SUSHI/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "BAL/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "CVX/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "YFI/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "AERO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "BLUR/USDT",
       "market_type": "spot"
     },
     {
@@ -677,55 +449,7 @@
       "market_type": "spot"
     },
     {
-      "asset": "BAT/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ZRX/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "LRC/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ANKR/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "STORJ/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "THETA/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "XTZ/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "COTI/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "XDC/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "DUSK/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "SAFE/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "TNSR/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "WEN/USDT",
       "market_type": "spot"
     },
     {
@@ -737,39 +461,11 @@
       "market_type": "spot"
     },
     {
-      "asset": "FXS/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "SPELL/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "RLC/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "TRB/USDT",
       "market_type": "spot"
     },
     {
       "asset": "DIA/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "HIFI/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "VELO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "ALICE/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "XVS/USDT",
       "market_type": "spot"
     },
     {
@@ -819,17 +515,6 @@
       }
     },
     {
-      "asset": "XPD/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "metal",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "okx": "XPD/USDT:USDT",
-        "mexc": "XPD/USDT:USDT"
-      }
-    },
-    {
       "asset": "WTI/USDT",
       "market_type": "futures",
       "asset_class": "tradfi",
@@ -862,48 +547,6 @@
       "venue_symbols": {
         "okx": "NG/USDT:USDT",
         "mexc": "NGAS/USDT:USDT"
-      }
-    },
-    {
-      "asset": "EUR/USD",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "fx",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "EURUSD/USDT:USDT"
-      }
-    },
-    {
-      "asset": "GBP/USD",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "fx",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "GBPUSD/USDT:USDT"
-      }
-    },
-    {
-      "asset": "SPX/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "index",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "SPX/USDT:USDT",
-        "okx": "SPX/USDT:USDT",
-        "mexc": "SPX/USDT:USDT"
-      }
-    },
-    {
-      "asset": "NDX/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "index",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "mexc": "NAS100/USDT:USDT"
       }
     },
     {
@@ -949,28 +592,6 @@
         "bybit": "QQQ/USDT:USDT",
         "okx": "QQQ/USDT:USDT",
         "mexc": "QQQSTOCK/USDT:USDT"
-      }
-    },
-    {
-      "asset": "IWM/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "etf",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "IWM/USDT:USDT",
-        "okx": "IWM/USDT:USDT",
-        "mexc": "IWM/USDT:USDT"
-      }
-    },
-    {
-      "asset": "GLD/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "etf",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "mexc": "GLD/USDT:USDT"
       }
     },
     {
@@ -1093,18 +714,6 @@
       }
     },
     {
-      "asset": "SNDK/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "SNDK/USDT:USDT",
-        "okx": "SNDK/USDT:USDT",
-        "mexc": "SNDKSTOCK/USDT:USDT"
-      }
-    },
-    {
       "asset": "ARM/USDT",
       "market_type": "futures",
       "asset_class": "tradfi",
@@ -1138,30 +747,6 @@
         "bybit": "ASML/USDT:USDT",
         "okx": "ASML/USDT:USDT",
         "mexc": "ASMLSTOCK/USDT:USDT"
-      }
-    },
-    {
-      "asset": "SMCI/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "SMCI/USDT:USDT",
-        "okx": "SMCI/USDT:USDT",
-        "mexc": "SMCISTOCK/USDT:USDT"
-      }
-    },
-    {
-      "asset": "QCOM/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "QCOM/USDT:USDT",
-        "okx": "QCOM/USDT:USDT",
-        "mexc": "QCOMSTOCK/USDT:USDT"
       }
     },
     {
@@ -1213,18 +798,6 @@
       }
     },
     {
-      "asset": "MSTR/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "MSTR/USDT:USDT",
-        "okx": "MSTR/USDT:USDT",
-        "mexc": "MSTRSTOCK/USDT:USDT"
-      }
-    },
-    {
       "asset": "JPM/USDT",
       "market_type": "futures",
       "asset_class": "tradfi",
@@ -1233,52 +806,6 @@
       "venue_symbols": {
         "bybit": "JPM/USDT:USDT",
         "mexc": "JPMSTOCK/USDT:USDT"
-      }
-    },
-    {
-      "asset": "BAC/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "BAC/USDT:USDT",
-        "mexc": "BACSTOCK/USDT:USDT"
-      }
-    },
-    {
-      "asset": "WMT/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "WMT/USDT:USDT",
-        "okx": "WMT/USDT:USDT",
-        "mexc": "WMTSTOCK/USDT:USDT"
-      }
-    },
-    {
-      "asset": "XOM/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "XOM/USDT:USDT",
-        "okx": "XOM/USDT:USDT",
-        "mexc": "XOMSTOCK/USDT:USDT"
-      }
-    },
-    {
-      "asset": "BA/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bitget": "BA/USDT:USDT",
-        "mexc": "BASTOCK/USDT:USDT"
       }
     }
   ]
