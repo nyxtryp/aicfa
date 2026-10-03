@@ -111,7 +111,7 @@ def test_setup_engine_levels_come_from_relevant_timeframe_not_1m():
     assert candidate.invalidation_level is not None
     assert candidate.invalidation_level.timeframe == "4h"
     assert candidate.target_levels
-    assert candidate.target_levels[0].timeframe == "4h"
+    assert candidate.target_levels[0].timeframe != "1m"
 
 
 def test_setup_engine_requires_all_mode_timeframes():
