@@ -121,9 +121,9 @@ def test_find_setup_fetches_only_selected_intraday_timeframes():
     )
 
     assert result.mode is TradingMode.INTRADAY
-    assert result.timeframes == ("1d", "4h", "1h", "15m")
+    assert result.timeframes == ("4h", "1h", "15m", "5m")
     assert result.timeframes == tuple(call[2] for call in provider.calls)
-    assert tuple(call[2] for call in provider.calls) == ("1d", "4h", "1h", "15m")
+    assert tuple(call[2] for call in provider.calls) == ("4h", "1h", "15m", "5m")
     assert all(call[0] == "BTC/USDT" for call in provider.calls)
     assert all(call[1] == "spot" for call in provider.calls)
     assert result.analysis["timestamp"].is_monotonic_increasing
@@ -131,9 +131,9 @@ def test_find_setup_fetches_only_selected_intraday_timeframes():
 
 @pytest.mark.parametrize("mode, expected", [
     ("scalping", ("15m", "5m", "1m")),
-    ("intraday", ("1d", "4h", "1h", "15m")),
-    ("swing", ("1w", "1d", "4h", "1h")),
-    ("position", ("1M", "1w", "1d", "4h")),
+    ("intraday", ("4h", "1h", "15m", "5m")),
+    ("swing", ("1d", "4h", "1h")),
+    ("position", ("1w", "1d", "4h")),
 ])
 def test_find_setup_timeframes_match_exact_mode_contract(mode, expected):
     provider = FakeProvider()
@@ -214,7 +214,7 @@ def test_find_setup_uses_mode_aware_analysis_depth_when_no_diagnostic_limit_is_g
         now_ms=120 * 60_000,
     )
     # FindSetup defaults to Intraday: the first pass uses the role-aware
-    # baseline 1d=120, 4h=180, 1h=240, 15m=240. Missing context may
+    # baseline 4h=120, 1h=180, 15m=240, 5m=240. Missing context may
     # trigger up to two adaptive expansion passes.
     limits = [call[4] for call in provider.calls]
     assert limits[:4] == [120, 180, 240, 240]
@@ -240,9 +240,9 @@ def test_find_setup_expands_missing_context_until_provider_boundary():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    assert [call[4] for call in provider.calls if call[2] == "1d"] == [120, 240]
-    assert [call[4] for call in provider.calls if call[2] == "4h"] == [180, 360]
-    assert len(result.frames["15m"]) == 130
+    assert [call[4] for call in provider.calls if call[2] == "4h"] == [120, 240]
+    assert [call[4] for call in provider.calls if call[2] == "1h"] == [180, 360]
+    assert len(result.frames["5m"]) == 130
 
 
 class UnboundedNoContextProvider(FakeProvider):
@@ -260,7 +260,7 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
     assert all(call[4] in {120, 180, 240, 360, 480, 720, 960} for call in provider.calls)
-    assert [call[4] for call in provider.calls if call[2] == "1d"] == [120, 240, 480]
+    assert [call[4] for call in provider.calls if call[2] == "4h"] == [120, 240, 480]
 
 
 def test_find_setup_does_not_fetch_optional_microstructure_by_default():
