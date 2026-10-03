@@ -1,3 +1,26 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 FULL REGRESSION GREEN
+
+### Verified server results after latest zone hot-loop fix
+- Commit under test: `1881089f2afe40dc5893793f4c6d1a4cacbf789b` — `fix: preserve candle arrays in zone reaction hot loop`.
+- `tests/test_zone_reaction.py`: **5 passed in 0.60s**.
+- `tests/test_features.py`: **10 passed in 57.03s**.
+- Full suite: **384 passed in 84.23s (1:24)**.
+- Compared with the previously recorded Task 6 full-suite result of **384 passed in 105.05s**, the latest full suite is **20.82 seconds faster**. The feature integration also improved from **86.00s** to **57.03s**.
+- However, this is still slower than the earlier pre-Task-6 full-suite baseline of roughly **45–50s**. Functional regression is GREEN; performance is improved but not fully back to baseline.
+
+### Task 6 status
+- Zone Reaction + Support/Resistance focused contract: **GREEN**.
+- Feature integration: **GREEN**.
+- Full regression: **GREEN — 384/384**.
+- Task 6 is functionally integrated. Before marking it fully closed, decide whether to make another targeted performance pass or accept the current measured regression with a recorded follow-up. Do not silently claim baseline performance has been restored.
+
+### Next action
+- Recommended next step: profile the remaining Task 6 integration cost and attempt one targeted optimization without changing lifecycle semantics; run focused zone tests and `tests/test_features.py` first, then full suite only if integration improves and remains green.
+- If the next optimization does not produce a worthwhile improvement, document the trade-off and close Task 6 with the remaining performance debt explicit, then continue to Task 7 — Volume Evidence.
+- Always update this file after every meaningful implementation/test/fix, with commit SHA, exact test results/runtime, current status, and the next action. This plan remains the continuity source of truth across chats.
+
+---
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 FEATURE INTEGRATION VERIFIED; PERFORMANCE STILL UNDER REVIEW
 
 ### Server verification
