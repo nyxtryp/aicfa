@@ -11,6 +11,7 @@ backdated to a pivot/source candle that was not yet confirmed.
 
 from __future__ import annotations
 
+import bisect
 import numpy as np
 import pandas as pd
 
@@ -230,6 +231,10 @@ def build_zone_reaction(
         np.log(np.maximum(highs, 1e-300)) / bucket_step
     ).astype(np.int64)
     zone_buckets: dict[int, list[int]] = {}
+    # Keep occupied bucket ids sorted. _active_level() can then inspect the
+    # nearest occupied price buckets directly instead of walking thousands of
+    # empty radius buckets on long histories.
+    occupied_bucket_keys: list[int] = []
     wide_zones: list[int] = []
     # Reuse a marker array for per-candle candidate deduplication rather than
     # allocating and hashing a new Python set on every row.
@@ -262,7 +267,12 @@ def build_zone_reaction(
             wide_zones.append(zone_id)
         else:
             for bucket_id in range(first, last + 1):
-                zone_buckets.setdefault(bucket_id, []).append(zone_id)
+                bucket = zone_buckets.get(bucket_id)
+                if bucket is None:
+                    zone_buckets[bucket_id] = [zone_id]
+                    bisect.insort(occupied_bucket_keys, bucket_id)
+                else:
+                    bucket.append(zone_id)
 
 
     def _append_zone(*, source, side, low, high, created):
@@ -316,12 +326,29 @@ def build_zone_reaction(
     }
 
     def _active_level(close: float, side: int):
-        # Use the existing spatial bucket index for nearest-active lookup.
-        # This avoids O(n) insort/pop operations as the zone set grows.
+        # Exact nearest-level lookup using the occupied logarithmic buckets.
+        # The previous implementation expanded radius one bucket at a time;
+        # when no nearby bucket existed this could traverse thousands of empty
+        # buckets for every candle. Only the current bucket and its nearest
+        # occupied neighbors can contain the nearest non-wide zone.
         current_bucket = _bucket(close)
         best_zone = -1
         best_distance = float("inf")
 
+        def _consider(bucket_id: int):
+            nonlocal best_zone, best_distance
+            for zone_id in zone_buckets.get(bucket_id, ()):
+                if zone_side[zone_id] != side:
+                    continue
+                if zone_state[zone_id] in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
+                    continue
+                level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
+                distance = abs(close - level)
+                if distance < best_distance:
+                    best_zone, best_distance = zone_id, distance
+
+        # Wide zones are not represented in the bucket index, so they must
+        # remain part of the exact lookup.
         for zone_id in wide_zones:
             if zone_side[zone_id] != side:
                 continue
@@ -332,31 +359,25 @@ def build_zone_reaction(
             if distance < best_distance:
                 best_zone, best_distance = zone_id, distance
 
-        radius = 0
-        while True:
-            buckets = (current_bucket,) if radius == 0 else (current_bucket - radius, current_bucket + radius)
-            for bucket_id in buckets:
-                for zone_id in zone_buckets.get(bucket_id, ()):
-                    if zone_side[zone_id] != side:
-                        continue
-                    if zone_state[zone_id] in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
-                        continue
-                    level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
-                    distance = abs(close - level)
-                    if distance < best_distance:
-                        best_zone, best_distance = zone_id, distance
-            if best_zone >= 0:
-                lower_edge = np.exp((current_bucket - radius - 1) * bucket_step)
-                upper_edge = np.exp((current_bucket + radius + 1) * bucket_step)
-                if lower_edge < close - best_distance and upper_edge > close + best_distance:
-                    break
-            if radius > len(zone_buckets) + 1:
-                break
-            radius += 1
+        pos = bisect.bisect_left(occupied_bucket_keys, current_bucket)
+        if pos < len(occupied_bucket_keys) and occupied_bucket_keys[pos] == current_bucket:
+            _consider(current_bucket)
+            left = pos - 1
+            right = pos + 1
+        else:
+            left = pos - 1
+            right = pos
+
+        if left >= 0:
+            _consider(occupied_bucket_keys[left])
+        if right < len(occupied_bucket_keys):
+            _consider(occupied_bucket_keys[right])
+
         if best_zone < 0:
             return None
         level = (zone_low[best_zone] + zone_high[best_zone]) / 2.0
         return best_zone, level, best_distance
+
     for i in range(n):
         created_count = 0
 
