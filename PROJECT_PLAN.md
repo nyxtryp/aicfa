@@ -1,3 +1,10 @@
+## 2026-10-03 — MTF focused validation
+
+- Server validation after the targeted MTF optimization: `tests/test_multi_timeframe.py` = **6 passed in 0.73s**.
+- This confirms the focused MTF behavior remains green after the lightweight `build_structure()` path was introduced.
+- Performance improvement itself is not yet accepted; the integration benchmark is still pending.
+- Next exact action: run `tests/test_features.py` once and compare against the previous stalled >4 minute run / prior 57.03s baseline.
+
 ## 2026-10-03 — MTF performance diagnosis and targeted optimization
 
 - Confirmed server-side slowdown: `tests/test_features.py` stalled on `test_feature_integration_exposes_required_higher_timeframes`; first three tests passed before the long-running test.
