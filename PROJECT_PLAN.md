@@ -300,3 +300,23 @@ Run focused VDS validation for `tests/test_trade_description.py`. If green, run 
 ### Next exact action
 
 Run focused VDS validation for `tests/test_market_orchestrator.py` and `tests/test_trade_description.py`. If green, run the full regression. After that, define the setup identity/lifecycle integration so multiple independent Intraday/Swing/Position setups can remain active without overwriting each other.
+
+
+### 2026-10-03 — MULTIPLE INDEPENDENT SETUP LIFECYCLES IMPLEMENTED
+
+- Corrected the lifecycle contract: a market is **not** limited to one setup, and a horizon is **not** limited to one setup.
+- Added `SetupIdentity` in `src/aicfa/setup_lifecycle.py`.
+- Identity is based on market, market type, horizon, direction and actionable Entry/SL/TP geometry. Re-observing the same geometry updates the existing lifecycle instead of creating a duplicate.
+- The lifecycle now supports multiple independent setups simultaneously for the same market + same horizon, different horizons on the same market, and different markets independently.
+- Added `evaluate_all(...)` to evaluate all existing setups independently and activate every distinct new actionable candidate.
+- Existing setup geometry remains immutable after activation; a changed analytical candidate does not overwrite the original active setup.
+- Added `active_setups(...)` and identity-aware clearing while preserving the existing single-result `evaluate(...)` API for compatibility.
+- Removed the previous behavior that refused activation whenever an assessment contained multiple candidates.
+- Added tests for two distinct setups active simultaneously on the same BTC/USDT Intraday horizon, the same setup reappearing on the next scan without duplication, and independent Intraday/Swing/Position setups coexisting on the same market.
+- Production commit: `e714ba8353779a638781d01f76556aac795749dc` — `feat: support independent concurrent setup lifecycles`.
+- Test commit: `df7bfebed945bdd00f4a11b62ace3adc09eeb305` — `test: cover concurrent setup identities and horizons`.
+- VDS verification is pending.
+
+### Next exact action
+
+Deploy the two commits to the VDS, run `tests/test_setup_lifecycle.py` first, then `tests/test_market_orchestrator.py tests/test_trade_description.py`, then the full regression. After green verification, connect the orchestrator's HorizonSetup identities to this multi-setup lifecycle so repeated scans update the same setup while distinct geometries remain simultaneously active.
