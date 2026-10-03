@@ -347,3 +347,12 @@ End-user UX remains asset-only: user enters an asset such as BTC; AICFA internal
 - Changed `src/aicfa/zone_reaction.py`: wide zones now use a coarser logarithmic bucket index and nearest occupied coarse buckets instead of a global `wide_zones` scan.
 - GitHub commit: `a4236083c91ad924bed39937f15b9635ba087cb5` — `perf: index wide zones for active-level lookup`.
 - No server validation yet. Next: deploy this revision, run `tests/test_zone_reaction.py`, then the single previously hanging higher-timeframe feature integration test.
+
+
+### 2026-10-03 — Zone active-level Python scan vectorized
+- Diagnostic stack confirmed the remaining >5s hotspot was `zone_reaction.py:_active_level()` (stack at line 383).
+- Replaced per-zone Python candidate iteration in `_active_level()` with NumPy filtering/distance calculation after collecting only the nearest occupied normal/coarse buckets.
+- No zone lifecycle creation/touch/reaction/retest/break rules intentionally changed.
+- Commit: `0879620f2e9c1d840551b02e65b046511e1bbb25`
+- Server validation: pending deployment.
+- Next: deploy this revision, run `tests/test_zone_reaction.py`, then run the isolated 10,080-row `zone_reaction` benchmark. If it is still slow, capture the next stack before changing another path.
