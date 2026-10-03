@@ -356,3 +356,16 @@ End-user UX remains asset-only: user enters an asset such as BTC; AICFA internal
 - Commit: `0879620f2e9c1d840551b02e65b046511e1bbb25`
 - Server validation: pending deployment.
 - Next: deploy this revision, run `tests/test_zone_reaction.py`, then run the isolated 10,080-row `zone_reaction` benchmark. If it is still slow, capture the next stack before changing another path.
+
+
+### 2026-10-03 — Task 6 zone bottleneck resolved; feature integration verified
+
+- Server focused Zone Reaction contract after active-level vectorization: **5 passed in 0.45s**.
+- Isolated 10,080-row `build_zone_reaction()` benchmark: **0.032s**, confirming Zone Reaction itself is no longer the integration bottleneck.
+- Previously hanging higher-timeframe feature integration test now completes successfully: `tests/test_features.py::test_feature_integration_exposes_required_higher_timeframes` = **1 passed in 24.21s**.
+- Commit under validation: `0879620f2e9c1d840551b02e65b046511e1bbb25` — `perf: vectorize active zone level lookup`.
+- This confirms the latest zone-reaction optimization removed the observed hang, while the full 10,080-row feature path still has measurable runtime (~24.21s) that may contain other costs.
+- Full `tests/test_features.py` regression and full suite have **not** been rerun after this optimization.
+
+### Next exact action
+Profile the complete 10,080-row `build_features()` path to identify the remaining runtime contributors. Do not make another blind zone change; Zone Reaction is currently measured at 0.032s in isolation.
