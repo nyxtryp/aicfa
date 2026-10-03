@@ -194,6 +194,16 @@ def scan_universe(
     lifecycle: SetupLifecycle | None = None,
 ) -> MultiMarketScan:
     """Scan the durable configured universe without hardcoding any asset."""
+    register = getattr(provider, "register_market_symbols", None)
+    if register is not None:
+        for market in universe.markets:
+            if market.venue_symbols:
+                register(
+                    market.asset,
+                    market.venue_symbols,
+                    market_type=market.market_type,
+                )
+
     markets = tuple(
         analyze_market_horizons(
             market.asset,
