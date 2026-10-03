@@ -195,6 +195,8 @@ def test_target_contract_uses_only_current_rows_not_future_rows():
         frame.loc[1] = frame.loc[0]
         frame.loc[1, "timestamp"] = 2000
         frame.loc[1, "active_buy_liquidity_price"] = float("nan")
+        frame.loc[1, "smc_structure_direction"] = 1
+        frame.loc[1, "close"] = 105.0
 
     result = _pipeline(frames)
     assert result.candidates
