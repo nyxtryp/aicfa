@@ -58,3 +58,17 @@ Continue Task 9 from the existing chronological purged-fold foundation with the 
 ### Next exact action
 
 Continue Task 9 from the verified historical setup journal and chronological evaluation foundation with the next evaluation/statistics layer defined by the project plan, preserving strict causal boundaries and avoiding fixed RR filters, confidence scores, arbitrary thresholds, or unsupported performance claims.
+
+
+### 2026-10-03 — DIRECTIONAL OUTCOME STATISTICS FOCUSED GREEN
+
+- Added directional historical setup outcome statistics in production commit `0a0c1232773942cef9dffddb614be957020f86b9` — `feat: add directional setup outcome statistics`.
+- Added contract coverage in test commit `459d9d9b3f7e843540d2950827003e937adaaea1` — `test: define directional setup outcome statistics contract`.
+- Statistics keep Long/Short outcomes separated; TP/SL/TIMEOUT/AMBIGUOUS remain visible and resolved metrics exclude unresolved outcomes.
+- Server focused validation: `tests/test_evaluation.py` = **28 passed in 0.58s**.
+- Full regression is not yet rerun after this layer.
+- Task 9 remains ACTIVE.
+
+### Next exact action
+
+Run the full regression after directional outcome statistics, then continue Task 9 from the verified journal/evaluation foundation.
