@@ -1,3 +1,38 @@
+## 2026-10-03 — TASK 6 FINAL REGRESSION GREEN / HANDOFF
+
+- Server full regression after the latest Zone Reaction/index optimizations: **384 passed in 79.11s (1:19)**.
+- Result: **0 failed, 0 skipped** in the current automated test suite.
+- Previously verified focused Zone Reaction contract: **5 passed in 0.48s**.
+- Previously verified higher-timeframe integration: **1 passed in 13.75s**.
+- Task 6 — Zone Reaction + Support/Resistance is now **functionally GREEN and regression-verified**.
+- The current full-suite runtime is materially improved versus the recent 105.05s Task 6 baseline, but remains above the older ~45–50s pre-Task-6 baseline. This is recorded as performance debt; do not make further blind Zone Reaction changes now.
+- The bad `cProfile -m pytest` diagnostic attempt is not part of validation and must not be repeated. The current acceptance is based on the real full pytest regression above.
+
+### Current project direction
+
+The authoritative SMC sequence remains:
+1. Confirmed Swing — GREEN.
+2. Causal BOS / CHoCH / MSS — GREEN.
+3. Liquidity Lifecycle — GREEN.
+4. Order Block Lifecycle — GREEN.
+5. FVG / Imbalance Lifecycle — GREEN.
+6. Zone Reaction + Support/Resistance — **GREEN / accepted**.
+7. **Volume Evidence — NEXT**.
+8. Structural Entry / SL / TP.
+9. Conservative Backtest / Evaluation.
+
+### Next exact action
+
+Start **Task 7 — Volume Evidence**:
+1. Audit the existing volume/volatility/CVD evidence implementation and current feature/unified-SMC propagation.
+2. Define the causal Volume Evidence contract before changing production logic.
+3. Add focused regression tests first.
+4. Implement only after the contract is covered.
+5. Run focused tests, then full regression.
+6. Update this file with every commit and actual server result/runtime.
+
+Do not move to Structural Entry / SL / TP until Task 7 is functionally integrated and regression-green.
+
 ## 2026-10-03 — TASK 6 third-pass zone index fix — VERIFIED
 
 - Server focused validation after commit `3214766ab725ab6dce890315299d7f2a11ddb590`: `tests/test_zone_reaction.py` = **5 passed in 0.48s**.
