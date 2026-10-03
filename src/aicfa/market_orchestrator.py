@@ -12,6 +12,7 @@ from typing import Callable, Sequence
 from .data_requirements import TradingMode
 from .find_setup import FindSetupRequest, FindSetupResult, find_setup
 from .market_universe import MarketUniverse
+from .trade_description import TradeDescription, build_trade_description
 
 
 PRIMARY_TRADING_MODES: tuple[TradingMode, ...] = (
@@ -27,6 +28,7 @@ class HorizonSetup:
 
     mode: TradingMode
     candidate: object
+    description: TradeDescription
 
 
 @dataclass(frozen=True)
@@ -85,7 +87,14 @@ def analyze_market_horizons(
         results.append(result)
         candidates = getattr(result.setup_assessment, "candidates", ())
         for candidate in candidates:
-            setups.append(HorizonSetup(mode=mode, candidate=candidate))
+            description = build_trade_description(result, candidate, now_ms=now_ms)
+            setups.append(
+                HorizonSetup(
+                    mode=mode,
+                    candidate=candidate,
+                    description=description,
+                )
+            )
 
     resolved_asset = results[0].symbol
     return MarketHorizonScan(
