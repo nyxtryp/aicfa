@@ -110,16 +110,22 @@ def build_liquidity(
     int_low_by_row = {i: p for i, p in int_lows}
 
     pools = []
+    active_counts = {"buy": 0, "sell": 0, "external_buy": 0, "external_sell": 0, "internal_buy": 0, "internal_sell": 0}
+    active_latest = {"buy": None, "sell": None}
     last_ext_high = last_ext_low = None
     last_int_high = last_int_low = None
     prev_ext_high = prev_ext_low = None
     prev_int_high = prev_int_low = None
 
     def add_pool(side, level, external, row):
+        pool_id = len(pools)
         pools.append({
             "side": side, "level": float(level), "external": bool(external),
-            "created": row, "state": "active",
+            "created": row, "state": "active", "id": pool_id,
         })
+        active_counts[side] += 1
+        active_counts[("external_" if external else "internal_") + side] += 1
+        active_latest[side] = pool_id
         out.at[row, "liquidity_pool_created_high" if side == "buy" else "liquidity_pool_created_low"] = 1
         out.at[row, "equal_high" if side == "buy" else "equal_low"] = 1
         out.at[row, "buy_side_liquidity" if side == "buy" else "sell_side_liquidity"] = 1
@@ -140,24 +146,32 @@ def build_liquidity(
             if side == "buy" and highs[row] > level:
                 if closes[row] < level:
                     pool["state"] = "swept"
+                    active_counts["buy"] -= 1
+                    active_counts["external_buy" if pool["external"] else "internal_buy"] -= 1
                     out.at[row, "sweep_high"] = 1
                     out.at[row, "sweep_high_reclaim"] = 1
                     out.at[row, "sweep_high_level"] = level
                     out.at[row, "liquidity_pool_swept_high"] = 1
                 elif closes[row] > level:
                     pool["state"] = "broken"
+                    active_counts["buy"] -= 1
+                    active_counts["external_buy" if pool["external"] else "internal_buy"] -= 1
                     out.at[row, "sweep_high_level"] = level
                     out.at[row, "liquidity_breakout_high"] = 1
                     out.at[row, "liquidity_pool_invalidated_high"] = 1
             elif side == "sell" and lows[row] < level:
                 if closes[row] >= level:
                     pool["state"] = "swept"
+                    active_counts["sell"] -= 1
+                    active_counts["external_sell" if pool["external"] else "internal_sell"] -= 1
                     out.at[row, "sweep_low"] = 1
                     out.at[row, "sweep_low_reclaim"] = 1
                     out.at[row, "sweep_low_level"] = level
                     out.at[row, "liquidity_pool_swept_low"] = 1
                 elif closes[row] < level:
                     pool["state"] = "broken"
+                    active_counts["sell"] -= 1
+                    active_counts["external_sell" if pool["external"] else "internal_sell"] -= 1
                     out.at[row, "sweep_low_level"] = level
                     out.at[row, "liquidity_breakout_low"] = 1
                     out.at[row, "liquidity_pool_invalidated_low"] = 1
@@ -194,22 +208,23 @@ def build_liquidity(
         elif last_int_low is not None:
             out.at[row, "internal_previous_low"] = last_int_low
 
-        active = [p for p in pools if p["state"] == "active"]
-        active_buy = [p for p in active if p["side"] == "buy"]
-        active_sell = [p for p in active if p["side"] == "sell"]
-        active_ext_buy = [p for p in active_buy if p["external"]]
-        active_ext_sell = [p for p in active_sell if p["external"]]
-        active_int_buy = [p for p in active_buy if not p["external"]]
-        active_int_sell = [p for p in active_sell if not p["external"]]
-        out.at[row, "active_buy_liquidity_pools"] = len(active_buy)
-        out.at[row, "active_sell_liquidity_pools"] = len(active_sell)
-        out.at[row, "active_external_buy_pools"] = len(active_ext_buy)
-        out.at[row, "active_external_sell_pools"] = len(active_ext_sell)
-        out.at[row, "active_internal_buy_pools"] = len(active_int_buy)
-        out.at[row, "active_internal_sell_pools"] = len(active_int_sell)
-        if active_buy:
-            out.at[row, "active_buy_liquidity_price"] = float(active_buy[-1]["level"])
-        if active_sell:
-            out.at[row, "active_sell_liquidity_price"] = float(active_sell[-1]["level"])
+        out.at[row, "active_buy_liquidity_pools"] = active_counts["buy"]
+        out.at[row, "active_sell_liquidity_pools"] = active_counts["sell"]
+        out.at[row, "active_external_buy_pools"] = active_counts["external_buy"]
+        out.at[row, "active_external_sell_pools"] = active_counts["external_sell"]
+        out.at[row, "active_internal_buy_pools"] = active_counts["internal_buy"]
+        out.at[row, "active_internal_sell_pools"] = active_counts["internal_sell"]
+        if active_counts["buy"]:
+            latest = active_latest["buy"]
+            if latest is None or pools[latest]["state"] != "active":
+                latest = next(i for i in range(len(pools) - 1, -1, -1) if pools[i]["state"] == "active" and pools[i]["side"] == "buy")
+                active_latest["buy"] = latest
+            out.at[row, "active_buy_liquidity_price"] = float(pools[latest]["level"])
+        if active_counts["sell"]:
+            latest = active_latest["sell"]
+            if latest is None or pools[latest]["state"] != "active":
+                latest = next(i for i in range(len(pools) - 1, -1, -1) if pools[i]["state"] == "active" and pools[i]["side"] == "sell")
+                active_latest["sell"] = latest
+            out.at[row, "active_sell_liquidity_price"] = float(pools[latest]["level"])
 
     return out
