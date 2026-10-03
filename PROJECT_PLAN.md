@@ -738,3 +738,26 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 3. Run the 143-market live coverage check and record which crypto futures are actually available.
 4. Remove only crypto markets that genuinely have no usable futures source after the 15-second rule; do not silently fall back to spot.
 5. Validate representative/full futures OHLCV/MTF acquisition before continuing with setup analysis.
+
+
+### 2026-10-04 — FULL MARKET EVIDENCE ACQUISITION: DERIVATIVES + CAUSAL SMART-MONEY CONTEXT
+
+- Verified that AICFA already contains a dedicated derivatives evidence layer:
+  `derivatives_market_data.py` collects real Funding Rate, Open Interest, Mark Price and public liquidation events from Binance/Bybit without fabrication.
+- `derivatives.py` causally aligns funding/OI/positioning observations to the OHLCV timeline and derives descriptive OI/price relationships.
+- `derivatives_evidence.py` feeds the derivatives state into the same `MarketEvidence → scenario → setup → decision` chain. Liquidations remain optional event context; missing liquidation data never becomes a fabricated zero.
+- Updated live `FindSetup` so futures requests automatically collect this existing derivatives layer; spot/non-futures requests do not incur the derivatives collection cost unless explicitly requested.
+- Updated the full market-data diagnostic to verify real derivatives sources instead of reporting them as fake `UNSUPPORTED(provider-contract)` placeholders.
+- Fixed Binance futures order-book history probing: Binance futures depth requires a supported depth limit; the L1 history collector now requests a valid futures depth size and still records only the best bid/ask.
+- CCXT documentation was checked against the current unified public API: funding, open interest and liquidations are contract-specific and exchange-dependent, so unsupported venue capabilities must remain explicitly unavailable rather than fabricated.
+- Current architecture therefore uses:
+  `OHLCV + trades + order book + causal order-book history + derivatives context` where the market actually supports the source.
+- Important timeout clarification: the existing 15-second timeout is a coverage/symbol-resolution guard. It is not yet a hard kill of a full production FindSetup analysis.
+
+### Next exact action
+
+1. Deploy the latest Git changes through FrostDeploy.
+2. Run focused derivatives + FindSetup tests.
+3. Run the full regression.
+4. Run the complete 143-market full-data diagnostic.
+5. Inspect actual coverage by source and only then decide whether any additional venue-specific adapters are justified.
