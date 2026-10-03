@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from aicfa.data_requirements import TradingMode
-from aicfa.setup_analysis import SetupCandidate
+from aicfa.setup_analysis import SetupCandidate, SetupLevel
 from aicfa.market_orchestrator import (
     PRIMARY_TRADING_MODES,
     analyze_market_horizons,
@@ -43,6 +43,7 @@ def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAI
         frames={execution: pd.DataFrame({"close": [101.0]})},
         decision=decision,
         setup_assessment=SimpleNamespace(
+            decision=SimpleNamespace(value="ready" if candidate is not None and decision == "LONG" else "wait"),
             candidates=() if candidate is None else (candidate,),
         ),
     )
