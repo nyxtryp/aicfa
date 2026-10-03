@@ -121,10 +121,6 @@
       "market_type": "spot"
     },
     {
-      "asset": "XMR/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "ETC/USDT",
       "market_type": "spot"
     },
@@ -153,10 +149,6 @@
       "market_type": "spot"
     },
     {
-      "asset": "INJ/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "SEI/USDT",
       "market_type": "spot"
     },
@@ -170,10 +162,6 @@
     },
     {
       "asset": "NEO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "EOS/USDT",
       "market_type": "spot"
     },
     {
@@ -622,18 +610,6 @@
     },
     {
       "asset": "GNS/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "AEVO/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "YGG/USDT",
-      "market_type": "spot"
-    },
-    {
-      "asset": "PRIME/USDT",
       "market_type": "spot"
     },
     {
