@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from aicfa.evaluation import (
+    BatchEvaluation,
     EvaluationOutcome,
     analyze_rr_outcomes,
     analyze_rr_outcomes_by_folds,
@@ -216,13 +217,13 @@ def test_rr_analysis_by_folds_rejects_mismatched_fold_lengths() -> None:
 
 
 def test_outcome_statistics_by_folds_preserve_each_fold_without_pooling() -> None:
-    first = BatchEvaluationProxy(
+    first = BatchEvaluation(
         counts={"tp": 3, "sl": 1, "timeout": 2, "ambiguous": 0},
         resolved_count=4,
         tp_rate=0.75,
         mean_gross_return=0.01,
     )
-    second = BatchEvaluationProxy(
+    second = BatchEvaluation(
         counts={"tp": 1, "sl": 3, "timeout": 0, "ambiguous": 1},
         resolved_count=4,
         tp_rate=0.25,
@@ -236,13 +237,13 @@ def test_outcome_statistics_by_folds_preserve_each_fold_without_pooling() -> Non
 
 
 def test_outcome_statistics_by_folds_do_not_create_cross_fold_average() -> None:
-    first = BatchEvaluationProxy(
+    first = BatchEvaluation(
         counts={"tp": 10, "sl": 0, "timeout": 0, "ambiguous": 0},
         resolved_count=10,
         tp_rate=1.0,
         mean_gross_return=0.02,
     )
-    second = BatchEvaluationProxy(
+    second = BatchEvaluation(
         counts={"tp": 0, "sl": 10, "timeout": 0, "ambiguous": 0},
         resolved_count=10,
         tp_rate=0.0,
@@ -253,5 +254,3 @@ def test_outcome_statistics_by_folds_do_not_create_cross_fold_average() -> None:
     assert stats[0].tp_rate == 1.0
     assert stats[1].tp_rate == 0.0
 
-
-BatchEvaluationProxy = type("BatchEvaluationProxy", (), {})
