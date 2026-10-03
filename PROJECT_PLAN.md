@@ -482,3 +482,23 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 - Resolution is cached per asset + market type for the life of the router; the cache can be cleared explicitly.
 - Added tests/test_market_aware_router.py in commit 9603ee770dc8ddd2986df6b70e8dad3ff6e5ecac proving fallback from one venue to another uses the second venue's own symbol.
 - Next: build the production multi-source provider chain from the existing native adapters plus the CCXT sources, then run the 200-market coverage audit. No live 200-market network scan has been claimed yet.
+
+
+### 2026-10-03 — PRODUCTION MULTI-SOURCE PROVIDER CHAIN
+
+- Added src/aicfa/public_market_data.py in commit f93642c480de4f9d73a351a507440b527bd49f1f.
+- Production chain is native-first: Binance + Bybit, followed by the configured CCXT venues excluding duplicate Binance/Bybit integrations.
+- Added provider-compatible venue-aware routing in commit f337263175023800770479846fdd8409162149ed. The router now exposes the normal resolve_symbol/fetch_ohlcv provider contract while preserving venue-specific fallback resolution.
+- Added tests/test_public_market_data.py in commit 3a8f1caa8ab9a529cc03c65cd816f3121deb93b6.
+- Added scripts/check_market_coverage.py in commit 2ec113ce214036a7e7d2c33266f7d1f0427ca66a. This is the VDS-side audit for all configured 200 markets across the production source chain.
+- No 200-market multi-source coverage result is claimed yet; the real network audit must be run on the VDS.
+- Current external CCXT documentation confirms the unified adapter approach and cached load_markets behavior. cite: turn0search0 turn0search2
+
+### Next exact action
+
+1. Deploy these commits through FrostDeploy.
+2. Run focused provider/router tests.
+3. Run scripts/check_market_coverage.py on the VDS.
+4. Fix any markets still missing across the full source chain.
+5. Then measure the real 40-market batch wall-clock runtime.
+6. Only after that wire the live service loop and proceed to durable persistence.
