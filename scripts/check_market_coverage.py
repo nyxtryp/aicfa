@@ -28,11 +28,18 @@ def main() -> None:
     for index, item in enumerate(markets, start=1):
         asset = item["asset"]
         market_type = item.get("market_type", "spot")
-        venue_symbols = tuple(
-            (str(pair[0]), str(pair[1]))
-            for pair in item.get("venue_symbols", [])
-            if isinstance(pair, (list, tuple)) and len(pair) == 2
-        )
+        raw_venue_symbols = item.get("venue_symbols", {})
+        if isinstance(raw_venue_symbols, dict):
+            venue_symbols = tuple(
+                (str(venue), str(symbol))
+                for venue, symbol in raw_venue_symbols.items()
+            )
+        else:
+            venue_symbols = tuple(
+                (str(pair[0]), str(pair[1]))
+                for pair in raw_venue_symbols
+                if isinstance(pair, (list, tuple)) and len(pair) == 2
+            )
 
         if venue_symbols:
             provider.register_market_symbols(
