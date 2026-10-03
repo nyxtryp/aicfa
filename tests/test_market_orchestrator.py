@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from aicfa.data_requirements import TradingMode
+from aicfa.setup_analysis import SetupCandidate
 from aicfa.market_orchestrator import (
     PRIMARY_TRADING_MODES,
     analyze_market_horizons,
@@ -10,6 +11,20 @@ from aicfa.market_orchestrator import (
     scan_universe,
 )
 from aicfa.market_universe import MarketUniverse, MonitoredMarket
+
+
+def _candidate(direction="long", scenario="continuation"):
+    return SetupCandidate(
+        scenario=scenario,
+        supporting_concepts=("market_structure.bos", "displacement", "liquidity.sweep"),
+        zone_concepts=("order_block.bullish", "imbalance.fvg"),
+        zone_locations=("order_block.bullish: discount",),
+        entry_condition=("zone reaction/confirmation is required",),
+        invalidation=("previous low breaks the setup",),
+        targets=("next liquidity",),
+        rationale=("BOS followed by displacement",),
+        direction=direction,
+    )
 
 
 def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAIT"):
@@ -30,7 +45,7 @@ def test_one_market_runs_all_three_primary_horizons(monkeypatch):
 
     def fake_find_setup(request, **kwargs):
         calls.append(request.mode)
-        candidate = SimpleNamespace(name=request.mode.value)
+        candidate = _candidate()
         return _fake_result(request.asset, request.mode, candidate=candidate, decision="LONG")
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
@@ -46,7 +61,7 @@ def test_one_market_runs_all_three_primary_horizons(monkeypatch):
 
 def test_multiple_markets_keep_results_independent(monkeypatch):
     def fake_find_setup(request, **kwargs):
-        candidate = SimpleNamespace(market=request.asset, horizon=request.mode.value)
+        candidate = _candidate()
         return _fake_result(request.asset, request.mode, candidate=candidate, decision="LONG")
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
