@@ -1,3 +1,17 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 TARGETED OPTIMIZATION PASS 2 (TESTS PENDING)
+
+### Code change
+- Commit: `76ef392bbf66dae8f48a2e4d9731e83208165463` — `perf: reuse zone candidate markers and precompute candle buckets`.
+- In `src/aicfa/zone_reaction.py`, replaced per-candle candidate `set` creation/updates with a reusable integer marker array and candidate list deduplication.
+- Precomputed each candle's low/high logarithmic bucket IDs using NumPy rather than computing two scalar logarithms inside every loop iteration.
+- Intended as an implementation-only performance optimization. No zone lifecycle thresholds, state-transition rules, source semantics, or causal timing were intentionally changed.
+- **Verification pending.** Do not consider this optimization accepted until the focused zone contract and feature integration pass; measure integration runtime before deciding whether to run the full suite.
+
+### Next action
+Run only `tests/test_zone_reaction.py`. If it passes, run `tests/test_features.py` and compare its runtime with the prior 57.03s. If focused tests fail, fix the regression before integration testing.
+
+---
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 FULL REGRESSION GREEN
 
 ### Verified server results after latest zone hot-loop fix
