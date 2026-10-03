@@ -1,0 +1,804 @@
+{
+  "markets": [
+    {
+      "asset": "BTC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ETH/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SOL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BNB/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "XRP/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DOGE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ADA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AVAX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "LINK/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "HYPE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SUI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TRX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TON/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "NEAR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DOT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "POL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "UNI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AAVE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ARB/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "OP/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ATOM/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "LTC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PEPE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SHIB/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BONK/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "WIF/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "FLOKI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PUMP/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TAO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ICP/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BCH/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "XMR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ETC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "FIL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ALGO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "VET/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "XLM/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "HBAR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "APT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "INJ/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SEI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TIA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "IOTA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "NEO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "EOS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "JASMY/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SAND/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MANA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AXS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "GALA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ENJ/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "CHZ/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RON/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BEAM/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MAGIC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ILV/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RPL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "LDO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MKR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "CRV/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "COMP/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SNX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DYDX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "GMX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "JUP/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ENA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "EIGEN/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PENDLE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MORPHO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ONDO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "CAKE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "1INCH/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "APE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DEGEN/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "POPCAT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MEW/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BOME/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TURBO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MEME/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BABYDOGE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "NEIRO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "COQ/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PONKE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MYRO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "GIGA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "GOAT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SPX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ACT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PNUT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TRUMP/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DOGS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "NOT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MOODENG/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "FWOG/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MICHI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SLERF/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MANEKI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PENGU/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "KSM/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "WLD/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "WOO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TWT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "API3/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BAND/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "VVV/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "KAITO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ZRO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DASH/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ZEC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "QTUM/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ICX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ZIL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RVN/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SATS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MASK/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "VIRTUAL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AIXBT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ARC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SWARMS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "COOKIE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "CFX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RENDER/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "GRT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "LPT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AKT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "HNT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AIOZ/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "GRASS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "KAS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "STX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "IMX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MNT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RUNE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SYRUP/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "CFG/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MPL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TRU/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AXL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ENS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SSV/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "QNT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "FET/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "KAVA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "MINA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "EGLD/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "FLOW/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ROSE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "KDA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ONE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "CKB/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "FLUX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "IOTX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ARKM/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "STG/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RDNT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "GNS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AEVO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "YGG/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PRIME/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PIXEL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "GMT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ETHFI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "JTO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "PYTH/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RAY/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ORCA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DRIFT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "JOE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SUSHI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BAL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "CVX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "YFI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "AERO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BLUR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RSR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "BAT/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ZRX/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "LRC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ANKR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "STORJ/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "THETA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "XTZ/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "COTI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "XDC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DUSK/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SAFE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TNSR/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "WEN/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "IO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "VANA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "FXS/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "SPELL/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "RLC/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "TRB/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "DIA/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "HIFI/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "VELO/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "ALICE/USDT",
+      "market_type": "spot"
+    },
+    {
+      "asset": "XVS/USDT",
+      "market_type": "spot"
+    }
+  ]
+}
