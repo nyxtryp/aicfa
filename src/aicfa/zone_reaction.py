@@ -340,72 +340,66 @@ def build_zone_reaction(
     }
 
     def _active_level(close: float, side: int):
-        # Exact nearest-level lookup using the occupied logarithmic buckets.
-        # The previous implementation expanded radius one bucket at a time;
-        # when no nearby bucket existed this could traverse thousands of empty
-        # buckets for every candle. Only the current bucket and its nearest
-        # occupied neighbors can contain the nearest non-wide zone.
-        current_bucket = _bucket(close)
-        best_zone = -1
-        best_distance = float("inf")
+        # Query only the nearest occupied buckets, then evaluate their
+        # candidates with NumPy.  The previous implementation iterated every
+        # candidate zone in Python; on long histories a single occupied bucket
+        # can contain thousands of historical zones.
+        bucket_ids = []
 
-        def _consider(bucket_id: int):
-            nonlocal best_zone, best_distance
-            for zone_id in zone_buckets.get(bucket_id, ()):
-                if zone_side[zone_id] != side:
-                    continue
-                if zone_state[zone_id] in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
-                    continue
-                level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
-                distance = abs(close - level)
-                if distance < best_distance:
-                    best_zone, best_distance = zone_id, distance
-
-        # Wide zones use the coarser index instead of a global scan.
         wide_bucket = int(np.floor(np.log(max(close, 1e-300)) / wide_bucket_step))
         wide_pos = bisect.bisect_left(wide_occupied_bucket_keys, wide_bucket)
-        wide_bucket_ids = []
-        if wide_pos < len(wide_occupied_bucket_keys) and wide_occupied_bucket_keys[wide_pos] == wide_bucket:
-            wide_bucket_ids.append(wide_bucket)
+        if (
+            wide_pos < len(wide_occupied_bucket_keys)
+            and wide_occupied_bucket_keys[wide_pos] == wide_bucket
+        ):
+            bucket_ids.append(("wide", wide_bucket))
             wide_left = wide_pos - 1
             wide_right = wide_pos + 1
         else:
             wide_left = wide_pos - 1
             wide_right = wide_pos
         if wide_left >= 0:
-            wide_bucket_ids.append(wide_occupied_bucket_keys[wide_left])
+            bucket_ids.append(("wide", wide_occupied_bucket_keys[wide_left]))
         if wide_right < len(wide_occupied_bucket_keys):
-            wide_bucket_ids.append(wide_occupied_bucket_keys[wide_right])
+            bucket_ids.append(("wide", wide_occupied_bucket_keys[wide_right]))
 
-        for bucket_id in wide_bucket_ids:
-            for zone_id in wide_zone_buckets.get(bucket_id, ()):
-                if zone_side[zone_id] != side:
-                    continue
-                if zone_state[zone_id] in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
-                    continue
-                level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
-                distance = abs(close - level)
-                if distance < best_distance:
-                    best_zone, best_distance = zone_id, distance
-
+        current_bucket = _bucket(close)
         pos = bisect.bisect_left(occupied_bucket_keys, current_bucket)
         if pos < len(occupied_bucket_keys) and occupied_bucket_keys[pos] == current_bucket:
-            _consider(current_bucket)
+            bucket_ids.append(("normal", current_bucket))
             left = pos - 1
             right = pos + 1
         else:
             left = pos - 1
             right = pos
-
         if left >= 0:
-            _consider(occupied_bucket_keys[left])
+            bucket_ids.append(("normal", occupied_bucket_keys[left]))
         if right < len(occupied_bucket_keys):
-            _consider(occupied_bucket_keys[right])
+            bucket_ids.append(("normal", occupied_bucket_keys[right]))
 
-        if best_zone < 0:
+        candidate_ids = []
+        for kind, bucket_id in bucket_ids:
+            source = wide_zone_buckets if kind == "wide" else zone_buckets
+            candidate_ids.extend(source.get(bucket_id, ()))
+
+        if not candidate_ids:
             return None
-        level = (zone_low[best_zone] + zone_high[best_zone]) / 2.0
-        return best_zone, level, best_distance
+
+        idx = np.asarray(candidate_ids, dtype=np.intp)
+        valid = (
+            (zone_side[idx] == side)
+            & (zone_state[idx] != STATE_CODE[ZONE_BROKEN])
+            & (zone_state[idx] != STATE_CODE[ZONE_CANCELLED])
+        )
+        if not valid.any():
+            return None
+
+        idx = idx[valid]
+        levels = (zone_low[idx] + zone_high[idx]) * 0.5
+        distances = np.abs(close - levels)
+        best = int(np.argmin(distances))
+        zone_id = int(idx[best])
+        return zone_id, float(levels[best]), float(distances[best])
 
     for i in range(n):
         created_count = 0
