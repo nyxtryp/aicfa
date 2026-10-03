@@ -304,3 +304,5 @@ End-user UX remains asset-only: user enters an asset such as BTC; AICFA internal
 - Replaced sorted level maintenance with the existing spatial bucket index for exact nearest-active lookup; wide zones remain explicitly checked. Zone lifecycle creation/touch/reaction/retest/break rules were not intentionally changed.
 - Commit: `392606125317356839f4f2c6cb240e8782f57948` — `perf: remove O(n) sorted zone level maintenance`.
 - Next: focused `tests/test_zone_reaction.py`, then rerun `tests/test_features.py`.
+
+- Fix follow-up: focused Zone Reaction test exposed two stale `_remove_level(...)` calls left from the removed sorted level index; added a compatibility no-op shim so lifecycle cleanup no longer references deleted bookkeeping. Commit: `ccd907855bc85c712205c329f197c0ec26643332` — `fix: remove stale sorted zone index cleanup calls`.
