@@ -306,3 +306,9 @@ End-user UX remains asset-only: user enters an asset such as BTC; AICFA internal
 - Next: focused `tests/test_zone_reaction.py`, then rerun `tests/test_features.py`.
 
 - Fix follow-up: focused Zone Reaction test exposed two stale `_remove_level(...)` calls left from the removed sorted level index; added a compatibility no-op shim so lifecycle cleanup no longer references deleted bookkeeping. Commit: `ccd907855bc85c712205c329f197c0ec26643332` — `fix: remove stale sorted zone index cleanup calls`.
+
+### 2026-10-03 — Zone Reaction follow-up: remove stale sorted-index references
+- Directly fixed on GitHub `main`: removed the obsolete `_remove_level` shim and the two break-path calls that still passed deleted `support_levels` / `resistance_levels` variables. This was the cause of the `NameError`; no server file edits were made.
+- Commit: `07a5a3c93aa12cf8d65445f115ec4401770398c0` — `fix: remove obsolete zone level cleanup references`.
+- Validation status: **pending server deploy and focused test**; do not treat Zone Reaction as green until `tests/test_zone_reaction.py` passes.
+- Next: deploy this GitHub revision, then run only `tests/test_zone_reaction.py`; after it passes, return to the slow `tests/test_features.py` integration test.
