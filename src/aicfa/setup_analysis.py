@@ -725,8 +725,6 @@ def analyze_setups(
                 direction, entry_levels, invalidation_level, target_levels
             )
 
-                continue
-
         candidates.append(
             SetupCandidate(
                 scenario=hypothesis.scenario,
