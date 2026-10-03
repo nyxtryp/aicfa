@@ -451,3 +451,15 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 - The current 153/200 Binance Spot result is therefore recorded as a diagnostic, not as a universe decision.
 - No production code was changed in this step. The next implementation step is to audit the actual implemented adapters versus the registry declarations, then define/implement the smallest provider-agnostic fallback path needed by the autonomous 40-markets-per-minute scanner.
 - After provider coverage/fallback is verified, re-check the full 200-market universe across the available sources, then measure the real 40-market batch runtime. The fixed production target remains 5 sequential batches of 40, one batch per minute, with each market revisited approximately every 5 minutes.
+
+
+### 2026-10-03 — GENERIC MULTI-EXCHANGE ADAPTER ADDED
+
+- Added src/aicfa/ccxt_market_data.py in production commit 5a3d76555bb2475153415f6bdede3d81fda58185.
+- The adapter implements the existing provider-agnostic MarketDataProvider shape through CCXT instead of creating one transport implementation per exchange.
+- It supports public spot/futures symbol resolution, OHLCV, trades, L1 order book and causal order-book history.
+- Exchange-specific transport is selected by CCXT exchange id; the same AICFA normalization contract is preserved.
+- Current CCXT documentation lists 104 cryptocurrency exchanges plus prediction-market integrations, so the architecture can support many venues through one tested adapter rather than maintaining dozens of duplicate adapters. (Verified against current CCXT documentation.)
+- Added tests/test_ccxt_market_data.py in commit bef369cc88c9100e82497d81f18ec5d243932ed2 covering spot/futures resolution and normalized OHLCV/trades/order-book output with a mocked exchange.
+- Important: adding the generic adapter does not mean AICFA will query every exchange on every scan. Provider selection remains capability-aware and fallback is per market/request; the next step is to wire the real CCXT venues into the existing source registry/router and validate their actual 200-market coverage.
+- The 200-market universe remains unchanged. Binance's earlier 153/200 result remains only a Binance Spot diagnostic.
