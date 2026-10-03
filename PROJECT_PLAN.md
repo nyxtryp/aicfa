@@ -231,3 +231,14 @@ Run the full regression after directional outcome statistics, then continue Task
 
 Run the focused horizon/orchestrator tests on the VDS. If green, run the full regression. Only after that continue with the configured market universe and the structured explainable TradeDescription contract.
 
+
+
+### 2026-10-03 — FULL REGRESSION: THREE-HORIZON CONTRACT RECONCILIATION
+
+- Production VDS full regression after the primary three-horizon orchestration changes: 432 passed, 3 failed, 0 skipped in 92.00s.
+- All three failures were traced to the transition from the former timeframe contract to the new primary profiles.
+- Analysis-depth expectations were updated to the current Intraday 4h/1h/15m/5m, Swing 1d/4h/1h and Position 1w/1d/4h role mappings.
+- The lower-confirmation conflict fixture was corrected so the actual Intraday structure timeframe (1h) conflicts with the lower confirmation timeframe (15m).
+- The MTF target test was corrected to enforce the actual contract: targets may come from any relevant non-execution timeframe and must not be manufactured by 1m; dedicated causal target fallback tests remain unchanged.
+- No production setup-analysis logic was changed for these failures because the first two were stale fixtures and the third assertion contradicted the existing target-discovery contract.
+- Next exact action: run the corrected focused tests, then full regression. If green, proceed to configurable market universe.
