@@ -674,3 +674,17 @@ If GREEN, run the full `pytest -q` regression and record the exact result before
 
 ### Next exact action
 Run the full server regression and record the exact result. If GREEN, proceed to the next Task 9 slice: batch evaluation/statistics and leakage-aware evaluation using the existing causal label-end intervals. Do not introduce optimization or performance claims before that evaluation layer is covered.
+
+
+## 2026-10-03 — TASK 9 — FULL REGRESSION GREEN
+
+- Server full regression after the conservative evaluator slice: **409 passed in 80.63s (0:01:20)**.
+- Result: **0 failed, 0 skipped** in the current automated test suite.
+- Focused evaluator contract remains GREEN: **7 passed in 0.56s**.
+- The suite increased from **402 to 409 tests** due to the new Task 9 evaluator coverage.
+- Regression runtime improved from the previous 402-test baseline of **82.05s** to **80.63s**; this is an observed runtime, not a performance claim or optimization target.
+- Task 9 conservative single-setup evaluation is now **GREEN / regression-verified**.
+- No hit-rate, profitability, or trading-performance claim is made.
+
+### Next exact action
+Proceed with the next Task 9 slice: **batch evaluation/statistics and leakage-aware evaluation/purging**, using the existing causal `label_end_timestamp_<horizon>` intervals. First inspect the current evaluation/dataset contracts and existing label-end semantics, then define focused regression tests before production implementation.
