@@ -2,459 +2,687 @@
   "markets": [
     {
       "asset": "BTC/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ETH/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "SOL/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "BNB/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "XRP/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "DOGE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ADA/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "AVAX/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "LINK/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "HYPE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "SUI/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "TRX/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "NEAR/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "DOT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "POL/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "UNI/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "AAVE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ARB/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "OP/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ATOM/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "LTC/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "PEPE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "SHIB/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "BONK/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "WIF/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "FLOKI/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "PUMP/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "TAO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ICP/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "BCH/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ETC/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "FIL/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "XLM/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "HBAR/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "APT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "SEI/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "TIA/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "IOTA/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "RPL/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "LDO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "CRV/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "COMP/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "DYDX/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "GMX/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "JUP/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ENA/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "EIGEN/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "PENDLE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "MORPHO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ONDO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "CAKE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "POPCAT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "MEW/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "BOME/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "TURBO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "MEME/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "BABYDOGE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "PONKE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "MYRO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "PNUT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "TRUMP/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "MOODENG/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "PENGU/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "KSM/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "WLD/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "API3/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "BAND/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "VVV/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "KAITO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ZRO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ZEC/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "VIRTUAL/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "AIXBT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ARC/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "SWARMS/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "COOKIE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "CFX/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "RENDER/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "GRT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "AR/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "LPT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "AKT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "HNT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "AIOZ/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "GRASS/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "KAS/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "STX/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "IMX/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "MNT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "RUNE/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "SYRUP/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ENS/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "SSV/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "QNT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "FET/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ARKM/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "STG/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "RDNT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "GNS/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "PIXEL/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "GMT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ETHFI/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "JTO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "PYTH/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "RAY/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "ORCA/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "DRIFT/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "AERO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "RSR/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "XTZ/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "IO/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "VANA/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "TRB/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "DIA/USDT",
-      "market_type": "futures"
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
     },
     {
       "asset": "XAU/USDT",
