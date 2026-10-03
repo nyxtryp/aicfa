@@ -433,3 +433,21 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 5. If the batch fits inside 60 seconds, wire the live service to run_forever_batches(interval_seconds=60, batch_size=40).
 6. Confirm the five-batch rotation gives each market one evaluation every 5 minutes.
 7. Only then proceed to durable setup-state persistence.
+
+
+### 2026-10-03 — MARKET DATA MULTI-SOURCE ROUTING AUDIT / 200-MARKET AVAILABILITY CHECK
+
+- The initial production-universe availability check against Binance Spot returned **153/200 available** and **47/200 unavailable**. This result is only a Binance Spot availability result; it does **not** reduce or redefine the configured 200-market universe.
+- The 47 unavailable Binance Spot pairs are not to be deleted or replaced merely because Binance Spot does not list them. AICFA must support multiple public market-data sources and automatic per-market fallback.
+- Repository audit confirmed that this architecture is already partially present and must be extended rather than duplicated:
+  - src/aicfa/market_data_router.py contains FallbackMarketDataProvider, which tries providers in order and returns the first successful normalized OHLCV/trades/order-book result while preserving provider-attempt diagnostics.
+  - src/aicfa/market_data_router.py also contains SharedSnapshotMarketDataProvider for short-lived shared MTF snapshots.
+  - src/aicfa/market_source_registry.py already defines capability-aware source selection and an ordered public-source registry containing Binance, Bybit, Bitget, Kraken, KuCoin, Gate, MEXC, CoinLore and CoinGecko.
+  - src/aicfa/bybit_market_data.py is an implemented public Bybit adapter for symbol resolution, OHLCV, trades and order-book data.
+  - Binance and Bybit are therefore not separate analytical paths; they are market-data providers underneath the shared AICFA data contract.
+- Important architectural requirement is now fixed: **the entire AICFA analytical pipeline must consume provider-agnostic normalized market data**. Provider selection/fallback must happen below the scanner/setup/evidence layers.
+- Provider fallback must be automatic per market/request: if the preferred source cannot resolve a market or cannot provide a required dataset, AICFA should try the next compatible source rather than abandoning the market or requiring manual source selection.
+- Capability matters: a source that has OHLCV but lacks a required auxiliary capability must not be selected as if it could satisfy the full request. The existing registry already models this distinction.
+- The current 153/200 Binance Spot result is therefore recorded as a diagnostic, not as a universe decision.
+- No production code was changed in this step. The next implementation step is to audit the actual implemented adapters versus the registry declarations, then define/implement the smallest provider-agnostic fallback path needed by the autonomous 40-markets-per-minute scanner.
+- After provider coverage/fallback is verified, re-check the full 200-market universe across the available sources, then measure the real 40-market batch runtime. The fixed production target remains 5 sequential batches of 40, one batch per minute, with each market revisited approximately every 5 minutes.
