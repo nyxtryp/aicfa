@@ -72,3 +72,70 @@ Continue Task 9 from the verified historical setup journal and chronological eva
 ### Next exact action
 
 Run the full regression after directional outcome statistics, then continue Task 9 from the verified journal/evaluation foundation.
+
+
+### 2026-10-03 — AICFA PRODUCT DIRECTION: THREE CORE HORIZONS + AUTONOMOUS MARKET SCANNER
+
+- Product direction is now fixed around **three main trading horizons** in the primary AICFA system:
+  - **Intraday** — 5m–1h, minutes to hours.
+  - **Swing** — 1h–1d, hours to days.
+  - **Position** — 4h–1w, days to weeks.
+- **Scalping is explicitly separated from the primary AICFA system.** It will be implemented later as a dedicated website window with its own faster/microstructure logic and approximately minute-level updates. Scalping must not distort or replace the causal architecture of the three primary horizons.
+- The three horizons are contexts of the shared Setup Engine, not three independent engines.
+- The primary system must not remain request-driven ("analyze BTC when the user asks"). The target product behavior is an **autonomous market scanner**:
+  1. Maintain a configured list of supported coins/markets.
+  2. Continuously obtain the required market data for those markets.
+  3. Analyze each market across Intraday, Swing, and Position contexts.
+  4. Search automatically for currently formed setup candidates.
+  5. Emit only setups that satisfy the existing structural/causal contracts.
+  6. Produce a concrete **LONG / SHORT** setup when a valid directional setup exists, including Entry, SL, TP1/TP2 and RR where structurally available.
+  7. Produce WAIT / NO TRADE when no valid directional setup exists; no forced signal.
+  8. Surface results in a dedicated, visually clear **website setup window/dashboard**. Telegram is not part of the primary delivery path.
+- The scanner must work across multiple assets, not BTC-only. BTC is one market in the configured universe, not a special-case engine.
+- The future website setup window should support at minimum:
+  - live/new setup feed;
+  - coin/market;
+  - horizon (Intraday / Swing / Position);
+  - LONG / SHORT direction;
+  - Entry;
+  - SL;
+  - TP1 / TP2;
+  - RR;
+  - setup timestamp / freshness;
+  - setup status / lifecycle;
+  - enough structural explanation to show why the setup exists.
+- The autonomous scanner must reuse the existing AICFA architecture: confirmed swing → causal BOS/CHoCH/MSS → liquidity → OB/FVG lifecycle → zone reaction → volume evidence → structural Entry/SL/TP → conservative evaluation. Do not introduce a parallel generic indicator scanner.
+- Fixed counts of setups per horizon are **not** a requirement. The system should discover whatever valid setup families are currently present rather than manufacture a target number of signals.
+- The existing four-way classification is retained only as historical/product context; the primary production system is now explicitly three-horizon, with Scalping separated.
+- A dedicated **coin universe/list configuration** must be designed before autonomous scanning is implemented. It should allow the user to define which coins/markets AICFA monitors, rather than hardcoding BTC or a fixed small set.
+- Before implementing the autonomous scanner, perform a complete repository audit of `src/aicfa` and tests to identify all existing capabilities for:
+  - market data and market context;
+  - MTF preparation;
+  - setup analysis;
+  - candidate generation;
+  - Entry/SL/TP/RR;
+  - historical evaluation;
+  - mode iteration;
+  - multi-setup aggregation;
+  - deduplication/lifecycle;
+  - any existing orchestration layer.
+- Do not create a duplicate orchestration/scanner if an existing component can be extended.
+- Planned implementation sequence after the audit:
+  1. Finish/record the current Task 9 regression state.
+  2. Audit the complete existing setup/orchestration architecture.
+  3. Define the three-horizon autonomous analysis contract.
+  4. Define configurable monitored coin/market universe.
+  5. Build/extend one shared multi-market orchestration layer.
+  6. Make the scanner discover all valid current setups across the three horizons.
+  7. Add causal deduplication, setup lifecycle/freshness and conflict handling where required.
+  8. Expose scanner results through the website setup window.
+  9. Add persistent/historical setup records so displayed setups can be evaluated after completion.
+  10. Validate the complete flow on multiple markets, not BTC alone.
+- Quality principle: AICFA should prefer **no signal** over a fabricated or weakly justified LONG/SHORT. No arbitrary confidence score, fixed RR filter, or unsupported profitability claim should be introduced merely to make the scanner produce more signals.
+- Scalping remains a later, separate product surface and implementation task.
+
+### 2026-10-03 — DIRECTIONAL STATISTICS FULL REGRESSION VERIFIED
+
+- After directional outcome statistics commit `0a0c1232773942cef9dffddb614be957020f86b9`, server full regression completed successfully: **428 passed in 82.05s (0:01:22)**.
+- Result: **0 failed, 0 skipped**.
+- Task 9 remains ACTIVE.
