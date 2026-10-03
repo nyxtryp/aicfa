@@ -325,7 +325,23 @@ End-user UX remains asset-only: user enters an asset such as BTC; AICFA internal
 - Validation status: **pending server deploy and focused test**; do not treat Zone Reaction as green until `tests/test_zone_reaction.py` passes.
 - Next: deploy this GitHub revision, then run only `tests/test_zone_reaction.py`; after it passes, return to the slow `tests/test_features.py` integration test.
 
+### 2026-10-03 — Zone lifecycle candidate bottleneck: second wide-zone global scan removed
+
+- The hanging 10,080-row integration was re-audited against the deployed code after a4236083.
+- Found a second independent O(n) path: the per-candle lifecycle candidate collection still iterated the entire wide_zones list before vectorized filtering. Therefore the previous wide-zone fix only optimized _active_level(); it did not remove the global scan from lifecycle evaluation.
+- Replaced that scan with the existing coarse logarithmic wide-zone bucket index, using the candle's coarse bucket range and the existing candidate marker array for deduplication.
+- GitHub commit: 40448a16000b2d9dae15e13f2794c0a7c49833ed — perf: remove wide zone scan from candle candidate lookup.
+- No zone lifecycle thresholds, creation timing, touch/reaction/retest/break precedence or causal semantics were intentionally changed.
+- Server validation is pending deployment.
+- Next: deploy 40448a16, run only tests/test_zone_reaction.py; if green, run the single hanging higher-timeframe feature test. If it still stalls, capture a fresh faulthandler stack rather than waiting minutes.
+
 ### 2026-10-03 — Zone active-level bottleneck: wide-zone global scan removed
+- Faulthandler evidence from the previous deployed revision repeatedly landed inside `_active_level()`, specifically the `wide_zones` loop.
+- The prior optimization removed the empty-bucket radius walk but still scanned every wide zone on every candle, so the hot path could remain O(n) per candle.
+- Changed `src/aicfa/zone_reaction.py`: wide zones now use a coarser logarithmic bucket index and nearest occupied coarse buckets instead of a global `wide_zones` scan.
+- GitHub commit: `a4236083c91ad924bed39937f15b9635ba087cb5` — `perf: index wide zones for active-level lookup`.
+- No server validation yet. Next: deploy this revision, run `tests/test_zone_reaction.py`, then the single previously hanging higher-timeframe feature integration test.
+
 - Faulthandler evidence from the previous deployed revision repeatedly landed inside `_active_level()`, specifically the `wide_zones` loop.
 - The prior optimization removed the empty-bucket radius walk but still scanned every wide zone on every candle, so the hot path could remain O(n) per candle.
 - Changed `src/aicfa/zone_reaction.py`: wide zones now use a coarser logarithmic bucket index and nearest occupied coarse buckets instead of a global `wide_zones` scan.
