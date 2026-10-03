@@ -771,6 +771,515 @@
     {
       "asset": "XVS/USDT",
       "market_type": "spot"
+    },
+    {
+      "asset": "XAU/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "metal",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "XAU/USDT:USDT",
+        "okx": "XAU/USDT:USDT",
+        "mexc": "XAU/USDT:USDT"
+      }
+    },
+    {
+      "asset": "XAG/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "metal",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "XAG/USDT:USDT",
+        "okx": "XAG/USDT:USDT",
+        "mexc": "SILVER/USDT:USDT"
+      }
+    },
+    {
+      "asset": "XCU/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "metal",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "okx": "XCU/USDT:USDT",
+        "mexc": "COPPER/USDT:USDT"
+      }
+    },
+    {
+      "asset": "XPT/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "metal",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "okx": "XPT/USDT:USDT",
+        "mexc": "XPT/USDT:USDT"
+      }
+    },
+    {
+      "asset": "XPD/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "metal",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "okx": "XPD/USDT:USDT",
+        "mexc": "XPD/USDT:USDT"
+      }
+    },
+    {
+      "asset": "WTI/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "energy",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "CL/USDT:USDT",
+        "okx": "CL/USDT:USDT",
+        "mexc": "USOIL/USDT:USDT"
+      }
+    },
+    {
+      "asset": "BRENT/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "energy",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "BZ/USDT:USDT",
+        "okx": "BZ/USDT:USDT",
+        "mexc": "UKOIL/USDT:USDT"
+      }
+    },
+    {
+      "asset": "NATGAS/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "energy",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "okx": "NG/USDT:USDT",
+        "mexc": "NGAS/USDT:USDT"
+      }
+    },
+    {
+      "asset": "EUR/USD",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "fx",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "EURUSD/USDT:USDT"
+      }
+    },
+    {
+      "asset": "GBP/USD",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "fx",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "GBPUSD/USDT:USDT"
+      }
+    },
+    {
+      "asset": "SPX/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "index",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "SPX/USDT:USDT",
+        "okx": "SPX/USDT:USDT",
+        "mexc": "SPX/USDT:USDT"
+      }
+    },
+    {
+      "asset": "NDX/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "index",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "mexc": "NAS100/USDT:USDT"
+      }
+    },
+    {
+      "asset": "DJIA/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "index",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "mexc": "US30/USDT:USDT"
+      }
+    },
+    {
+      "asset": "NIKKEI/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "index",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "okx": "JP225/USDT:USDT",
+        "mexc": "JP225/USDT:USDT"
+      }
+    },
+    {
+      "asset": "SPY/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "etf",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "SPY/USDT:USDT",
+        "okx": "SPY/USDT:USDT",
+        "mexc": "SPY/USDT:USDT"
+      }
+    },
+    {
+      "asset": "QQQ/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "etf",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "QQQ/USDT:USDT",
+        "okx": "QQQ/USDT:USDT",
+        "mexc": "QQQSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "IWM/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "etf",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "IWM/USDT:USDT",
+        "okx": "IWM/USDT:USDT",
+        "mexc": "IWM/USDT:USDT"
+      }
+    },
+    {
+      "asset": "GLD/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "etf",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "mexc": "GLD/USDT:USDT"
+      }
+    },
+    {
+      "asset": "AAPL/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "AAPL/USDT:USDT",
+        "okx": "AAPL/USDT:USDT",
+        "mexc": "AAPLSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "MSFT/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "MSFT/USDT:USDT",
+        "okx": "MSFT/USDT:USDT",
+        "mexc": "MSFTSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "NVDA/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "NVDA/USDT:USDT",
+        "okx": "NVDA/USDT:USDT",
+        "mexc": "NVIDIA/USDT:USDT"
+      }
+    },
+    {
+      "asset": "AMZN/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "AMZN/USDT:USDT",
+        "okx": "AMZN/USDT:USDT",
+        "mexc": "AMZNSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "GOOGL/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "GOOGL/USDT:USDT",
+        "okx": "GOOGL/USDT:USDT",
+        "mexc": "GOOGLSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "META/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "META/USDT:USDT",
+        "okx": "META/USDT:USDT",
+        "mexc": "METASTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "TSLA/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "TSLA/USDT:USDT",
+        "okx": "TSLA/USDT:USDT",
+        "mexc": "TESLA/USDT:USDT"
+      }
+    },
+    {
+      "asset": "AVGO/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "AVGO/USDT:USDT",
+        "okx": "AVGO/USDT:USDT",
+        "mexc": "AVGOSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "AMD/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "okx": "AMD/USDT:USDT",
+        "mexc": "AMDSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "MU/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "MU/USDT:USDT",
+        "okx": "MU/USDT:USDT",
+        "mexc": "MUSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "SNDK/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "SNDK/USDT:USDT",
+        "okx": "SNDK/USDT:USDT",
+        "mexc": "SNDKSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "ARM/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "ARM/USDT:USDT",
+        "okx": "ARM/USDT:USDT",
+        "mexc": "ARMSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "TSM/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "TSM/USDT:USDT",
+        "okx": "TSM/USDT:USDT",
+        "mexc": "TSMCSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "ASML/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "ASML/USDT:USDT",
+        "okx": "ASML/USDT:USDT",
+        "mexc": "ASMLSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "SMCI/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "SMCI/USDT:USDT",
+        "okx": "SMCI/USDT:USDT",
+        "mexc": "SMCISTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "QCOM/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "QCOM/USDT:USDT",
+        "okx": "QCOM/USDT:USDT",
+        "mexc": "QCOMSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "ORCL/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "ORCL/USDT:USDT",
+        "okx": "ORCL/USDT:USDT",
+        "mexc": "ORCLSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "PLTR/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "PLTR/USDT:USDT",
+        "okx": "PLTR/USDT:USDT",
+        "mexc": "PLTRSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "NFLX/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "NFLX/USDT:USDT",
+        "okx": "NFLX/USDT:USDT",
+        "mexc": "NFLXSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "COIN/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "COIN/USDT:USDT",
+        "okx": "COIN/USDT:USDT",
+        "mexc": "COINBASE/USDT:USDT"
+      }
+    },
+    {
+      "asset": "MSTR/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "MSTR/USDT:USDT",
+        "okx": "MSTR/USDT:USDT",
+        "mexc": "MSTRSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "JPM/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "JPM/USDT:USDT",
+        "mexc": "JPMSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "BAC/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "BAC/USDT:USDT",
+        "mexc": "BACSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "WMT/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "WMT/USDT:USDT",
+        "okx": "WMT/USDT:USDT",
+        "mexc": "WMTSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "XOM/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bybit": "XOM/USDT:USDT",
+        "okx": "XOM/USDT:USDT",
+        "mexc": "XOMSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "BA/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "stock",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "bitget": "BA/USDT:USDT",
+        "mexc": "BASTOCK/USDT:USDT"
+      }
     }
   ]
 }
