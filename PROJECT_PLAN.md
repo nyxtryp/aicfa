@@ -615,3 +615,29 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 3. Store only verified native symbols/IDs and instrument types.
 4. Validate OHLCV availability on the confirmed instruments for the three primary horizons.
 5. Merge confirmed TradFi markets into the same production MarketUniverse without touching the 193 crypto entries.
+
+
+### 2026-10-04 — LIVE TRADFI VERIFICATION UTILITY ADDED
+
+- Added `scripts/verify_tradfi_targets.py`.
+- It reads the approved 55-target config and queries **Bybit, OKX, Bitget and MEXC through CCXT live market metadata**.
+- It reports only compact candidate metadata per target:
+  - native `symbol` / `id`;
+  - market type;
+  - spot/swap/future flags;
+  - base/quote/settle;
+  - active/state;
+  - exchange-specific contract fields when present.
+- The utility is **verification only**: it does not modify `config/market_universe.json`, does not create TradFi setups, and does not become a separate scanner.
+- Matching intentionally produces candidates for manual review because the same ticker can appear as crypto, ETF, index, RWA or another instrument on different venues. Native exchange metadata remains the final source of truth.
+
+### Immediate verification command
+
+```bash
+sudo -u fd-aicfa bash -lc '
+cd "$(readlink -f /srv/frostdeploy/aicfa/current)" &&
+PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targets.py
+'
+```
+
+- Do not add any result to production until the output has been reviewed target-by-target.
