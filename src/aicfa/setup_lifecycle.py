@@ -273,7 +273,7 @@ class SetupLifecycle:
             now_ms=now_ms,
             expires_at_ms=expires_at_ms,
         )
-        return results[0] if len(results) == 1 else results[-1]
+        return results[0]
 
     def clear(
         self,
