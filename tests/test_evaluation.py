@@ -240,12 +240,14 @@ def test_outcome_statistics_by_folds_preserve_each_fold_without_pooling() -> Non
 
 def test_outcome_statistics_by_folds_do_not_create_cross_fold_average() -> None:
     first = BatchEvaluation(
+        results=(),
         counts={"tp": 10, "sl": 0, "timeout": 0, "ambiguous": 0},
         resolved_count=10,
         tp_rate=1.0,
         mean_gross_return=0.02,
     )
     second = BatchEvaluation(
+        results=(),
         counts={"tp": 0, "sl": 10, "timeout": 0, "ambiguous": 0},
         resolved_count=10,
         tp_rate=0.0,
