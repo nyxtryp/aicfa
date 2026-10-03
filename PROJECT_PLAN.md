@@ -663,3 +663,15 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 3. Run live resolution/MTF acquisition on a small representative TradFi set across Bybit/OKX/MEXC.
 4. If resolution is clean, run the full 237-market universe validation and measure the new autonomous rotation interval.
 5. Investigate the 11 still-pending targets separately; do not fabricate mappings or convert crypto/USDT instruments into FX/index equivalents.
+
+
+### 2026-10-04 — TRADFI LIVE OHLCV TEST EXPOSED GENERIC-ROUTING BYPASS
+
+- The first VDS live OHLCV check across all 44 integrated TradFi markets returned **42/44 OK**, but exposed a routing defect: several markets were being resolved to Binance tickers even though production `venue_symbols` explicitly mapped them to Bybit/OKX/MEXC.
+- Observed examples include **XAG/USDT → Binance XAGUSDT**, **SPX/USDT → Binance SPXUSDT**, and **SNDK/USDT → Binance SNDKUSDT**. The same bypass affected additional TradFi targets.
+- This violates the verified native-symbol contract. An explicit `venue_symbols` mapping is now authoritative: AICFA may use only the listed mapped venues for that market and may fall back only between those mapped venues. It must never substitute a generic resolver result from an unmapped venue.
+- **EUR/USD** and **GBP/USD** were the two live failures. Their configured Bybit symbols were selected, but Bybit rejected the symbol as invalid during the OHLCV request. The previous generic fallback then triggered long multi-venue resolution attempts. The new authoritative-mapping rule prevents that silent substitution; these FX mappings now require fresh native-symbol verification.
+- Added regression coverage proving that an unmapped Binance provider cannot bypass an explicit TradFi mapping and that fallback may move only between explicitly mapped venues.
+- No TradFi market was removed or replaced by this fix.
+- Next: deploy the routing fix, rerun the complete 44-market OHLCV validation, then inspect any remaining mapped-venue failures before MTF analysis.
+
