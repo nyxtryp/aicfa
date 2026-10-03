@@ -509,3 +509,24 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 - Fixed src/aicfa/market_aware_router.py in commit b160e20cf028ce8340fbd9f10610fda964e2f9c6.
 - Added the missing resolve_symbol() provider-contract method and populated the venue-symbol cache during resolution.
 - This fixes the VDS focused-test failure where MarketAwareFallbackProvider had no resolve_symbol attribute; the fallback path continues to use each venue's own symbol.
+
+
+### 2026-10-03 — AUTONOMOUS ROTATION REVISED TO 20 MARKETS PER MINUTE SLOT
+
+- The production scheduling model is now **20 configured markets per minute-sized slot**, rather than 40.
+- The scheduler does not impose a data-volume deadline or truncate market data to fit the slot.
+- The batch is simply the unit of work assigned to a recurring minute-sized slot; provider requests are allowed to complete normally.
+- With the current **199-market** universe, the rotation is **20 × 9 + 19 markets**, i.e. 10 batches per full rotation.
+- Therefore each market is normally revisited once per approximately **10-minute rotation**, not forced into a five-minute refresh.
+- Setup logic is unchanged: Intraday + Swing + Position continue through the existing FindSetup/SMC/evidence pipeline, and SetupLifecycle preserves the identity of repeated setups across rotations.
+- Multi-source routing remains independent of the scheduler: Binance availability is not assumed, and fallback/alternative venues remain responsible for obtaining the required data.
+- Full multi-source aggregation remains a separate data layer to be completed after the scheduler contract is fixed; it must not reduce the information supplied to analysis merely to satisfy a timing target.
+
+### Next exact action
+
+1. Deploy the 20-market batch scheduler change.
+2. Run focused autonomous-scan tests.
+3. Run the full regression.
+4. Measure a real 20-market batch on the VDS without truncating data or imposing a hard 60-second data deadline.
+5. Validate a full 199-market rotation and its effective revisit interval.
+6. Then implement/verify full multi-source data aggregation and durable setup-state persistence.
