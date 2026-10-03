@@ -204,7 +204,7 @@ def test_target_contract_uses_only_current_rows_not_future_rows():
         frame.loc[1, "close"] = 105.0
 
     context = build_multi_timeframe_context(
-        _pipeline(_frames()).candidates[0].__class__ and _pipeline(_frames()).candidates[0].__class__ and (
+        (
             MarketObservation(
                 concept_id="market_structure.bos",
                 timeframe="4h",
