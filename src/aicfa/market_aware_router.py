@@ -68,7 +68,13 @@ class MarketAwareFallbackProvider:
         attempts: list[MarketResolutionAttempt] = []
         for provider in self._providers:
             provider_id = provider_name(provider).strip().lower()
-            if provider_id in mapped:
+
+            # Explicit venue mappings are authoritative. Never replace a
+            # verified native symbol with a generic resolver result from an
+            # unmapped venue.
+            if mapped:
+                if provider_id not in mapped:
+                    continue
                 resolved = ResolvedMarket(
                     asset=key[0],
                     market_type=market_type,
@@ -78,6 +84,7 @@ class MarketAwareFallbackProvider:
                 self._resolved[key] = resolved
                 self._by_symbol[(resolved.symbol.upper(), market_type)] = resolved
                 return resolved
+
             resolver = getattr(provider, "resolve_symbol", None)
             if resolver is None:
                 attempts.append(MarketResolutionAttempt(
@@ -122,16 +129,27 @@ class MarketAwareFallbackProvider:
         if resolved is None:
             raise ValueError("symbol was not resolved through MarketAwareFallbackProvider")
         attempts: list[ProviderAttempt] = []
-        start = self._providers.index(next(
-            p for p in self._providers if provider_name(p) == resolved.provider
-        ))
-        for provider in self._providers[start:]:
+        mapped = self._market_symbols.get((resolved.asset, market_type), {})
+
+        if mapped:
+            # Explicit mappings may fall back only between mapped venues.
+            providers = tuple(
+                provider
+                for provider in self._providers
+                if provider_name(provider).strip().lower() in mapped
+            )
+        else:
+            start = self._providers.index(next(
+                p for p in self._providers if provider_name(p) == resolved.provider
+            ))
+            providers = self._providers[start:]
+
+        for provider in providers:
             resolver = getattr(provider, "resolve_symbol", None)
             if resolver is None:
                 attempts.append(ProviderAttempt(provider_name(provider), "symbol resolver unavailable"))
                 continue
             try:
-                mapped = self._market_symbols.get((resolved.asset, market_type), {})
                 venue_symbol = (
                     mapped.get(provider_name(provider).strip().lower())
                     or (
