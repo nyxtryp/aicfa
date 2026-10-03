@@ -565,3 +565,22 @@ Define focused tests for the **causal Target/TP contract** before changing produ
 6. if no valid structural/liquidity objective exists, no fabricated TP is emitted;
 7. no future-looking target data may leak into the current setup.
 Run focused tests first, then implement only the missing production behavior, then run focused + MTF + full regression.
+
+
+## 2026-10-03 — TASK 8 TARGET/TP CONTRACT — FOCUSED GREEN
+
+- Added focused causal Target/TP regression coverage in `tests/test_structural_entry.py`.
+- Two initial fixture cases were corrected to isolate target discovery rather than depend on unrelated setup prerequisites.
+- Final test fixture fix commit: `cb4dfa1ab4e4fb29c94738923fb5edbf47d14e91`.
+- Server verification: `tests/test_structural_entry.py` = **9 passed in 0.62s**.
+- Production `_target_levels()` was inspected and already satisfies the core contract: targets must be beyond current price, 1m is excluded, active liquidity is a target/draw rather than SL, distinct targets remain price-ordered, and no target is fabricated without a valid objective.
+- The future-leakage case now directly exercises `build_multi_timeframe_context()` + `_target_levels()` against current rows.
+
+### Current Task 8 status
+- Structural Entry: **GREEN**.
+- Structural SL: **GREEN**.
+- Target/TP focused contract: **GREEN — 9/9**.
+- Full Task 8 regression after the final Target/TP contract tests: **pending**.
+
+### Next exact action
+Run the MTF/setup-engine regression together with the structural-entry contract, then run the full suite. If GREEN, close Task 8 with the exact full-suite result and move to Task 9 — Conservative Backtest / Evaluation. No production Target/TP change is justified unless regression exposes a real behavioral gap.
