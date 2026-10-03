@@ -166,3 +166,78 @@ def test_active_long_completes_at_target_two():
     assert result.status is SetupLifecycleStatus.COMPLETED
     assert result.action == "WAIT"
     assert lifecycle.active(symbol="BTC/USDT") is None
+
+
+def test_multiple_distinct_candidates_activate_and_remain_independent():
+    lifecycle = SetupLifecycle()
+    first = _candidate()
+    second = SetupCandidate(
+        **{**first.__dict__,
+           "entry_zone": (
+               SetupLevel(96.0, "15m", "active bullish FVG low"),
+               SetupLevel(98.0, "15m", "active bullish FVG high"),
+           ),
+           "invalidation_level": SetupLevel(92.0, "5m", "previous low"),
+           "target_levels": (
+               SetupLevel(108.0, "4h", "previous high"),
+               SetupLevel(115.0, "1d", "previous high"),
+           )}
+    )
+    assessment = SetupAssessment(
+        decision=SetupDecision.READY,
+        candidates=(first, second),
+        missing_context=(),
+        conflicts=(),
+        reasons=("two independent setups",),
+    )
+
+    results = lifecycle.evaluate_all(
+        symbol="BTC/USDT",
+        market_type="spot",
+        horizon="intraday",
+        assessment=assessment,
+        current_price=101.0,
+        now_ms=1_000,
+    )
+
+    assert len(results) == 2
+    assert all(result.status is SetupLifecycleStatus.ACTIVE for result in results)
+    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 2
+
+
+def test_same_candidate_on_next_scan_does_not_create_duplicate():
+    lifecycle = SetupLifecycle()
+    assessment = _ready()
+
+    lifecycle.evaluate_all(
+        symbol="BTC/USDT", market_type="spot", horizon="intraday",
+        assessment=assessment, current_price=101.0, now_ms=1_000,
+    )
+    results = lifecycle.evaluate_all(
+        symbol="BTC/USDT", market_type="spot", horizon="intraday",
+        assessment=assessment, current_price=101.0, now_ms=2_000,
+    )
+
+    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 1
+    assert results[-1].status is SetupLifecycleStatus.ACTIVE
+    assert results[-1].candidate == assessment.candidates[0]
+
+
+def test_same_market_can_hold_independent_horizons():
+    lifecycle = SetupLifecycle()
+    assessment = _ready()
+
+    lifecycle.evaluate_all(
+        symbol="BTC/USDT", market_type="spot", horizon="intraday",
+        assessment=assessment, current_price=101.0, now_ms=1_000,
+    )
+    lifecycle.evaluate_all(
+        symbol="BTC/USDT", market_type="spot", horizon="swing",
+        assessment=assessment, current_price=101.0, now_ms=1_000,
+    )
+    lifecycle.evaluate_all(
+        symbol="BTC/USDT", market_type="spot", horizon="position",
+        assessment=assessment, current_price=101.0, now_ms=1_000,
+    )
+
+    assert len(lifecycle.active_setups(symbol="BTC/USDT")) == 3
