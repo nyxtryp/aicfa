@@ -207,6 +207,33 @@ def _knowledge_requirements(concepts: tuple[str, ...]) -> tuple[tuple[str, ...],
     return _unique(confirmations), _unique(invalidations)
 
 
+def _entry_confirmation_conditions(
+    scenario: str,
+    supporting: tuple[str, ...],
+    direction: str,
+    structure_timeframe: str,
+    observations: tuple[MarketObservation, ...],
+) -> tuple[str, ...]:
+    """Describe the causal confirmation required at the selected zone."""
+    conditions = [
+        f"zone reaction/confirmation is required before {direction} entry",
+        f"entry direction confirmed by {structure_timeframe} structure",
+    ]
+    if "market_structure.bos" in supporting:
+        conditions.append("confirmed BOS with follow-through")
+    if "market_structure.choch" in supporting:
+        conditions.append("confirmed CHoCH with follow-through")
+    if "displacement" in supporting:
+        conditions.append("displacement confirms repricing from the zone")
+    if "liquidity.sweep" in supporting:
+        conditions.append("liquidity sweep must show rejection or displacement away")
+    if "price_action.rejection" in supporting:
+        conditions.append("price rejection must occur at meaningful structural context")
+    if any(item.concept_id.startswith("volume") and item.state == "observed" for item in observations):
+        conditions.append("volume evidence may confirm the reaction but cannot create the entry level")
+    return _unique(conditions)
+
+
 def _targets(hypothesis: ScenarioHypothesis) -> tuple[str, ...]:
     if hypothesis.scenario == "range":
         return ("opposing visible range boundary or opposing liquidity, if present",)
@@ -703,10 +730,12 @@ def analyze_setups(
                 source_tfs,
                 entry_timeframe,
             )
-            entry_conditions = _unique(
-                list(hypothesis.confirmations)
-                + list(confirmations)
-                + [f"direction confirmed by {context.structure_timeframe} structure"]
+            entry_conditions = _entry_confirmation_conditions(
+                hypothesis.scenario,
+                supporting,
+                direction,
+                context.structure_timeframe,
+                evidence_observations,
             )
             rationale = _unique(
                 list(hypothesis.rationale)
