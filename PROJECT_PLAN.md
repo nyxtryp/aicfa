@@ -463,3 +463,13 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 - Added tests/test_ccxt_market_data.py in commit bef369cc88c9100e82497d81f18ec5d243932ed2 covering spot/futures resolution and normalized OHLCV/trades/order-book output with a mocked exchange.
 - Important: adding the generic adapter does not mean AICFA will query every exchange on every scan. Provider selection remains capability-aware and fallback is per market/request; the next step is to wire the real CCXT venues into the existing source registry/router and validate their actual 200-market coverage.
 - The 200-market universe remains unchanged. Binance's earlier 153/200 result remains only a Binance Spot diagnostic.
+
+
+### 2026-10-03 — CCXT SOURCE FACTORY / CAPABILITY ROUTING
+
+- Added src/aicfa/ccxt_sources.py in commit 5adff66ce8c2414ef613615da3adc36471151ad5.
+- Added a broad initial CCXT venue set: Binance, Bybit, OKX, Bitget, Gate, KuCoin, MEXC, Kraken, Coinbase, Bitfinex, BingX, HTX, BitMart, CoinEx, WhiteBIT, Crypto.com, Bitrue, Bitstamp, Gemini and Upbit.
+- The factory does not blindly assume every venue supports every data type. It reads the installed CCXT exchange capability flags and builds SourceDescriptor capabilities from the actual adapter metadata. CCXT documents these has flags and recommends checking them before calling unified methods. cite: turn0search0
+- Market metadata is intentionally loaded lazily inside each provider and cached by CCXT; this avoids the earlier Binance mistake of downloading exchangeInfo once per market. CCXT explicitly documents loadMarkets caching. cite: turn0search0
+- Added tests/test_ccxt_sources.py in commit 6150e4716926c2d6a42c187de1cbe06a1c5d317f for capability detection and deterministic source ordering.
+- Next implementation step: connect the constructed sources to the existing fallback router with source-specific symbol resolution, so a symbol resolved on venue A is never accidentally fetched from venue B using the wrong venue symbol format. Then run the 200-market coverage map and measure the 40-market batch.
