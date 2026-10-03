@@ -53,9 +53,16 @@ def main() -> None:
         start = time.perf_counter()
         try:
             # One market gets at most 15 seconds; a slow market never blocks the queue.
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(provider.resolve_symbol, asset, market_type=market_type)
+            executor = ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(provider.resolve_symbol, asset, market_type=market_type)
+            try:
                 symbol = future.result(timeout=timeout_seconds)
+            except TimeoutError:
+                future.cancel()
+                executor.shutdown(wait=False, cancel_futures=True)
+                raise
+            else:
+                executor.shutdown(wait=True)
             elapsed = time.perf_counter() - start
             timings.append(elapsed)
             resolved = provider._resolved[(asset.upper(), market_type)]
