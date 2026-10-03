@@ -68,32 +68,17 @@ class MarketAwareFallbackProvider:
     def clear_resolution_cache(self) -> None:
         self._resolved.clear()
 
-    def fetch_ohlcv(
-        self,
-        *,
-        asset: str,
-        market_type: str,
-        timeframe: str,
-        since_ms: int | None,
-        limit: int,
-    ):
+    def fetch_ohlcv(self, *, symbol: str, market_type: str, timeframe: str, since_ms: int | None, limit: int):
         return self.fetch_ohlcv_with_source(
-            asset=asset, market_type=market_type, timeframe=timeframe,
+            symbol=symbol, market_type=market_type, timeframe=timeframe,
             since_ms=since_ms, limit=limit,
-        )
+        ).frame
 
-    def fetch_ohlcv_with_source(
-        self,
-        *,
-        asset: str,
-        market_type: str,
-        timeframe: str,
-        since_ms: int | None,
-        limit: int,
-    ):
+    def fetch_ohlcv_with_source(self, *, symbol: str, market_type: str, timeframe: str, since_ms: int | None, limit: int):
         from .market_data_router import MarketFetchResult, ProviderAttempt
-
-        resolved = self.resolve_market(asset, market_type=market_type)
+        resolved = self._by_symbol.get((symbol.upper(), market_type))
+        if resolved is None:
+            raise ValueError("symbol was not resolved through MarketAwareFallbackProvider")
         attempts: list[ProviderAttempt] = []
         start = self._providers.index(next(
             p for p in self._providers if provider_name(p) == resolved.provider
@@ -104,18 +89,22 @@ class MarketAwareFallbackProvider:
                 attempts.append(ProviderAttempt(provider_name(provider), "symbol resolver unavailable"))
                 continue
             try:
-                symbol = str(resolver(asset, market_type=market_type))
+                venue_symbol = str(resolver(resolved.asset, market_type=market_type))
                 frame = provider.fetch_ohlcv(
-                    symbol=symbol, market_type=market_type, timeframe=timeframe,
+                    symbol=venue_symbol, market_type=market_type, timeframe=timeframe,
                     since_ms=since_ms, limit=limit,
                 )
                 if frame is None or frame.empty:
                     raise ValueError("provider returned no OHLCV rows")
+                current = ResolvedMarket(
+                    asset=resolved.asset, market_type=market_type,
+                    provider=provider_name(provider), symbol=venue_symbol,
+                )
+                self._resolved[(resolved.asset, market_type)] = current
+                self._by_symbol[(venue_symbol.upper(), market_type)] = current
                 return MarketFetchResult(
-                    provider=provider_name(provider),
-                    symbol=symbol,
-                    frame=frame,
-                    attempts=tuple(attempts),
+                    provider=provider_name(provider), symbol=venue_symbol,
+                    frame=frame, attempts=tuple(attempts),
                 )
             except Exception as exc:
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
