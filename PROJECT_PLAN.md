@@ -1,3 +1,16 @@
+## 2026-10-03 — MTF performance diagnosis and targeted optimization
+
+- Confirmed server-side slowdown: `tests/test_features.py` stalled on `test_feature_integration_exposes_required_higher_timeframes`; first three tests passed before the long-running test.
+- Measured `build_features()` by source timeframe on the server: 5m (2016 rows) = 16.60s; 15m (672) = 2.52s; 1h (168) = 0.60s; 4h (42) = 0.46s; 1d (7) = 0.39s; 1w (1) = 0.41s.
+- Code inspection showed `build_features()` invokes MTF after the full feature pipeline, while `build_multi_timeframe_structure()` unnecessarily called the full `build_structure()` for each HTF frame.
+- Targeted optimization committed directly to `main`:
+  - `8811b843d8f5505731165ea8ec6949672423cfdf` — added optional lightweight structure flags.
+  - `64a457195dedf0187331df9d1f88182547fbbb77` — MTF now requests only external structure needed for its 15 mapped columns, skipping internal structure, protected levels, and pivot/confirmation timestamp generation.
+  - `7a4904db7df0e8c7b6adf4ed99a7ba985ef22206` — corrected indentation in the structure optimization block; final code inspected on GitHub.
+- Default `build_structure()` behavior remains unchanged because all three new flags default to `True`; only MTF explicitly disables the unnecessary layers.
+- Server validation is still required. Do NOT claim performance improvement or test equivalence until the focused MTF/features tests run on the deployed release.
+- Next exact action: run the focused MTF test file first, then `tests/test_features.py` if it passes.
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 OPTIMIZATION PASS 2 FOCUSED TEST GREEN
 
 ### Server verification
