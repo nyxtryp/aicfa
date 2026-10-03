@@ -1,3 +1,12 @@
+## 2026-10-03 — build_features performance: liquidity active-pool bookkeeping
+
+- User stopped the slow `tests/test_features.py` run after it stalled at `...`; no result was claimed.
+- MTF optimization remains validated separately: `tests/test_multi_timeframe.py` = 6 passed in 0.73s.
+- GitHub inspection identified a hot path in `src/aicfa/liquidity.py`: every candle rebuilt six filtered active-pool lists from the entire historical pool list, adding substantial Python allocation/work inside the row loop.
+- Optimization commit: `5deb10c6359917084b9606ae8501b4f5b1e12037` (`perf: avoid rebuilding liquidity active pool lists`). Active buy/sell and external/internal counts are now maintained incrementally; latest active level lookup is retained semantically with a fallback scan only when the previous latest pool becomes inactive.
+- This is a performance-only bookkeeping optimization; pool creation/sweep/break conditions were not intentionally changed.
+- Next: run the focused liquidity tests first, then re-run `tests/test_features.py` once.
+
 ## 2026-10-03 — MTF focused validation
 
 - Server validation after the targeted MTF optimization: `tests/test_multi_timeframe.py` = **6 passed in 0.73s**.
