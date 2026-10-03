@@ -1,3 +1,15 @@
+## 2026-10-03 — TASK 7 VOLUME EVIDENCE — FOCUSED CONTRACT GREEN
+
+- Production implementation commit: `89aa9bc23eace629cb842d4bd9772c88d919cca4` — `feat: add causal volume evidence layer`.
+- Focused contract tests commit: `367abf502d9a8f160d9835bc864e6c05c4343d8d` — `test: define causal volume evidence contract`.
+- Server validation: `tests/test_volume_evidence.py` = **7 passed in 0.52s**.
+- Contract covers relative volume, z-score, expansion/dry-up, BOS/breakout evidence, liquidity sweep/rejection, displacement, future-leakage protection, no artificial `volume_evidence_score`, and negative-volume validation.
+- Volume Evidence remains an observation/evidence layer; it does not manufacture BUY/SELL signals or directional scores.
+- Task 7 is **focused-contract GREEN**; integration into `features.py` and `unified_smc.py` is still pending.
+
+### Next exact action
+Integrate `build_volume_evidence()` into the feature pipeline and unified SMC propagation without changing existing causal semantics. Add integration coverage first, then run the focused + integration tests before the full regression.
+
 ## 2026-10-03 — TASK 6 FINAL REGRESSION GREEN / HANDOFF
 
 - Server full regression after the latest Zone Reaction/index optimizations: **384 passed in 79.11s (1:19)**.
