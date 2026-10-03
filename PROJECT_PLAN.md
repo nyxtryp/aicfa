@@ -139,3 +139,29 @@ Run the full regression after directional outcome statistics, then continue Task
 - After directional outcome statistics commit `0a0c1232773942cef9dffddb614be957020f86b9`, server full regression completed successfully: **428 passed in 82.05s (0:01:22)**.
 - Result: **0 failed, 0 skipped**.
 - Task 9 remains ACTIVE.
+
+
+### 2026-10-03 — EXPLAINABLE SETUP CONTRACT FIXED
+
+- AICFA setup output is now planned as an **explainable trade scenario**, not a bare LONG/SHORT signal.
+- Every displayed setup should carry structured evidence from the actual analysis pipeline:
+  - market and timeframe context;
+  - horizon: Intraday / Swing / Position;
+  - direction: LONG / SHORT;
+  - Entry;
+  - structural SL;
+  - TP1 / TP2 where structurally available;
+  - RR derived from Entry/SL/TP;
+  - structure evidence (HH/HL/LH/LL, BOS/CHoCH/MSS);
+  - liquidity evidence and sweeps;
+  - OB/FVG evidence and lifecycle;
+  - zone reaction / confirmation;
+  - volume evidence where available;
+  - explicit invalidation condition;
+  - setup timestamp, freshness and lifecycle status.
+- The website should present this as a clear **trade description/card** so the user can see not only what AICFA found, but why the setup exists and what would invalidate it.
+- The explanation must be generated from real structured evidence produced by AICFA. Do not add an LLM-written explanation layer that invents reasons not present in the underlying analysis.
+- A valid setup remains a causal structural result. The description is a presentation of evidence, not an additional signal filter.
+- Planned build direction is now explicit: **analyze the existing code → extend the existing architecture → build the autonomous multi-market scanner → expose explainable setups on the website**.
+- No implementation should begin by creating a parallel generic signal/indicator scanner.
+- Next implementation step remains the complete repository audit of src/aicfa and tests, followed by the smallest architectural extension needed for autonomous multi-market discovery.
