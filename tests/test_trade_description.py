@@ -53,7 +53,7 @@ def _candidate():
 
 
 def test_trade_description_projects_existing_geometry_and_evidence():
-    description = build_trade_description(_result(_candidate()), now_ms=1_759_488_000_000)
+    description = build_trade_description(_result(_candidate()), _candidate(), now_ms=1_759_488_000_000)
 
     assert description.asset == "BTC/USDT"
     assert description.market_type == "spot"
@@ -80,7 +80,7 @@ def test_missing_geometry_is_preserved_without_fabrication():
     candidate = SetupCandidate(
         **{**candidate.__dict__, "entry_zone": (), "invalidation_level": None, "target_levels": ()}
     )
-    description = build_trade_description(_result(candidate))
+    description = build_trade_description(_result(candidate), candidate)
 
     assert description.entry == ()
     assert description.stop_loss is None
