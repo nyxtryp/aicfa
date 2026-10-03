@@ -675,3 +675,30 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - No TradFi market was removed or replaced by this fix.
 - Next: deploy the routing fix, rerun the complete 44-market OHLCV validation, then inspect any remaining mapped-venue failures before MTF analysis.
 
+
+
+### 2026-10-04 — FINAL PRODUCTION UNIVERSE CLEANUP: 117 CRYPTO + 29 TRADFI
+
+- Finalized the production market universe after the user's quality cleanup.
+- Removed exactly **76 crypto markets** from the previous 193-market crypto universe; **117 crypto markets remain**.
+- Removed the duplicate/weak TradFi entries and the two FX targets explicitly rejected by the user.
+- Final TradFi production set is **29 markets**:
+  - 4 metals: XAU, XAG, XCU, XPT.
+  - 3 energy: WTI, BRENT, NATGAS.
+  - 4 index/ETF exposures: DJIA, NIKKEI, SPY, QQQ.
+  - 18 stocks: AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AVGO, AMD, ARM, TSM, ASML, ORCL, PLTR, NFLX, COIN, JPM, MU.
+- Removed TradFi entries: XPD, EUR/USD, GBP/USD, SPX, NDX, IWM, GLD, SNDK, SMCI, QCOM, MSTR, BAC, WMT, XOM, BA.
+- The crypto SPX/USDT entry was also removed, eliminating the previous canonical-name collision with the TradFi SPX target.
+- Updated config/tradfi_targets.json from the broad 55-target investigation set to the final 29-target production set; FX is now intentionally absent.
+- Updated the market-universe contract test from 55 to 29 targets and explicitly locked out removed SPX/SNDK/EUR/USD/GBP/USD targets.
+- Resulting production universe: **117 Crypto + 29 TradFi = 146 markets**.
+- No setup-analysis, SMC, routing, lifecycle, Entry/SL/TP, or scheduler logic was changed by this cleanup.
+
+### Next exact action
+
+1. Deploy the finalized 146-market configuration through FrostDeploy.
+2. Run the focused market-universe/configuration tests on the VDS.
+3. Run the full test suite.
+4. Run live resolution for all **146 markets** and verify that no removed market remains in the production universe.
+5. Measure the real autonomous 20-market slot and the full rotation interval after the universe reduction.
+6. Run representative/full TradFi OHLCV verification for the remaining 29 markets, then proceed to MTF acquisition validation.
