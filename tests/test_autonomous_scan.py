@@ -137,3 +137,70 @@ def test_run_forever_can_be_stopped_after_a_scan(monkeypatch):
 
     assert engine.scan_number == 1
     assert sleeps == []
+
+
+def test_scan_batch_rotates_40_markets_and_revisits_after_five_batches(monkeypatch):
+    calls = []
+
+    def fake_find_setup(request, **kwargs):
+        calls.append(request.asset)
+        return _result(request.asset, request.mode)
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    assets = tuple(f"COIN{i:03d}/USDT" for i in range(200))
+    engine = AutonomousScanEngine(
+        MarketUniverse(tuple(MonitoredMarket(asset) for asset in assets))
+    )
+
+    states = [
+        engine.scan_batch(i, batch_size=40, now_ms=1_000 + i * 60_000)
+        for i in range(5)
+    ]
+
+    assert [len(state.result.markets) for state in states] == [40, 40, 40, 40, 40]
+    assert [state.result.markets[0].asset for state in states] == [
+        "COIN000/USDT",
+        "COIN040/USDT",
+        "COIN080/USDT",
+        "COIN120/USDT",
+        "COIN160/USDT",
+    ]
+    assert len(calls) == 200 * 3
+    assert set(calls) == set(assets)
+
+    sixth = engine.scan_batch(0, batch_size=40, now_ms=301_000)
+    assert len(sixth.result.markets) == 40
+    assert sixth.result.markets[0].asset == "COIN000/USDT"
+
+
+def test_run_forever_batches_rotates_batches(monkeypatch):
+    def fake_find_setup(request, **kwargs):
+        return _result(request.asset, request.mode)
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    assets = tuple(f"COIN{i:03d}/USDT" for i in range(200))
+    engine = AutonomousScanEngine(
+        MarketUniverse(tuple(MonitoredMarket(asset) for asset in assets))
+    )
+
+    seen = []
+    sleeps = []
+
+    engine.run_forever_batches(
+        interval_seconds=60,
+        batch_size=40,
+        on_scan=lambda state: seen.append(state.result.markets[0].asset),
+        should_stop=lambda: len(seen) >= 5,
+        sleep=sleeps.append,
+    )
+
+    assert seen == [
+        "COIN000/USDT",
+        "COIN040/USDT",
+        "COIN080/USDT",
+        "COIN120/USDT",
+        "COIN160/USDT",
+    ]
+    assert sleeps == [60, 60, 60, 60]
