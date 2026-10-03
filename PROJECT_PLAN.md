@@ -1,3 +1,16 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 OPTIMIZATION PASS 2 FOCUSED TEST GREEN
+
+### Server verification
+- Code commit: `76ef392bbf66dae8f48a2e4d9731e83208165463`.
+- Focused `tests/test_zone_reaction.py`: **5 passed in 0.47s**.
+- This validates the focused lifecycle contract after replacing per-candle candidate sets with reusable marker-array deduplication and precomputing candle bucket bounds.
+- Feature integration runtime and full regression are still pending for this optimization.
+
+### Next action
+Run only `tests/test_features.py` and record the exact runtime. Compare with the previous integration result of **10 passed in 57.03s**. Run the full suite only if the integration remains green and its runtime indicates the change is safe and worthwhile.
+
+---
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 TARGETED OPTIMIZATION PASS 2 (TESTS PENDING)
 
 ### Code change
