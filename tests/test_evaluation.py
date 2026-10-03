@@ -14,6 +14,7 @@ from aicfa.evaluation import (
     evaluate_setups,
     purge_training_labels,
     summarize_cost_adjusted_returns_by_folds,
+    summarize_outcomes_by_direction,
     summarize_outcomes_by_folds,
 )
 
@@ -330,3 +331,44 @@ def test_setup_outcome_journal_rejects_mismatched_setup_and_evaluation_counts() 
     evaluation = evaluate_setups(candles([(100, 101, 99), (100, 106, 99)]), [])
     with pytest.raises(ValueError, match="same number"):
         build_setup_outcome_journal([setup], evaluation)
+
+
+
+def test_setup_outcome_statistics_by_direction_preserve_outcomes_without_pooling() -> None:
+    setups = [
+        {"setup_timestamp": "2026-01-01T00:00:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 105},
+        {"setup_timestamp": "2026-01-01T00:01:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 110},
+        {"setup_timestamp": "2026-01-01T00:02:00Z", "direction": "short", "entry_price": 100, "stop_price": 105, "target_price": 95},
+    ]
+    evaluation = evaluate_setups(
+        candles([(100, 101, 99), (100, 106, 99), (100, 103, 97), (100, 101, 94)]),
+        setups,
+        max_horizon=1,
+    )
+    journal = build_setup_outcome_journal(setups, evaluation)
+    stats = summarize_outcomes_by_direction(journal)
+
+    assert [item.direction for item in stats] == ["long", "short"]
+    assert stats[0].counts == {"tp": 1, "sl": 0, "timeout": 1, "ambiguous": 0}
+    assert stats[0].resolved_count == 1
+    assert stats[0].tp_rate == 1.0
+    assert stats[1].counts == {"tp": 1, "sl": 0, "timeout": 0, "ambiguous": 0}
+    assert stats[1].resolved_count == 1
+    assert stats[1].tp_rate == 1.0
+
+
+def test_setup_outcome_statistics_by_direction_keep_unresolved_excluded_from_resolved_metrics() -> None:
+    setups = [
+        {"setup_timestamp": "2026-01-01T00:00:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 105},
+    ]
+    evaluation = evaluate_setups(
+        candles([(100, 101, 99), (100, 103, 97)]),
+        setups,
+        max_horizon=1,
+    )
+    journal = build_setup_outcome_journal(setups, evaluation)
+    stats = summarize_outcomes_by_direction(journal)
+
+    assert stats[0].resolved_count == 0
+    assert stats[0].tp_rate is None
+    assert stats[0].mean_gross_return is None
