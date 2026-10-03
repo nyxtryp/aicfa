@@ -369,3 +369,10 @@ End-user UX remains asset-only: user enters an asset such as BTC; AICFA internal
 
 ### Next exact action
 Profile the complete 10,080-row `build_features()` path to identify the remaining runtime contributors. Do not make another blind zone change; Zone Reaction is currently measured at 0.032s in isolation.
+
+## 2026-10-03 — Zone candidate lookup optimization
+- **Commit:** `6de9aa9df7c5de2dba29c82532df1ac7df8d1fc7`
+- **Change:** narrowed zone-reaction candle candidates by price within each logarithmic bucket using lazy sorted indexes and binary search; avoids appending/scanning all historical zones from broad buckets.
+- **Diagnostic basis:** full `build_zone_reaction` on 10,080 rows previously showed the hot stack at candidate collection (`zone_reaction.py:491`), not the active-level lookup.
+- **Validation:** pending on deployed release.
+- **Next:** run focused zone-reaction test, then the higher-timeframe feature integration test; if both pass, measure the 10,080-row full zone-reaction runtime once.
