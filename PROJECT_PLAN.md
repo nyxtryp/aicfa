@@ -406,3 +406,30 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 4. Run one complete autonomous `scan_once()` over the full 200-market universe and measure wall-clock execution time.
 5. Compare the measured runtime with the fixed **300-second / 5-minute** cadence.
 6. Only after the full-list runtime and market availability are verified, proceed to durable setup-state persistence.
+
+
+### 2026-10-03 — AUTONOMOUS SCAN ROTATION CHANGED TO 40 MARKETS PER MINUTE
+
+- Clarified the production scheduling model: the universe contains **200 configured markets**, but the site must **not** run all 200 markets in one five-minute burst.
+- Production rotation is now designed as **5 sequential batches × 40 markets**.
+- One batch is processed every **60 seconds**.
+- After five batches, all 200 markets have been revisited once; therefore each configured market is normally re-evaluated once every **5 minutes / 300 seconds**.
+- This keeps the original five-minute market refresh contract while reducing the per-minute workload from 200 markets to 40 markets.
+- The existing SetupLifecycle remains long-lived across batches, so a setup can persist while its market waits for the next batch; the next visit can recognize the same setup, a new geometry, TP1/TP2, invalidation or expiration.
+- Added AutonomousScanEngine.scan_batch() and run_forever_batches() with defaults of **40 markets per batch** and **60 seconds between batches**.
+- The legacy full-universe scan_once() / run_forever() APIs remain available for deterministic tests and full-scan runtime measurement.
+- Added regression tests proving 200 markets rotate as 40/40/40/40/40 and the first batch is revisited after the five-batch rotation.
+- Production implementation commit: b5f5fe7d3eea9b2755e6ae72c3e3a640363844b0.
+- Test commit: 2c52d11d91d078349841dfcdb1e56788c27c48ef.
+- Important runtime contract: the 40-market batch must complete within its 60-second slot if the production service is to maintain a strict one-batch-per-minute cadence. We therefore measure real batch wall-clock time on the VDS before enabling the live loop.
+- Durable persistence is still deferred.
+
+### Next exact action
+
+1. Deploy the 200-market configuration and rotating-batch code to the VDS.
+2. Run focused autonomous/universe/orchestrator tests.
+3. Verify all 200 configured USDT spot pairs against the real provider.
+4. Measure a real **40-market batch** wall-clock runtime on the VDS.
+5. If the batch fits inside 60 seconds, wire the live service to run_forever_batches(interval_seconds=60, batch_size=40).
+6. Confirm the five-batch rotation gives each market one evaluation every 5 minutes.
+7. Only then proceed to durable setup-state persistence.
