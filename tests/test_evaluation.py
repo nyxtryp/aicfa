@@ -218,12 +218,14 @@ def test_rr_analysis_by_folds_rejects_mismatched_fold_lengths() -> None:
 
 def test_outcome_statistics_by_folds_preserve_each_fold_without_pooling() -> None:
     first = BatchEvaluation(
+        results=(),
         counts={"tp": 3, "sl": 1, "timeout": 2, "ambiguous": 0},
         resolved_count=4,
         tp_rate=0.75,
         mean_gross_return=0.01,
     )
     second = BatchEvaluation(
+        results=(),
         counts={"tp": 1, "sl": 3, "timeout": 0, "ambiguous": 1},
         resolved_count=4,
         tp_rate=0.25,
