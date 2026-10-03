@@ -717,27 +717,14 @@ def analyze_setups(
             if not target_levels:
                 missing.append(f"{hypothesis.scenario}: no geometrically valid target is available")
                 continue
-            rr = _risk_reward_value(
+            # Risk/reward is derived geometry, not a strategy gate.
+            # The setup engine exposes structurally valid Entry/Invalidation/Target
+            # even when the resulting RR is below an arbitrary fixed threshold.
+            # Statistical evaluation belongs to the later backtest/evaluation layer.
+            _risk_reward_value(
                 direction, entry_levels, invalidation_level, target_levels
             )
-            if rr is None or rr < 2.0:
-                entry_low = min(level.value for level in entry_levels)
-                entry_high = max(level.value for level in entry_levels)
-                invalidation_value = invalidation_level.value
-                tp1 = target_levels[0].value
-                tp2 = target_levels[1].value if len(target_levels) > 1 else None
-                missing.append(
-                    f"{hypothesis.scenario}: structural risk/reward is below the minimum "
-                    f"(entry={entry_low:.2f}-{entry_high:.2f}, "
-                    f"invalidation={invalidation_value:.2f}, "
-                    f"tp1={tp1:.2f}, "
-                    f"tp2={tp2:.2f}" if tp2 is not None else
-                    f"{hypothesis.scenario}: structural risk/reward is below the minimum "
-                    f"(entry={entry_low:.2f}-{entry_high:.2f}, "
-                    f"invalidation={invalidation_value:.2f}, "
-                    f"tp1={tp1:.2f}, tp2=none"
-                )
-                missing[-1] += f", rr={'none' if rr is None else f'{rr:.3f}'}, minimum=2.000)"
+
                 continue
 
         candidates.append(
