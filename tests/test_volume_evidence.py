@@ -102,3 +102,75 @@ def test_volume_evidence_rejects_invalid_input():
     x.loc[10, "volume"] = -1.0
     with pytest.raises(ValueError):
         build_volume_evidence(x)
+
+
+def test_volume_evidence_propagates_through_unified_smc():
+    x = frame()
+    x.loc[100, "volume"] = 100.0
+    structure = pd.DataFrame({
+        "bos_up": np.zeros(len(x), dtype=np.int8),
+        "bos_down": np.zeros(len(x), dtype=np.int8),
+    })
+    structure.loc[100, "bos_up"] = 1
+    liquidity = pd.DataFrame({
+        "sweep_high": np.zeros(len(x), dtype=np.int8),
+        "sweep_low": np.zeros(len(x), dtype=np.int8),
+    })
+    liquidity.loc[100, "sweep_high"] = 1
+    displacement = pd.DataFrame({
+        "displacement_up": np.zeros(len(x), dtype=np.int8),
+        "displacement_down": np.zeros(len(x), dtype=np.int8),
+    })
+    displacement.loc[100, "displacement_up"] = 1
+
+    evidence = build_volume_evidence(
+        x, structure=structure, liquidity=liquidity, displacement=displacement
+    )
+    from aicfa.unified_smc import build_unified_smc
+    result = build_unified_smc(
+        x,
+        structure=structure,
+        liquidity=liquidity,
+        displacement=displacement,
+        volume_evidence=evidence,
+    )
+
+    for column in [
+        "smc_volume_evidence_relative",
+        "smc_volume_evidence_zscore",
+        "smc_volume_evidence_expansion",
+        "smc_volume_evidence_breakout_up",
+        "smc_volume_evidence_rejection_high",
+        "smc_volume_evidence_liquidity_sweep_high",
+        "smc_volume_evidence_displacement_up",
+    ]:
+        assert column in result.columns
+    assert result.loc[100, "smc_volume_evidence_breakout_up"] == 1
+    assert result.loc[100, "smc_volume_evidence_rejection_high"] == 1
+    assert "smc_volume_evidence_score" not in result.columns
+
+
+def test_features_expose_volume_evidence():
+    from aicfa.features import build_features
+    result = build_features(frame())
+    for column in [
+        "volume_evidence_relative",
+        "volume_evidence_zscore",
+        "volume_evidence_expansion",
+        "volume_evidence_dry_up",
+        "volume_evidence_breakout_up",
+        "volume_evidence_breakout_down",
+        "volume_evidence_rejection_high",
+        "volume_evidence_rejection_low",
+        "volume_evidence_liquidity_sweep_high",
+        "volume_evidence_liquidity_sweep_low",
+        "volume_evidence_displacement_up",
+        "volume_evidence_displacement_down",
+        "smc_volume_evidence_relative",
+        "smc_volume_evidence_expansion",
+        "smc_volume_evidence_breakout_up",
+        "smc_volume_evidence_rejection_high",
+        "smc_volume_evidence_liquidity_sweep_high",
+        "smc_volume_evidence_displacement_up",
+    ]:
+        assert column in result.columns
