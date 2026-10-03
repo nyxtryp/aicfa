@@ -16,6 +16,8 @@ def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAI
     return SimpleNamespace(
         symbol=f"{asset}/USDT" if "/" not in asset else asset,
         mode=mode,
+        request=SimpleNamespace(market_type="spot"),
+        analysis=None,
         decision=decision,
         setup_assessment=SimpleNamespace(
             candidates=() if candidate is None else (candidate,),
@@ -38,6 +40,8 @@ def test_one_market_runs_all_three_primary_horizons(monkeypatch):
     assert [item.mode for item in result.results] == list(PRIMARY_TRADING_MODES)
     assert calls == list(PRIMARY_TRADING_MODES)
     assert [item.mode for item in result.setups] == list(PRIMARY_TRADING_MODES)
+    assert [item.description.horizon for item in result.setups] == list(PRIMARY_TRADING_MODES)
+    assert all(item.description.direction == "long" for item in result.setups)
 
 
 def test_multiple_markets_keep_results_independent(monkeypatch):
@@ -83,6 +87,7 @@ def test_distinct_concurrent_horizon_setups_are_preserved(monkeypatch):
 
     assert len(result.setups) == 3
     assert [item.candidate.direction for item in result.setups] == ["long", "long", "short"]
+    assert [item.description.direction for item in result.setups] == ["long", "long", "short"]
 
 
 def test_primary_orchestrator_rejects_scalping(monkeypatch):
