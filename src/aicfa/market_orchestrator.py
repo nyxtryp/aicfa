@@ -11,6 +11,7 @@ from typing import Callable, Sequence
 
 from .data_requirements import TradingMode
 from .find_setup import FindSetupRequest, FindSetupResult, find_setup
+from .market_universe import MarketUniverse
 
 
 PRIMARY_TRADING_MODES: tuple[TradingMode, ...] = (
@@ -118,5 +119,28 @@ def scan_markets(
             modes=modes,
         )
         for asset in normalized_assets
+    )
+    return MultiMarketScan(markets=markets)
+
+
+def scan_universe(
+    universe: MarketUniverse,
+    *,
+    provider: object | None = None,
+    now_ms: int,
+    resolver: Callable[[str, str], str] | None = None,
+    modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
+) -> MultiMarketScan:
+    """Scan the durable configured universe without hardcoding any asset."""
+    markets = tuple(
+        analyze_market_horizons(
+            market.asset,
+            provider=provider,
+            now_ms=now_ms,
+            market_type=market.market_type,
+            resolver=resolver,
+            modes=modes,
+        )
+        for market in universe.markets
     )
     return MultiMarketScan(markets=markets)
