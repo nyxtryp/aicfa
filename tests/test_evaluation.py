@@ -5,6 +5,7 @@ import pytest
 
 from aicfa.evaluation import (
     EvaluationOutcome,
+    build_chronological_folds,
     evaluate_setup,
     evaluate_setups,
     purge_training_labels,
@@ -165,3 +166,56 @@ def test_purge_requires_label_end_column_and_drops_missing_intervals() -> None:
             label_end_column="missing")
     purged = purge_training_labels(frame, validation_start="2026-01-01T00:03:00Z")
     assert len(purged) == 1
+
+
+def test_chronological_folds_are_forward_only_and_purged() -> None:
+    timestamps = pd.date_range("2026-01-01", periods=8, freq="min", tz="UTC")
+    frame = pd.DataFrame({
+        "timestamp": timestamps,
+        "feature": range(8),
+        "label_end_timestamp_5": timestamps + pd.to_timedelta(
+            [1, 1, 1, 2, 2, 1, 1, 1], unit="min"
+        ),
+    })
+    folds = build_chronological_folds(frame, validation_size=2, n_splits=2)
+
+    assert len(folds) == 2
+    train_0, validation_0 = folds[0]
+    train_1, validation_1 = folds[1]
+
+    assert validation_0["timestamp"].tolist() == list(timestamps[4:6])
+    assert validation_1["timestamp"].tolist() == list(timestamps[6:8])
+    assert train_0["timestamp"].max() < validation_0["timestamp"].min()
+    assert train_1["timestamp"].max() < validation_1["timestamp"].min()
+    assert train_0["timestamp"].tolist() == list(timestamps[:2])
+    assert train_1["timestamp"].tolist() == list(timestamps[:4])
+
+
+def test_chronological_folds_purge_labels_touching_validation_start() -> None:
+    timestamps = pd.date_range("2026-01-01", periods=6, freq="min", tz="UTC")
+    frame = pd.DataFrame({
+        "timestamp": timestamps,
+        "label_end_timestamp_5": [
+            timestamps[0], timestamps[1], timestamps[2], timestamps[3],
+            timestamps[4], timestamps[5],
+        ],
+    })
+    folds = build_chronological_folds(frame, validation_size=2, n_splits=1)
+    train, validation = folds[0]
+
+    assert validation["timestamp"].tolist() == list(timestamps[4:6])
+    assert train["timestamp"].tolist() == list(timestamps[:4])
+    assert train["label_end_timestamp_5"].max() < validation["timestamp"].min()
+
+
+def test_chronological_folds_reject_invalid_window_sizes() -> None:
+    frame = pd.DataFrame({
+        "timestamp": pd.date_range("2026-01-01", periods=4, freq="min", tz="UTC"),
+        "label_end_timestamp_5": pd.date_range("2026-01-01", periods=4, freq="min", tz="UTC"),
+    })
+    with pytest.raises(ValueError, match="validation_size"):
+        build_chronological_folds(frame, validation_size=0, n_splits=1)
+    with pytest.raises(ValueError, match="n_splits"):
+        build_chronological_folds(frame, validation_size=1, n_splits=0)
+    with pytest.raises(ValueError, match="rows"):
+        build_chronological_folds(frame, validation_size=3, n_splits=2)
