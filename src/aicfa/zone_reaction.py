@@ -235,6 +235,7 @@ def build_zone_reaction(
     # historical zones. Keep a lazily-built index sorted by zone low; candle
     # lookup can then binary-search the relevant price slice.
     zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
+    zone_bucket_level_sorted: dict[int, list[tuple[float, int]]] = {}
     # Keep occupied bucket ids sorted. _active_level() can then inspect the
     # nearest occupied price buckets directly instead of walking thousands of
     # empty radius buckets on long histories.
@@ -244,6 +245,7 @@ def build_zone_reaction(
     wide_bucket_step = bucket_step * 65
     wide_zone_buckets: dict[int, list[int]] = {}
     wide_zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
+    wide_zone_bucket_level_sorted: dict[int, list[tuple[float, int]]] = {}
     wide_occupied_bucket_keys: list[int] = []
     wide_zones: list[int] = []
     # Reuse a marker array for per-candle candidate deduplication rather than
@@ -285,6 +287,7 @@ def build_zone_reaction(
                 else:
                     bucket.append(zone_id)
                 wide_zone_bucket_sorted.pop(bucket_id, None)
+                wide_zone_bucket_level_sorted.pop(bucket_id, None)
         else:
             for bucket_id in range(first, last + 1):
                 bucket = zone_buckets.get(bucket_id)
@@ -294,6 +297,7 @@ def build_zone_reaction(
                 else:
                     bucket.append(zone_id)
                 zone_bucket_sorted.pop(bucket_id, None)
+                zone_bucket_level_sorted.pop(bucket_id, None)
 
 
     def _append_zone(*, source, side, low, high, created):
@@ -347,11 +351,12 @@ def build_zone_reaction(
     }
 
     def _active_level(close: float, side: int):
-        # Query only the nearest occupied buckets, then evaluate their
-        # candidates with NumPy.  The previous implementation iterated every
-        # candidate zone in Python; on long histories a single occupied bucket
-        # can contain thousands of historical zones.
-        bucket_ids = []
+        # Query the same nearest occupied buckets as before, but use a lazy
+        # index sorted by zone midpoint.  The old path materialized every zone
+        # in each selected bucket and then ran NumPy over the whole historical
+        # population.  On long histories that made the supposedly indexed
+        # lookup effectively O(number_of_zones) per candle.
+        bucket_refs = []
 
         wide_bucket = int(np.floor(np.log(max(close, 1e-300)) / wide_bucket_step))
         wide_pos = bisect.bisect_left(wide_occupied_bucket_keys, wide_bucket)
@@ -359,54 +364,94 @@ def build_zone_reaction(
             wide_pos < len(wide_occupied_bucket_keys)
             and wide_occupied_bucket_keys[wide_pos] == wide_bucket
         ):
-            bucket_ids.append(("wide", wide_bucket))
+            bucket_refs.append(("wide", wide_bucket))
             wide_left = wide_pos - 1
             wide_right = wide_pos + 1
         else:
             wide_left = wide_pos - 1
             wide_right = wide_pos
         if wide_left >= 0:
-            bucket_ids.append(("wide", wide_occupied_bucket_keys[wide_left]))
+            bucket_refs.append(("wide", wide_occupied_bucket_keys[wide_left]))
         if wide_right < len(wide_occupied_bucket_keys):
-            bucket_ids.append(("wide", wide_occupied_bucket_keys[wide_right]))
+            bucket_refs.append(("wide", wide_occupied_bucket_keys[wide_right]))
 
         current_bucket = _bucket(close)
         pos = bisect.bisect_left(occupied_bucket_keys, current_bucket)
         if pos < len(occupied_bucket_keys) and occupied_bucket_keys[pos] == current_bucket:
-            bucket_ids.append(("normal", current_bucket))
+            bucket_refs.append(("normal", current_bucket))
             left = pos - 1
             right = pos + 1
         else:
             left = pos - 1
             right = pos
         if left >= 0:
-            bucket_ids.append(("normal", occupied_bucket_keys[left]))
+            bucket_refs.append(("normal", occupied_bucket_keys[left]))
         if right < len(occupied_bucket_keys):
-            bucket_ids.append(("normal", occupied_bucket_keys[right]))
+            bucket_refs.append(("normal", occupied_bucket_keys[right]))
 
-        candidate_ids = []
-        for kind, bucket_id in bucket_ids:
-            source = wide_zone_buckets if kind == "wide" else zone_buckets
-            candidate_ids.extend(source.get(bucket_id, ()))
+        best_id = None
+        best_level = np.nan
+        best_distance = np.inf
 
-        if not candidate_ids:
+        for kind, bucket_id in bucket_refs:
+            if kind == "wide":
+                raw_bucket = wide_zone_buckets.get(bucket_id)
+                cache = wide_zone_bucket_level_sorted
+            else:
+                raw_bucket = zone_buckets.get(bucket_id)
+                cache = zone_bucket_level_sorted
+            if not raw_bucket:
+                continue
+
+            ordered = cache.get(bucket_id)
+            if ordered is None:
+                ordered = sorted(
+                    (
+                        (float(zone_low[zone_id] + zone_high[zone_id]) * 0.5, zone_id)
+                        for zone_id in raw_bucket
+                    ),
+                    key=lambda item: item[0],
+                )
+                cache[bucket_id] = ordered
+
+            # Exact nearest-neighbour search in the midpoint-sorted bucket.
+            # Expand only while the next midpoint can still beat the current
+            # best distance; this avoids scanning unrelated historical zones.
+            insert_at = bisect.bisect_left(ordered, (close, -1))
+            left_i = insert_at - 1
+            right_i = insert_at
+
+            while left_i >= 0 or right_i < len(ordered):
+                left_distance = (
+                    abs(close - ordered[left_i][0]) if left_i >= 0 else np.inf
+                )
+                right_distance = (
+                    abs(close - ordered[right_i][0]) if right_i < len(ordered) else np.inf
+                )
+                if min(left_distance, right_distance) >= best_distance:
+                    break
+
+                if left_distance <= right_distance:
+                    level, zone_id = ordered[left_i]
+                    left_i -= 1
+                else:
+                    level, zone_id = ordered[right_i]
+                    right_i += 1
+
+                if zone_side[zone_id] != side:
+                    continue
+                state = zone_state[zone_id]
+                if state == STATE_CODE[ZONE_BROKEN] or state == STATE_CODE[ZONE_CANCELLED]:
+                    continue
+                distance = abs(close - level)
+                if distance < best_distance:
+                    best_distance = distance
+                    best_id = zone_id
+                    best_level = level
+
+        if best_id is None:
             return None
-
-        idx = np.asarray(candidate_ids, dtype=np.intp)
-        valid = (
-            (zone_side[idx] == side)
-            & (zone_state[idx] != STATE_CODE[ZONE_BROKEN])
-            & (zone_state[idx] != STATE_CODE[ZONE_CANCELLED])
-        )
-        if not valid.any():
-            return None
-
-        idx = idx[valid]
-        levels = (zone_low[idx] + zone_high[idx]) * 0.5
-        distances = np.abs(close - levels)
-        best = int(np.argmin(distances))
-        zone_id = int(idx[best])
-        return zone_id, float(levels[best]), float(distances[best])
+        return int(best_id), float(best_level), float(best_distance)
 
     for i in range(n):
         created_count = 0
