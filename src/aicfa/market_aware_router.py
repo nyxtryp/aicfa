@@ -28,7 +28,8 @@ class MarketAwareFallbackProvider:
         if not providers:
             raise ValueError("at least one market data provider is required")
         self._providers = tuple(providers)
-        self._resolved: dict[tuple[str, str], ResolvedMarket] = {}\n        self._by_symbol: dict[tuple[str, str], ResolvedMarket] = {}
+        self._resolved: dict[tuple[str, str], ResolvedMarket] = {}
+        self._by_symbol: dict[tuple[str, str], ResolvedMarket] = {}
 
     @property
     def providers(self) -> tuple[MarketDataProvider, ...]:
@@ -57,6 +58,7 @@ class MarketAwareFallbackProvider:
                     symbol=symbol,
                 )
                 self._resolved[key] = resolved
+                self._by_symbol[(symbol.upper(), market_type)] = resolved
                 return resolved
             except Exception as exc:
                 attempts.append(MarketResolutionAttempt(
@@ -65,8 +67,13 @@ class MarketAwareFallbackProvider:
         details = "; ".join(f"{x.provider}: {x.error}" for x in attempts)
         raise ValueError(f"unable to resolve market {asset}: {details}")
 
+    def resolve_symbol(self, asset: str, *, market_type: str = "spot") -> str:
+        """Resolve an asset through the fallback chain and return its venue-native symbol."""
+        return self.resolve_market(asset, market_type=market_type).symbol
+
     def clear_resolution_cache(self) -> None:
         self._resolved.clear()
+        self._by_symbol.clear()
 
     def fetch_ohlcv(self, *, symbol: str, market_type: str, timeframe: str, since_ms: int | None, limit: int):
         return self.fetch_ohlcv_with_source(
