@@ -49,10 +49,6 @@
       "market_type": "spot"
     },
     {
-      "asset": "TON/USDT",
-      "market_type": "spot"
-    },
-    {
       "asset": "NEAR/USDT",
       "market_type": "spot"
     },
