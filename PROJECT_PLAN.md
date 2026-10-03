@@ -22,8 +22,21 @@
 - Chronological purged validation folds: GREEN.
 - RR ↔ outcome analysis: GREEN.
 - RR ↔ outcome analysis across chronological folds: GREEN.
-- Full regression: **GREEN — 421/421**.
+- Fold outcome statistics by chronological folds: GREEN.
+- Full regression: **GREEN — 423/423**.
 - Task 9 remains ACTIVE.
+
+### 2026-10-03 — FOLD OUTCOME STATISTICS GREEN / FULL REGRESSION VERIFIED
+
+- Added fold-local outcome statistics in production commit `d0b29625fa5abfcd3f1bf8d0d9654567a5c6a110` — `feat: add fold outcome statistics`.
+- Added contract coverage in test commit `21e2e7e8c2a2a82df0c5de0c51a1543989713a1e` — `test: define fold outcome statistics contract`.
+- Corrected test construction to use the real `BatchEvaluation` contract, including required `results`, in commits `afb3968a1efb64497c922fcf1954990b8089aad7`, `bc9b2c9a056d5b740432e35c6789d6676d890562`, and `781fb414ee590efd8502984044c4a0197430db7a`.
+- Fold statistics preserve each fold independently: TP/SL/TIMEOUT/AMBIGUOUS counts, resolved count, TP rate among resolved outcomes, and mean gross return among resolved outcomes.
+- No cross-fold pooling or cross-fold average is created.
+- Focused server validation: `tests/test_evaluation.py` = **21 passed in 0.54s**.
+- Full server regression: **423 passed in 79.60s (0:01:19)**.
+- Result: **0 failed, 0 skipped**.
+- No performance, confidence, hit-rate, profitability, or predictive-performance claim is made from these statistics.
 
 ### Next exact action
 
