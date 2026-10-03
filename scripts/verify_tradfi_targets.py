@@ -98,23 +98,80 @@ def _match_score(target: dict, market: dict) -> int:
     return score
 
 
-def _compact(market: dict) -> str:
+def _market_kind(market: dict) -> str:
     info = market.get("info") or {}
-    symbol = market.get("symbol") or market.get("id")
-    kind = market.get("type") or "-"
-    contract = (
+    market_type = str(market.get("type") or "").lower()
+    contract = str(
         info.get("contractType")
         or info.get("instType")
         or info.get("symbolType")
-        or "-"
-    )
-    quote = market.get("quote") or "-"
-    settle = market.get("settle") or "-"
-    active = market.get("active")
+        or ""
+    ).lower()
+    if market_type == "swap" or contract in {"swap", "perpetual", "linearperpetual", "inverseperpetual"}:
+        return "perpetual"
+    if market_type == "future" or contract in {"future", "futures", "delivery"}:
+        return "future"
+    if market_type in {"spot", "margin"}:
+        return "spot"
+    return market_type or "other"
+
+
+def _is_active_derivative(market: dict) -> bool:
+    return bool(market.get("active")) and _market_kind(market) in {"perpetual", "future"}
+
+
+def _rwa_flag(market: dict) -> str:
+    info = market.get("info") or {}
+    value = info.get("isRwa")
+    if value is None:
+        return "-"
+    return str(value)
+
+
+def _compact(market: dict) -> str:
+    info = market.get("info") or {}
+    symbol = market.get("symbol") or market.get("id")
     return (
-        f"{symbol} | type={kind} | contract={contract} | "
-        f"quote={quote} | settle={settle} | active={active}"
+        f"{symbol} | {_market_kind(market)} | "
+        f"quote={market.get('quote') or '-'} | settle={market.get('settle') or '-'} | "
+        f"active={market.get('active')} | isRwa={_rwa_flag(market)}"
     )
+
+
+def _candidate_rank(target: dict, market: dict, score: int) -> tuple:
+    kind = _market_kind(market)
+    quote = str(market.get("quote") or "").upper()
+    settle = str(market.get("settle") or "").upper()
+    # Prefer perpetuals and USDT settlement, then futures and USD/USDC.
+    kind_rank = {"perpetual": 30, "future": 20}.get(kind, 0)
+    settle_rank = {"USDT": 6, "USDC": 5, "USD": 4}.get(settle, 0)
+    quote_rank = {"USDT": 3, "USDC": 2, "USD": 1}.get(quote, 0)
+    return (-score, -kind_rank, -settle_rank, -quote_rank, str(market.get("symbol") or market.get("id") or ""))
+
+
+def _verify_target(target: dict, markets: dict) -> tuple[str, str | None]:
+    candidates = []
+    for market in markets.values():
+        score = _match_score(target, market)
+        if score <= 0 or not _is_active_derivative(market):
+            continue
+        candidates.append((score, market))
+
+    if not candidates:
+        return "ABSENT", None
+
+    candidates.sort(key=lambda item: _candidate_rank(target, item[1], item[0]))
+    best_score, best = candidates[0]
+
+    # A weak alias hit is never promoted to production automatically.
+    if best_score < 90:
+        return "REVIEW", _compact(best)
+
+    # RWA metadata, when explicitly exposed, requires human review.
+    if _rwa_flag(best).lower() in {"true", "1", "yes"}:
+        return "REVIEW", _compact(best)
+
+    return "ACCEPT", _compact(best)
 
 
 def main() -> None:
@@ -128,48 +185,24 @@ def main() -> None:
         exchanges[venue] = markets
         print(f"  markets={len(markets)}", flush=True)
 
-    confirmed = multiple = absent = 0
+    accepted = review = absent = 0
 
     for target in targets:
         per_venue = []
         for venue in VENUES:
-            scored = []
-            for market in exchanges[venue].values():
-                score = _match_score(target, market)
-                if score:
-                    scored.append((score, _compact(market), market))
-
-            # Prefer the strongest exact/native-looking candidates.
-            scored.sort(key=lambda item: (-item[0], item[1]))
-            top = scored[:5]
-
-            # Deduplicate by native symbol/id.
-            unique = []
-            seen = set()
-            for score, compact, market in top:
-                key = str(market.get("id") or market.get("symbol"))
-                if key not in seen:
-                    seen.add(key)
-                    unique.append((score, compact))
-
-            if not unique:
-                status = "ABSENT"
-                absent += 1
-            elif len(unique) == 1:
-                status = f"CONFIRMED {unique[0][1]}"
-                confirmed += 1
+            status, candidate = _verify_target(target, exchanges[venue])
+            if status == "ACCEPT":
+                accepted += 1
+                per_venue.append(f"{venue}=ACCEPT {candidate}")
+            elif status == "REVIEW":
+                review += 1
+                per_venue.append(f"{venue}=REVIEW {candidate}")
             else:
-                candidates = " || ".join(item[1] for item in unique[:3])
-                status = f"MULTIPLE {candidates}"
-                multiple += 1
-
-            per_venue.append(f"{venue}={status}")
-
+                absent += 1
+                per_venue.append(f"{venue}=ABSENT")
         print(f"{target['asset']} | {target['name']} | " + " | ".join(per_venue))
 
-    print(
-        f"\nSUMMARY confirmed={confirmed} multiple={multiple} absent={absent}"
-    )
+    print(f"\nSUMMARY accept={accepted} review={review} absent={absent}")
 
 
 if __name__ == "__main__":
