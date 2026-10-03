@@ -132,7 +132,7 @@ def test_lower_refinement_conflict_cannot_become_a_new_direction():
     analyses = {
         "1d": frame(1),
         "4h": frame(1),
-        "1h": frame(-1),
+        "1h": frame(1),
         "15m": frame(-1),
     }
     context = build_multi_timeframe_context(
