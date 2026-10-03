@@ -203,3 +203,31 @@ Run the full regression after directional outcome statistics, then continue Task
 2. Define the minimal multi-horizon orchestration contract around the existing `find_setup`/Setup Engine; do not implement the website yet.
 3. Add tests for: one market → three horizons, multiple markets → independent results, no forced signal, and preservation of distinct concurrent setups.
 
+### 2026-10-03 — PRIMARY THREE-HORIZON ORCHESTRATION: IMPLEMENTED, VERIFICATION PENDING
+
+- Reconciled the primary TradingMode timeframe contract:
+  - Intraday: `4h → 1h → 15m → 5m`
+  - Swing: `1d → 4h → 1h`
+  - Position: `1w → 1d → 4h`
+  - Scalping remains isolated at `15m → 5m → 1m` for the later dedicated fast product.
+- Added `src/aicfa/market_orchestrator.py` as the first autonomous orchestration layer over the existing `find_setup` pipeline.
+- The orchestrator runs one market through the three primary horizons, preserves independent candidates, and explicitly rejects Scalping in the primary scan.
+- Added multi-market orchestration so a configured asset list can be scanned independently without making BTC special.
+- Added focused contract tests for:
+  - one market → all three primary horizons;
+  - multiple markets → independent results;
+  - WAIT → no forced setup;
+  - simultaneous distinct horizon setups remain separate;
+  - Scalping isolation.
+- Commits:
+  - `2d0d4f458af49c5de6f0ab5a037134ee2fc2582d` — primary horizon timeframe contract
+  - `f648c03fbd3ddd863c9b73fab1e955216d462398` — FindSetup horizon tests
+  - `e759375266a221e99562387123258b47e4864d42` — data-requirement horizon tests
+  - `8a8e6e02d448ef70fded068ac3f9abf9a1836346` — primary market orchestrator
+  - `820f296389de7cac73501164d0d3965eb896ad1f` — orchestrator tests
+- Verification status: **focused tests not yet executed on the production VDS** after these changes.
+
+### Next exact action
+
+Run the focused horizon/orchestrator tests on the VDS. If green, run the full regression. Only after that continue with the configured market universe and the structured explainable TradeDescription contract.
+
