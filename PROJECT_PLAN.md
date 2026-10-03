@@ -524,3 +524,13 @@ Task 8 must build structural entry conditions from already-established causal ev
 
 ### Next exact action
 Audit the existing entry/setup/SL/TP implementation and tests before changing production logic. Define the Task 8 causal contract first, then add focused regression tests before implementation.
+
+
+### 2026-10-03 — TASK 8 STRUCTURAL ENTRY / SL / TP — FIRST CONTRACT FIX
+- Added focused regression coverage in `tests/test_structural_entry.py`.
+- Structural setup engine no longer rejects an otherwise geometrically valid setup solely because derived RR is below fixed 2.0.
+- RR remains derived geometry for later evaluation; it is not a setup-generation gate.
+- Execution timeframe `1m` remains excluded from Entry / Invalidation / Target price generation.
+- Production implementation commit: `85467a2dcb41818186a0deb00e00244cb220f072`.
+- Focused tests must be run on the server before marking this slice GREEN.
+- Next Task 8 slice: make invalidation explicitly structural/case-dependent rather than selecting the nearest arbitrary level.
