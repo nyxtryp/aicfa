@@ -235,6 +235,11 @@ def build_zone_reaction(
     # nearest occupied price buckets directly instead of walking thousands of
     # empty radius buckets on long histories.
     occupied_bucket_keys: list[int] = []
+    # Wide zones use a coarser logarithmic index; a global scan per candle
+    # becomes O(n) again when the wide-zone set grows.
+    wide_bucket_step = bucket_step * 65
+    wide_zone_buckets: dict[int, list[int]] = {}
+    wide_occupied_bucket_keys: list[int] = []
     wide_zones: list[int] = []
     # Reuse a marker array for per-candle candidate deduplication rather than
     # allocating and hashing a new Python set on every row.
@@ -265,6 +270,15 @@ def build_zone_reaction(
         last = _bucket(padded_hi)
         if last - first > MAX_BUCKET_SPAN:
             wide_zones.append(zone_id)
+            wide_first = int(np.floor(np.log(padded_lo) / wide_bucket_step))
+            wide_last = int(np.floor(np.log(padded_hi) / wide_bucket_step))
+            for bucket_id in range(wide_first, wide_last + 1):
+                bucket = wide_zone_buckets.get(bucket_id)
+                if bucket is None:
+                    wide_zone_buckets[bucket_id] = [zone_id]
+                    bisect.insort(wide_occupied_bucket_keys, bucket_id)
+                else:
+                    bucket.append(zone_id)
         else:
             for bucket_id in range(first, last + 1):
                 bucket = zone_buckets.get(bucket_id)
@@ -347,17 +361,32 @@ def build_zone_reaction(
                 if distance < best_distance:
                     best_zone, best_distance = zone_id, distance
 
-        # Wide zones are not represented in the bucket index, so they must
-        # remain part of the exact lookup.
-        for zone_id in wide_zones:
-            if zone_side[zone_id] != side:
-                continue
-            if zone_state[zone_id] in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
-                continue
-            level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
-            distance = abs(close - level)
-            if distance < best_distance:
-                best_zone, best_distance = zone_id, distance
+        # Wide zones use the coarser index instead of a global scan.
+        wide_bucket = int(np.floor(np.log(max(close, 1e-300)) / wide_bucket_step))
+        wide_pos = bisect.bisect_left(wide_occupied_bucket_keys, wide_bucket)
+        wide_bucket_ids = []
+        if wide_pos < len(wide_occupied_bucket_keys) and wide_occupied_bucket_keys[wide_pos] == wide_bucket:
+            wide_bucket_ids.append(wide_bucket)
+            wide_left = wide_pos - 1
+            wide_right = wide_pos + 1
+        else:
+            wide_left = wide_pos - 1
+            wide_right = wide_pos
+        if wide_left >= 0:
+            wide_bucket_ids.append(wide_occupied_bucket_keys[wide_left])
+        if wide_right < len(wide_occupied_bucket_keys):
+            wide_bucket_ids.append(wide_occupied_bucket_keys[wide_right])
+
+        for bucket_id in wide_bucket_ids:
+            for zone_id in wide_zone_buckets.get(bucket_id, ()):
+                if zone_side[zone_id] != side:
+                    continue
+                if zone_state[zone_id] in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
+                    continue
+                level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
+                distance = abs(close - level)
+                if distance < best_distance:
+                    best_zone, best_distance = zone_id, distance
 
         pos = bisect.bisect_left(occupied_bucket_keys, current_bucket)
         if pos < len(occupied_bucket_keys) and occupied_bucket_keys[pos] == current_bucket:
