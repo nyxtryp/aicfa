@@ -315,6 +315,10 @@ def build_zone_reaction(
         "liquidity_pool_created_high": _column_array(liquidity, "liquidity_pool_created_high", np.nan),
     }
 
+    def _remove_level(levels, zone_id: int):
+        # Kept as a no-op compatibility shim; sorted level indexes were removed.
+        return None
+
     def _active_level(close: float, side: int):
         # Use the existing spatial bucket index for nearest-active lookup.
         # This avoids O(n) insort/pop operations as the zone set grows.
