@@ -1,3 +1,17 @@
+## 2026-10-03 — TASK 6 third-pass zone index fix
+
+- Server validation of the previous `_active_level()` optimization: `tests/test_zone_reaction.py` = **5 passed in 0.53s**.
+- The higher-timeframe integration then completed, but regressed to **1 passed in 67.71s**.
+- Root cause found in the new lazy indexes: every newly created zone invalidated the already-built sorted bucket indexes. On a long history, `_active_level()` therefore rebuilt large historical bucket lists repeatedly, turning the optimization into a repeated sort/rebuild path.
+- Fixed `src/aicfa/zone_reaction.py` to maintain existing normal/wide candidate and midpoint indexes incrementally with `bisect.insort` when a new zone enters an already-indexed bucket, instead of invalidating and rebuilding the whole bucket.
+- Commit: `3214766ab725ab6dce890315299d7f2a11ddb590` — `perf: keep zone bucket indexes incrementally sorted`.
+- No lifecycle/causality rules were intentionally changed.
+- **Server validation pending.**
+
+### Next exact action
+
+Run `tests/test_zone_reaction.py`. If green, run the single higher-timeframe integration test again and compare against **67.71s**. Do not run the full suite until this regression is resolved.
+
 ## 2026-10-03 — TASK 6 active-level second-pass optimization (server test pending)
 
 - Latest server verification before this code change: `tests/test_zone_reaction.py` = **5 passed in 0.44s**.
