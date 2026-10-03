@@ -1,3 +1,31 @@
+## 2026-10-03 — TASK 6 third-pass zone index fix — VERIFIED
+
+- Server focused validation after commit `3214766ab725ab6dce890315299d7f2a11ddb590`: `tests/test_zone_reaction.py` = **5 passed in 0.48s**.
+- Server higher-timeframe integration after the same fix: `tests/test_features.py::test_feature_integration_exposes_required_higher_timeframes` = **1 passed in 13.75s**.
+- This materially improves the previous **67.71s** regression and the earlier **25.88s / 24.21s** measurements.
+- Root cause/fix is validated: incrementally maintaining already-built zone bucket indexes avoids repeated large index rebuilds as zones are created.
+- Full `tests/test_features.py` and full-suite regression have **not** yet been rerun after this optimization.
+- Task 6 remains open pending profiling and final regression acceptance.
+
+### Current project direction
+AICFA is being built as an independent, data-native crypto-analysis system. The SMC sequence is: Confirmed Swing → causal BOS/CHoCH/MSS → Liquidity Lifecycle → Order Block Lifecycle → FVG/Imbalance Lifecycle → Zone Reaction + Support/Resistance → Volume Evidence → Structural Entry/SL/TP → Conservative Backtest/Evaluation.
+
+End-user UX remains asset-only: user supplies an asset such as BTC; AICFA internally orchestrates relevant horizons/setup variants. Core logic must remain causal, avoid fabricated missing data/future leakage, and not depend on order-book input.
+
+### What remains
+1. Finish Task 6: profile the current **13.75s** integration path, target the actual bottleneck, then run focused + integration + full regression.
+2. Task 7 — Volume Evidence.
+3. Task 8 — Structural Entry / SL / TP.
+4. Task 9 — Conservative Backtest / Evaluation.
+5. Stabilize FindSetup so asset input is enough and AICFA internally selects necessary horizons/setup variants.
+6. Later: scanner/alerts and broader asset coverage; no live-trading dependency.
+
+### Exact next action
+Profile the complete 10,080-row `build_features()` path on the server. Do not make another blind Zone Reaction change. After profiling, optimize only the measured bottleneck, then run:
+- `tests/test_zone_reaction.py`
+- `tests/test_features.py::test_feature_integration_exposes_required_higher_timeframes`
+- full `pytest -q` only after the targeted change remains green.
+
 ## 2026-10-03 — TASK 6 third-pass zone index fix
 
 - Server validation of the previous `_active_level()` optimization: `tests/test_zone_reaction.py` = **5 passed in 0.53s**.
