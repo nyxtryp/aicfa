@@ -90,9 +90,9 @@ def test_waiting_horizon_does_not_force_a_signal(monkeypatch):
 
 def test_distinct_concurrent_horizon_setups_are_preserved(monkeypatch):
     def fake_find_setup(request, **kwargs):
-        candidate = SimpleNamespace(
-            direction="long" if request.mode is not TradingMode.POSITION else "short",
-            entry=request.mode.value,
+        candidate = _candidate(
+            "long" if request.mode is not TradingMode.POSITION else "short",
+            request.mode.value,
         )
         return _fake_result(request.asset, request.mode, candidate=candidate, decision="LONG")
 
