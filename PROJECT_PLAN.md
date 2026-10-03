@@ -662,3 +662,15 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_ev
 ```
 
 If GREEN, run the full `pytest -q` regression and record the exact result before adding the next Task 9 slice (batch statistics / leakage-aware evaluation).
+
+
+### 2026-10-03 — TASK 9 — FOCUSED EVALUATOR GREEN
+
+- Corrected the short-side evaluator test fixture in commit `0b45d90df64c687b3e338892326f78dc832665ff` — `test: correct short evaluation candle fixture`.
+- The production evaluator was not changed; the failing case was caused by the test fixture assigning high/low in the wrong order.
+- Server verification: `tests/test_evaluation.py` = **7 passed in 0.56s**.
+- Task 9 conservative evaluator contract is now focused-test GREEN.
+- No hit-rate, profitability, or performance claim is made.
+
+### Next exact action
+Run the full server regression and record the exact result. If GREEN, proceed to the next Task 9 slice: batch evaluation/statistics and leakage-aware evaluation using the existing causal label-end intervals. Do not introduce optimization or performance claims before that evaluation layer is covered.
