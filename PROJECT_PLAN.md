@@ -630,3 +630,35 @@ If GREEN, record the exact result, close Task 8, and move to **Task 9 — Conser
 
 ### Next exact action
 Begin **Task 9 — Conservative Backtest / Evaluation** strictly according to the existing plan. First inspect the Task 9 requirements and current backtest/evaluation implementation/tests before making production changes. Do not skip directly to optimization or trading-performance claims.
+
+
+## 2026-10-03 — TASK 9 — CONSERVATIVE EVALUATION CONTRACT IMPLEMENTED
+
+- Task 9 inspection confirmed there is no dedicated `backtest.py` or `evaluation.py` implementation yet; existing `labels.py` and `dataset.py` provide the causal future-outcome foundation and preserve `label_end_timestamp_<horizon>` for leakage-aware validation.
+- Historical label work was inspected through commits `ac51fdeeb0365bfef78f44c7cf3ee192147c392a` and `a864d7e356ff1b2fd9292413f45e44c47a01f3dc`; no existing purged evaluator/backtest implementation was found.
+- Added `src/aicfa/evaluation.py` in commit `5ee92174ae1eebf99cfe929912825c35054e10f7` — `feat: add conservative causal setup evaluator`.
+- Added focused Task 9 contract coverage in `tests/test_evaluation.py`; latest test-file commit is `16bbdbe051f43254cdda5979343092934f182996`.
+- Evaluator contract:
+  - consumes already-established Entry/SL/TP; it does not invent levels;
+  - evaluates only candles strictly after the setup timestamp;
+  - LONG/SHORT are symmetric;
+  - first barrier hit wins;
+  - same-candle TP + SL is `AMBIGUOUS`, never guessed;
+  - explicit `TIMEOUT` when the horizon expires;
+  - invalid Entry/SL/TP geometry is rejected;
+  - no future rows before setup are eligible;
+  - gross return is reported only for resolved TP/SL outcomes.
+- This is the first Task 9 implementation slice only. No performance, hit-rate, or profitability claim is made.
+- **Server verification pending**: run `tests/test_evaluation.py` first, then the full regression if focused tests are GREEN.
+
+### Next exact action
+
+Run:
+```bash
+sudo -u fd-aicfa bash -lc '
+cd "$(readlink -f /srv/frostdeploy/aicfa/current)" &&
+PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_evaluation.py
+'
+```
+
+If GREEN, run the full `pytest -q` regression and record the exact result before adding the next Task 9 slice (batch statistics / leakage-aware evaluation).
