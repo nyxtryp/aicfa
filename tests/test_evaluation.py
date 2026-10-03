@@ -5,6 +5,7 @@ import pytest
 
 from aicfa.evaluation import (
     EvaluationOutcome,
+    analyze_rr_outcomes,
     build_chronological_folds,
     evaluate_setup,
     evaluate_setups,
@@ -219,3 +220,91 @@ def test_chronological_folds_reject_invalid_window_sizes() -> None:
         build_chronological_folds(frame, validation_size=1, n_splits=0)
     with pytest.raises(ValueError, match="rows"):
         build_chronological_folds(frame, validation_size=3, n_splits=2)
+
+
+def test_rr_analysis_derives_rr_from_structural_prices() -> None:
+    setups = [
+        {
+            "setup_timestamp": "2026-01-01T00:00:00Z",
+            "direction": "long",
+            "entry_price": 100,
+            "stop_price": 95,
+            "target_price": 110,
+        },
+        {
+            "setup_timestamp": "2026-01-01T00:01:00Z",
+            "direction": "short",
+            "entry_price": 100,
+            "stop_price": 105,
+            "target_price": 90,
+        },
+    ]
+    evaluation = evaluate_setups(
+        candles([
+            (100, 101, 99),
+            (100, 111, 99),
+            (100, 101, 89),
+        ]),
+        setups,
+    )
+
+    analysis = analyze_rr_outcomes(setups, evaluation)
+    assert [row.rr for row in analysis.observations] == [2.0, 2.0]
+    assert [row.outcome for row in analysis.observations] == [
+        EvaluationOutcome.TP, EvaluationOutcome.TP
+    ]
+    assert analysis.resolved_count == 2
+    assert analysis.tp_count == 2
+    assert analysis.mean_rr == 2.0
+
+
+def test_rr_analysis_keeps_unresolved_outcomes_visible() -> None:
+    setups = [
+        {
+            "setup_timestamp": "2026-01-01T00:00:00Z",
+            "direction": "long",
+            "entry_price": 100,
+            "stop_price": 95,
+            "target_price": 105,
+        },
+        {
+            "setup_timestamp": "2026-01-01T00:01:00Z",
+            "direction": "long",
+            "entry_price": 100,
+            "stop_price": 95,
+            "target_price": 110,
+        },
+    ]
+    evaluation = evaluate_setups(
+        candles([
+            (100, 101, 99),
+            (100, 106, 99),
+            (100, 103, 97),
+        ]),
+        setups,
+        max_horizon=1,
+    )
+
+    analysis = analyze_rr_outcomes(setups, evaluation)
+    assert [row.outcome for row in analysis.observations] == [
+        EvaluationOutcome.TP, EvaluationOutcome.TIMEOUT
+    ]
+    assert analysis.resolved_count == 1
+    assert analysis.tp_count == 1
+    assert analysis.mean_rr == 1.0
+
+
+def test_rr_analysis_rejects_mismatched_setup_and_evaluation_counts() -> None:
+    setups = [{
+        "setup_timestamp": "2026-01-01T00:00:00Z",
+        "direction": "long",
+        "entry_price": 100,
+        "stop_price": 95,
+        "target_price": 105,
+    }]
+    evaluation = evaluate_setups(
+        candles([(100, 101, 99), (100, 106, 99)]),
+        [],
+    )
+    with pytest.raises(ValueError, match="same number"):
+        analyze_rr_outcomes(setups, evaluation)
