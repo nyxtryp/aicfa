@@ -530,3 +530,19 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 4. Measure a real 20-market batch on the VDS without truncating data or imposing a hard 60-second data deadline.
 5. Validate a full 199-market rotation and its effective revisit interval.
 6. Then implement/verify full multi-source data aggregation and durable setup-state persistence.
+
+
+### 2026-10-04 — MARKET UNIVERSE CLEANUP AFTER FULL RESOLUTION TEST
+
+- Full VDS resolution test of the previous **199-market** production universe completed in **549 seconds (9m 09s)**.
+- At the user's request, removed these six markets from the production universe: **INJ/USDT, XMR/USDT, EOS/USDT, AEVO/USDT, YGG/USDT, PRIME/USDT**.
+- Production `config/market_universe.json` now contains **193 markets**.
+- No other market was removed or replaced.
+- This is a universe/configuration change only; setup logic, provider routing and market-data collection contracts are unchanged.
+
+### Next exact action
+
+1. Deploy the updated 193-market universe to the VDS.
+2. Re-run the full resolution test for all 193 markets.
+3. Compare total runtime and identify remaining slow/fallback markets.
+4. Then measure actual MTF data acquisition for a 20-market slot without truncation or a hard data deadline.
