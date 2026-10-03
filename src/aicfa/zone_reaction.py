@@ -221,8 +221,19 @@ def build_zone_reaction(
     # Zone ranges are registered into every bucket they can touch.  Very wide
     # zones are kept separately so the index never sacrifices correctness.
     bucket_step = np.log1p(reaction_threshold_pct)
+    # Candle bucket bounds are independent of zone state; calculate them once
+    # with NumPy instead of performing two scalar logarithms per candle.
+    candle_first_buckets = np.floor(
+        np.log(np.maximum(lows, 1e-300)) / bucket_step
+    ).astype(np.int64)
+    candle_last_buckets = np.floor(
+        np.log(np.maximum(highs, 1e-300)) / bucket_step
+    ).astype(np.int64)
     zone_buckets: dict[int, list[int]] = {}
     wide_zones: list[int] = []
+    # Reuse a marker array for per-candle candidate deduplication rather than
+    # allocating and hashing a new Python set on every row.
+    candidate_marks = np.zeros(max_zones, dtype=np.int32)
     MAX_BUCKET_SPAN = 64
 
     # Sorted active level indexes provide exact nearest support/resistance
@@ -398,18 +409,29 @@ def build_zone_reaction(
 
         # Query only price buckets intersecting the current candle. This is the
         # critical path optimization: unrelated historical zones are skipped.
-        first_bucket = _bucket(max(l, 1e-300))
-        last_bucket = _bucket(max(h, 1e-300))
-        candidate_ids = set(wide_zones)
+        first_bucket = int(candle_first_buckets[i])
+        last_bucket = int(candle_last_buckets[i])
+        stamp = i + 1
+        candidate_ids = []
+        for zone_id in wide_zones:
+            if candidate_marks[zone_id] != stamp:
+                candidate_marks[zone_id] = stamp
+                candidate_ids.append(zone_id)
         for bucket_id in range(first_bucket, last_bucket + 1):
-            candidate_ids.update(zone_buckets.get(bucket_id, ()))
+            for zone_id in zone_buckets.get(bucket_id, ()):
+                if candidate_marks[zone_id] != stamp:
+                    candidate_marks[zone_id] = stamp
+                    candidate_ids.append(zone_id)
         if candidate_ids:
-            idx = np.fromiter(candidate_ids, dtype=np.intp)
-            idx = idx[
-                (zone_created[idx] < i)
-                & (zone_state[idx] != STATE_CODE[ZONE_BROKEN])
-                & (zone_state[idx] != STATE_CODE[ZONE_CANCELLED])
-            ]
+            idx = np.asarray(
+                [
+                    zone_id for zone_id in candidate_ids
+                    if zone_created[zone_id] < i
+                    and zone_state[zone_id] != STATE_CODE[ZONE_BROKEN]
+                    and zone_state[zone_id] != STATE_CODE[ZONE_CANCELLED]
+                ],
+                dtype=np.intp,
+            )
         else:
             idx = np.empty(0, dtype=np.intp)
 
