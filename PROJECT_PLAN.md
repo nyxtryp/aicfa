@@ -165,3 +165,41 @@ Run the full regression after directional outcome statistics, then continue Task
 - Planned build direction is now explicit: **analyze the existing code → extend the existing architecture → build the autonomous multi-market scanner → expose explainable setups on the website**.
 - No implementation should begin by creating a parallel generic signal/indicator scanner.
 - Next implementation step remains the complete repository audit of src/aicfa and tests, followed by the smallest architectural extension needed for autonomous multi-market discovery.
+
+### 2026-10-03 — COMPLETE REPOSITORY AUDIT: AUTONOMOUS THREE-HORIZON SCANNER GAP ANALYSIS
+
+- Audited the repository tree and the existing `src/aicfa` analytical/scanner/orchestration modules plus the corresponding tests, with the current main branch at plan commit `9f083fd4c59689905cd4c091382bbe1bbeb43f9f`.
+- Existing analytical core is substantial and should be reused:
+  - causal structure / HH-HL-LH-LL / BOS / CHoCH / MSS;
+  - liquidity pools, sweeps and lifecycle;
+  - FVG and Order Block lifecycle;
+  - zone reaction;
+  - displacement;
+  - volume evidence;
+  - MTF causal mapping;
+  - market evidence / scenario reasoning;
+  - structural Entry / invalidation / target geometry;
+  - RR derivation;
+  - conservative historical evaluation, chronological purged folds, outcome journal and directional/fold statistics.
+- `find_setup.py` is currently the main end-to-end request-driven orchestration path for **one asset and one TradingMode at a time**. It resolves one symbol, fetches that mode's timeframes, builds evidence/scenarios/setup/decision and returns one `FindSetupResult`.
+- `market_scanner.py` already contains `CentralMarketScanner`, but it is only a provider-independent polling foundation over an explicitly supplied `list[MarketKey]`; it fetches/builds features per market/timeframe. It does **not** yet run the complete setup-analysis/decision pipeline, iterate the three horizons, aggregate setup candidates, or emit explainable trade objects.
+- There is currently **no completed top-level autonomous orchestrator** equivalent to: configured coin universe → one market → Intraday + Swing + Position → shared Setup Engine → all current valid setups → unified multi-market result.
+- There is currently **no persistent/user-facing coin-universe configuration layer**. The existing scanner accepts a universe in memory; the required product behavior needs a durable configurable list of monitored markets without hardcoding BTC.
+- There is currently **no autonomous continuous scheduling/lifecycle loop** around setup discovery. `scan_once()` is a primitive we can extend rather than duplicate.
+- `setup_analysis.py` supports MTF setup analysis for a single `TradingMode` and already deduplicates identical actionable geometry inside one assessment. It does not yet aggregate/deduplicate across Intraday/Swing/Position or across multiple symbols.
+- `setup_lifecycle.py` currently keys active state by only `(symbol, market_type)`. That is insufficient for the new product contract because a symbol may legitimately have independent Intraday, Swing and Position setups simultaneously. Lifecycle identity must eventually include the horizon/setup identity and preserve multiple active setups per market where geometry is distinct.
+- The current `TradingMode` code still contains **SCALPING** as a production mode, while the new primary product contract is three horizons. More importantly, current profiles are not yet the exact desired product boundaries: Intraday is `1d/4h/1h/15m`, and Position includes `1M/1w/1d/4h`. These must be reconciled with the fixed primary contract (Intraday 5m–1h context, Swing 1h–1d, Position 4h–1w) before autonomous orchestration is built. This is an architectural contract change, not a reason to duplicate the engine.
+- The existing market-data layer is suitable as a base for multi-market work: normalized OHLCV, completed-candle filtering, fallback providers, shared short-lived snapshots, symbol resolution, and optional trades/order-book/derivatives collection are already present. The knowledge-driven requirements layer can request auxiliary data without making every scan pay that cost.
+- The existing evidence/decision chain correctly preserves WAIT/NO TRADE and does not manufacture direction from concept names. This should remain the gate for autonomous emission.
+- Explainability is partially present in `SetupCandidate` / `DecisionCandidate` through supporting concepts, entry conditions, invalidation, targets and rationale. However, there is not yet a dedicated immutable **display/trade-description contract** combining market, horizon, direction, numeric Entry/SL/TP1/TP2, RR, evidence, invalidation, timestamp/freshness and lifecycle status. The website should consume such a structured object rather than generate reasons independently.
+- Numeric setup geometry is currently represented as `entry_zone`, `invalidation_level` and `target_levels`, not as a finalized scalar Entry/SL/TP display contract. The conversion to a website-ready trade description must preserve the underlying zone geometry and must not invent prices.
+- Historical evaluation is already causal and separate from live setup generation. The missing piece is integration of emitted live setup records with persistent historical outcome records after lifecycle completion.
+- Test coverage includes dedicated tests for market scanning, FindSetup, MTF setup engine, setup detection/lifecycle, structural entry, market data routing, data requirements, multi-timeframe structure, decision gating and evaluation. The latest user-run full regression is **428 passed, 0 failed, 0 skipped in 82.05s**.
+- Audit conclusion: **do not create a new generic scanner or replace the existing Setup Engine**. Extend the existing `CentralMarketScanner` + `find_setup`/MTF setup pipeline with a new top-level multi-market/multi-horizon orchestration layer, then add the coin universe, setup identity/lifecycle, explainable trade-description contract, and website feed.
+
+### Next exact action after audit
+
+1. Reconcile the code-level TradingMode/timeframe contract to the fixed three primary horizons while keeping Scalping isolated for later.
+2. Define the minimal multi-horizon orchestration contract around the existing `find_setup`/Setup Engine; do not implement the website yet.
+3. Add tests for: one market → three horizons, multiple markets → independent results, no forced signal, and preservation of distinct concurrent setups.
+
