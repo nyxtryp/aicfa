@@ -42,7 +42,7 @@ def _result(asset, mode):
         symbol=asset,
         mode=mode,
         request=SimpleNamespace(market_type="spot"),
-        analysis={"timestamp": 1_000},
+        analysis=pd.DataFrame({"timestamp": [1_000]}),
         frames={execution: pd.DataFrame({"close": [101.0]})},
         decision="LONG",
         setup_assessment=SimpleNamespace(
@@ -98,7 +98,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
             symbol=request.asset,
             mode=request.mode,
             request=SimpleNamespace(market_type="spot"),
-            analysis={"timestamp": 1_000 + calls["count"]},
+            analysis=pd.DataFrame({"timestamp": [1_000 + calls["count"]]}),
             frames={
                 {TradingMode.INTRADAY: "5m", TradingMode.SWING: "1h", TradingMode.POSITION: "4h"}[request.mode]:
                 pd.DataFrame({"close": [101.0]})
