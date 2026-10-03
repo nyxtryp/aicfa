@@ -706,3 +706,18 @@ Proceed with the next Task 9 slice: **batch evaluation/statistics and leakage-aw
 
 ### Next exact action
 Run `tests/test_evaluation.py` on the server. If GREEN, inspect the exact result and then run the full regression. Only after both pass, continue Task 9 with broader chronological fold construction / leakage-aware validation if required by the existing plan.
+
+
+## 2026-10-03 — TASK 9 — BATCH EVALUATION / PURGE FOCUSED GREEN
+
+- Server verification: `tests/test_evaluation.py` = **11 passed in 0.46s**.
+- This validates the original conservative evaluator plus the new batch evaluation/statistics and causal label-purging contracts.
+- Batch evaluation preserves individual outcomes and transparent TP/SL/TIMEOUT/AMBIGUOUS counts; ambiguous outcomes are excluded from resolved statistics.
+- Purging requires a causal label-end interval and keeps a training row only when its label end is **strictly before** validation start; intervals ending exactly at validation start are purged.
+- Production commit: `02786f1beb939bce3963c0a2b9ac2c4f3151201f` — `feat: add batch evaluation and label purging`.
+- Test commit: `431e7930cc1374c112cf42f88a74a35fde3d66fe` — `test: define batch evaluation and purge contracts`.
+- No setup generation, confidence score, profitability claim, or future-looking evaluation was introduced.
+- **Focused Task 9 batch/purge slice: GREEN.**
+
+### Next exact action
+Run the full server regression and record the exact pass/fail count and runtime. If GREEN, update this plan and continue Task 9 with the next leakage-aware chronological validation/fold slice required by the existing plan.
