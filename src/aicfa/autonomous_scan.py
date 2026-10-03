@@ -23,7 +23,7 @@ from .setup_lifecycle import ActiveSetup, SetupLifecycle
 
 MAIN_SCAN_INTERVAL_SECONDS = 300
 BATCH_SCAN_INTERVAL_SECONDS = 60
-DEFAULT_MARKETS_PER_BATCH = 40
+DEFAULT_MARKETS_PER_BATCH = 20
 
 
 @dataclass(frozen=True)
@@ -155,9 +155,10 @@ class AutonomousScanEngine:
     ) -> None:
         """Scan the configured universe in rotating batches without overlap.
 
-        With 200 markets and batch_size=40 this produces five batches, so each
-        market is revisited once per five-minute rotation while only 40 markets
-        are processed in a minute-sized slot.
+        With 200 markets and batch_size=20 this produces ten batches, so each
+        market is revisited once per ten-minute rotation while only 20 markets
+        are assigned to each minute-sized slot. The final batch may be smaller
+        when the configured universe is not divisible by the batch size.
         """
         if interval_seconds <= 0:
             raise ValueError("interval_seconds must be greater than zero")
