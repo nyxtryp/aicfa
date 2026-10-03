@@ -315,10 +315,6 @@ def build_zone_reaction(
         "liquidity_pool_created_high": _column_array(liquidity, "liquidity_pool_created_high", np.nan),
     }
 
-    def _remove_level(levels, zone_id: int):
-        # Kept as a no-op compatibility shim; sorted level indexes were removed.
-        return None
-
     def _active_level(close: float, side: int):
         # Use the existing spatial bucket index for nearest-active lookup.
         # This avoids O(n) insort/pop operations as the zone set grows.
@@ -415,7 +411,6 @@ def build_zone_reaction(
             if zone_state[zone_id] == STATE_CODE[ZONE_RETESTED] and close < zone_low[zone_id] * (1.0 + break_threshold_pct):
                 zone_state[zone_id] = STATE_CODE[ZONE_BROKEN]
                 break_support.append(zone_id)
-                _remove_level(support_levels, zone_id)
 
         break_resistance = []
         while resistance_break_heap and resistance_break_heap[0][0] * (1.0 + break_threshold_pct) < close:
@@ -423,7 +418,6 @@ def build_zone_reaction(
             if zone_state[zone_id] == STATE_CODE[ZONE_RETESTED] and close > zone_high[zone_id] * (1.0 + break_threshold_pct):
                 zone_state[zone_id] = STATE_CODE[ZONE_BROKEN]
                 break_resistance.append(zone_id)
-                _remove_level(resistance_levels, zone_id)
 
         # Query only price buckets intersecting the current candle. This is the
         # critical path optimization: unrelated historical zones are skipped.
