@@ -475,10 +475,21 @@ def build_zone_reaction(
         last_bucket = int(candle_last_buckets[i])
         stamp = i + 1
         candidate_ids = []
-        for zone_id in wide_zones:
-            if candidate_marks[zone_id] != stamp:
-                candidate_marks[zone_id] = stamp
-                candidate_ids.append(zone_id)
+        # Wide zones are indexed by coarse logarithmic buckets as well.
+        # Never fall back to scanning the full historical wide-zone list on
+        # every candle; doing so recreates O(n * wide_zones) work.
+        wide_first_bucket = int(np.floor(np.log(max(lows[i], 1e-300)) / wide_bucket_step))
+        wide_last_bucket = int(np.floor(np.log(max(highs[i], 1e-300)) / wide_bucket_step))
+        wide_pos = bisect.bisect_left(wide_occupied_bucket_keys, wide_first_bucket)
+        while wide_pos < len(wide_occupied_bucket_keys):
+            wide_bucket_id = wide_occupied_bucket_keys[wide_pos]
+            if wide_bucket_id > wide_last_bucket:
+                break
+            for zone_id in wide_zone_buckets.get(wide_bucket_id, ()):
+                if candidate_marks[zone_id] != stamp:
+                    candidate_marks[zone_id] = stamp
+                    candidate_ids.append(zone_id)
+            wide_pos += 1
         for bucket_id in range(first_bucket, last_bucket + 1):
             for zone_id in zone_buckets.get(bucket_id, ()):
                 if candidate_marks[zone_id] != stamp:
