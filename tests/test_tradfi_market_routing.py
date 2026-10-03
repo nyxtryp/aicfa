@@ -17,7 +17,8 @@ class _Provider:
 
     def fetch_ohlcv(self, **kwargs):
         assert kwargs["symbol"] == self.fetched
-        return [{"ok": True}]
+        import pandas as pd
+        return pd.DataFrame({"close": [1.0]})
 
 
 def test_verified_venue_mapping_selects_native_symbol_before_generic_resolution() -> None:
@@ -39,7 +40,7 @@ def test_verified_venue_mapping_selects_native_symbol_before_generic_resolution(
         since_ms=None,
         limit=10,
     )
-    assert result == [{"ok": True}]
+    assert float(result.iloc[-1]["close"]) == 1.0
 
 
 def test_production_universe_keeps_193_crypto_and_adds_44_verified_tradfi() -> None:
