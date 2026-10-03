@@ -38,6 +38,20 @@ class BatchEvaluation:
     mean_gross_return: float | None
 
 
+@dataclass(frozen=True)
+class RRObservation:
+    rr: float
+    outcome: EvaluationOutcome
+
+
+@dataclass(frozen=True)
+class RRAnalysis:
+    observations: tuple[RRObservation, ...]
+    resolved_count: int
+    tp_count: int
+    mean_rr: float | None
+
+
 def _validate_geometry(direction: str, entry_price: float, stop_price: float, target_price: float) -> None:
     if direction not in {"long", "short"}:
         raise ValueError("direction must be 'long' or 'short'")
@@ -47,6 +61,13 @@ def _validate_geometry(direction: str, entry_price: float, stop_price: float, ta
     else:
         if not target_price < entry_price < stop_price:
             raise ValueError("short entry geometry requires target < entry < stop")
+
+
+def _risk_reward(direction: str, entry_price: float, stop_price: float, target_price: float) -> float:
+    _validate_geometry(direction, entry_price, stop_price, target_price)
+    if direction == "long":
+        return (target_price - entry_price) / (entry_price - stop_price)
+    return (entry_price - target_price) / (stop_price - entry_price)
 
 
 def evaluate_setup(
@@ -150,6 +171,42 @@ def evaluate_setups(
     )
 
 
+def analyze_rr_outcomes(
+    setups: Sequence[Mapping[str, object]],
+    evaluation: BatchEvaluation,
+) -> RRAnalysis:
+    """Relate derived structural RR to already-observed causal outcomes."""
+    if len(setups) != len(evaluation.results):
+        raise ValueError("setups and evaluation must contain the same number of results")
+
+    observations: list[RRObservation] = []
+    for setup, result in zip(setups, evaluation.results):
+        rr = _risk_reward(
+            str(setup["direction"]),
+            float(setup["entry_price"]),
+            float(setup["stop_price"]),
+            float(setup["target_price"]),
+        )
+        observations.append(RRObservation(rr=rr, outcome=result.outcome))
+
+    resolved = [
+        observation for observation in observations
+        if observation.outcome in {EvaluationOutcome.TP, EvaluationOutcome.SL}
+    ]
+    return RRAnalysis(
+        observations=tuple(observations),
+        resolved_count=len(resolved),
+        tp_count=sum(
+            observation.outcome is EvaluationOutcome.TP
+            for observation in resolved
+        ),
+        mean_rr=(
+            sum(observation.rr for observation in resolved) / len(resolved)
+            if resolved else None
+        ),
+    )
+
+
 def purge_training_labels(
     dataset: pd.DataFrame,
     *,
@@ -182,12 +239,7 @@ def build_chronological_folds(
     n_splits: int,
     label_end_column: str = "label_end_timestamp_5",
 ) -> tuple[tuple[pd.DataFrame, pd.DataFrame], ...]:
-    """Build expanding chronological validation folds with causal purging.
-
-    Validation windows are consecutive blocks at the end of the dataset.
-    Each fold trains only on rows before its validation start, then purges
-    training labels whose causal interval reaches that validation start.
-    """
+    """Build expanding chronological validation folds with causal purging."""
     if validation_size <= 0:
         raise ValueError("validation_size must be positive")
     if n_splits <= 0:
