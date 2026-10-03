@@ -113,3 +113,24 @@ def test_universe_rejects_duplicate_native_venues():
             category="stock",
             venue_symbols=(("bybit", "AAPLUSDT"), ("BYBIT", "AAPLUSDT")),
         )
+
+
+def test_approved_tradfi_target_file_contains_55_unique_targets():
+    from pathlib import Path
+    payload = json.loads(
+        (Path(__file__).parents[1] / "config" / "tradfi_targets.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    targets = payload["targets"]
+
+    assert len(targets) == 55
+    assert len({item["asset"] for item in targets}) == 55
+    assert sum(item["category"] == "metal" for item in targets) == 5
+    assert sum(item["category"] == "energy" for item in targets) == 3
+    assert sum(item["category"] == "fx" for item in targets) == 7
+    assert sum(item["category"] == "index" for item in targets) == 10
+    assert sum(item["category"] == "etf" for item in targets) == 4
+    assert sum(item["category"] == "stock" for item in targets) == 26
+    assert "SPX/USDT" in {item["asset"] for item in targets}
+    assert "SNDK/USDT" in {item["asset"] for item in targets}
