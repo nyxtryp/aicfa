@@ -534,3 +534,34 @@ Audit the existing entry/setup/SL/TP implementation and tests before changing pr
 - Production implementation commit: `85467a2dcb41818186a0deb00e00244cb220f072`.
 - Focused tests must be run on the server before marking this slice GREEN.
 - Next Task 8 slice: make invalidation explicitly structural/case-dependent rather than selecting the nearest arbitrary level.
+
+
+## 2026-10-03 — TASK 8 STRUCTURAL ENTRY / SL — SERVER GREEN
+
+- Structural SL production commit: `d34c6fc9b8484329135bfc558214aa63ab13df29`.
+- Structural SL contract verified with MTF: `tests/test_setup_engine_mtf.py` + `tests/test_structural_entry.py` = **14 passed in 0.63s**.
+- Structural Entry focused-contract tests commit: `a2dc525180e36a521219c63dfd518844b7851477`.
+- Structural Entry production commit: `44b2f5ea3cd7eefad0dee74ca668ea7327ee2e3c`.
+- Entry + MTF contract verified: **15 passed in 0.64s**.
+- Full regression after Entry + SL: **396 passed in 82.20s (1:22)**.
+- Entry now requires causal zone reaction/confirmation; BOS/CHoCH, displacement, sweep rejection and structural context are used as confirmation evidence. Volume Evidence can confirm but cannot manufacture an Entry level.
+- 1m remains excluded from structural Entry, Invalidation and Target generation.
+- Structural SL uses structural invalidation only: Continuation prefers previous swing then sweep; Reversal / Breakout Failure prefer sweep then previous swing. Active liquidity is treated as a draw/target, not an automatic SL.
+- If no valid structural invalidation exists beyond Entry, no fabricated SL is emitted.
+
+### Current Task 8 status
+Structural Entry: **GREEN**.
+Structural SL: **GREEN**.
+Full regression: **GREEN — 396/396**.
+Task 8 remains **ACTIVE** because the Target/TP contract is not yet finalized and regression-verified as the final Task 8 slice.
+
+### Next exact action
+Define focused tests for the **causal Target/TP contract** before changing production code:
+1. target must be a real causal objective beyond Entry;
+2. active liquidity may be a target/draw, never an automatic invalidation;
+3. target hierarchy must not import fixed RR or arbitrary percentages;
+4. 1m cannot create a structural target;
+5. multiple distinct targets must remain causally ordered;
+6. if no valid structural/liquidity objective exists, no fabricated TP is emitted;
+7. no future-looking target data may leak into the current setup.
+Run focused tests first, then implement only the missing production behavior, then run focused + MTF + full regression.
