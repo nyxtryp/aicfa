@@ -345,3 +345,18 @@ Deploy the latest commits to the VDS. Run the lifecycle + orchestrator focused t
 - Fixed orchestrator lifecycle test fixtures to expose the required assessment decision and imported `SetupLevel`.
 - Regression failures were test/API compatibility issues; no one-setup-per-market restriction was restored.
 - Fix commits: `b7ba368ef696fd6b136ffa9a4f0a5b98c53c957c`, `32d8cf93c1e4a0762260582a4497f7b236202d78`.
+### 2026-10-03 — AUTONOMOUS RECURRING SCAN/STATE ENGINE ADDED
+
+- Added `src/aicfa/autonomous_scan.py` with `AutonomousScanEngine` and `AutonomousScanState`.
+- The engine owns one long-lived `SetupLifecycle` and reuses it across scans, so repeated identical setup geometry keeps the same lifecycle while independent geometries remain separate.
+- Each scan runs only against the configured `MarketUniverse`; the monitored market list is not hardcoded to BTC and supports the user's configurable asset/market list.
+- The primary autonomous loop remains strictly **Intraday + Swing + Position**. Scalping is not included.
+- `scan_once()` provides deterministic single-cycle execution for testing and service integration.
+- `run_forever()` provides the recurring loop with configurable interval, stop predicate, and callback; it adds no new signal logic or setup-count limit.
+- Current state is intentionally in-process. Durable persistence of active setup records across process/server restarts remains the next state-storage layer.
+- Added regression coverage for repeated scans, independent lifecycle identities, configured multi-market scanning, and stoppable recurring execution.
+- User server baseline before this step: **451 passed, 0 failed, 0 skipped**.
+
+### Next exact action
+
+Deploy the autonomous scan/state engine and run its focused tests. If green, run the full regression. Then add durable setup-state records so active setups survive process restarts without changing setup identity or lifecycle semantics. Keep the monitored coin list configurable and do not hardcode a fixed asset set.
