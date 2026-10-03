@@ -79,6 +79,9 @@ def build_multi_timeframe_structure(
             left=structure_left,
             right=structure_right,
             equal_tolerance=equal_tolerance,
+            include_internal=False,
+            include_protected=False,
+            include_timestamps=False,
         )
         state_columns = [
             "structure_direction", "swing_high", "swing_low", "hh", "hl", "lh", "ll",
