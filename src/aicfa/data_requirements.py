@@ -117,10 +117,28 @@ class DataRequirementPlan:
 
 
 _MODE_PROFILES = {
-    TradingMode.SCALPING: ModeTimeframeProfile(TradingMode.SCALPING, ("15m", "5m", "1m"), (("15m", TimeframeRole.BROADER_CONTEXT), ("5m", TimeframeRole.HIGHER_STRUCTURE), ("1m", TimeframeRole.EXECUTION))),
-    TradingMode.INTRADAY: ModeTimeframeProfile(TradingMode.INTRADAY, ("1d", "4h", "1h", "15m"), (("1d", TimeframeRole.BROADER_CONTEXT), ("4h", TimeframeRole.HIGHER_STRUCTURE), ("1h", TimeframeRole.LOWER_CONFIRMATION), ("15m", TimeframeRole.EXECUTION))),
-    TradingMode.SWING: ModeTimeframeProfile(TradingMode.SWING, ("1w", "1d", "4h", "1h"), (("1w", TimeframeRole.BROADER_CONTEXT), ("1d", TimeframeRole.HIGHER_STRUCTURE), ("4h", TimeframeRole.LOWER_CONFIRMATION), ("1h", TimeframeRole.EXECUTION))),
-    TradingMode.POSITION: ModeTimeframeProfile(TradingMode.POSITION, ("1M", "1w", "1d", "4h"), (("1M", TimeframeRole.BROADER_CONTEXT), ("1w", TimeframeRole.HIGHER_STRUCTURE), ("1d", TimeframeRole.LOWER_CONFIRMATION), ("4h", TimeframeRole.EXECUTION))),
+    # Primary AICFA horizons. Scalping remains available as an isolated mode
+    # for the later dedicated fast/scalping product surface.
+    TradingMode.SCALPING: ModeTimeframeProfile(
+        TradingMode.SCALPING,
+        ("15m", "5m", "1m"),
+        (("15m", TimeframeRole.BROADER_CONTEXT), ("5m", TimeframeRole.HIGHER_STRUCTURE), ("1m", TimeframeRole.EXECUTION)),
+    ),
+    TradingMode.INTRADAY: ModeTimeframeProfile(
+        TradingMode.INTRADAY,
+        ("4h", "1h", "15m", "5m"),
+        (("4h", TimeframeRole.BROADER_CONTEXT), ("1h", TimeframeRole.HIGHER_STRUCTURE), ("15m", TimeframeRole.LOWER_CONFIRMATION), ("5m", TimeframeRole.EXECUTION)),
+    ),
+    TradingMode.SWING: ModeTimeframeProfile(
+        TradingMode.SWING,
+        ("1d", "4h", "1h"),
+        (("1d", TimeframeRole.BROADER_CONTEXT), ("4h", TimeframeRole.HIGHER_STRUCTURE), ("1h", TimeframeRole.EXECUTION)),
+    ),
+    TradingMode.POSITION: ModeTimeframeProfile(
+        TradingMode.POSITION,
+        ("1w", "1d", "4h"),
+        (("1w", TimeframeRole.BROADER_CONTEXT), ("1d", TimeframeRole.HIGHER_STRUCTURE), ("4h", TimeframeRole.EXECUTION)),
+    ),
 }
 
 
