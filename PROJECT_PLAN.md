@@ -478,3 +478,25 @@ Profile the complete 10,080-row `build_features()` path to identify the remainin
 - **Diagnostic basis:** full `build_zone_reaction` on 10,080 rows previously showed the hot stack at candidate collection (`zone_reaction.py:491`), not the active-level lookup.
 - **Validation:** pending on deployed release.
 - **Next:** run focused zone-reaction test, then the higher-timeframe feature integration test; if both pass, measure the 10,080-row full zone-reaction runtime once.
+
+## Continuity checkpoint — 2026-10-03 — TASK 7 VOLUME EVIDENCE INTEGRATION GREEN
+
+### Verification
+- Production Volume Evidence layer: `89aa9bc23eace629cb842d4bd9772c88d919cca4`.
+- Volume Evidence contract + integration tests: `cd7a3892dc4510906e3ff75de830aba6c7f71941`.
+- Unified SMC propagation: `75d3640b44f35704c332fe8a095adec78ff37d74`.
+- Features integration: `c7b21aa6605db4a6659ba538c4e6bcbfc4cb0f26`.
+- Follow-up fix for optional structure event columns: `04f50ed231b73e8a8d72e2c4194b44ddde945121`.
+- Server focused Volume Evidence regression: **9 passed in 1.29s**.
+- The 9 tests cover causal observations, prior-only baseline, expansion/dry-up, event attachment, displacement, no future rewrite, invalid volume, unified SMC propagation and features exposure.
+- No directional volume score or BUY/SELL verdict was introduced.
+
+### Current status
+- Task 7 focused contract + integration: **GREEN**.
+- Full regression after Task 7 integration: **pending**.
+- Task 8 Structural Entry / SL / TP must not start until the Task 7 changes survive the relevant feature/unified tests and full regression.
+
+### Next exact action
+Run the feature regression:
+`tests/test_features.py`.
+After that, run the full suite and record the actual result here before closing Task 7.
