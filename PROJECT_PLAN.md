@@ -1,3 +1,15 @@
+## 2026-10-03 — TASK 6 active-level lookup rework (tests pending)
+
+- `faulthandler` diagnostics on the 10,080-row feature integration repeatedly stopped inside `zone_reaction._active_level()`, confirming the runtime bottleneck was the nearest-zone lookup rather than MTF imports.
+- Root cause: the previous bucket lookup walked outward radius-by-radius and could traverse thousands of empty price buckets for every candle and for both support/resistance.
+- Reworked `src/aicfa/zone_reaction.py` to maintain sorted occupied bucket IDs and inspect only the current occupied bucket plus its nearest occupied neighbors; wide zones remain explicitly checked so the lookup stays exact.
+- Commit: `2a24cc1f5481b79d0d78041b70227cd6dd90ffd7` — `perf: use nearest occupied buckets for active zone lookup`.
+- No lifecycle thresholds, creation timing, touch/reaction/retest/break state rules were intentionally changed.
+- Server validation is pending.
+
+### Next exact action
+Run only `tests/test_zone_reaction.py`. If it passes, run the previously hanging `tests/test_features.py::test_feature_integration_exposes_required_higher_timeframes` and record the exact runtime before any full-suite run.
+
 ## 2026-10-03 — build_features performance: liquidity active-pool bookkeeping
 
 - User stopped the slow `tests/test_features.py` run after it stalled at `...`; no result was claimed.
