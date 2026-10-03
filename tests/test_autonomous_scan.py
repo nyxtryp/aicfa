@@ -179,13 +179,13 @@ def test_scan_batch_rotates_20_markets_and_revisits_after_ten_batches(monkeypatc
     assert eleventh.result.markets[0].asset == "COIN000/USDT"
 
 
-def test_run_forever_batches_rotates_20_market_batches(monkeypatch):
+def test_run_forever_batches_scans_one_market_sequentially(monkeypatch):
     def fake_find_setup(request, **kwargs):
         return _result(request.asset, request.mode)
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
 
-    assets = tuple(f"COIN{i:03d}/USDT" for i in range(199))
+    assets = tuple(f"COIN{i:03d}/USDT" for i in range(3))
     engine = AutonomousScanEngine(
         MarketUniverse(tuple(MonitoredMarket(asset) for asset in assets))
     )
@@ -195,7 +195,7 @@ def test_run_forever_batches_rotates_20_market_batches(monkeypatch):
 
     engine.run_forever_batches(
         interval_seconds=60,
-        batch_size=20,
+        batch_size=1,
         on_scan=lambda state: seen.append(state.result.markets[0].asset),
         should_stop=lambda: len(seen) >= 5,
         sleep=sleeps.append,
@@ -203,9 +203,9 @@ def test_run_forever_batches_rotates_20_market_batches(monkeypatch):
 
     assert seen == [
         "COIN000/USDT",
-        "COIN020/USDT",
-        "COIN040/USDT",
-        "COIN060/USDT",
-        "COIN080/USDT",
+        "COIN001/USDT",
+        "COIN002/USDT",
+        "COIN000/USDT",
+        "COIN001/USDT",
     ]
     assert sleeps == [60, 60, 60, 60]
