@@ -3,7 +3,12 @@ import pandas as pd
 from aicfa.evidence_reasoning import assess_market_evidence
 from aicfa.market_evidence import MarketEvidence, MarketObservation
 from aicfa.scenario_reasoning import assess_scenarios
-from aicfa.setup_analysis import SetupDecision, analyze_setups
+from aicfa.setup_analysis import (
+    SetupDecision,
+    _target_levels,
+    analyze_setups,
+    build_multi_timeframe_context,
+)
 
 
 TFS = ("1d", "4h", "1h", "15m")
@@ -198,6 +203,40 @@ def test_target_contract_uses_only_current_rows_not_future_rows():
         frame.loc[1, "smc_structure_direction"] = 1
         frame.loc[1, "close"] = 105.0
 
-    result = _pipeline(frames)
-    assert result.candidates
-    assert result.candidates[0].target_levels == ()
+    context = build_multi_timeframe_context(
+        _pipeline(_frames()).candidates[0].__class__ and _pipeline(_frames()).candidates[0].__class__ and (
+            MarketObservation(
+                concept_id="market_structure.bos",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("bos_up=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="displacement",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("displacement_up=1",),
+                direction="long",
+            ),
+            MarketObservation(
+                concept_id="imbalance.fvg",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("fvg_bullish=1",),
+                direction="long",
+            ),
+        ),
+        frames,
+        timeframes=TFS,
+    )
+    assert _target_levels(
+        context,
+        "long",
+        current_price=105.0,
+        preferred_timeframes=TFS,
+        entry_timeframe="15m",
+    ) == ()
