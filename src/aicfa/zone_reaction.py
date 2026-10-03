@@ -286,8 +286,13 @@ def build_zone_reaction(
                     bisect.insort(wide_occupied_bucket_keys, bucket_id)
                 else:
                     bucket.append(zone_id)
-                wide_zone_bucket_sorted.pop(bucket_id, None)
-                wide_zone_bucket_level_sorted.pop(bucket_id, None)
+                    ordered = wide_zone_bucket_sorted.get(bucket_id)
+                    if ordered is not None:
+                        bisect.insort(ordered, (lo, zone_id))
+                    level_ordered = wide_zone_bucket_level_sorted.get(bucket_id)
+                    if level_ordered is not None:
+                        midpoint = (lo + hi) * 0.5
+                        bisect.insort(level_ordered, (midpoint, zone_id))
         else:
             for bucket_id in range(first, last + 1):
                 bucket = zone_buckets.get(bucket_id)
@@ -296,8 +301,13 @@ def build_zone_reaction(
                     bisect.insort(occupied_bucket_keys, bucket_id)
                 else:
                     bucket.append(zone_id)
-                zone_bucket_sorted.pop(bucket_id, None)
-                zone_bucket_level_sorted.pop(bucket_id, None)
+                    ordered = zone_bucket_sorted.get(bucket_id)
+                    if ordered is not None:
+                        bisect.insort(ordered, (lo, zone_id))
+                    level_ordered = zone_bucket_level_sorted.get(bucket_id)
+                    if level_ordered is not None:
+                        midpoint = (lo + hi) * 0.5
+                        bisect.insort(level_ordered, (midpoint, zone_id))
 
 
     def _append_zone(*, source, side, low, high, created):
