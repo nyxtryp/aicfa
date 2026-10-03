@@ -20,6 +20,7 @@ def build_unified_smc(
     fvg: pd.DataFrame | None = None,
     order_blocks: pd.DataFrame | None = None,
     premium_discount: pd.DataFrame | None = None,
+    volume_evidence: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build a causal unified SMC state from already-causal components.
 
@@ -60,6 +61,11 @@ def build_unified_smc(
     if premium_discount is None:
         from .premium_discount import build_premium_discount
         premium_discount = build_premium_discount(x)
+    if volume_evidence is None:
+        from .volume_evidence import build_volume_evidence
+        volume_evidence = build_volume_evidence(
+            x, structure=structure, liquidity=liquidity, displacement=displacement
+        )
 
     n = len(x)
     out = x.copy()
@@ -212,6 +218,18 @@ def build_unified_smc(
     copy_column(order_blocks, "order_block_active", "smc_order_block_active")
     copy_column(order_blocks, "breaker_bullish", "smc_breaker_bullish")
     copy_column(order_blocks, "breaker_bearish", "smc_breaker_bearish")
+
+    # Volume Evidence remains a set of observable, causal measurements.
+    # It is propagated without collapsing the evidence into a score/verdict.
+    for source in [
+        "volume_evidence_relative", "volume_evidence_zscore",
+        "volume_evidence_expansion", "volume_evidence_dry_up",
+        "volume_evidence_breakout_up", "volume_evidence_breakout_down",
+        "volume_evidence_rejection_high", "volume_evidence_rejection_low",
+        "volume_evidence_liquidity_sweep_high", "volume_evidence_liquidity_sweep_low",
+        "volume_evidence_displacement_up", "volume_evidence_displacement_down",
+    ]:
+        copy_column(volume_evidence, source, "smc_" + source)
 
     # Structural Premium/Discount is already causal and is carried into the
     # unified representation without converting it into a trade verdict.
