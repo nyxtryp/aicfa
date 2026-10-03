@@ -265,3 +265,22 @@ Run the focused horizon/orchestrator tests on the VDS. If green, run the full re
 ### Next exact action
 
 Run focused VDS tests for tests/test_market_universe.py and tests/test_market_orchestrator.py. If green, run the full regression. After that, move to the structured explainable TradeDescription contract. The actual monitored coin list is intentionally deferred until the universe mechanism is verified.
+
+
+### 2026-10-03 — EXPLAINABLE TRADE DESCRIPTION CONTRACT IMPLEMENTED
+
+- Added `src/aicfa/trade_description.py` with immutable `TradeDescription` and builders over the existing `SetupCandidate` geometry.
+- The contract preserves the real entry zone, structural invalidation/SL, TP levels and derived RR without collapsing zones to fabricated scalar prices.
+- Structured evidence is separated into market structure, liquidity, zone/OB/FVG, reaction and volume evidence, plus entry conditions, invalidation, rationale and source/confirmation timeframes.
+- The description carries asset, market type, Intraday/Swing/Position horizon, LONG/SHORT direction, scenario, setup timestamp, freshness and lifecycle status.
+- Missing Entry/SL/TP geometry remains missing; no fallback price, confidence score or synthetic reason is created.
+- Added `build_trade_descriptions(...)` to preserve every current setup candidate rather than ranking or silently dropping candidates.
+- Added `tests/test_trade_description.py` covering geometry preservation, evidence projection, RR derivation, missing geometry, multiple directions and lifecycle status.
+- Implementation commits:
+  - `ea507440732b88169b0805f6f2614ea8ce2e7c7d` — explainable trade description contract
+  - `0f8198a1a670022b0726425364d10db2ca70d468` — initial contract tests
+  - `dd95d0d03949a8e9bba8c3fa31514d3b2d2ba3f9` — corrected RR test expectation
+
+### Next exact action
+
+Run focused VDS validation for `tests/test_trade_description.py`. If green, run the full regression. Then integrate `TradeDescription` into the multi-horizon orchestrator so scanner output exposes structured explainable setups while preserving the existing `FindSetupResult` and candidate pipeline.
