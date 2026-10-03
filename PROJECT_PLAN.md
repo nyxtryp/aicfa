@@ -592,3 +592,26 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 4. Review false positives/duplicates (especially ETF vs index and commodity tokens vs actual TradFi contracts).
 5. Add only confirmed TradFi entries to the same MarketUniverse alongside the unchanged 193 crypto markets.
 6. Run focused universe/routing tests, then VDS live resolution/MTF verification.
+
+
+### 2026-10-04 — TRADFI TARGET CONFIG ADDED / LIVE VERIFICATION PENDING
+
+- Added approved target file: `config/tradfi_targets.json`.
+- The file contains exactly **55 unique canonical AICFA targets** grouped into metal/energy/FX/index/ETF/stock categories.
+- Added tests locking the 55-target contract, including **SPX** and **SNDK**.
+- Extended `MonitoredMarket` so verified TradFi entries can later carry:
+  - `asset_class=tradfi`;
+  - category;
+  - exact instrument type;
+  - venue-native symbol/ID mappings.
+- Existing crypto entries remain backward-compatible and the production `config/market_universe.json` remains at **193 crypto markets**. No TradFi target has been inserted into that production file yet.
+- This target file is a canonical approved input list, not a separate TradFi scanner or analytical engine.
+- Live native-symbol verification remains the gate before populating production TradFi mappings.
+
+### Next exact action
+
+1. Run the focused market-universe tests on the VDS.
+2. Run the live 55-target venue verification against Bybit, OKX, Bitget and MEXC.
+3. Store only verified native symbols/IDs and instrument types.
+4. Validate OHLCV availability on the confirmed instruments for the three primary horizons.
+5. Merge confirmed TradFi markets into the same production MarketUniverse without touching the 193 crypto entries.
