@@ -93,7 +93,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
 
     def fake_find_setup(request, **kwargs):
         calls["count"] += 1
-        candidate = first if request.mode is TradingMode.INTRADAY and calls["count"] > 3 else second
+        candidate = second if request.mode is TradingMode.INTRADAY and calls["count"] > 3 else first
         return SimpleNamespace(
             symbol=request.asset,
             mode=request.mode,
