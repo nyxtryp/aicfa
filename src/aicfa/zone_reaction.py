@@ -238,9 +238,6 @@ def build_zone_reaction(
 
     # Sorted active level indexes provide exact nearest support/resistance
     # lookup without scanning every zone. Entries are (level, zone_id).
-    support_levels: list[tuple[float, int]] = []
-    resistance_levels: list[tuple[float, int]] = []
-    import bisect
     import heapq
 
     # Retested zones are the only zones eligible for a break. Heaps let us
@@ -267,9 +264,6 @@ def build_zone_reaction(
             for bucket_id in range(first, last + 1):
                 zone_buckets.setdefault(bucket_id, []).append(zone_id)
 
-        level = (lo + hi) / 2.0
-        levels = support_levels if side == 1 else resistance_levels
-        bisect.insort(levels, (level, zone_id))
 
     def _append_zone(*, source, side, low, high, created):
         nonlocal zone_count
@@ -321,28 +315,48 @@ def build_zone_reaction(
         "liquidity_pool_created_high": _column_array(liquidity, "liquidity_pool_created_high", np.nan),
     }
 
-    def _active_level(levels, close: float):
-        if not levels:
-            return None
-        pos = bisect.bisect_left(levels, (close, -1))
-        # Broken/cancelled zones are removed from the sorted index, so the
-        # nearest active level can only be one of the two immediate neighbors.
-        candidates = []
-        if pos:
-            candidates.append(levels[pos - 1])
-        if pos < len(levels):
-            candidates.append(levels[pos])
-        if not candidates:
-            return None
-        level, zone_id = min(candidates, key=lambda item: abs(close - item[0]))
-        return zone_id, level, abs(close - level)
+    def _active_level(close: float, side: int):
+        # Use the existing spatial bucket index for nearest-active lookup.
+        # This avoids O(n) insort/pop operations as the zone set grows.
+        current_bucket = _bucket(close)
+        best_zone = -1
+        best_distance = float("inf")
 
-    def _remove_level(levels, zone_id: int):
-        level = float((zone_low[zone_id] + zone_high[zone_id]) / 2.0)
-        pos = bisect.bisect_left(levels, (level, zone_id))
-        if pos < len(levels) and levels[pos] == (level, zone_id):
-            levels.pop(pos)
+        for zone_id in wide_zones:
+            if zone_side[zone_id] != side:
+                continue
+            if zone_state[zone_id] in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
+                continue
+            level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
+            distance = abs(close - level)
+            if distance < best_distance:
+                best_zone, best_distance = zone_id, distance
 
+        radius = 0
+        while True:
+            buckets = (current_bucket,) if radius == 0 else (current_bucket - radius, current_bucket + radius)
+            for bucket_id in buckets:
+                for zone_id in zone_buckets.get(bucket_id, ()):
+                    if zone_side[zone_id] != side:
+                        continue
+                    if zone_state[zone_id] in (STATE_CODE[ZONE_BROKEN], STATE_CODE[ZONE_CANCELLED]):
+                        continue
+                    level = (zone_low[zone_id] + zone_high[zone_id]) / 2.0
+                    distance = abs(close - level)
+                    if distance < best_distance:
+                        best_zone, best_distance = zone_id, distance
+            if best_zone >= 0:
+                lower_edge = np.exp((current_bucket - radius - 1) * bucket_step)
+                upper_edge = np.exp((current_bucket + radius + 1) * bucket_step)
+                if lower_edge < close - best_distance and upper_edge > close + best_distance:
+                    break
+            if radius > len(zone_buckets) + 1:
+                break
+            radius += 1
+        if best_zone < 0:
+            return None
+        level = (zone_low[best_zone] + zone_high[best_zone]) / 2.0
+        return best_zone, level, best_distance
     for i in range(n):
         created_count = 0
 
@@ -475,7 +489,6 @@ def build_zone_reaction(
                 for zone_id in break_idx.tolist():
                     if zone_state[zone_id] != STATE_CODE[ZONE_BROKEN]:
                         zone_state[zone_id] = STATE_CODE[ZONE_BROKEN]
-                        _remove_level(support_levels if zone_side[zone_id] == 1 else resistance_levels, zone_id)
                 result_binary["zone_break_support"][i] |= int(np.any(zone_side[break_idx] == 1))
                 result_binary["zone_break_resistance"][i] |= int(np.any(zone_side[break_idx] == -1))
 
@@ -506,8 +519,8 @@ def build_zone_reaction(
                 result_binary["zone_retest_support"][i] |= int(np.any(zone_side[retest_idx] == 1))
                 result_binary["zone_retest_resistance"][i] |= int(np.any(zone_side[retest_idx] == -1))
 
-        best_support = _active_level(support_levels, close)
-        best_resistance = _active_level(resistance_levels, close)
+        best_support = _active_level(close, 1)
+        best_resistance = _active_level(close, -1)
         if best_support is not None:
             zone_id, level, distance = best_support
             result_numeric["zone_support_price"][i] = level
