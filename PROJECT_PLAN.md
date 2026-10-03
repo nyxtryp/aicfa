@@ -1,3 +1,37 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 FEATURE INTEGRATION VERIFIED; PERFORMANCE STILL UNDER REVIEW
+
+### Server verification
+- Focused `tests/test_zone_reaction.py`: **5 passed in 0.60s** after commit `1881089f2afe40dc5893793f4c6d1a4cacbf789b`.
+- Feature integration `tests/test_features.py`: **10 passed in 57.03s**.
+- The integration path improved from the last recorded **86.00s** to **57.03s** (about 29 seconds faster), but remains slower than the pre-Task-6 full-suite baseline (~45–50 seconds for the entire suite). Do not claim performance is solved.
+
+### Project continuity / working agreement
+- Treat this `PROJECT_PLAN.md` as the persistent source of truth across chats: record each meaningful implementation, commit, actual server test result/runtime, bug/fix, current status, next exact action, and the larger project direction.
+- Never record a test/deploy as completed until the user reports the actual result or a tool verifies it.
+- Keep the plan explicit enough that a new chat can resume without asking the user to retell the project.
+- Preserve the asset-only user experience: the user provides an asset (e.g. BTC); AICFA internally orchestrates relevant horizons/setup variants. The long-term goal remains an independent, data-native crypto analysis system, not a thin wrapper around another model.
+- Maintain causal/no-future-leakage rules and the SMC roadmap already recorded below. No live trading is being implemented as part of this Task 6 verification.
+
+### Current status
+- Task 6 focused contract: **GREEN**.
+- Task 6 feature integration: **GREEN functionally**, performance **improved but still under review**.
+- Full regression after commit `1881089f`: **not run**.
+- Task 6 is **not yet marked fully complete**.
+
+### Next action
+1. Run the full regression only now that the feature integration passes:
+   ```bash
+   sudo -u fd-aicfa bash -lc '
+   cd "$(readlink -f /srv/frostdeploy/aicfa/current)" &&
+   PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q
+   '
+   ```
+2. Record the exact pass/fail count and runtime here.
+3. If full regression passes, compare its runtime against the 384 passed / 105.05s Task 6 baseline and ~45–50s pre-Task-6 baseline. Decide whether another optimization is needed before closing Task 6.
+4. Only after Task 6 is accepted, proceed to Task 7 — Volume Evidence; then Task 8 — Structural Entry / SL / TP; Task 9 — Conservative Backtest / Evaluation.
+
+---
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 NUMPY HOT-LOOP FIX VERIFIED (FOCUSED)
 
 ### What changed
