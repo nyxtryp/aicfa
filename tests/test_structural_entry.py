@@ -106,3 +106,12 @@ def test_structural_levels_never_come_from_execution_timeframe():
     assert candidate.invalidation_level is not None
     assert candidate.invalidation_level.timeframe != "1m"
     assert all(level.timeframe != "1m" for level in candidate.target_levels)
+
+
+def test_entry_condition_requires_structural_confirmation_at_zone():
+    result = _pipeline(_frames())
+
+    assert result.candidates
+    condition = result.candidates[0].entry_condition
+    assert any("reaction/confirmation" in item for item in condition)
+    assert any("displacement" in item.lower() for item in condition)
