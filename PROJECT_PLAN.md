@@ -702,3 +702,12 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 4. Run live resolution for all **146 markets** and verify that no removed market remains in the production universe.
 5. Measure the real autonomous 20-market slot and the full rotation interval after the universe reduction.
 6. Run representative/full TradFi OHLCV verification for the remaining 29 markets, then proceed to MTF acquisition validation.
+
+
+### 2026-10-04 — FULL REGRESSION FOLLOW-UP: STALE UNIVERSE TEST + MAPPED-ROUTING CACHE FIX
+
+- Full regression reached 468 passed with 2 failures; both were isolated to the recent TradFi routing test file.
+- Updated the stale production-universe assertion from the previous 193 Crypto + 44 TradFi universe to the finalized 117 Crypto + 29 TradFi = 146 markets.
+- Fixed MarketAwareFallbackProvider.register_market_symbols() so every explicitly mapped native venue symbol is immediately routable after registration; fallback still remains restricted to the explicitly mapped venues.
+- No market-analysis, SMC, setup, lifecycle, Entry/SL/TP, or scheduler behavior was changed.
+- Next: redeploy these two fixes, run the focused TradFi routing tests, then rerun the full regression.
