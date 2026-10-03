@@ -324,3 +324,10 @@ End-user UX remains asset-only: user enters an asset such as BTC; AICFA internal
 - Commit: `07a5a3c93aa12cf8d65445f115ec4401770398c0` — `fix: remove obsolete zone level cleanup references`.
 - Validation status: **pending server deploy and focused test**; do not treat Zone Reaction as green until `tests/test_zone_reaction.py` passes.
 - Next: deploy this GitHub revision, then run only `tests/test_zone_reaction.py`; after it passes, return to the slow `tests/test_features.py` integration test.
+
+### 2026-10-03 — Zone active-level bottleneck: wide-zone global scan removed
+- Faulthandler evidence from the previous deployed revision repeatedly landed inside `_active_level()`, specifically the `wide_zones` loop.
+- The prior optimization removed the empty-bucket radius walk but still scanned every wide zone on every candle, so the hot path could remain O(n) per candle.
+- Changed `src/aicfa/zone_reaction.py`: wide zones now use a coarser logarithmic bucket index and nearest occupied coarse buckets instead of a global `wide_zones` scan.
+- GitHub commit: `a4236083c91ad924bed39937f15b9635ba087cb5` — `perf: index wide zones for active-level lookup`.
+- No server validation yet. Next: deploy this revision, run `tests/test_zone_reaction.py`, then the single previously hanging higher-timeframe feature integration test.
