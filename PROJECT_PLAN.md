@@ -610,3 +610,23 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python -m pytest -q
 '
 ```
 If GREEN, record the exact result, close Task 8, and move to **Task 9 — Conservative Backtest / Evaluation**. Do not make unrelated production changes before the full regression.
+
+
+## 2026-10-03 — TASK 8 CLOSED — FULL REGRESSION GREEN
+
+- Full server regression completed: **402 passed in 82.05s (0:01:22)**.
+- Result: **0 failed** across the complete test suite.
+- Target/TP contract remained GREEN: 9/9 focused tests.
+- MTF + Structural Entry regression remained GREEN: 21/21.
+- Structural Entry, Structural SL, and causal Target/TP contracts are therefore verified together under the full suite.
+- No production Target/TP change was required; the contract tests confirmed the existing causal target implementation.
+- **Task 8 — Structural Entry / SL / Target/TP: CLOSED.**
+
+### Final Task 8 verification
+- Focused Structural Entry / Target tests: **9 passed in 0.62s**.
+- MTF + Structural Entry: **21 passed in 0.71s**.
+- Full regression: **402 passed in 82.05s**.
+- Regression baseline before Target/TP focused work: 396 passed; final suite is +6 tests from the new Target/TP contract coverage.
+
+### Next exact action
+Begin **Task 9 — Conservative Backtest / Evaluation** strictly according to the existing plan. First inspect the Task 9 requirements and current backtest/evaluation implementation/tests before making production changes. Do not skip directly to optimization or trading-performance claims.
