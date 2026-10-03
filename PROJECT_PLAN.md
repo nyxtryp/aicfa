@@ -1,3 +1,16 @@
+## 2026-10-03 — TASK 6 active-level second-pass optimization (server test pending)
+
+- Latest server verification before this code change: `tests/test_zone_reaction.py` = **5 passed in 0.44s**.
+- Higher-timeframe integration after the previous candidate-lookup optimization: `tests/test_features.py::test_feature_integration_exposes_required_higher_timeframes` = **1 passed in 25.88s** (previously 24.21s), so that optimization did not improve the full integration runtime.
+- GitHub inspection identified the remaining avoidable cost in `_active_level()`: even after bucket selection, it materialized every zone from each selected bucket and ran NumPy over the whole bucket population on every candle.
+- Implemented a lazy midpoint-sorted bucket index for normal and wide zones. Nearest-level lookup now performs an exact binary-search/expansion around the candle price and stops once remaining midpoints cannot beat the current best distance. Lifecycle semantics and the selected occupied-bucket strategy are unchanged.
+- Commit: `f915d20b5b9e7bafbaedb2a93020d84ea55dfacf` — `perf: avoid full bucket scans in active zone lookup`.
+- **Server validation pending.**
+
+### Next exact action
+
+Run only `tests/test_zone_reaction.py`. If green, immediately rerun the single higher-timeframe integration test and compare its exact runtime with **25.88s**. Do not run the full suite yet.
+
 ## 2026-10-03 — TASK 6 active-level lookup rework (tests pending)
 
 - `faulthandler` diagnostics on the 10,080-row feature integration repeatedly stopped inside `zone_reaction._active_level()`, confirming the runtime bottleneck was the nearest-zone lookup rather than MTF imports.
