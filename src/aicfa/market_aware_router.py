@@ -28,7 +28,7 @@ class MarketAwareFallbackProvider:
         if not providers:
             raise ValueError("at least one market data provider is required")
         self._providers = tuple(providers)
-        self._resolved: dict[tuple[str, str], ResolvedMarket] = {}
+        self._resolved: dict[tuple[str, str], ResolvedMarket] = {}\n        self._by_symbol: dict[tuple[str, str], ResolvedMarket] = {}
 
     @property
     def providers(self) -> tuple[MarketDataProvider, ...]:
