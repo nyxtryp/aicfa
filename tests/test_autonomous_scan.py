@@ -93,7 +93,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
 
     def fake_find_setup(request, **kwargs):
         calls["count"] += 1
-        candidate = first if calls["count"] == 1 else second
+        candidate = first if request.mode is TradingMode.INTRADAY and calls["count"] > 3 else second
         return SimpleNamespace(
             symbol=request.asset,
             mode=request.mode,
@@ -116,7 +116,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
     engine.scan_once(now_ms=1_000)
     engine.scan_once(now_ms=2_000)
 
-    assert len(engine.active_setups(symbol="BTC/USDT")) == 3
+    assert len(engine.active_setups(symbol="BTC/USDT")) == 4
 
 
 def test_run_forever_can_be_stopped_after_a_scan(monkeypatch):
