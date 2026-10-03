@@ -546,3 +546,22 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 2. Re-run the full resolution test for all 193 markets.
 3. Compare total runtime and identify remaining slow/fallback markets.
 4. Then measure actual MTF data acquisition for a 20-market slot without truncation or a hard data deadline.
+
+
+### 2026-10-04 — TRADFI UNIVERSE INVESTIGATION STARTED (SEPARATE FROM 193 CRYPTO MARKETS)
+
+- The production crypto universe is fixed at **193 markets** and is not being changed during the TradFi investigation.
+- Started a separate investigation of real TradFi instruments available natively on **Bybit, OKX, Bitget and MEXC**.
+- Required categories: **metals, oil, gas, stocks, indices/ETFs and FX**.
+- The investigation must preserve the exchange's **native contract symbol/ID** and explicitly record the instrument type (for example perpetual/swap/future where applicable). Normalized AICFA symbols must not be invented before the venue-native mapping is known.
+- Raw full derivatives listings must **not** be dumped to the user. The scan must filter server-side and return only a compact categorized TradFi inventory with exchange, native symbol/ID, category and contract type.
+- CFD/other non-perpetual venue products must not be silently mixed with futures/perpetual instruments. Their market type and data requirements must be identified separately before integration into the existing AICFA market model.
+- Official venue API metadata is the source of truth for the live inventory. Current official documentation confirms instrument metadata endpoints for Bybit, OKX, Bitget and MEXC. citeturn0search2turn0search0turn0search1turn1search0
+
+### Next exact action
+
+1. Run a **server-side compact TradFi inventory scan** against Bybit, OKX, Bitget and MEXC; do not print the raw market universe.
+2. Produce counts and categorized native symbols only.
+3. Review the resulting inventory for false positives/false negatives and distinguish perpetuals/futures from other venue products.
+4. Build a separate TradFi market mapping/configuration only after the live inventory is verified; keep the existing 193 crypto markets unchanged.
+5. Then determine which existing AICFA market-data contracts can support the verified TradFi instruments and what adapter extensions, if any, are required.
