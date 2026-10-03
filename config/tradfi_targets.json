@@ -1,64 +1,149 @@
 {
   "targets": [
-    {"asset": "XAU/USDT", "name": "Gold", "category": "metal"},
-    {"asset": "XAG/USDT", "name": "Silver", "category": "metal"},
-    {"asset": "XCU/USDT", "name": "Copper", "category": "metal"},
-    {"asset": "XPT/USDT", "name": "Platinum", "category": "metal"},
-    {"asset": "XPD/USDT", "name": "Palladium", "category": "metal"},
-
-    {"asset": "WTI/USDT", "name": "WTI", "category": "energy"},
-    {"asset": "BRENT/USDT", "name": "Brent", "category": "energy"},
-    {"asset": "NATGAS/USDT", "name": "Natural Gas", "category": "energy"},
-
-    {"asset": "EUR/USD", "name": "EUR/USD", "category": "fx"},
-    {"asset": "GBP/USD", "name": "GBP/USD", "category": "fx"},
-    {"asset": "USD/JPY", "name": "USD/JPY", "category": "fx"},
-    {"asset": "USD/CHF", "name": "USD/CHF", "category": "fx"},
-    {"asset": "AUD/USD", "name": "AUD/USD", "category": "fx"},
-    {"asset": "USD/CAD", "name": "USD/CAD", "category": "fx"},
-    {"asset": "NZD/USD", "name": "NZD/USD", "category": "fx"},
-
-    {"asset": "SPX/USDT", "name": "S&P 500", "category": "index"},
-    {"asset": "NDX/USDT", "name": "Nasdaq-100", "category": "index"},
-    {"asset": "DJIA/USDT", "name": "Dow Jones", "category": "index"},
-    {"asset": "RUT/USDT", "name": "Russell 2000", "category": "index"},
-    {"asset": "DAX/USDT", "name": "DAX 40", "category": "index"},
-    {"asset": "FTSE/USDT", "name": "FTSE 100", "category": "index"},
-    {"asset": "CAC/USDT", "name": "CAC 40", "category": "index"},
-    {"asset": "NIKKEI/USDT", "name": "Nikkei 225", "category": "index"},
-    {"asset": "STOXX50/USDT", "name": "Euro Stoxx 50", "category": "index"},
-    {"asset": "VIX/USDT", "name": "VIX", "category": "index"},
-
-    {"asset": "SPY/USDT", "name": "SPY", "category": "etf"},
-    {"asset": "QQQ/USDT", "name": "QQQ", "category": "etf"},
-    {"asset": "IWM/USDT", "name": "IWM", "category": "etf"},
-    {"asset": "GLD/USDT", "name": "GLD", "category": "etf"},
-
-    {"asset": "AAPL/USDT", "name": "Apple", "category": "stock"},
-    {"asset": "MSFT/USDT", "name": "Microsoft", "category": "stock"},
-    {"asset": "NVDA/USDT", "name": "NVIDIA", "category": "stock"},
-    {"asset": "AMZN/USDT", "name": "Amazon", "category": "stock"},
-    {"asset": "GOOGL/USDT", "name": "Alphabet", "category": "stock"},
-    {"asset": "META/USDT", "name": "Meta", "category": "stock"},
-    {"asset": "TSLA/USDT", "name": "Tesla", "category": "stock"},
-    {"asset": "AVGO/USDT", "name": "Broadcom", "category": "stock"},
-    {"asset": "AMD/USDT", "name": "AMD", "category": "stock"},
-    {"asset": "MU/USDT", "name": "Micron", "category": "stock"},
-    {"asset": "SNDK/USDT", "name": "SanDisk", "category": "stock"},
-    {"asset": "ARM/USDT", "name": "Arm", "category": "stock"},
-    {"asset": "TSM/USDT", "name": "TSMC", "category": "stock"},
-    {"asset": "ASML/USDT", "name": "ASML", "category": "stock"},
-    {"asset": "SMCI/USDT", "name": "Super Micro Computer", "category": "stock"},
-    {"asset": "QCOM/USDT", "name": "Qualcomm", "category": "stock"},
-    {"asset": "ORCL/USDT", "name": "Oracle", "category": "stock"},
-    {"asset": "PLTR/USDT", "name": "Palantir", "category": "stock"},
-    {"asset": "NFLX/USDT", "name": "Netflix", "category": "stock"},
-    {"asset": "COIN/USDT", "name": "Coinbase", "category": "stock"},
-    {"asset": "MSTR/USDT", "name": "Strategy", "category": "stock"},
-    {"asset": "JPM/USDT", "name": "JPMorgan", "category": "stock"},
-    {"asset": "BAC/USDT", "name": "Bank of America", "category": "stock"},
-    {"asset": "WMT/USDT", "name": "Walmart", "category": "stock"},
-    {"asset": "XOM/USDT", "name": "Exxon Mobil", "category": "stock"},
-    {"asset": "BA/USDT", "name": "Boeing", "category": "stock"}
+    {
+      "asset": "XAU/USDT",
+      "name": "Gold",
+      "category": "metal"
+    },
+    {
+      "asset": "XAG/USDT",
+      "name": "Silver",
+      "category": "metal"
+    },
+    {
+      "asset": "XCU/USDT",
+      "name": "Copper",
+      "category": "metal"
+    },
+    {
+      "asset": "XPT/USDT",
+      "name": "Platinum",
+      "category": "metal"
+    },
+    {
+      "asset": "WTI/USDT",
+      "name": "WTI",
+      "category": "energy"
+    },
+    {
+      "asset": "BRENT/USDT",
+      "name": "Brent",
+      "category": "energy"
+    },
+    {
+      "asset": "NATGAS/USDT",
+      "name": "Natural Gas",
+      "category": "energy"
+    },
+    {
+      "asset": "DJIA/USDT",
+      "name": "Dow Jones",
+      "category": "index"
+    },
+    {
+      "asset": "NIKKEI/USDT",
+      "name": "Nikkei 225",
+      "category": "index"
+    },
+    {
+      "asset": "SPY/USDT",
+      "name": "SPY",
+      "category": "etf"
+    },
+    {
+      "asset": "QQQ/USDT",
+      "name": "QQQ",
+      "category": "etf"
+    },
+    {
+      "asset": "AAPL/USDT",
+      "name": "Apple",
+      "category": "stock"
+    },
+    {
+      "asset": "MSFT/USDT",
+      "name": "Microsoft",
+      "category": "stock"
+    },
+    {
+      "asset": "NVDA/USDT",
+      "name": "NVIDIA",
+      "category": "stock"
+    },
+    {
+      "asset": "AMZN/USDT",
+      "name": "Amazon",
+      "category": "stock"
+    },
+    {
+      "asset": "GOOGL/USDT",
+      "name": "Alphabet",
+      "category": "stock"
+    },
+    {
+      "asset": "META/USDT",
+      "name": "Meta",
+      "category": "stock"
+    },
+    {
+      "asset": "TSLA/USDT",
+      "name": "Tesla",
+      "category": "stock"
+    },
+    {
+      "asset": "AVGO/USDT",
+      "name": "Broadcom",
+      "category": "stock"
+    },
+    {
+      "asset": "AMD/USDT",
+      "name": "AMD",
+      "category": "stock"
+    },
+    {
+      "asset": "MU/USDT",
+      "name": "Micron",
+      "category": "stock"
+    },
+    {
+      "asset": "ARM/USDT",
+      "name": "Arm",
+      "category": "stock"
+    },
+    {
+      "asset": "TSM/USDT",
+      "name": "TSMC",
+      "category": "stock"
+    },
+    {
+      "asset": "ASML/USDT",
+      "name": "ASML",
+      "category": "stock"
+    },
+    {
+      "asset": "ORCL/USDT",
+      "name": "Oracle",
+      "category": "stock"
+    },
+    {
+      "asset": "PLTR/USDT",
+      "name": "Palantir",
+      "category": "stock"
+    },
+    {
+      "asset": "NFLX/USDT",
+      "name": "Netflix",
+      "category": "stock"
+    },
+    {
+      "asset": "COIN/USDT",
+      "name": "Coinbase",
+      "category": "stock"
+    },
+    {
+      "asset": "JPM/USDT",
+      "name": "JPMorgan",
+      "category": "stock"
+    }
   ]
 }
