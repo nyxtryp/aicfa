@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
 from aicfa.data_requirements import TradingMode
@@ -11,6 +12,7 @@ from aicfa.market_orchestrator import (
     scan_universe,
 )
 from aicfa.market_universe import MarketUniverse, MonitoredMarket
+from aicfa.setup_lifecycle import SetupLifecycle, SetupLifecycleStatus
 
 
 def _candidate(direction="long", scenario="continuation"):
@@ -28,11 +30,17 @@ def _candidate(direction="long", scenario="continuation"):
 
 
 def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAIT"):
+    execution = {
+        TradingMode.INTRADAY: "5m",
+        TradingMode.SWING: "1h",
+        TradingMode.POSITION: "4h",
+    }[mode]
     return SimpleNamespace(
         symbol=f"{asset}/USDT" if "/" not in asset else asset,
         mode=mode,
         request=SimpleNamespace(market_type="spot"),
         analysis=None,
+        frames={execution: pd.DataFrame({"close": [101.0]})},
         decision=decision,
         setup_assessment=SimpleNamespace(
             candidates=() if candidate is None else (candidate,),
@@ -139,3 +147,55 @@ def test_configured_market_universe_controls_assets_and_market_type(monkeypatch)
         ("ETH/USDT", "futures"),
         ("ETH/USDT", "futures"),
     ]
+
+
+def test_orchestrator_updates_existing_lifecycle_without_duplicate(monkeypatch):
+    lifecycle = SetupLifecycle()
+
+    def fake_find_setup(request, **kwargs):
+        return _fake_result(request.asset, request.mode, candidate=_candidate(), decision="LONG")
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    first = analyze_market_horizons("BTC/USDT", now_ms=1_000, lifecycle=lifecycle)
+    second = analyze_market_horizons("BTC/USDT", now_ms=2_000, lifecycle=lifecycle)
+
+    assert len(first.setups) == 3
+    assert len(second.setups) == 3
+    assert all(item.identity is not None for item in second.setups)
+    assert all(
+        item.lifecycle_result is not None
+        and item.lifecycle_result.status is SetupLifecycleStatus.ACTIVE
+        for item in second.setups
+    )
+    assert len(lifecycle.active_setups(symbol="BTC/USDT")) == 3
+
+
+def test_orchestrator_keeps_two_same_horizon_geometries_independent(monkeypatch):
+    lifecycle = SetupLifecycle()
+    first = _candidate()
+    second = SetupCandidate(**{
+        **first.__dict__,
+        "entry_zone": (
+            SetupLevel(96.0, "15m", "second FVG low"),
+            SetupLevel(98.0, "15m", "second FVG high"),
+        ),
+        "invalidation_level": SetupLevel(92.0, "5m", "second invalidation"),
+        "target_levels": (
+            SetupLevel(108.0, "4h", "second target 1"),
+            SetupLevel(115.0, "1d", "second target 2"),
+        ),
+    })
+
+    def fake_find_setup(request, **kwargs):
+        candidate = first if request.mode is TradingMode.SWING else second
+        return _fake_result(request.asset, request.mode, candidate=candidate, decision="LONG")
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    result = analyze_market_horizons("BTC/USDT", now_ms=1_000, lifecycle=lifecycle)
+
+    assert len(result.lifecycle_results) == 3
+    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 1
+    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="swing")) == 1
+    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="position")) == 1
