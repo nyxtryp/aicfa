@@ -163,8 +163,8 @@ def test_target_contract_does_not_create_arbitrary_tp_when_no_objective_exists()
         frame.loc[0, "internal_previous_high"] = float("nan")
         frame.loc[0, "rolling_high_60"] = float("nan")
     result = _pipeline(frames)
-    assert result.candidates
-    assert result.candidates[0].target_levels == ()
+    assert result.decision is SetupDecision.NEED_MORE_EVIDENCE
+    assert result.candidates == ()
 
 
 def test_target_contract_keeps_distinct_targets_in_causal_price_order():
@@ -186,12 +186,16 @@ def test_target_contract_keeps_distinct_targets_in_causal_price_order():
 def test_target_contract_uses_only_current_rows_not_future_rows():
     frames = _frames()
     for frame in frames.values():
-        frame.loc[0, "active_buy_liquidity_price"] = float("nan")
+        frame.loc[0, "timestamp"] = 1000
+        frame.loc[0, "active_buy_liquidity_price"] = 150.0
         frame.loc[0, "previous_high"] = float("nan")
         frame.loc[0, "internal_previous_high"] = float("nan")
         frame.loc[0, "rolling_high_60"] = float("nan")
+
+        frame.loc[1] = frame.loc[0]
         frame.loc[1, "timestamp"] = 2000
-        frame.loc[1, "active_buy_liquidity_price"] = 150.0
+        frame.loc[1, "active_buy_liquidity_price"] = float("nan")
+
     result = _pipeline(frames)
     assert result.candidates
     assert result.candidates[0].target_levels == ()
