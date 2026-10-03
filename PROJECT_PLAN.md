@@ -473,3 +473,12 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 - Market metadata is intentionally loaded lazily inside each provider and cached by CCXT; this avoids the earlier Binance mistake of downloading exchangeInfo once per market. CCXT explicitly documents loadMarkets caching. cite: turn0search0
 - Added tests/test_ccxt_sources.py in commit 6150e4716926c2d6a42c187de1cbe06a1c5d317f for capability detection and deterministic source ordering.
 - Next implementation step: connect the constructed sources to the existing fallback router with source-specific symbol resolution, so a symbol resolved on venue A is never accidentally fetched from venue B using the wrong venue symbol format. Then run the 200-market coverage map and measure the 40-market batch.
+
+
+### 2026-10-03 — VENUE-AWARE FALLBACK ROUTING
+
+- Added src/aicfa/market_aware_router.py in commit edd628657b521c357d6e250681821d6dc569ee6e.
+- The router resolves an asset against the provider chain and, when falling back, resolves the symbol again on the next venue before fetching data. This prevents exchange-specific symbols from being reused on the wrong venue.
+- Resolution is cached per asset + market type for the life of the router; the cache can be cleared explicitly.
+- Added tests/test_market_aware_router.py in commit 9603ee770dc8ddd2986df6b70e8dad3ff6e5ecac proving fallback from one venue to another uses the second venue's own symbol.
+- Next: build the production multi-source provider chain from the existing native adapters plus the CCXT sources, then run the 200-market coverage audit. No live 200-market network scan has been claimed yet.
