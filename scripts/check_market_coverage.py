@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from pathlib import Path
 
 from aicfa.public_market_data import build_public_market_data_provider
@@ -13,6 +14,7 @@ def main() -> None:
     payload = json.loads(path.read_text())
     markets = payload["markets"]
     provider = build_public_market_data_provider(timeout_seconds=10.0)
+    timeout_seconds = 15.0
 
     print(f"Configured markets: {len(markets)}", flush=True)
     print(
@@ -50,7 +52,10 @@ def main() -> None:
 
         start = time.perf_counter()
         try:
-            symbol = provider.resolve_symbol(asset, market_type=market_type)
+            # One market gets at most 15 seconds; a slow market never blocks the queue.
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(provider.resolve_symbol, asset, market_type=market_type)
+                symbol = future.result(timeout=timeout_seconds)
             elapsed = time.perf_counter() - start
             timings.append(elapsed)
             resolved = provider._resolved[(asset.upper(), market_type)]
@@ -60,6 +65,14 @@ def main() -> None:
                 flush=True,
             )
             covered += 1
+        except TimeoutError:
+            elapsed = time.perf_counter() - start
+            timings.append(elapsed)
+            print(
+                f"[{index:03d}/{len(markets)}] {asset} [{market_type}] -> TIMEOUT | "
+                f"{elapsed:.3f}s | no source resolved within {timeout_seconds:.0f}s; next market",
+                flush=True,
+            )
         except Exception as exc:
             elapsed = time.perf_counter() - start
             timings.append(elapsed)
