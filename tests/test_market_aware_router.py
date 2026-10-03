@@ -27,8 +27,9 @@ def test_router_falls_back_using_the_second_venues_own_symbol():
     first = Provider("first", "TON/USDT")
     second = Provider("second", "TON/USDT:USDT")
     router = MarketAwareFallbackProvider([first, second])
+    router.resolve_symbol("TON/USDT", market_type="spot")
     result = router.fetch_ohlcv_with_source(
-        asset="TON/USDT", market_type="spot", timeframe="5m",
+        symbol="TON/USDT", market_type="spot", timeframe="5m",
         since_ms=None, limit=10,
     )
     assert result.provider == "second"
