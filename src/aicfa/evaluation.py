@@ -156,12 +156,7 @@ def purge_training_labels(
     validation_start: str | pd.Timestamp,
     label_end_column: str = "label_end_timestamp_5",
 ) -> pd.DataFrame:
-    """Remove training rows whose future label reaches validation_start.
-
-    A training label is safe only when its label interval ends strictly before
-    the first validation timestamp. Missing label ends are excluded rather
-    than treated as safely non-overlapping.
-    """
+    """Remove training rows whose future label reaches validation_start."""
     if "timestamp" not in dataset.columns:
         raise ValueError("dataset must contain timestamp")
     if label_end_column not in dataset.columns:
@@ -178,3 +173,53 @@ def purge_training_labels(
         & ends.lt(validation_time)
     )
     return frame.loc[safe].reset_index(drop=True)
+
+
+def build_chronological_folds(
+    dataset: pd.DataFrame,
+    *,
+    validation_size: int,
+    n_splits: int,
+    label_end_column: str = "label_end_timestamp_5",
+) -> tuple[tuple[pd.DataFrame, pd.DataFrame], ...]:
+    """Build expanding chronological validation folds with causal purging.
+
+    Validation windows are consecutive blocks at the end of the dataset.
+    Each fold trains only on rows before its validation start, then purges
+    training labels whose causal interval reaches that validation start.
+    """
+    if validation_size <= 0:
+        raise ValueError("validation_size must be positive")
+    if n_splits <= 0:
+        raise ValueError("n_splits must be positive")
+    if "timestamp" not in dataset.columns:
+        raise ValueError("dataset must contain timestamp")
+    if label_end_column not in dataset.columns:
+        raise ValueError(f"dataset missing label end column: {label_end_column}")
+
+    frame = dataset.copy()
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="raise")
+    if frame["timestamp"].duplicated().any():
+        raise ValueError("dataset contains duplicate timestamps")
+    frame = frame.sort_values("timestamp").reset_index(drop=True)
+
+    required_rows = validation_size * n_splits
+    if len(frame) <= required_rows:
+        raise ValueError("dataset does not contain enough rows for requested validation windows")
+
+    validation_start_index = len(frame) - required_rows
+    folds: list[tuple[pd.DataFrame, pd.DataFrame]] = []
+
+    for fold_index in range(n_splits):
+        start = validation_start_index + fold_index * validation_size
+        end = start + validation_size
+        validation = frame.iloc[start:end].reset_index(drop=True)
+        training = frame.iloc[:start].reset_index(drop=True)
+        training = purge_training_labels(
+            training,
+            validation_start=validation["timestamp"].iloc[0],
+            label_end_column=label_end_column,
+        )
+        folds.append((training, validation))
+
+    return tuple(folds)
