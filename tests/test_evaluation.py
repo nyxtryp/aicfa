@@ -5,6 +5,7 @@ import pytest
 
 from aicfa.evaluation import (
     BatchEvaluation,
+    build_setup_outcome_journal,
     EvaluationOutcome,
     analyze_rr_outcomes,
     analyze_rr_outcomes_by_folds,
@@ -284,3 +285,48 @@ def test_cost_adjusted_returns_reject_negative_cost() -> None:
     )
     with pytest.raises(ValueError, match="non-negative"):
         summarize_cost_adjusted_returns_by_folds([evaluation], round_trip_cost_rate=-0.01)
+
+
+def test_setup_outcome_journal_pairs_setup_geometry_with_causal_result() -> None:
+    setups = [{
+        "setup_timestamp": "2026-01-01T00:00:00Z",
+        "direction": "long",
+        "entry_price": 100,
+        "stop_price": 95,
+        "target_price": 110,
+    }]
+    evaluation = evaluate_setups(candles([(100, 101, 99), (100, 111, 99)]), setups)
+    journal = build_setup_outcome_journal(setups, evaluation)
+    assert len(journal) == 1
+    record = journal[0]
+    assert record.setup_timestamp == "2026-01-01T00:00:00Z"
+    assert record.direction == "long"
+    assert record.entry_price == 100
+    assert record.stop_price == 95
+    assert record.target_price == 110
+    assert record.rr == 2.0
+    assert record.outcome is EvaluationOutcome.TP
+    assert record.outcome_offset == 1
+    assert record.exit_price == 110
+    assert record.gross_return == pytest.approx(0.10)
+
+
+def test_setup_outcome_journal_keeps_unresolved_outcomes_visible() -> None:
+    setups = [
+        {"setup_timestamp": "2026-01-01T00:00:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 105},
+        {"setup_timestamp": "2026-01-01T00:01:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 105},
+    ]
+    evaluation = evaluate_setups(candles([(100, 101, 99), (100, 106, 94), (100, 103, 97)]), setups, max_horizon=1)
+    journal = build_setup_outcome_journal(setups, evaluation)
+    assert [record.outcome for record in journal] == [EvaluationOutcome.AMBIGUOUS, EvaluationOutcome.TIMEOUT]
+    assert journal[0].exit_price is None
+    assert journal[0].gross_return is None
+    assert journal[1].exit_price is None
+    assert journal[1].gross_return is None
+
+
+def test_setup_outcome_journal_rejects_mismatched_setup_and_evaluation_counts() -> None:
+    setup = {"setup_timestamp": "2026-01-01T00:00:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 105}
+    evaluation = evaluate_setups(candles([(100, 101, 99), (100, 106, 99)]), [])
+    with pytest.raises(ValueError, match="same number"):
+        build_setup_outcome_journal([setup], evaluation)
