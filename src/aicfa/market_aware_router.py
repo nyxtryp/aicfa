@@ -57,6 +57,23 @@ class MarketAwareFallbackProvider:
         for cache_key in tuple(self._by_symbol):
             if cache_key[1] == market_type:
                 self._by_symbol.pop(cache_key, None)
+        # Make every explicitly mapped native symbol immediately routable.
+        # Fetch still tries all mapped venues in configured order.
+        first_provider = next(iter(normalized), None)
+        for provider_id, native_symbol in normalized.items():
+            self._by_symbol[(native_symbol.upper(), market_type)] = ResolvedMarket(
+                asset=key[0],
+                market_type=market_type,
+                provider=provider_id,
+                symbol=native_symbol,
+            )
+        if first_provider is not None:
+            self._resolved[key] = ResolvedMarket(
+                asset=key[0],
+                market_type=market_type,
+                provider=first_provider,
+                symbol=normalized[first_provider],
+            )
 
     def resolve_market(self, asset: str, *, market_type: str = "spot") -> ResolvedMarket:
         key = (asset.strip().upper(), market_type)
