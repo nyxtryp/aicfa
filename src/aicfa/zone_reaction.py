@@ -231,6 +231,10 @@ def build_zone_reaction(
         np.log(np.maximum(highs, 1e-300)) / bucket_step
     ).astype(np.int64)
     zone_buckets: dict[int, list[int]] = {}
+    # Buckets are broad price ranges, so a single bucket may contain many
+    # historical zones. Keep a lazily-built index sorted by zone low; candle
+    # lookup can then binary-search the relevant price slice.
+    zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
     # Keep occupied bucket ids sorted. _active_level() can then inspect the
     # nearest occupied price buckets directly instead of walking thousands of
     # empty radius buckets on long histories.
@@ -239,6 +243,7 @@ def build_zone_reaction(
     # becomes O(n) again when the wide-zone set grows.
     wide_bucket_step = bucket_step * 65
     wide_zone_buckets: dict[int, list[int]] = {}
+    wide_zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
     wide_occupied_bucket_keys: list[int] = []
     wide_zones: list[int] = []
     # Reuse a marker array for per-candle candidate deduplication rather than
@@ -279,6 +284,7 @@ def build_zone_reaction(
                     bisect.insort(wide_occupied_bucket_keys, bucket_id)
                 else:
                     bucket.append(zone_id)
+                wide_zone_bucket_sorted.pop(bucket_id, None)
         else:
             for bucket_id in range(first, last + 1):
                 bucket = zone_buckets.get(bucket_id)
@@ -287,6 +293,7 @@ def build_zone_reaction(
                     bisect.insort(occupied_bucket_keys, bucket_id)
                 else:
                     bucket.append(zone_id)
+                zone_bucket_sorted.pop(bucket_id, None)
 
 
     def _append_zone(*, source, side, low, high, created):
@@ -469,26 +476,44 @@ def build_zone_reaction(
         last_bucket = int(candle_last_buckets[i])
         stamp = i + 1
         candidate_ids = []
+        candle_low = float(lows[i])
+        candle_high = float(highs[i])
+
+        def _append_bucket_candidates(bucket_ids, source_buckets, sorted_buckets):
+            for bucket_id in bucket_ids:
+                raw_bucket = source_buckets.get(bucket_id)
+                if not raw_bucket:
+                    continue
+                ordered = sorted_buckets.get(bucket_id)
+                if ordered is None:
+                    ordered = sorted(
+                        (float(zone_low[zone_id]), zone_id)
+                        for zone_id in raw_bucket
+                    )
+                    sorted_buckets[bucket_id] = ordered
+                stop = bisect.bisect_right(ordered, (candle_high, max_zones))
+                for _, zone_id in ordered[:stop]:
+                    if zone_high[zone_id] >= candle_low and candidate_marks[zone_id] != stamp:
+                        candidate_marks[zone_id] = stamp
+                        candidate_ids.append(zone_id)
+
         # Wide zones are indexed by coarse logarithmic buckets as well.
-        # Never fall back to scanning the full historical wide-zone list on
-        # every candle; doing so recreates O(n * wide_zones) work.
-        wide_first_bucket = int(np.floor(np.log(max(lows[i], 1e-300)) / wide_bucket_step))
-        wide_last_bucket = int(np.floor(np.log(max(highs[i], 1e-300)) / wide_bucket_step))
-        wide_pos = bisect.bisect_left(wide_occupied_bucket_keys, wide_first_bucket)
-        while wide_pos < len(wide_occupied_bucket_keys):
-            wide_bucket_id = wide_occupied_bucket_keys[wide_pos]
-            if wide_bucket_id > wide_last_bucket:
-                break
-            for zone_id in wide_zone_buckets.get(wide_bucket_id, ()):
-                if candidate_marks[zone_id] != stamp:
-                    candidate_marks[zone_id] = stamp
-                    candidate_ids.append(zone_id)
-            wide_pos += 1
-        for bucket_id in range(first_bucket, last_bucket + 1):
-            for zone_id in zone_buckets.get(bucket_id, ()):
-                if candidate_marks[zone_id] != stamp:
-                    candidate_marks[zone_id] = stamp
-                    candidate_ids.append(zone_id)
+        # Never scan the full historical wide-zone list on every candle.
+        wide_first_bucket = int(np.floor(np.log(max(candle_low, 1e-300)) / wide_bucket_step))
+        wide_last_bucket = int(np.floor(np.log(max(candle_high, 1e-300)) / wide_bucket_step))
+        wide_start = bisect.bisect_left(wide_occupied_bucket_keys, wide_first_bucket)
+        wide_stop = bisect.bisect_right(wide_occupied_bucket_keys, wide_last_bucket)
+        _append_bucket_candidates(
+            wide_occupied_bucket_keys[wide_start:wide_stop],
+            wide_zone_buckets,
+            wide_zone_bucket_sorted,
+        )
+
+        _append_bucket_candidates(
+            range(first_bucket, last_bucket + 1),
+            zone_buckets,
+            zone_bucket_sorted,
+        )
         if candidate_ids:
             idx = np.asarray(
                 [
