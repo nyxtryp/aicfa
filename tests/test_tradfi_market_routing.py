@@ -43,7 +43,7 @@ def test_verified_venue_mapping_selects_native_symbol_before_generic_resolution(
     assert float(result.iloc[-1]["close"]) == 1.0
 
 
-def test_production_universe_keeps_193_crypto_and_adds_44_verified_tradfi() -> None:
+def test_production_universe_keeps_117_crypto_and_adds_29_final_tradfi() -> None:
     path = Path(__file__).parents[1] / "config" / "market_universe.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     markets = payload["markets"]
@@ -51,8 +51,8 @@ def test_production_universe_keeps_193_crypto_and_adds_44_verified_tradfi() -> N
     crypto = [item for item in markets if item.get("asset_class", "crypto") == "crypto"]
     tradfi = [item for item in markets if item.get("asset_class") == "tradfi"]
 
-    assert len(crypto) == 193
-    assert len(tradfi) == 44
+    assert len(crypto) == 117
+    assert len(tradfi) == 29
     assert all(item["market_type"] == "futures" for item in tradfi)
     assert all(item["instrument_type"] == "perpetual" for item in tradfi)
     assert all(item["venue_symbols"] for item in tradfi)
