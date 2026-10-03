@@ -22,8 +22,8 @@ from .setup_lifecycle import ActiveSetup, SetupLifecycle
 
 
 MAIN_SCAN_INTERVAL_SECONDS = 300
-BATCH_SCAN_INTERVAL_SECONDS = 60
-DEFAULT_MARKETS_PER_BATCH = 20
+BATCH_SCAN_INTERVAL_SECONDS = 0
+DEFAULT_MARKETS_PER_BATCH = 1
 
 
 @dataclass(frozen=True)
@@ -144,42 +144,47 @@ class AutonomousScanEngine:
         return state
 
 
+    def scan_market(self, market_index: int, *, now_ms: int | None = None) -> AutonomousScanState:
+        """Run exactly one configured market and preserve lifecycle state."""
+        if market_index < 0 or market_index >= len(self.universe.markets):
+            raise ValueError(f"market_index must be between 0 and {len(self.universe.markets) - 1}")
+        timestamp = self._clock_ms() if now_ms is None else now_ms
+        market = MarketUniverse((self.universe.markets[market_index],))
+        result = scan_universe(
+            market, provider=self.provider, now_ms=timestamp, resolver=self.resolver,
+            modes=self.modes, lifecycle=self.lifecycle,
+        )
+        self._scan_number += 1
+        state = AutonomousScanState(scan_number=self._scan_number, scanned_at_ms=timestamp, result=result)
+        self._last_state = state
+        return state
+
     def run_forever_batches(
-        self,
-        *,
-        interval_seconds: float = BATCH_SCAN_INTERVAL_SECONDS,
+        self, *, interval_seconds: float = BATCH_SCAN_INTERVAL_SECONDS,
         batch_size: int = DEFAULT_MARKETS_PER_BATCH,
         on_scan: Callable[[AutonomousScanState], None] | None = None,
         should_stop: Callable[[], bool] | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
-        """Scan the configured universe in rotating batches without overlap.
-
-        With 200 markets and batch_size=20 this produces ten batches, so each
-        market is revisited once per ten-minute rotation while only 20 markets
-        are assigned to each minute-sized slot. The final batch may be smaller
-        when the configured universe is not divisible by the batch size.
-        """
-        if interval_seconds <= 0:
-            raise ValueError("interval_seconds must be greater than zero")
-        if batch_size <= 0:
-            raise ValueError("batch_size must be greater than zero")
-        batch_count = (len(self.universe.markets) + batch_size - 1) // batch_size
-        if batch_count == 0:
+        """Continuously scan one market after another in configured order."""
+        if interval_seconds < 0:
+            raise ValueError("interval_seconds must be non-negative")
+        if batch_size != 1:
+            raise ValueError("batch_size must be 1; autonomous scanning is sequential")
+        if not self.universe.markets:
             raise ValueError("market universe must not be empty")
-
-        batch_index = 0
+        market_index = 0
         while True:
             if should_stop is not None and should_stop():
                 return
-            state = self.scan_batch(batch_index, batch_size=batch_size)
+            state = self.scan_market(market_index)
             if on_scan is not None:
                 on_scan(state)
             if should_stop is not None and should_stop():
                 return
-            batch_index = (batch_index + 1) % batch_count
-            sleep(interval_seconds)
-
+            market_index = (market_index + 1) % len(self.universe.markets)
+            if interval_seconds:
+                sleep(interval_seconds)
     def run_forever(
         self,
         *,
