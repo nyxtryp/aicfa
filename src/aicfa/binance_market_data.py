@@ -234,7 +234,7 @@ class BinanceMarketDataProvider:
             raise ValueError("Binance order-book limit must be between 1 and 5000")
         payload = self._public_json(
             "depth", market_type=market_type,
-            params={"symbol": self._normalize_symbol(symbol), "limit": int(limit)},
+            params={"symbol": self._normalize_symbol(symbol), "limit": (max(int(limit), 5) if market_type == "futures" else int(limit))},
         )
         if not isinstance(payload, dict):
             raise ValueError("Binance order book response must be an object")
