@@ -242,3 +242,26 @@ Run the focused horizon/orchestrator tests on the VDS. If green, run the full re
 - The MTF target test was corrected to enforce the actual contract: targets may come from any relevant non-execution timeframe and must not be manufactured by 1m; dedicated causal target fallback tests remain unchanged.
 - No production setup-analysis logic was changed for these failures because the first two were stale fixtures and the third assertion contradicted the existing target-discovery contract.
 - Next exact action: run the corrected focused tests, then full regression. If green, proceed to configurable market universe.
+
+
+### 2026-10-03 — THREE-HORIZON REGRESSION GREEN / CONFIGURABLE MARKET UNIVERSE IMPLEMENTED
+
+- Corrected deployment fixture commit fd021de902b4544556aa82bdb0f5b651f4218f68 reached the VDS.
+- Focused tests/test_setup_analysis.py: 8 passed in 0.44s.
+- Full VDS regression after the three-horizon reconciliation: 435 passed in 87.73s (0:01:27).
+- Result: 0 failed, 0 skipped.
+- Added src/aicfa/market_universe.py with immutable MonitoredMarket and MarketUniverse contracts, asset normalization, explicit spot/futures market type, duplicate protection, and JSON loading for a durable configured universe.
+- Added config/market_universe.example.json as an empty configuration template. No coin list is hardcoded yet; the actual monitored list will be selected later.
+- Connected market_orchestrator.py to the configured universe through scan_universe(...).
+- The orchestrator still reuses the existing find_setup / Setup Engine and does not introduce a second signal engine.
+- Added contract tests for universe normalization, validation, JSON loading and configured-universe orchestration.
+- Commits:
+  - f69c22905865d06691f2bac57c11982b16fc1fe3 — configurable market universe
+  - 0405f2ccdd39855960cfddef8abc33f256b20156 — market universe contract tests
+  - 9c0e24f4c5412cc4e619c9f16d7ba177d1c7a922 — connect orchestrator to market universe
+  - 011d5b65c79840f600d07b139a5ff126097c62de — configured-universe orchestration test
+  - 6e4f2f0cfe5ffeb2038a5749628b6c34405820b9 — market universe configuration template
+
+### Next exact action
+
+Run focused VDS tests for tests/test_market_universe.py and tests/test_market_orchestrator.py. If green, run the full regression. After that, move to the structured explainable TradeDescription contract. The actual monitored coin list is intentionally deferred until the universe mechanism is verified.
