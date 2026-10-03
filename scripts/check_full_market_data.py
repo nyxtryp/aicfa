@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from pathlib import Path
 
 from aicfa.public_market_data import build_public_market_data_provider
+from aicfa.derivatives_market_data import FallbackDerivativesProvider
 
 TIMEFRAMES = ("1w", "1d", "4h", "1h", "15m", "5m")
 MARKET_TIMEOUT_SECONDS = 30.0
@@ -21,6 +22,7 @@ TRADES_LIMIT = 10
 ORDER_BOOK_LIMIT = 5
 ORDER_BOOK_SNAPSHOTS = 2
 ORDER_BOOK_INTERVAL_SECONDS = 0.2
+DERIVATIVES_LIMIT = 50
 
 
 def _call_with_timeout(fn, timeout: float):
@@ -40,7 +42,7 @@ def _call_with_timeout(fn, timeout: float):
         return result
 
 
-def _probe_market(provider, item: dict) -> tuple[bool, list[str]]:
+def _probe_market(provider, item: dict, derivatives_provider) -> tuple[bool, list[str]]:
     asset = str(item["asset"])
     market_type = str(item.get("market_type", "spot"))
     raw = item.get("venue_symbols", {})
@@ -110,8 +112,30 @@ def _probe_market(provider, item: dict) -> tuple[bool, list[str]]:
         ok = False
         results.append(f"order_book_history=FAIL({type(exc).__name__}: {exc})")
 
-    for source in ("funding", "open_interest", "liquidations", "mark_price"):
-        results.append(f"{source}=UNSUPPORTED(provider-contract)")
+    if market_type == "futures":
+        try:
+            derivatives, derivatives_source = derivatives_provider.fetch_derivatives(
+                symbol=symbol, limit=DERIVATIVES_LIMIT
+            )
+            required = ("funding_rate", "open_interest", "mark_price")
+            missing = [name for name in required if name not in derivatives.columns or derivatives[name].notna().sum() == 0]
+            if missing:
+                ok = False
+                results.append(f"derivatives=FAIL(missing:{','.join(missing)})")
+            else:
+                liq_count = int(derivatives["liquidation_volume"].notna().sum()) if "liquidation_volume" in derivatives.columns else 0
+                results.append(
+                    f"derivatives=OK(source={derivatives_source},rows={len(derivatives)},"
+                    f"funding={int(derivatives['funding_rate'].notna().sum())},"
+                    f"oi={int(derivatives['open_interest'].notna().sum())},"
+                    f"mark={int(derivatives['mark_price'].notna().sum())},"
+                    f"liquidation_events={liq_count})"
+                )
+        except Exception as exc:
+            ok = False
+            results.append(f"derivatives=FAIL({type(exc).__name__}: {exc})")
+    else:
+        results.append("derivatives=UNAVAILABLE(non-futures-market)")
 
     return ok, results
 
@@ -119,6 +143,7 @@ def _probe_market(provider, item: dict) -> tuple[bool, list[str]]:
 def main() -> None:
     markets = json.loads(Path("config/market_universe.json").read_text())["markets"]
     provider = build_public_market_data_provider(timeout_seconds=10.0)
+    derivatives_provider = FallbackDerivativesProvider()
 
     print(f"Configured markets: {len(markets)}", flush=True)
     print(
@@ -131,12 +156,12 @@ def main() -> None:
     )
     print(
         "Checked: " + ", ".join(TIMEFRAMES)
-        + " + trades + order_book + order_book_history",
+        + " + trades + order_book + order_book_history + funding + open_interest + liquidations + mark_price",
         flush=True,
     )
     print(
-        "Not silently fabricated: funding/open_interest/liquidations/mark_price "
-        "are reported as UNSUPPORTED until provider contracts exist.",
+        "Futures derivatives: funding + open_interest + mark_price are required; "
+        "liquidations are real optional event context.",
         flush=True,
     )
 
@@ -149,7 +174,7 @@ def main() -> None:
         start = time.perf_counter()
         try:
             ok, details = _call_with_timeout(
-                lambda: _probe_market(provider, item),
+                lambda: _probe_market(provider, item, derivatives_provider),
                 MARKET_TIMEOUT_SECONDS,
             )
             elapsed = time.perf_counter() - start
@@ -176,7 +201,7 @@ def main() -> None:
                 flush=True,
             )
 
-    print(f"Markets with all currently supported sources OK: {full}/{len(markets)}", flush=True)
+    print(f"Markets with all required sources OK: {full}/{len(markets)}", flush=True)
     print(f"Total elapsed: {time.perf_counter() - start_all:.2f}s", flush=True)
 
 
