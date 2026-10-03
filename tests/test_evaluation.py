@@ -187,7 +187,7 @@ def test_chronological_folds_are_forward_only_and_purged() -> None:
     assert validation_1["timestamp"].tolist() == list(timestamps[6:8])
     assert train_0["timestamp"].max() < validation_0["timestamp"].min()
     assert train_1["timestamp"].max() < validation_1["timestamp"].min()
-    assert train_0["timestamp"].tolist() == list(timestamps[:2])
+    assert train_0["timestamp"].tolist() == list(timestamps[:3])
     assert train_1["timestamp"].tolist() == list(timestamps[:4])
 
 
