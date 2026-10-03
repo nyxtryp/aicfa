@@ -374,11 +374,9 @@ def test_setup_engine_can_return_second_distinct_target_after_primary_draw():
     assert targets[1].value == 125.0
 
 
-def test_setup_engine_reports_rejected_rr_geometry():
+def test_setup_engine_exposes_derived_rr_without_fixed_minimum_gate():
     frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     # Keep this fixture's target geometry deterministic across all TFs.
-    # Other frames normally carry active liquidity at 130, which can make
-    # the candidate pass RR even when the 4h liquidity is too close.
     for frame in frames.values():
         frame.loc[0, "active_buy_liquidity_price"] = float("nan")
         frame.loc[0, "liquidity_breakout_high"] = float("nan")
@@ -390,13 +388,9 @@ def test_setup_engine_reports_rejected_rr_geometry():
 
     result = _pipeline(frames)
 
-    assert result.candidates == ()
-    rr_messages = [
-        item for item in result.missing_context
-        if item.startswith("continuation: structural risk/reward is below the minimum")
-    ]
-    assert rr_messages
-    assert "entry=" in rr_messages[0]
-    assert "invalidation=" in rr_messages[0]
-    assert "tp1=" in rr_messages[0]
-    assert "rr=" in rr_messages[0]
+    assert result.decision is SetupDecision.READY
+    assert result.candidates
+    candidate = result.candidates[0]
+    assert candidate.invalidation_level.value == 99.0
+    assert candidate.target_levels[0].value == 106.0
+    assert candidate.target_levels[0].value > max(level.value for level in candidate.entry_zone)
