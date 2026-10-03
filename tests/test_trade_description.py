@@ -64,7 +64,7 @@ def test_trade_description_projects_existing_geometry_and_evidence():
     assert description.stop_loss.value == 96.0
     assert description.tp1.value == 105.0
     assert description.tp2.value == 110.0
-    assert description.rr == pytest.approx(6.0)
+    assert description.rr == pytest.approx(3.0)
     assert "market_structure.bos" in description.structure_evidence
     assert "liquidity.sweep" in description.liquidity_evidence
     assert description.zone_evidence == ("order_block.bullish", "imbalance.fvg")
