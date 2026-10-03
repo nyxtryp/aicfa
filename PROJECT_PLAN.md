@@ -1,24 +1,24 @@
-## 2026-10-03 — TASK 9 — CHRONOLOGICAL PURGED FOLDS GREEN / REGRESSION VERIFIED
+## 2026-10-03 — TASK 9 — RR ↔ OUTCOME ANALYSIS GREEN
 
-- Corrected the focused chronological-fold test expectation in commit `cb0f716521b0437697ab1f3f5c504151b4c161b4` — `test: correct chronological fold purge expectation`.
-- Production chronological-fold implementation remains unchanged: `c36f241b78c5ae7780ee30064719efcf167b8d7f`.
-- Server focused validation: `tests/test_evaluation.py` = **14 passed in 0.47s**.
-- The corrected expectation reflects strict causal purging: a training label is retained only when `label_end_timestamp < validation_start`; labels ending exactly at or after validation start are removed.
-- Server full regression: **416 passed in 82.03s (0:01:22)**.
+- Added causal RR ↔ outcome analysis in production commit `3118e99fee3381d01598544e60f80edbfb614e72` — `feat: add RR outcome analysis`.
+- RR is derived directly from structural Entry/SL/TP geometry for each already-defined setup; it is not used as a setup-validity filter.
+- Analysis preserves the observed outcome for every setup: TP, SL, TIMEOUT, or AMBIGUOUS.
+- Aggregate `mean_rr` is calculated only across resolved TP/SL outcomes; unresolved TIMEOUT/AMBIGUOUS outcomes remain visible and are excluded from that resolved aggregate.
+- Mismatched setup/evaluation counts are rejected explicitly.
+- Server focused validation: `tests/test_evaluation.py` = **17 passed in 0.49s**.
 - Result: **0 failed, 0 skipped**.
-- Chronological validation is forward-only with expanding training windows; validation rows never enter training; causal label intervals are purged at the validation boundary.
-- RR remains a derived setup metric and is not used as a fixed setup-validity filter.
-- No hit-rate, profitability, confidence, or trading-performance claim is made from this validation.
+- No hit-rate, profitability, confidence, predictive-performance, or trading-performance claim is made from this analysis.
 
 ### Current Task 9 status
 
 - Conservative single-setup evaluator: GREEN.
 - Batch evaluation/statistics: GREEN.
 - Causal label purging: GREEN.
-- Chronological purged validation folds: **GREEN**.
-- Full regression: **GREEN — 416/416**.
-- Task 9 remains ACTIVE because the next required evaluation layer is RR ↔ outcome analysis on causally separated folds.
+- Chronological purged validation folds: GREEN.
+- RR ↔ outcome analysis: **GREEN — 17/17 focused evaluation tests**.
+- Full regression after the RR layer: **PENDING**.
+- Task 9 remains ACTIVE.
 
 ### Next exact action
 
-Implement focused tests for **RR ↔ outcome analysis on chronological purged folds**. RR must be treated as an observed setup attribute and analyzed against actual TP/SL/TIMEOUT/AMBIGUOUS outcomes without turning RR into a fixed filter or claiming predictive performance in advance. Preserve strict causal boundaries and do not introduce confidence scores or arbitrary thresholds.
+Run the full regression suite on the server after the RR layer. If green, record the exact result in this diary and continue Task 9 with RR/outcome analysis across the chronological purged folds, preserving strict causal boundaries and avoiding fixed RR filters, confidence scores, arbitrary thresholds, or unsupported performance claims.
