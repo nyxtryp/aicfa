@@ -176,10 +176,18 @@ def build_features(
         for column in derivatives.columns:
             out[column] = derivatives[column].to_numpy()
 
+    from .volume_evidence import build_volume_evidence
+    volume_evidence = build_volume_evidence(
+        x, structure=structure, liquidity=liquidity, displacement=displacement
+    )
+    for column in volume_evidence.columns:
+        if column.startswith("volume_evidence_"):
+            out[column] = volume_evidence[column].to_numpy()
+
     from .unified_smc import build_unified_smc
     unified_smc=build_unified_smc(x,structure=structure,liquidity=liquidity,
         displacement=displacement,fvg=fvg,order_blocks=order_blocks,
-        premium_discount=premium_discount)
+        premium_discount=premium_discount,volume_evidence=volume_evidence)
     for column in ["smc_structure_direction","smc_structure_event","smc_structure_shift",
                     "smc_liquidity_event","smc_sweep_low_reclaim","smc_sweep_high_reclaim",
                     "smc_buy_side_liquidity","smc_sell_side_liquidity",
@@ -200,7 +208,13 @@ def build_features(
                     "smc_fvg_active","smc_order_block_event","smc_order_block_lifecycle",
                     "smc_order_block_active","smc_breaker_bullish","smc_breaker_bearish",
                     "smc_dealing_range_position","smc_premium_discount","smc_premium",
-                    "smc_discount","smc_equilibrium","smc_state_ready"]:
+                    "smc_discount","smc_equilibrium","smc_state_ready",
+                    "smc_volume_evidence_relative","smc_volume_evidence_zscore",
+                    "smc_volume_evidence_expansion","smc_volume_evidence_dry_up",
+                    "smc_volume_evidence_breakout_up","smc_volume_evidence_breakout_down",
+                    "smc_volume_evidence_rejection_high","smc_volume_evidence_rejection_low",
+                    "smc_volume_evidence_liquidity_sweep_high","smc_volume_evidence_liquidity_sweep_low",
+                    "smc_volume_evidence_displacement_up","smc_volume_evidence_displacement_down"]:
         out[column]=unified_smc[column].to_numpy()
 
     if multi_timeframe_frames is not None:
