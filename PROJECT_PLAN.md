@@ -320,3 +320,20 @@ Run focused VDS validation for `tests/test_market_orchestrator.py` and `tests/te
 ### Next exact action
 
 Deploy the two commits to the VDS, run `tests/test_setup_lifecycle.py` first, then `tests/test_market_orchestrator.py tests/test_trade_description.py`, then the full regression. After green verification, connect the orchestrator's HorizonSetup identities to this multi-setup lifecycle so repeated scans update the same setup while distinct geometries remain simultaneously active.
+
+
+### 2026-10-03 — ORCHESTRATOR CONNECTED TO MULTI-SETUP LIFECYCLE
+
+- Connected `market_orchestrator.py` to the existing multi-setup `SetupLifecycle` through an optional lifecycle state.
+- Each emitted `HorizonSetup` can now expose its stable `SetupIdentity` and the corresponding lifecycle result.
+- The orchestrator evaluates the latest execution-timeframe close for each primary horizon when lifecycle tracking is enabled.
+- Repeated scans of the same setup geometry update the same lifecycle instead of creating duplicates.
+- Distinct geometries in the same market/horizon remain independent; Intraday, Swing and Position lifecycles coexist on the same market.
+- Lifecycle state is still separate from the deterministic setup-generation pipeline; no new signal logic or forced setup was introduced.
+- Added orchestrator regression tests for repeated-scan continuity and independent geometries.
+- Production commit: `5d121fbc10b5a575dc3ee16a2e166d2510960c94` — `feat: connect orchestrator scans to setup lifecycle`.
+- Test commit: `1b43f3ac3ce863382f8075f2ebbf7c5e88c035cd` — `test: verify orchestrator lifecycle continuity`.
+
+### Next exact action
+
+Deploy the latest commits to the VDS. Run the lifecycle + orchestrator focused tests first. If green, run the full regression. Then move to the autonomous recurring scan/state loop and persistent setup records, without limiting the number of valid concurrent setups.
