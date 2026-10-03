@@ -9,9 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
-from .data_requirements import TradingMode
+from .data_requirements import TradingMode, mode_timeframe_profile
 from .find_setup import FindSetupRequest, FindSetupResult, find_setup
 from .market_universe import MarketUniverse
+from .setup_lifecycle import SetupIdentity, SetupLifecycle, SetupLifecycleResult
 from .trade_description import TradeDescription, build_trade_description
 
 
@@ -24,11 +25,13 @@ PRIMARY_TRADING_MODES: tuple[TradingMode, ...] = (
 
 @dataclass(frozen=True)
 class HorizonSetup:
-    """One setup candidate with the horizon that produced it."""
+    """One setup candidate with identity and current lifecycle projection."""
 
     mode: TradingMode
     candidate: object
     description: TradeDescription
+    identity: SetupIdentity | None = None
+    lifecycle_result: SetupLifecycleResult | None = None
 
 
 @dataclass(frozen=True)
@@ -38,6 +41,7 @@ class MarketHorizonScan:
     asset: str
     results: tuple[FindSetupResult, ...]
     setups: tuple[HorizonSetup, ...]
+    lifecycle_results: tuple[SetupLifecycleResult, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -55,6 +59,17 @@ class MultiMarketScan:
         )
 
 
+def _latest_execution_price(result: FindSetupResult, mode: TradingMode) -> float:
+    """Read the latest completed execution close used by lifecycle evaluation."""
+    timeframe = mode_timeframe_profile(mode).execution_timeframe
+    frame = result.frames.get(timeframe)
+    if frame is None or frame.empty or "close" not in frame.columns:
+        raise ValueError(
+            f"execution timeframe {timeframe} has no close data for lifecycle evaluation"
+        )
+    return float(frame["close"].iloc[-1])
+
+
 def analyze_market_horizons(
     asset: str,
     *,
@@ -63,6 +78,7 @@ def analyze_market_horizons(
     market_type: str = "spot",
     resolver: Callable[[str, str], str] | None = None,
     modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
+    lifecycle: SetupLifecycle | None = None,
 ) -> MarketHorizonScan:
     """Run the existing FindSetup pipeline once per primary horizon.
 
@@ -77,6 +93,7 @@ def analyze_market_horizons(
 
     results: list[FindSetupResult] = []
     setups: list[HorizonSetup] = []
+    lifecycle_results: list[SetupLifecycleResult] = []
     for mode in normalized_modes:
         result = find_setup(
             FindSetupRequest(asset=asset, market_type=market_type, mode=mode),
@@ -86,13 +103,45 @@ def analyze_market_horizons(
         )
         results.append(result)
         candidates = getattr(result.setup_assessment, "candidates", ())
+
+        mode_lifecycle: tuple[SetupLifecycleResult, ...] = ()
+        if lifecycle is not None:
+            mode_lifecycle = lifecycle.evaluate_all(
+                symbol=result.symbol,
+                market_type=market_type,
+                horizon=mode,
+                assessment=result.setup_assessment,
+                current_price=_latest_execution_price(result, mode),
+                now_ms=now_ms,
+            )
+            lifecycle_results.extend(mode_lifecycle)
+
+        lifecycle_by_identity = {
+            item.identity: item
+            for item in mode_lifecycle
+            if item.identity is not None
+        }
         for candidate in candidates:
             description = build_trade_description(result, candidate, now_ms=now_ms)
+            identity = (
+                lifecycle.identity(
+                    symbol=result.symbol,
+                    market_type=market_type,
+                    horizon=mode,
+                    candidate=candidate,
+                )
+                if lifecycle is not None
+                else None
+            )
             setups.append(
                 HorizonSetup(
                     mode=mode,
                     candidate=candidate,
                     description=description,
+                    identity=identity,
+                    lifecycle_result=(
+                        lifecycle_by_identity.get(identity) if identity is not None else None
+                    ),
                 )
             )
 
@@ -101,6 +150,7 @@ def analyze_market_horizons(
         asset=resolved_asset,
         results=tuple(results),
         setups=tuple(setups),
+        lifecycle_results=tuple(lifecycle_results),
     )
 
 
@@ -112,6 +162,7 @@ def scan_markets(
     market_type: str = "spot",
     resolver: Callable[[str, str], str] | None = None,
     modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
+    lifecycle: SetupLifecycle | None = None,
 ) -> MultiMarketScan:
     """Scan each configured market independently across the primary horizons."""
     normalized_assets = tuple(asset.strip() for asset in assets if asset.strip())
@@ -126,6 +177,7 @@ def scan_markets(
             market_type=market_type,
             resolver=resolver,
             modes=modes,
+            lifecycle=lifecycle,
         )
         for asset in normalized_assets
     )
@@ -139,6 +191,7 @@ def scan_universe(
     now_ms: int,
     resolver: Callable[[str, str], str] | None = None,
     modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
+    lifecycle: SetupLifecycle | None = None,
 ) -> MultiMarketScan:
     """Scan the durable configured universe without hardcoding any asset."""
     markets = tuple(
@@ -149,6 +202,7 @@ def scan_universe(
             market_type=market.market_type,
             resolver=resolver,
             modes=modes,
+            lifecycle=lifecycle,
         )
         for market in universe.markets
     )
