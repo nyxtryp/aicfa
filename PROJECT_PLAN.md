@@ -502,3 +502,10 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 4. Fix any markets still missing across the full source chain.
 5. Then measure the real 40-market batch wall-clock runtime.
 6. Only after that wire the live service loop and proceed to durable persistence.
+
+
+### 2026-10-03 — VENUE ROUTER CONTRACT FIX
+
+- Fixed src/aicfa/market_aware_router.py in commit b160e20cf028ce8340fbd9f10610fda964e2f9c6.
+- Added the missing resolve_symbol() provider-contract method and populated the venue-symbol cache during resolution.
+- This fixes the VDS focused-test failure where MarketAwareFallbackProvider had no resolve_symbol attribute; the fallback path continues to use each venue's own symbol.
