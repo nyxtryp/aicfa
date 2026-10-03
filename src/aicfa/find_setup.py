@@ -236,6 +236,11 @@ def find_setup(
 ) -> FindSetupResult:
     """Resolve the asset, collect knowledge-required context, and run AICFA."""
     use_live_derivatives = provider is None
+    # Futures are derivative instruments: collect the existing causal
+    # derivatives evidence layer automatically for live FindSetup requests.
+    # Spot/TradFi requests do not pay this cost unless explicitly requested.
+    if use_live_derivatives and request.market_type == "futures" and derivatives_provider is None:
+        derivatives_provider = FallbackDerivativesProvider()
     if provider is None:
         provider = FallbackMarketDataProvider(
             (BinanceMarketDataProvider(), BybitMarketDataProvider())
