@@ -12,6 +12,7 @@ from aicfa.evaluation import (
     evaluate_setup,
     evaluate_setups,
     purge_training_labels,
+    summarize_cost_adjusted_returns_by_folds,
     summarize_outcomes_by_folds,
 )
 
@@ -258,3 +259,28 @@ def test_outcome_statistics_by_folds_do_not_create_cross_fold_average() -> None:
     assert stats[0].tp_rate == 1.0
     assert stats[1].tp_rate == 0.0
 
+
+def test_cost_adjusted_returns_by_folds_apply_explicit_cost_only_to_resolved_outcomes() -> None:
+    first = evaluate_setups(
+        candles([(100, 101, 99), (100, 106, 99)]),
+        [{"setup_timestamp": "2026-01-01T00:00:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 105}],
+    )
+    second = evaluate_setups(
+        candles([(100, 101, 99), (100, 106, 94)]),
+        [{"setup_timestamp": "2026-01-01T00:00:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 105}],
+    )
+    stats = summarize_cost_adjusted_returns_by_folds([first, second], round_trip_cost_rate=0.01)
+    assert stats[0].resolved_count == 1
+    assert stats[0].mean_net_return == pytest.approx(0.04)
+    assert stats[1].resolved_count == 0
+    assert stats[1].mean_net_return is None
+    assert stats[0].round_trip_cost_rate == 0.01
+
+
+def test_cost_adjusted_returns_reject_negative_cost() -> None:
+    evaluation = evaluate_setups(
+        candles([(100, 101, 99), (100, 106, 99)]),
+        [{"setup_timestamp": "2026-01-01T00:00:00Z", "direction": "long", "entry_price": 100, "stop_price": 95, "target_price": 105}],
+    )
+    with pytest.raises(ValueError, match="non-negative"):
+        summarize_cost_adjusted_returns_by_folds([evaluation], round_trip_cost_rate=-0.01)
