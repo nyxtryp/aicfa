@@ -81,13 +81,17 @@ def build_unified_smc(
 
     # Structure: direction and discrete break/shift events remain separate.
     copy_column(structure, "structure_direction", "smc_structure_direction")
+    structure_bos_up = structure["bos_up"].to_numpy() if "bos_up" in structure.columns else np.zeros(n, dtype="int8")
+    structure_bos_down = structure["bos_down"].to_numpy() if "bos_down" in structure.columns else np.zeros(n, dtype="int8")
+    structure_choch_up = structure["choch_up"].to_numpy() if "choch_up" in structure.columns else np.zeros(n, dtype="int8")
+    structure_choch_down = structure["choch_down"].to_numpy() if "choch_down" in structure.columns else np.zeros(n, dtype="int8")
     out["smc_structure_event"] = np.select(
-        [structure["bos_up"].to_numpy() == 1, structure["bos_down"].to_numpy() == 1],
+        [structure_bos_up == 1, structure_bos_down == 1],
         [1, -1],
         default=0,
     ).astype("int8")
     out["smc_structure_shift"] = np.select(
-        [structure["choch_up"].to_numpy() == 1, structure["choch_down"].to_numpy() == 1],
+        [structure_choch_up == 1, structure_choch_down == 1],
         [1, -1],
         default=0,
     ).astype("int8")
