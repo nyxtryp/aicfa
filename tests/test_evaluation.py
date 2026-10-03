@@ -52,7 +52,7 @@ def test_timeout_is_explicit_and_does_not_guess_winner() -> None:
 
 
 def test_short_is_symmetric() -> None:
-    result = evaluate_setup(candles([(100, 101, 99), (100, 94, 101)]),
+    result = evaluate_setup(candles([(100, 101, 99), (100, 101, 94)]),
         setup_timestamp="2026-01-01T00:00:00Z", direction="short",
         entry_price=100, stop_price=105, target_price=95)
     assert result.outcome is EvaluationOutcome.TP
