@@ -360,3 +360,19 @@ Deploy the latest commits to the VDS. Run the lifecycle + orchestrator focused t
 ### Next exact action
 
 Deploy the autonomous scan/state engine and run its focused tests. If green, run the full regression. Then add durable setup-state records so active setups survive process restarts without changing setup identity or lifecycle semantics. Keep the monitored coin list configurable and do not hardcode a fixed asset set.
+
+### 2026-10-03 — PRIMARY AUTONOMOUS SCAN CADENCE FIXED AT 5 MINUTES
+
+- Fixed the primary autonomous scan cadence contract at **5 minutes (300 seconds)** via `MAIN_SCAN_INTERVAL_SECONDS = 300`.
+- Each cycle re-evaluates the configured market universe; it does **not** create a new signal merely because five minutes elapsed.
+- `SetupLifecycle` remains responsible for recognizing the same setup geometry, a new independent setup, TP1/TP2, invalidation and expiration.
+- Scalping remains a separate future approximately minute-level product surface and is not part of this primary cycle.
+- Durable persistence is intentionally deferred until the real scan cadence and market-universe runtime are verified.
+- The actual monitored coin list is still intentionally not invented; it will be fixed in the single `config/market_universe.json` configuration once the user selects the exact markets.
+
+### Next exact action
+
+1. Select the exact fixed monitored coin/market list.
+2. Create the production `config/market_universe.json` from that list.
+3. Run the autonomous scanner against the complete list and measure one full 5-minute-cycle execution time on the VDS.
+4. Only after runtime is acceptable, proceed to durable setup-state persistence.
