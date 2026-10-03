@@ -61,3 +61,46 @@ def test_production_universe_keeps_193_crypto_and_adds_44_verified_tradfi() -> N
         and "GBP/USDT:USDT" not in item["venue_symbols"].values()
         for item in tradfi
     )
+
+
+def test_explicit_mapping_never_falls_back_to_unmapped_generic_venue() -> None:
+    binance = _Provider("binance", "XAGUSDT", "XAGUSDT")
+    bybit = _Provider("bybit", "WRONG", "XAG/USDT:USDT")
+    router = MarketAwareFallbackProvider([binance, bybit])
+
+    router.register_market_symbols(
+        "XAG/USDT",
+        (("bybit", "XAG/USDT:USDT"),),
+        market_type="futures",
+    )
+
+    assert router.resolve_symbol("XAG/USDT", market_type="futures") == "XAG/USDT:USDT"
+    result = router.fetch_ohlcv(
+        symbol="XAG/USDT:USDT",
+        market_type="futures",
+        timeframe="1h",
+        since_ms=None,
+        limit=10,
+    )
+    assert float(result.iloc[-1]["close"]) == 1.0
+
+
+def test_explicit_mapping_can_fallback_between_mapped_venues_only() -> None:
+    bybit = _Provider("bybit", "WRONG", "BAD")
+    okx = _Provider("okx", "WRONG", "XAG/USDT:USDT")
+    router = MarketAwareFallbackProvider([bybit, okx])
+
+    router.register_market_symbols(
+        "XAG/USDT",
+        (("bybit", "XAG/USDT:USDT"), ("okx", "XAG/USDT:USDT")),
+        market_type="futures",
+    )
+
+    result = router.fetch_ohlcv(
+        symbol="XAG/USDT:USDT",
+        market_type="futures",
+        timeframe="1h",
+        since_ms=None,
+        limit=10,
+    )
+    assert float(result.iloc[-1]["close"]) == 1.0
