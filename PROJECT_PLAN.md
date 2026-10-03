@@ -720,3 +720,21 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Added total, average, minimum and maximum resolution timings.
 - Output is flushed immediately so the per-market timer is visible while the 146-market run is in progress.
 - No market-data, routing, analysis, or scheduler logic was changed.
+
+### 2026-10-04 — FUTURES-ONLY MONITORING + SEQUENTIAL 24/7 QUEUE + 15s MARKET TIMEOUT
+
+- Removed **MKR/USDT, NOT/USDT and DOGS/USDT** from the production monitored universe.
+- Changed the remaining crypto monitored markets from **spot to futures**, because AICFA's execution/trading target is futures. TradFi remains futures as before.
+- Production universe is now **114 crypto futures + 29 TradFi futures = 143 markets**.
+- Autonomous monitoring no longer uses a 20-market/minute batch model. The queue is now **one market at a time in configured order**, then wraps to the first market and repeats continuously 24/7.
+- `batch_size=1` is retained only for API compatibility; a multi-market batch is no longer the production scheduling model.
+- Coverage resolution now has a **15-second per-market timeout**. If no source resolves the market within 15 seconds, it is logged as TIMEOUT and the queue advances to the next market immediately.
+- The 15-second rule is a data-resolution guard; it does not fabricate data or substitute an unmapped venue.
+
+### Next exact action
+
+1. Deploy these changes through FrostDeploy.
+2. Run focused universe + autonomous scheduler tests.
+3. Run the 143-market live coverage check and record which crypto futures are actually available.
+4. Remove only crypto markets that genuinely have no usable futures source after the 15-second rule; do not silently fall back to spot.
+5. Validate representative/full futures OHLCV/MTF acquisition before continuing with setup analysis.
