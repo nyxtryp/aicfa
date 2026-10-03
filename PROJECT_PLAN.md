@@ -641,3 +641,25 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 ```
 
 - Do not add any result to production until the output has been reviewed target-by-target.
+
+
+### 2026-10-04 — LIVE TRADFI MAPPING INTEGRATED BESIDE 193 CRYPTO
+
+- Reviewed the live Bybit/OKX/Bitget/MEXC verification output for all 55 approved targets.
+- Integrated **44 verified TradFi perpetual markets** into the same `config/market_universe.json` beside the unchanged **193 crypto spot markets**.
+- TradFi entries use `market_type=futures`, `asset_class=tradfi`, `instrument_type=perpetual`, and verified `venue_symbols`.
+- Bitget entries explicitly marked `isRwa=YES` were not used as production mappings.
+- FX false positives such as `EUR/USDT`, `GBP/USDT`, `JPY/USDT`, `CHF/USDT`, `AUD/USDT`, `CAD/USDT` were not treated as the corresponding FX pairs. Only verified EUR/USD and GBP/USD perpetual mappings were integrated.
+- Existing **SPX/USDT spot crypto entry remains untouched**; the S&P 500 TradFi target is represented separately by the same canonical asset with `market_type=futures`, preserving both markets.
+- Added routing support so `MarketAwareFallbackProvider` consumes verified `venue_symbols` before generic symbol resolution, while retaining normal fallback behavior for unmapped venues.
+- `scan_universe()` now registers configured venue mappings before running the existing FindSetup/SMC pipeline; no separate TradFi scanner or analytical engine was introduced.
+- Added focused regression coverage for native-symbol routing and the 193-crypto + 44-TradFi production-universe contract.
+- **11 approved targets remain pending** because no non-RWA verified perpetual mapping was established in the current four-venue output: USD/JPY, USD/CHF, AUD/USD, USD/CAD, NZD/USD, RUT, DAX 40, FTSE 100, CAC 40, Euro Stoxx 50, VIX.
+
+### Next exact action
+
+1. Deploy commits to VDS.
+2. Run focused TradFi routing/universe tests.
+3. Run live resolution/MTF acquisition on a small representative TradFi set across Bybit/OKX/MEXC.
+4. If resolution is clean, run the full 237-market universe validation and measure the new autonomous rotation interval.
+5. Investigate the 11 still-pending targets separately; do not fabricate mappings or convert crypto/USDT instruments into FX/index equivalents.
