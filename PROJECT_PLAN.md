@@ -711,3 +711,12 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Fixed MarketAwareFallbackProvider.register_market_symbols() so every explicitly mapped native venue symbol is immediately routable after registration; fallback still remains restricted to the explicitly mapped venues.
 - No market-analysis, SMC, setup, lifecycle, Entry/SL/TP, or scheduler behavior was changed.
 - Next: redeploy these two fixes, run the focused TradFi routing tests, then rerun the full regression.
+
+
+### 2026-10-04 — LIVE COVERAGE TIMING INSTRUMENTATION
+
+- Updated `scripts/check_market_coverage.py` to measure the real symbol-resolution time for **each configured market**.
+- Each market now prints an indexed timing line in the form `[001/146] BTC/USDT -> ... | 0.123s`, including missing markets.
+- Added total, average, minimum and maximum resolution timings.
+- Output is flushed immediately so the per-market timer is visible while the 146-market run is in progress.
+- No market-data, routing, analysis, or scheduler logic was changed.
