@@ -30,10 +30,33 @@ class MarketAwareFallbackProvider:
         self._providers = tuple(providers)
         self._resolved: dict[tuple[str, str], ResolvedMarket] = {}
         self._by_symbol: dict[tuple[str, str], ResolvedMarket] = {}
+        self._market_symbols: dict[tuple[str, str], dict[str, str]] = {}
 
     @property
     def providers(self) -> tuple[MarketDataProvider, ...]:
         return self._providers
+
+    def register_market_symbols(
+        self,
+        asset: str,
+        venue_symbols: Sequence[tuple[str, str]],
+        *,
+        market_type: str = "spot",
+    ) -> None:
+        """Register verified venue-native symbols for one configured market."""
+        key = (asset.strip().upper(), market_type)
+        normalized = {
+            str(venue).strip().lower(): str(symbol).strip()
+            for venue, symbol in venue_symbols
+            if str(venue).strip() and str(symbol).strip()
+        }
+        if not normalized:
+            return
+        self._market_symbols[key] = normalized
+        self._resolved.pop(key, None)
+        for cache_key in tuple(self._by_symbol):
+            if cache_key[1] == market_type:
+                self._by_symbol.pop(cache_key, None)
 
     def resolve_market(self, asset: str, *, market_type: str = "spot") -> ResolvedMarket:
         key = (asset.strip().upper(), market_type)
@@ -41,8 +64,20 @@ class MarketAwareFallbackProvider:
         if cached is not None:
             return cached
 
+        mapped = self._market_symbols.get(key, {})
         attempts: list[MarketResolutionAttempt] = []
         for provider in self._providers:
+            provider_id = provider_name(provider).strip().lower()
+            if provider_id in mapped:
+                resolved = ResolvedMarket(
+                    asset=key[0],
+                    market_type=market_type,
+                    provider=provider_name(provider),
+                    symbol=mapped[provider_id],
+                )
+                self._resolved[key] = resolved
+                self._by_symbol[(resolved.symbol.upper(), market_type)] = resolved
+                return resolved
             resolver = getattr(provider, "resolve_symbol", None)
             if resolver is None:
                 attempts.append(MarketResolutionAttempt(
@@ -96,7 +131,15 @@ class MarketAwareFallbackProvider:
                 attempts.append(ProviderAttempt(provider_name(provider), "symbol resolver unavailable"))
                 continue
             try:
-                venue_symbol = str(resolver(resolved.asset, market_type=market_type))
+                mapped = self._market_symbols.get((resolved.asset, market_type), {})
+                venue_symbol = (
+                    mapped.get(provider_name(provider).strip().lower())
+                    or (
+                        resolved.symbol
+                        if provider_name(provider) == resolved.provider
+                        else str(resolver(resolved.asset, market_type=market_type))
+                    )
+                )
                 frame = provider.fetch_ohlcv(
                     symbol=venue_symbol, market_type=market_type, timeframe=timeframe,
                     since_ms=since_ms, limit=limit,
