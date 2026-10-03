@@ -340,25 +340,33 @@ def _scenario_zone_concepts(
 def _invalidation_level(
     context: MultiTimeframeContext,
     direction: str,
+    scenario: str,
     source_timeframes: tuple[str, ...],
     entry_zone: tuple[SetupLevel, ...],
 ) -> SetupLevel | None:
-    columns = (
-        ("smc_sweep_low_level", "sweep low"),
-        ("previous_low", "previous low"),
-        ("active_sell_liquidity_price", "sell-side liquidity"),
-    ) if direction == "long" else (
-        ("smc_sweep_high_level", "sweep high"),
-        ("previous_high", "previous high"),
-        ("active_buy_liquidity_price", "buy-side liquidity"),
+    if direction == "long":
+        sweep_column, sweep_source = "smc_sweep_low_level", "sweep low"
+        swing_column, swing_source = "previous_low", "previous low"
+    else:
+        sweep_column, sweep_source = "smc_sweep_high_level", "sweep high"
+        swing_column, swing_source = "previous_high", "previous high"
+
+    # Invalidation is the structural level whose violation breaks the setup
+    # hypothesis. Liquidity pools are draw-on targets, not automatic stop levels.
+    preferred = (
+        (sweep_column, sweep_source),
+        (swing_column, swing_source),
+    ) if scenario in {"reversal", "breakout_failure"} else (
+        (swing_column, swing_source),
+        (sweep_column, sweep_source),
     )
+
     if len(entry_zone) < 2:
         return None
     entry_low = min(level.value for level in entry_zone)
     entry_high = max(level.value for level in entry_zone)
     candidates: list[SetupLevel] = []
-    # Invalidation is tied to the structural premise, not mechanically to
-    # the entry zone timeframe. Inspect every non-execution structural layer.
+
     allowed = tuple(tf for tf in context.timeframes if tf != context.execution_timeframe)
     ordered_timeframes = tuple(
         tf for tf in source_timeframes if tf in allowed
@@ -369,7 +377,7 @@ def _invalidation_level(
         row = context.latest_rows.get(timeframe)
         if row is None:
             continue
-        for column, source in columns:
+        for column, source in preferred:
             value = _numeric(row, column)
             if value is None:
                 continue
@@ -377,8 +385,11 @@ def _invalidation_level(
                 candidates.append(SetupLevel(value=value, timeframe=timeframe, source=source))
             elif direction == "short" and value > entry_high:
                 candidates.append(SetupLevel(value=value, timeframe=timeframe, source=source))
+
     if not candidates:
         return None
+
+    # Pick the nearest valid level from the preferred structural family.
     if direction == "long":
         return max(candidates, key=lambda level: level.value)
     return min(candidates, key=lambda level: level.value)
@@ -683,7 +694,7 @@ def analyze_setups(
                 zones,
             )
             entry_levels = _zone_levels(context, direction, scenario_zones, current_price)
-            invalidation_level = _invalidation_level(context, direction, source_tfs, entry_levels)
+            invalidation_level = _invalidation_level(context, direction, hypothesis.scenario, source_tfs, entry_levels)
             entry_timeframe = entry_levels[0].timeframe if entry_levels else None
             target_levels = _target_levels(
                 context,
