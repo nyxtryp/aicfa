@@ -192,7 +192,7 @@ class BinanceMarketDataProvider:
             raise ValueError("Binance trade limit must be between 1 and 1000")
         payload = self._public_json(
             "trades", market_type=market_type,
-            params={"symbol": self._normalize_symbol(symbol), "limit": int(limit)},
+            params={"symbol": self._normalize_symbol(symbol), "limit": (max(int(limit), 5) if market_type == "futures" else int(limit))},
         )
         if not isinstance(payload, list):
             raise ValueError("Binance trades response must be a list")
