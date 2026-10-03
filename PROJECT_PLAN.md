@@ -41,3 +41,19 @@
 ### Next exact action
 
 Continue Task 9 from the existing chronological purged-fold foundation with the next evaluation/statistics layer defined by the project plan, preserving strict causal boundaries and avoiding fixed RR filters, confidence scores, arbitrary thresholds, or unsupported performance claims.
+
+
+### 2026-10-03 — SETUP OUTCOME JOURNAL GREEN / FOCUSED VALIDATION VERIFIED
+
+- Added historical per-setup outcome journal in production commit `6190b3817e46eb9fb4ed4cf6b28d61e5613f1e0a` — `feat: add historical setup outcome journal`.
+- Added contract coverage in test commit `9507961cff3652a6a8fa5df1ef8191cdbc4402ef` — `test: define setup outcome journal contract`.
+- Each journal record preserves setup timestamp, direction, Entry/SL/TP, derived RR, causal outcome, outcome offset, exit price, and gross return.
+- TP, SL, TIMEOUT, and AMBIGUOUS remain explicit; unresolved outcomes do not receive fabricated exit prices or returns.
+- The journal pairs already-defined setups with already-computed causal evaluations; it does not create or modify Entry/SL/TP.
+- Focused server validation: `tests/test_evaluation.py` = **26 passed**.
+- Full regression is not yet rerun after this layer.
+- Task 9 remains ACTIVE.
+
+### Next exact action
+
+Run the full regression after the historical setup outcome journal layer, then record the final test count and continue Task 9 only from the verified causal evaluation foundation.
