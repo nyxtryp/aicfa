@@ -721,3 +721,16 @@ Run `tests/test_evaluation.py` on the server. If GREEN, inspect the exact result
 
 ### Next exact action
 Run the full server regression and record the exact pass/fail count and runtime. If GREEN, update this plan and continue Task 9 with the next leakage-aware chronological validation/fold slice required by the existing plan.
+
+## 2026-10-03 — TASK 9 — BATCH EVALUATION / PURGE FULL REGRESSION GREEN
+
+- Server full regression: **413 passed in 81.26s (0:01:21)**.
+- Result: **0 failed, 0 skipped**.
+- Focused Task 9 evaluator/batch/purge suite: **11 passed in 0.46s**.
+- The suite increased from **409 to 413 tests** from the new batch evaluation/purging coverage.
+- Task 9 batch evaluation and causal label purging are now **GREEN / regression-verified**.
+- RR remains a derived setup metric, not a hard-coded setup-validity gate. The existing contract intentionally does not reject setups solely because RR is below 2.0; RR will be evaluated against actual causal outcomes rather than assumed to be predictive in advance.
+- No hit-rate, profitability, confidence, or trading-performance claim is made from this regression.
+
+### Next exact action
+Continue Task 9 with the next leakage-aware chronological validation/fold layer required by the existing plan. Preserve strict causal boundaries using label_end_timestamp_<horizon>; analyze RR as an observed setup attribute alongside actual TP/SL/TIMEOUT/AMBIGUOUS outcomes rather than turning it into a fixed filter.
