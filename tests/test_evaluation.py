@@ -11,6 +11,7 @@ from aicfa.evaluation import (
     evaluate_setup,
     evaluate_setups,
     purge_training_labels,
+    summarize_outcomes_by_folds,
 )
 
 
@@ -212,3 +213,45 @@ def test_rr_analysis_by_folds_rejects_mismatched_fold_lengths() -> None:
     evaluation = evaluate_setups(candles([(100, 101, 99), (100, 106, 99)]), [setup])
     with pytest.raises(ValueError, match="same number"):
         analyze_rr_outcomes_by_folds([([setup], evaluation), ([], evaluation)])
+
+
+def test_outcome_statistics_by_folds_preserve_each_fold_without_pooling() -> None:
+    first = BatchEvaluationProxy(
+        counts={"tp": 3, "sl": 1, "timeout": 2, "ambiguous": 0},
+        resolved_count=4,
+        tp_rate=0.75,
+        mean_gross_return=0.01,
+    )
+    second = BatchEvaluationProxy(
+        counts={"tp": 1, "sl": 3, "timeout": 0, "ambiguous": 1},
+        resolved_count=4,
+        tp_rate=0.25,
+        mean_gross_return=-0.01,
+    )
+    stats = summarize_outcomes_by_folds([first, second])
+    assert [(item.fold_index, item.counts, item.resolved_count, item.tp_rate, item.mean_gross_return) for item in stats] == [
+        (0, first.counts, 4, 0.75, 0.01),
+        (1, second.counts, 4, 0.25, -0.01),
+    ]
+
+
+def test_outcome_statistics_by_folds_do_not_create_cross_fold_average() -> None:
+    first = BatchEvaluationProxy(
+        counts={"tp": 10, "sl": 0, "timeout": 0, "ambiguous": 0},
+        resolved_count=10,
+        tp_rate=1.0,
+        mean_gross_return=0.02,
+    )
+    second = BatchEvaluationProxy(
+        counts={"tp": 0, "sl": 10, "timeout": 0, "ambiguous": 0},
+        resolved_count=10,
+        tp_rate=0.0,
+        mean_gross_return=-0.02,
+    )
+    stats = summarize_outcomes_by_folds([first, second])
+    assert len(stats) == 2
+    assert stats[0].tp_rate == 1.0
+    assert stats[1].tp_rate == 0.0
+
+
+BatchEvaluationProxy = type("BatchEvaluationProxy", (), {})
