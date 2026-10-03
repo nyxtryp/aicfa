@@ -207,6 +207,20 @@ def analyze_rr_outcomes(
     )
 
 
+def analyze_rr_outcomes_by_folds(
+    folds: Sequence[tuple[Sequence[Mapping[str, object]], BatchEvaluation]],
+) -> tuple[RRAnalysis, ...]:
+    """Analyze RR against observed outcomes independently for each causal fold.
+
+    Fold boundaries are preserved: observations from one chronological
+    validation fold are never mixed into another fold's analysis.
+    """
+    analyses: list[RRAnalysis] = []
+    for setups, evaluation in folds:
+        analyses.append(analyze_rr_outcomes(setups, evaluation))
+    return tuple(analyses)
+
+
 def purge_training_labels(
     dataset: pd.DataFrame,
     *,
