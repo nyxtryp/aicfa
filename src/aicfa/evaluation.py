@@ -48,6 +48,14 @@ class FoldOutcomeStatistics:
 
 
 @dataclass(frozen=True)
+class FoldCostAdjustedStatistics:
+    fold_index: int
+    resolved_count: int
+    mean_net_return: float | None
+    round_trip_cost_rate: float
+
+
+@dataclass(frozen=True)
 class RRObservation:
     rr: float
     outcome: EvaluationOutcome
@@ -198,6 +206,37 @@ def summarize_outcomes_by_folds(
         )
         for index, evaluation in enumerate(evaluations)
     )
+
+
+def summarize_cost_adjusted_returns_by_folds(
+    evaluations: Sequence[BatchEvaluation],
+    *,
+    round_trip_cost_rate: float,
+) -> tuple[FoldCostAdjustedStatistics, ...]:
+    """Summarize resolved returns after an explicit fixed round-trip cost."""
+    if round_trip_cost_rate < 0:
+        raise ValueError("round_trip_cost_rate must be non-negative")
+
+    statistics: list[FoldCostAdjustedStatistics] = []
+    for index, evaluation in enumerate(evaluations):
+        resolved_returns = [
+            float(result.gross_return) - round_trip_cost_rate
+            for result in evaluation.results
+            if result.outcome in {EvaluationOutcome.TP, EvaluationOutcome.SL}
+            and result.gross_return is not None
+        ]
+        statistics.append(
+            FoldCostAdjustedStatistics(
+                fold_index=index,
+                resolved_count=len(resolved_returns),
+                mean_net_return=(
+                    sum(resolved_returns) / len(resolved_returns)
+                    if resolved_returns else None
+                ),
+                round_trip_cost_rate=float(round_trip_cost_rate),
+            )
+        )
+    return tuple(statistics)
 
 
 def analyze_rr_outcomes(
