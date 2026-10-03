@@ -7,7 +7,9 @@ from aicfa.market_orchestrator import (
     PRIMARY_TRADING_MODES,
     analyze_market_horizons,
     scan_markets,
+    scan_universe,
 )
+from aicfa.market_universe import MarketUniverse, MonitoredMarket
 
 
 def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAIT"):
@@ -90,3 +92,30 @@ def test_primary_orchestrator_rejects_scalping(monkeypatch):
             now_ms=1000,
             modes=(TradingMode.SCALPING,),
         )
+
+
+def test_configured_market_universe_controls_assets_and_market_type(monkeypatch):
+    calls = []
+
+    def fake_find_setup(request, **kwargs):
+        calls.append((request.asset, request.market_type))
+        return _fake_result(request.asset, request.mode, decision="WAIT")
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    universe = MarketUniverse((
+        MonitoredMarket("BTC/USDT", "spot"),
+        MonitoredMarket("ETH/USDT", "futures"),
+    ))
+
+    result = scan_universe(universe, now_ms=1000)
+
+    assert [market.asset for market in result.markets] == ["BTC/USDT", "ETH/USDT"]
+    assert calls == [
+        ("BTC/USDT", "spot"),
+        ("BTC/USDT", "spot"),
+        ("BTC/USDT", "spot"),
+        ("ETH/USDT", "futures"),
+        ("ETH/USDT", "futures"),
+        ("ETH/USDT", "futures"),
+    ]
