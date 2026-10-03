@@ -26,9 +26,9 @@ def test_setup_requirements_are_knowledge_driven():
 def test_mode_profiles_match_authoritative_timeframe_hierarchies():
     expected = {
         TradingMode.SCALPING: ("15m", "5m", "1m"),
-        TradingMode.INTRADAY: ("1d", "4h", "1h", "15m"),
-        TradingMode.SWING: ("1w", "1d", "4h", "1h"),
-        TradingMode.POSITION: ("1M", "1w", "1d", "4h"),
+        TradingMode.INTRADAY: ("4h", "1h", "15m", "5m"),
+        TradingMode.SWING: ("1d", "4h", "1h"),
+        TradingMode.POSITION: ("1w", "1d", "4h"),
     }
     for mode, timeframes in expected.items():
         plan = default_setup_requirements("BTC", mode=mode)
