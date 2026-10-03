@@ -161,6 +161,9 @@ def build_structure(
     internal_left: int = 1,
     internal_right: int = 1,
     displacement: pd.DataFrame | None = None,
+    include_internal: bool = True,
+    include_protected: bool = True,
+    include_timestamps: bool = True,
 ) -> pd.DataFrame:
     """Build causal external/internal structure and protected levels.
 
@@ -194,15 +197,16 @@ def build_structure(
         highs, lows, closes,
         left=left, right=right, equal_tolerance=equal_tolerance,
     )
-    internal = _swing_layer(
-        highs, lows, closes,
-        left=internal_left, right=internal_right, equal_tolerance=equal_tolerance,
-    )
-
     for name, values in external.items():
         out[name] = values
-    for name, values in internal.items():
-        out[f"internal_{name}"] = values
+
+    if include_internal:
+        internal = _swing_layer(
+            highs, lows, closes,
+            left=internal_left, right=internal_right, equal_tolerance=equal_tolerance,
+        )
+        for name, values in internal.items():
+            out[f"internal_{name}"] = values
 
     out["mss_up"] = np.zeros(n, dtype="int8")
     out["mss_down"] = np.zeros(n, dtype="int8")
@@ -222,68 +226,70 @@ def build_structure(
             (out["choch_down"].to_numpy() == 1) & (disp_down == 1)
         ).astype("int8")
 
-    out["protected_high_price"] = np.nan
-    out["protected_low_price"] = np.nan
-    out["protected_high_active"] = np.zeros(n, dtype="int8")
-    out["protected_low_active"] = np.zeros(n, dtype="int8")
-    out["protected_high_created"] = np.zeros(n, dtype="int8")
-    out["protected_low_created"] = np.zeros(n, dtype="int8")
-    out["protected_high_broken"] = np.zeros(n, dtype="int8")
-    out["protected_low_broken"] = np.zeros(n, dtype="int8")
+    if include_protected:
+            out["protected_high_price"] = np.nan
+            out["protected_low_price"] = np.nan
+            out["protected_high_active"] = np.zeros(n, dtype="int8")
+            out["protected_low_active"] = np.zeros(n, dtype="int8")
+            out["protected_high_created"] = np.zeros(n, dtype="int8")
+            out["protected_low_created"] = np.zeros(n, dtype="int8")
+            out["protected_high_broken"] = np.zeros(n, dtype="int8")
+            out["protected_low_broken"] = np.zeros(n, dtype="int8")
+        
+            confirmed_high: float | None = None
+            confirmed_low: float | None = None
+            protected_high: float | None = None
+            protected_low: float | None = None
+            protected_high_active = False
+            protected_low_active = False
+        
+            for row in range(n):
+                if external["swing_high"][row] == 1:
+                    confirmed_high = float(external["swing_high_price"][row])
+                if external["swing_low"][row] == 1:
+                    confirmed_low = float(external["swing_low_price"][row])
+        
+                if external["bos_up"][row] == 1 and confirmed_low is not None:
+                    protected_low = confirmed_low
+                    protected_low_active = True
+                    out.at[row, "protected_low_created"] = 1
+        
+                if external["bos_down"][row] == 1 and confirmed_high is not None:
+                    protected_high = confirmed_high
+                    protected_high_active = True
+                    out.at[row, "protected_high_created"] = 1
+        
+                if protected_high_active and protected_high is not None:
+                    if row > 0 and closes[row] > protected_high:
+                        protected_high_active = False
+                        out.at[row, "protected_high_broken"] = 1
+        
+                if protected_low_active and protected_low is not None:
+                    if row > 0 and closes[row] < protected_low:
+                        protected_low_active = False
+                        out.at[row, "protected_low_broken"] = 1
+        
+                if protected_high is not None:
+                    out.at[row, "protected_high_price"] = protected_high
+                if protected_low is not None:
+                    out.at[row, "protected_low_price"] = protected_low
+                out.at[row, "protected_high_active"] = int(protected_high_active)
+                out.at[row, "protected_low_active"] = int(protected_low_active)
 
-    confirmed_high: float | None = None
-    confirmed_low: float | None = None
-    protected_high: float | None = None
-    protected_low: float | None = None
-    protected_high_active = False
-    protected_low_active = False
-
-    for row in range(n):
-        if external["swing_high"][row] == 1:
-            confirmed_high = float(external["swing_high_price"][row])
-        if external["swing_low"][row] == 1:
-            confirmed_low = float(external["swing_low_price"][row])
-
-        if external["bos_up"][row] == 1 and confirmed_low is not None:
-            protected_low = confirmed_low
-            protected_low_active = True
-            out.at[row, "protected_low_created"] = 1
-
-        if external["bos_down"][row] == 1 and confirmed_high is not None:
-            protected_high = confirmed_high
-            protected_high_active = True
-            out.at[row, "protected_high_created"] = 1
-
-        if protected_high_active and protected_high is not None:
-            if row > 0 and closes[row] > protected_high:
-                protected_high_active = False
-                out.at[row, "protected_high_broken"] = 1
-
-        if protected_low_active and protected_low is not None:
-            if row > 0 and closes[row] < protected_low:
-                protected_low_active = False
-                out.at[row, "protected_low_broken"] = 1
-
-        if protected_high is not None:
-            out.at[row, "protected_high_price"] = protected_high
-        if protected_low is not None:
-            out.at[row, "protected_low_price"] = protected_low
-        out.at[row, "protected_high_active"] = int(protected_high_active)
-        out.at[row, "protected_low_active"] = int(protected_low_active)
-
-    # Preserve both sides of the causal contract: pivot time is descriptive,
-    # confirmation time is the first time downstream logic may use the swing.
-    timestamps = x["timestamp"].to_numpy()
-    for side in ("high", "low"):
-        pivot_index = out[f"swing_{side}_pivot_index"].to_numpy()
-        confirmation_index = out[f"swing_{side}_confirmation_index"].to_numpy()
-        pivot_ts = np.full(n, np.nan)
-        confirmation_ts = np.full(n, np.nan)
-        known = pivot_index >= 0
-        pivot_ts[known] = timestamps[pivot_index[known]]
-        known_confirmation = confirmation_index >= 0
-        confirmation_ts[known_confirmation] = timestamps[confirmation_index[known_confirmation]]
-        out[f"swing_{side}_pivot_timestamp"] = pivot_ts
-        out[f"swing_{side}_confirmation_timestamp"] = confirmation_ts
+    if include_timestamps:
+            # Preserve both sides of the causal contract: pivot time is descriptive,
+            # confirmation time is the first time downstream logic may use the swing.
+            timestamps = x["timestamp"].to_numpy()
+            for side in ("high", "low"):
+                pivot_index = out[f"swing_{side}_pivot_index"].to_numpy()
+                confirmation_index = out[f"swing_{side}_confirmation_index"].to_numpy()
+                pivot_ts = np.full(n, np.nan)
+                confirmation_ts = np.full(n, np.nan)
+                known = pivot_index >= 0
+                pivot_ts[known] = timestamps[pivot_index[known]]
+                known_confirmation = confirmation_index >= 0
+                confirmation_ts[known_confirmation] = timestamps[confirmation_index[known_confirmation]]
+                out[f"swing_{side}_pivot_timestamp"] = pivot_ts
+                out[f"swing_{side}_confirmation_timestamp"] = confirmation_ts
 
     return out
