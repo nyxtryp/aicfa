@@ -104,15 +104,16 @@ def test_all_candidates_are_preserved():
 def test_invalid_direction_and_status_are_rejected():
     candidate = SetupCandidate(**{**_candidate().__dict__, "direction": None})
     with pytest.raises(ValueError, match="LONG or SHORT"):
-        build_trade_description(_result(candidate))
+        build_trade_description(_result(candidate), candidate)
 
     with pytest.raises(ValueError, match="lifecycle status"):
-        build_trade_description(_result(_candidate()), lifecycle_status="signal")
+        build_trade_description(_result(_candidate()), _candidate(), lifecycle_status="signal")
 
 
 def test_lifecycle_status_can_be_updated_without_changing_geometry():
     description = build_trade_description(
         _result(_candidate()),
+        _candidate(),
         lifecycle_status="active",
     )
     assert description.lifecycle_status == "active"
