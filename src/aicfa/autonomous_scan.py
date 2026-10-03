@@ -21,6 +21,9 @@ from .market_universe import MarketUniverse
 from .setup_lifecycle import ActiveSetup, SetupLifecycle
 
 
+MAIN_SCAN_INTERVAL_SECONDS = 300
+
+
 @dataclass(frozen=True)
 class AutonomousScanState:
     """Latest autonomous scan snapshot."""
