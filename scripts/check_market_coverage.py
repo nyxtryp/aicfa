@@ -11,10 +11,10 @@ from aicfa.public_market_data import build_public_market_data_provider
 def main() -> None:
     path = Path("config/market_universe.json")
     payload = json.loads(path.read_text())
-    assets = [item["asset"] for item in payload["markets"]]
+    markets = payload["markets"]
     provider = build_public_market_data_provider(timeout_seconds=10.0)
 
-    print(f"Configured markets: {len(assets)}", flush=True)
+    print(f"Configured markets: {len(markets)}", flush=True)
     print(
         "Providers:",
         ", ".join(getattr(p, "exchange", p.__class__.__name__) for p in provider.providers),
@@ -25,15 +25,30 @@ def main() -> None:
     timings: list[float] = []
     total_start = time.perf_counter()
 
-    for index, asset in enumerate(assets, start=1):
+    for index, item in enumerate(markets, start=1):
+        asset = item["asset"]
+        market_type = item.get("market_type", "spot")
+        venue_symbols = tuple(
+            (str(pair[0]), str(pair[1]))
+            for pair in item.get("venue_symbols", [])
+            if isinstance(pair, (list, tuple)) and len(pair) == 2
+        )
+
+        if venue_symbols:
+            provider.register_market_symbols(
+                asset,
+                venue_symbols,
+                market_type=market_type,
+            )
+
         start = time.perf_counter()
         try:
-            symbol = provider.resolve_symbol(asset, market_type="spot")
+            symbol = provider.resolve_symbol(asset, market_type=market_type)
             elapsed = time.perf_counter() - start
             timings.append(elapsed)
-            resolved = provider._resolved[(asset.upper(), "spot")]
+            resolved = provider._resolved[(asset.upper(), market_type)]
             print(
-                f"[{index:03d}/{len(assets)}] {asset} -> "
+                f"[{index:03d}/{len(markets)}] {asset} [{market_type}] -> "
                 f"{resolved.provider} ({symbol}) | {elapsed:.3f}s",
                 flush=True,
             )
@@ -42,7 +57,7 @@ def main() -> None:
             elapsed = time.perf_counter() - start
             timings.append(elapsed)
             print(
-                f"[{index:03d}/{len(assets)}] {asset} -> MISSING | "
+                f"[{index:03d}/{len(markets)}] {asset} [{market_type}] -> MISSING | "
                 f"{elapsed:.3f}s | {exc}",
                 flush=True,
             )
@@ -52,8 +67,8 @@ def main() -> None:
     minimum = min(timings, default=0.0)
     maximum = max(timings, default=0.0)
 
-    print(f"Coverage: {covered}/{len(assets)}", flush=True)
-    print(f"Missing: {len(assets) - covered}", flush=True)
+    print(f"Coverage: {covered}/{len(markets)}", flush=True)
+    print(f"Missing: {len(markets) - covered}", flush=True)
     print(
         f"Timing: total={total_elapsed:.3f}s | "
         f"avg={average:.3f}s | min={minimum:.3f}s | max={maximum:.3f}s",
