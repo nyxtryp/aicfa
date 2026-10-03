@@ -39,6 +39,15 @@ class BatchEvaluation:
 
 
 @dataclass(frozen=True)
+class FoldOutcomeStatistics:
+    fold_index: int
+    counts: dict[str, int]
+    resolved_count: int
+    tp_rate: float | None
+    mean_gross_return: float | None
+
+
+@dataclass(frozen=True)
 class RRObservation:
     rr: float
     outcome: EvaluationOutcome
@@ -168,6 +177,26 @@ def evaluate_setups(
         resolved_count=len(resolved),
         tp_rate=len(tp_results) / len(resolved) if resolved else None,
         mean_gross_return=mean_return,
+    )
+
+
+def summarize_outcomes_by_folds(
+    evaluations: Sequence[BatchEvaluation],
+) -> tuple[FoldOutcomeStatistics, ...]:
+    """Expose outcome statistics independently for each causal validation fold.
+
+    No observations are pooled across folds. Each returned record preserves
+    the fold-local TP/SL/TIMEOUT/AMBIGUOUS counts and resolved statistics.
+    """
+    return tuple(
+        FoldOutcomeStatistics(
+            fold_index=index,
+            counts=dict(evaluation.counts),
+            resolved_count=evaluation.resolved_count,
+            tp_rate=evaluation.tp_rate,
+            mean_gross_return=evaluation.mean_gross_return,
+        )
+        for index, evaluation in enumerate(evaluations)
     )
 
 
