@@ -284,3 +284,19 @@ Run focused VDS tests for tests/test_market_universe.py and tests/test_market_or
 ### Next exact action
 
 Run focused VDS validation for `tests/test_trade_description.py`. If green, run the full regression. Then integrate `TradeDescription` into the multi-horizon orchestrator so scanner output exposes structured explainable setups while preserving the existing `FindSetupResult` and candidate pipeline.
+
+
+### 2026-10-03 — TRADE DESCRIPTION INTEGRATED INTO MULTI-HORIZON ORCHESTRATOR
+
+- Integrated the existing immutable `TradeDescription` contract directly into `market_orchestrator.py`.
+- Every emitted `HorizonSetup` now carries both the original `SetupCandidate` and its structured `TradeDescription` projection.
+- The orchestrator does not generate new trading logic: it projects the already-approved candidate geometry/evidence from the existing FindSetup pipeline.
+- Entry/SL/TP/RR, evidence, horizon, direction, timestamp, freshness and lifecycle status therefore travel with the setup into the multi-market scan result.
+- Existing WAIT / NO TRADE behavior is unchanged: descriptions are created only for actual setup candidates; no candidate means no setup description.
+- Added orchestrator test coverage confirming descriptions preserve horizon and direction, including simultaneous long/short candidates.
+- Production change: `feat: expose trade descriptions from market orchestrator`.
+- Test commit: `07b31a5977b544047e2966f5fc3f652a48eaeacd`.
+
+### Next exact action
+
+Run focused VDS validation for `tests/test_market_orchestrator.py` and `tests/test_trade_description.py`. If green, run the full regression. After that, define the setup identity/lifecycle integration so multiple independent Intraday/Swing/Position setups can remain active without overwriting each other.
