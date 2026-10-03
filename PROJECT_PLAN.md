@@ -565,3 +565,30 @@ Deploy the autonomous scan/state engine and run its focused tests. If green, run
 3. Review the resulting inventory for false positives/false negatives and distinguish perpetuals/futures from other venue products.
 4. Build a separate TradFi market mapping/configuration only after the live inventory is verified; keep the existing 193 crypto markets unchanged.
 5. Then determine which existing AICFA market-data contracts can support the verified TradFi instruments and what adapter extensions, if any, are required.
+
+
+### 2026-10-04 — APPROVED 55-ITEM TRADFI TARGET SET / UNIFIED MARKET CONTRACT EXTENDED
+
+- The user approved the compact **55-item TradFi target universe**:
+  - 5 metals: Gold, Silver, Copper, Platinum, Palladium.
+  - 3 energy: WTI, Brent, Natural Gas.
+  - 7 FX: EUR/USD, GBP/USD, USD/JPY, USD/CHF, AUD/USD, USD/CAD, NZD/USD.
+  - 10 indices: SPX, NDX, DJIA, RUT, DAX 40, FTSE 100, CAC 40, Nikkei 225, Euro Stoxx 50, VIX.
+  - 4 ETFs: SPY, QQQ, IWM, GLD.
+  - 26 stocks: AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AVGO, AMD, MU, SNDK, ARM, TSM, ASML, SMCI, QCOM, ORCL, PLTR, NFLX, COIN, MSTR, JPM, BAC, WMT, XOM, BA.
+- **SPX is intentionally a separate index target from SPY**, which is an ETF target.
+- **SNDK remains explicitly included**.
+- The existing **193 crypto markets remain unchanged** for this phase. The user will clean the crypto universe separately later; no crypto replacement/removal is part of this TradFi step.
+- No native venue symbols are assumed from the canonical names. Official venue metadata remains the source of truth. Bybit exposes instrument metadata through its instruments-info endpoint; OKX exposes instrument metadata by instType including SWAP/FUTURES; Bitget exposes contract configuration through its mix contracts endpoint; MEXC exposes live futures contract pairs through its contract-detail endpoint.
+- Extended MonitoredMarket to support optional asset_class, category, instrument_type, and verified venue_symbols while preserving the existing crypto JSON contract unchanged.
+- This is a **single AICFA market-universe/data-routing contract**, not a separate TradFi scanner or analytical engine.
+- No 55-item TradFi production entries or native mappings have been added yet; they must be populated only after live venue verification.
+
+### Next exact action
+
+1. Run the live verification of all 55 approved targets against Bybit, OKX, Bitget and MEXC using the existing AICFA/CCXT market-data architecture.
+2. For every positive match, record the venue-native symbol/ID and exact instrument type/contract type; distinguish perpetual/swap/future from other products.
+3. Check the actual OHLCV availability needed by Intraday/Swing/Position on confirmed TradFi contracts.
+4. Review false positives/duplicates (especially ETF vs index and commodity tokens vs actual TradFi contracts).
+5. Add only confirmed TradFi entries to the same MarketUniverse alongside the unchanged 193 crypto markets.
+6. Run focused universe/routing tests, then VDS live resolution/MTF verification.
