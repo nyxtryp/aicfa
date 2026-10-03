@@ -1,6 +1,6 @@
-"""Conservative, causal evaluation of one already-defined setup.
+"""Conservative, causal evaluation of already-defined setups.
 
-This module evaluates historical OHLC after a setup timestamp. It does not
+This module evaluates historical OHLC after setup timestamps. It does not
 create Entry/SL/TP levels and does not infer intrabar ordering when both
 barriers are touched by the same candle.
 """
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Mapping, Sequence
 
 import pandas as pd
 
@@ -26,6 +27,15 @@ class SetupEvaluation:
     outcome_offset: int
     exit_price: float | None
     gross_return: float | None
+
+
+@dataclass(frozen=True)
+class BatchEvaluation:
+    results: tuple[SetupEvaluation, ...]
+    counts: dict[str, int]
+    resolved_count: int
+    tp_rate: float | None
+    mean_gross_return: float | None
 
 
 def _validate_geometry(direction: str, entry_price: float, stop_price: float, target_price: float) -> None:
@@ -49,16 +59,7 @@ def evaluate_setup(
     target_price: float,
     max_horizon: int | None = None,
 ) -> SetupEvaluation:
-    """Evaluate TP/SL/timeout from the first candle strictly after setup time.
-
-    The caller supplies already-established Entry/SL/TP levels. Historical
-    candles are used only after the setup timestamp. If one candle touches
-    both TP and SL, the result is AMBIGUOUS because OHLC does not reveal
-    which level was reached first.
-
-    max_horizon counts future candles after setup time. If omitted, all
-    available future candles are evaluated.
-    """
+    """Evaluate TP/SL/timeout from the first candle strictly after setup time."""
     _validate_geometry(direction, float(entry_price), float(stop_price), float(target_price))
 
     if max_horizon is not None and max_horizon <= 0:
@@ -107,3 +108,73 @@ def evaluate_setup(
             return SetupEvaluation(EvaluationOutcome.SL, offset, float(stop_price), float(gross_return))
 
     return SetupEvaluation(EvaluationOutcome.TIMEOUT, len(future), None, None)
+
+
+def evaluate_setups(
+    candles: pd.DataFrame,
+    setups: Sequence[Mapping[str, object]],
+    *,
+    max_horizon: int | None = None,
+) -> BatchEvaluation:
+    """Evaluate multiple already-defined setups and summarize resolved outcomes."""
+    results = tuple(
+        evaluate_setup(
+            candles,
+            setup_timestamp=setup["setup_timestamp"],
+            direction=str(setup["direction"]),
+            entry_price=float(setup["entry_price"]),
+            stop_price=float(setup["stop_price"]),
+            target_price=float(setup["target_price"]),
+            max_horizon=max_horizon,
+        )
+        for setup in setups
+    )
+    counts = {outcome.value: 0 for outcome in EvaluationOutcome}
+    for result in results:
+        counts[result.outcome.value] += 1
+
+    resolved = [result for result in results if result.outcome in {
+        EvaluationOutcome.TP, EvaluationOutcome.SL
+    }]
+    tp_results = [result for result in resolved if result.outcome is EvaluationOutcome.TP]
+    mean_return = (
+        sum(result.gross_return for result in resolved) / len(resolved)
+        if resolved else None
+    )
+    return BatchEvaluation(
+        results=results,
+        counts=counts,
+        resolved_count=len(resolved),
+        tp_rate=len(tp_results) / len(resolved) if resolved else None,
+        mean_gross_return=mean_return,
+    )
+
+
+def purge_training_labels(
+    dataset: pd.DataFrame,
+    *,
+    validation_start: str | pd.Timestamp,
+    label_end_column: str = "label_end_timestamp_5",
+) -> pd.DataFrame:
+    """Remove training rows whose future label reaches validation_start.
+
+    A training label is safe only when its label interval ends strictly before
+    the first validation timestamp. Missing label ends are excluded rather
+    than treated as safely non-overlapping.
+    """
+    if "timestamp" not in dataset.columns:
+        raise ValueError("dataset must contain timestamp")
+    if label_end_column not in dataset.columns:
+        raise ValueError(f"dataset missing label end column: {label_end_column}")
+
+    frame = dataset.copy()
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="raise")
+    ends = pd.to_datetime(frame[label_end_column], utc=True, errors="coerce")
+    validation_time = pd.to_datetime(validation_start, utc=True)
+
+    safe = (
+        frame["timestamp"].lt(validation_time)
+        & ends.notna()
+        & ends.lt(validation_time)
+    )
+    return frame.loc[safe].reset_index(drop=True)
