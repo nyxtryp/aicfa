@@ -39,6 +39,20 @@ class BatchEvaluation:
 
 
 @dataclass(frozen=True)
+class SetupOutcomeRecord:
+    setup_timestamp: str
+    direction: str
+    entry_price: float
+    stop_price: float
+    target_price: float
+    rr: float
+    outcome: EvaluationOutcome
+    outcome_offset: int
+    exit_price: float | None
+    gross_return: float | None
+
+
+@dataclass(frozen=True)
 class FoldOutcomeStatistics:
     fold_index: int
     counts: dict[str, int]
@@ -186,6 +200,37 @@ def evaluate_setups(
         tp_rate=len(tp_results) / len(resolved) if resolved else None,
         mean_gross_return=mean_return,
     )
+
+
+def build_setup_outcome_journal(
+    setups: Sequence[Mapping[str, object]],
+    evaluation: BatchEvaluation,
+) -> tuple[SetupOutcomeRecord, ...]:
+    """Pair each already-defined setup with its causal historical outcome."""
+    if len(setups) != len(evaluation.results):
+        raise ValueError("setups and evaluation must contain the same number of results")
+
+    records: list[SetupOutcomeRecord] = []
+    for setup, result in zip(setups, evaluation.results):
+        direction = str(setup["direction"])
+        entry_price = float(setup["entry_price"])
+        stop_price = float(setup["stop_price"])
+        target_price = float(setup["target_price"])
+        records.append(
+            SetupOutcomeRecord(
+                setup_timestamp=str(setup["setup_timestamp"]),
+                direction=direction,
+                entry_price=entry_price,
+                stop_price=stop_price,
+                target_price=target_price,
+                rr=_risk_reward(direction, entry_price, stop_price, target_price),
+                outcome=result.outcome,
+                outcome_offset=result.outcome_offset,
+                exit_price=result.exit_price,
+                gross_return=result.gross_return,
+            )
+        )
+    return tuple(records)
 
 
 def summarize_outcomes_by_folds(
