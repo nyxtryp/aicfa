@@ -337,3 +337,11 @@ Deploy the two commits to the VDS, run `tests/test_setup_lifecycle.py` first, th
 ### Next exact action
 
 Deploy the latest commits to the VDS. Run the lifecycle + orchestrator focused tests first. If green, run the full regression. Then move to the autonomous recurring scan/state loop and persistent setup records, without limiting the number of valid concurrent setups.
+
+### 2026-10-03 — LIFECYCLE REGRESSION FIX
+
+- Fixed backward-compatible `SetupLifecycle.evaluate()` to return the existing active setup first when a changed ready candidate creates an additional independent setup.
+- This preserves the legacy single-result API while `evaluate_all()` still retains all independent active setups.
+- Fixed orchestrator lifecycle test fixtures to expose the required assessment decision and imported `SetupLevel`.
+- Regression failures were test/API compatibility issues; no one-setup-per-market restriction was restored.
+- Fix commits: `b7ba368ef696fd6b136ffa9a4f0a5b98c53c957c`, `32d8cf93c1e4a0762260582a4497f7b236202d78`.
