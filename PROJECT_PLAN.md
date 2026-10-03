@@ -1,3 +1,22 @@
+## Continuity checkpoint — 2026-10-03 — TASK 6 NUMPY HOT-LOOP FIX VERIFIED (FOCUSED)
+
+### What changed
+- Fixed a variable-shadowing regression introduced by the NumPy hot-loop optimization: per-candle OHLC arrays `highs/lows` were overwritten by candidate-zone arrays.
+- Renamed candidate-zone arrays to `zone_highs/zone_lows`, preserving the candle arrays across iterations.
+- Removed the remaining scalar pandas write for resistance breaks, writing into the result array consistently.
+- Commit: `1881089f2afe40dc5893793f4c6d1a4cacbf789b` — `fix: preserve candle arrays in zone reaction hot loop`.
+
+### Server verification
+- `tests/test_zone_reaction.py`: **5 passed in 0.60s**.
+
+### Current status / next step
+- Focused zone contract: **GREEN** after the fix.
+- Feature integration: **pending**; performance improvement is not yet verified.
+- Full regression: **not run**.
+- Run only `tests/test_features.py` next and record its runtime before deciding whether a full suite is warranted.
+
+---
+
 ## Continuity checkpoint — 2026-10-03 — TASK 6 INTEGRATION STILL TOO SLOW
 
 ### Latest server verification
