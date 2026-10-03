@@ -62,6 +62,15 @@ class FoldOutcomeStatistics:
 
 
 @dataclass(frozen=True)
+class DirectionOutcomeStatistics:
+    direction: str
+    counts: dict[str, int]
+    resolved_count: int
+    tp_rate: float | None
+    mean_gross_return: float | None
+
+
+@dataclass(frozen=True)
 class FoldCostAdjustedStatistics:
     fold_index: int
     resolved_count: int
@@ -251,6 +260,44 @@ def summarize_outcomes_by_folds(
         )
         for index, evaluation in enumerate(evaluations)
     )
+
+
+def summarize_outcomes_by_direction(
+    journal: Sequence[SetupOutcomeRecord],
+) -> tuple[DirectionOutcomeStatistics, ...]:
+    """Summarize historical setup outcomes independently by direction."""
+    grouped: dict[str, list[SetupOutcomeRecord]] = {}
+    for record in journal:
+        grouped.setdefault(record.direction, []).append(record)
+
+    statistics: list[DirectionOutcomeStatistics] = []
+    for direction in sorted(grouped):
+        records = grouped[direction]
+        counts = {outcome.value: 0 for outcome in EvaluationOutcome}
+        for record in records:
+            counts[record.outcome.value] += 1
+        resolved = [
+            record for record in records
+            if record.outcome in {EvaluationOutcome.TP, EvaluationOutcome.SL}
+            and record.gross_return is not None
+        ]
+        statistics.append(
+            DirectionOutcomeStatistics(
+                direction=direction,
+                counts=counts,
+                resolved_count=len(resolved),
+                tp_rate=(
+                    sum(record.outcome is EvaluationOutcome.TP for record in resolved)
+                    / len(resolved)
+                    if resolved else None
+                ),
+                mean_gross_return=(
+                    sum(float(record.gross_return) for record in resolved) / len(resolved)
+                    if resolved else None
+                ),
+            )
+        )
+    return tuple(statistics)
 
 
 def summarize_cost_adjusted_returns_by_folds(
