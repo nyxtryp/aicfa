@@ -392,6 +392,7 @@ class FallbackDerivativesProvider:
                 CcxtDerivativesProvider("okx"),
                 CcxtDerivativesProvider("mexc"),
                 CcxtDerivativesProvider("bitget"),
+                CcxtDerivativesProvider("gateio"),
             )
         )
 
@@ -437,8 +438,11 @@ class CcxtDerivativesProvider:
             raise ValueError(f"unsupported CCXT exchange: {exchange_id}")
         self.exchange = exchange_id
         self.timeout_seconds = float(timeout_seconds)
+        options = {"enableRateLimit": True}
+        if exchange_id == "gateio":
+            options["options"] = {"defaultType": "swap"}
         self._exchange = (
-            factory({"enableRateLimit": True})
+            factory(options)
             if callable(factory)
             else factory
         )
