@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -222,12 +223,19 @@ class BinanceMarketDataProvider:
         if interval_seconds < 0:
             raise ValueError("interval_seconds must be non-negative")
 
-        rows = []
-        for index in range(int(snapshots)):
+        count = int(snapshots)
+
+        def collect(index: int) -> dict:
+            if interval_seconds and index:
+                self._sleeper(float(index) * float(interval_seconds))
             frame = self.fetch_order_book(symbol=symbol, market_type=market_type, limit=1)
-            rows.append(frame.iloc[0].to_dict())
-            if index + 1 < int(snapshots) and interval_seconds:
-                self._sleeper(float(interval_seconds))
+            return frame.iloc[0].to_dict()
+
+        # Schedule snapshots at the requested sampling times. Network requests
+        # may overlap, avoiding serial REST latency while preserving temporal
+        # spacing between snapshot starts.
+        with ThreadPoolExecutor(max_workers=count) as executor:
+            rows = list(executor.map(collect, range(count)))
         return pd.DataFrame(rows, columns=_BOOK_COLUMNS)
     def fetch_order_book(self, *, symbol: str, market_type: str, limit: int = 1) -> pd.DataFrame:
         if limit <= 0 or limit > 5000:
