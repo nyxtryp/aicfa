@@ -294,6 +294,9 @@ def test_one_market_computes_primary_features_once(monkeypatch):
     provider = FallbackMarketDataProvider([FeatureSnapshotProvider()])
     calls = []
 
+    def fake_completed_ohlcv(frame, *, timeframe, now_ms):
+        return frame
+
     def fake_build_features(frame):
         calls.append(len(frame))
         return frame.copy()
@@ -301,6 +304,7 @@ def test_one_market_computes_primary_features_once(monkeypatch):
     def fake_find_setup(request, **kwargs):
         return _fake_result(request.asset, request.mode, decision="WAIT")
 
+    monkeypatch.setattr("aicfa.market_orchestrator.completed_ohlcv", fake_completed_ohlcv)
     monkeypatch.setattr("aicfa.market_orchestrator.build_features", fake_build_features)
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
 
