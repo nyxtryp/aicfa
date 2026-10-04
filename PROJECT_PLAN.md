@@ -937,3 +937,13 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 3. Run the expanded 12-market diagnostic again.
 4. Compare BTC/ETH/SOL/LTC/APT/BONK against the prior green/partial behavior.
 5. Only then continue to the complete affected-market and final 143-market verification.
+
+### 2026-10-04 — DIAGNOSTIC SYMBOL CONTRACT FIX
+
+- The 12-market VDS diagnostic exposed a concrete integration bug in `scripts/check_full_market_data.py`: the script passed the resolved primary-market symbol into the universal derivatives fallback.
+- For Binance-resolved crypto markets this value is venue-native, e.g. `BTCUSDT`, while the universal derivatives layer expects AICFA's canonical asset identifier such as `BTC/USDT`; authoritative `venue_symbols` remain the mechanism for explicit native futures symbols.
+- This caused BTC/ETH/SOL/LTC/APT to fail derivatives acquisition even though their primary OHLCV/trades/order-book data was healthy. The failure was in the diagnostic's symbol handoff, not evidence that those markets themselves lacked futures derivatives.
+- Fixed only the diagnostic integration in production commit `826273563c3fc078893fdd15387837c9b62ad93d`: derivatives now receive `asset`, while primary market-data calls continue using the resolved `symbol`.
+- The already-green PEPE/XAU/XAG/XCU/WTI/NATGAS results remain untouched.
+- No speculative universal symbol normalization was reintroduced into the derivatives provider.
+- VDS verification is still required after this commit; no claim is made about the remaining 143-market coverage until the corrected diagnostic is run.
