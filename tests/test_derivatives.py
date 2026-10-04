@@ -202,7 +202,7 @@ def test_derivatives_preserve_partial_core_fields():
     base = base_frame()
     d = derivatives_frame()
     d.loc[0, "open_interest"] = np.nan
-    d.loc[2, "funding_rate"] = np.nan
+    d.loc[1, "funding_rate"] = np.nan
     out = build_derivatives(base, d, baseline_window=2)
     assert not out.empty
     assert out["funding_rate"].notna().any()
