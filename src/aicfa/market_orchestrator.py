@@ -64,6 +64,7 @@ class MarketHorizonScan:
     results: tuple[FindSetupResult, ...]
     setups: tuple[HorizonSetup, ...]
     lifecycle_results: tuple[SetupLifecycleResult, ...] = ()
+    diagnostics: MarketScanDiagnostics | None = None
 
 
 @dataclass(frozen=True)
