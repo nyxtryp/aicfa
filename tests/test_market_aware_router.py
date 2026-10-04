@@ -76,3 +76,40 @@ def test_router_missing_market_does_not_serialize_all_venues():
     elapsed = time.monotonic() - started
     assert "resolver timed out after 3.0s" in message
     assert elapsed < 7.5
+
+class AuxiliaryProvider(Provider):
+    def fetch_trades(self, *, symbol, market_type, limit):
+        self.calls.append(("trades", symbol))
+        import pandas as pd
+        return pd.DataFrame({"timestamp": [1000], "price": [1.5], "amount": [2.0]})
+
+    def fetch_order_book(self, *, symbol, market_type, limit):
+        self.calls.append(("order_book", symbol))
+        import pandas as pd
+        return pd.DataFrame({"timestamp": [1000], "bid": [1.4], "ask": [1.6]})
+
+    def fetch_order_book_history(self, *, symbol, market_type, snapshots, interval_seconds):
+        self.calls.append(("history", symbol))
+        import pandas as pd
+        return pd.DataFrame({"timestamp": [1000], "bid": [1.4], "ask": [1.6]})
+
+
+def test_router_routes_auxiliary_feeds_with_venue_native_symbol():
+    first = AuxiliaryProvider("first", "TON/USDT")
+    second = AuxiliaryProvider("second", "TON/USDT:USDT")
+    router = MarketAwareFallbackProvider([first, second])
+    router.resolve_symbol("TON/USDT", market_type="futures")
+
+    trades = router.fetch_trades_with_source(
+        symbol="TON/USDT", market_type="futures", limit=10
+    )
+    book = router.fetch_order_book_with_source(
+        symbol="TON/USDT", market_type="futures", limit=1
+    )
+    history = router.fetch_order_book_history_with_source(
+        symbol="TON/USDT", market_type="futures", snapshots=1, interval_seconds=1.0
+    )
+
+    assert trades.symbol == "TON/USDT"
+    assert book.symbol == "TON/USDT"
+    assert history.symbol == "TON/USDT"
