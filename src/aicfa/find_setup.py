@@ -14,6 +14,7 @@ import pandas as pd
 
 from .binance_market_data import BinanceMarketDataProvider
 from .bybit_market_data import BybitMarketDataProvider
+from .public_market_data import build_public_market_data_provider
 from .analysis_depth import resolve_analysis_depth
 from .data_requirements import DataKind, TradingMode, default_setup_requirements, mode_timeframe_profile, normalize_trading_mode
 from .decision import decide
@@ -242,9 +243,7 @@ def find_setup(
     if use_live_derivatives and request.market_type == "futures" and derivatives_provider is None:
         derivatives_provider = FallbackDerivativesProvider()
     if provider is None:
-        provider = FallbackMarketDataProvider(
-            (BinanceMarketDataProvider(), BybitMarketDataProvider())
-        )
+        provider = build_public_market_data_provider(timeout_seconds=10.0)
     if isinstance(provider, FallbackMarketDataProvider):
         provider = SharedSnapshotMarketDataProvider(provider, ttl_seconds=60.0)
     if resolver is None:
