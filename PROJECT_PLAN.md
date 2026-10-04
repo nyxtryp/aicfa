@@ -852,3 +852,25 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 3. Run the direct XCU full-data diagnostic.
 4. If XCU is green, run BONK and NATGAS targeted diagnostics.
 5. Only after those are green, rerun the broader derivatives-affected market set and compare against the 29/32 baseline.
+
+
+### 2026-10-04 — DERIVATIVES SEMANTIC CORRECTION: CONTEXTUAL EVIDENCE, NOT TRADING CORE
+
+- Corrected the product-level semantics of derivatives data.
+- **Price + market structure + SMC remain AICFA's primary decision foundation**: OHLCV, confirmed swings, HH/HL/LH/LL, BOS/CHoCH/MSS, liquidity, OB/FVG, zone reaction, volume, structural Entry/SL/TP.
+- Funding Rate, Open Interest, Mark Price and Liquidations are an **additional derivatives evidence/mechanism layer**. They help explain, confirm or contradict what price/structure is doing; they do not replace structural evidence.
+- The previous wording "mandatory derivatives core" was incorrect at the product level. The three fields funding_rate, open_interest, mark_price are now treated as a **preferred derivatives evidence coverage target** used only to optimize data acquisition/fallback.
+- A structurally valid SMC setup must **not** become NO TRADE solely because funding, OI, mark price or liquidation data is unavailable or partial.
+- Missing/partial derivatives data is now recorded in optional_missing_context, not the structural missing_context gate. Therefore derivatives availability cannot independently force NEED_MORE_EVIDENCE.
+- derivatives.price_oi evidence is emitted when the actual OI + mark observations needed for that relationship exist; funding enriches the context when available. Missing fields are never fabricated.
+- Renamed the market-data fallback terminology from "core fields" to **coverage fields** so the implementation cannot be mistaken for a trading-priority hierarchy.
+- Commits: 1ad02eb (contextual derivatives evidence / no setup gate), 16bd9b6 (regression tests for missing/partial derivatives), 69dec28 (derivatives coverage terminology), cd06679 (remove remaining mandatory-core implementation wording).
+- No new signal, confidence score, RR filter or asset-specific exception was introduced.
+
+### Next exact action
+
+1. Deploy the semantic correction to the VDS.
+2. Run tests/test_derivatives_market_data.py and the new tests/test_derivatives_contextual.py.
+3. Run focused FindSetup/decision tests to verify missing derivatives cannot gate a structural setup.
+4. Re-run XCU, then BONK/NATGAS targeted diagnostics using the universal field-level fallback.
+5. Only after those checks, continue the broader affected-market verification.
