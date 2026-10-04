@@ -7,6 +7,7 @@ preserves independent setup candidates across horizons and markets.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 from typing import Callable, Sequence
 
 from .analysis_depth import resolve_analysis_depth
@@ -24,6 +25,24 @@ PRIMARY_TRADING_MODES: tuple[TradingMode, ...] = (
     TradingMode.SWING,
     TradingMode.POSITION,
 )
+
+
+@dataclass(frozen=True)
+class HorizonTiming:
+    mode: TradingMode
+    duration_ms: float
+    setup_count: int
+    decision: str
+
+
+@dataclass(frozen=True)
+class MarketScanDiagnostics:
+    total_duration_ms: float
+    resolution_duration_ms: float
+    snapshot_duration_ms: float
+    snapshot_metrics: tuple[object, ...]
+    horizon_timings: tuple[HorizonTiming, ...]
+    refetched_between_horizons: bool
 
 
 @dataclass(frozen=True)
@@ -145,6 +164,8 @@ def analyze_market_horizons(
     if any(mode is TradingMode.SCALPING for mode in normalized_modes):
         raise ValueError("scalping is isolated from the primary horizon scan")
 
+    market_started = time.perf_counter()
+    acquisition_started = time.perf_counter()
     shared_provider, symbol, prefetched_frames = _acquire_primary_snapshot(
         provider,
         asset=asset,
@@ -152,12 +173,18 @@ def analyze_market_horizons(
         modes=normalized_modes,
         resolver=resolver,
     )
+    acquisition_elapsed = (time.perf_counter() - acquisition_started) * 1000.0
+    snapshot_metrics = tuple(getattr(shared_provider, "last_snapshot_metrics", ()))
+    snapshot_elapsed = sum(getattr(item, "duration_ms", 0.0) for item in snapshot_metrics)
+    resolution_elapsed = max(0.0, acquisition_elapsed - snapshot_elapsed)
     resolved = lambda _asset, _market_type: symbol
 
     results: list[FindSetupResult] = []
+    horizon_timings: list[HorizonTiming] = []
     setups: list[HorizonSetup] = []
     lifecycle_results: list[SetupLifecycleResult] = []
     for mode in normalized_modes:
+        horizon_started = time.perf_counter()
         result = find_setup(
             FindSetupRequest(asset=asset, market_type=market_type, mode=mode),
             provider=shared_provider,
@@ -166,6 +193,12 @@ def analyze_market_horizons(
             prefetched_frames=prefetched_frames,
         )
         results.append(result)
+        horizon_timings.append(HorizonTiming(
+            mode=mode,
+            duration_ms=(time.perf_counter() - horizon_started) * 1000.0,
+            setup_count=len(getattr(result.setup_assessment, "candidates", ())),
+            decision=str(result.decision),
+        ))
         candidates = getattr(result.setup_assessment, "candidates", ())
 
         mode_lifecycle: tuple[SetupLifecycleResult, ...] = ()
@@ -215,6 +248,14 @@ def analyze_market_horizons(
         results=tuple(results),
         setups=tuple(setups),
         lifecycle_results=tuple(lifecycle_results),
+        diagnostics=MarketScanDiagnostics(
+            total_duration_ms=(time.perf_counter() - market_started) * 1000.0,
+            resolution_duration_ms=resolution_elapsed,
+            snapshot_duration_ms=snapshot_elapsed,
+            snapshot_metrics=snapshot_metrics,
+            horizon_timings=tuple(horizon_timings),
+            refetched_between_horizons=False,
+        ),
     )
 
 
