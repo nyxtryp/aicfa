@@ -287,6 +287,7 @@ def build_zone_reaction(
                 bucket = wide_zone_buckets.get(bucket_id)
                 if bucket is None:
                     wide_zone_buckets[bucket_id] = [zone_id]
+                    wide_occupied_bucket_keys.append(bucket_id)
                     wide_occupied_bucket_key_set.add(bucket_id)
                     wide_occupied_bucket_keys_dirty = True
                 else:
@@ -297,6 +298,7 @@ def build_zone_reaction(
                 bucket = zone_buckets.get(bucket_id)
                 if bucket is None:
                     zone_buckets[bucket_id] = [zone_id]
+                    occupied_bucket_keys.append(bucket_id)
                     occupied_bucket_key_set.add(bucket_id)
                     occupied_bucket_keys_dirty = True
                 else:
@@ -357,10 +359,10 @@ def build_zone_reaction(
     def _active_level(close: float, side: int):
         nonlocal occupied_bucket_keys_dirty, wide_occupied_bucket_keys_dirty
         if occupied_bucket_keys_dirty:
-            occupied_bucket_keys[:] = sorted(occupied_bucket_key_set)
+            occupied_bucket_keys.sort()
             occupied_bucket_keys_dirty = False
         if wide_occupied_bucket_keys_dirty:
-            wide_occupied_bucket_keys[:] = sorted(wide_occupied_bucket_key_set)
+            wide_occupied_bucket_keys.sort()
             wide_occupied_bucket_keys_dirty = False
         # Query the same nearest occupied buckets as before, but use a lazy
         # index sorted by zone midpoint.  The old path materialized every zone
