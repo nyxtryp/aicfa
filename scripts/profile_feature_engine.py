@@ -35,7 +35,7 @@ def main() -> None:
 
     universe = load_market_universe(Path(args.universe))
     provider = build_public_market_data_provider(timeout_seconds=10.0)
-    modes = _primary_snapshot_limits((TradingMode.INTRADAY, TradingMode.SWING, TradingMode.POSITION))
+    modes = (TradingMode.INTRADAY, TradingMode.SWING, TradingMode.POSITION)
 
     for requested in args.assets:
         market = _market(universe, requested)
