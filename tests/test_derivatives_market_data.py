@@ -411,3 +411,40 @@ def test_fallback_runs_provider_attempts_in_bounded_parallel_batches():
     assert out["open_interest"].notna().any()
     assert out["mark_price"].notna().any()
     assert sources == "funding_rate=fast,open_interest=fast,mark_price=fast"
+
+
+def test_ccxt_provider_preserves_partial_fields_when_optional_current_calls_fail():
+    from aicfa.derivatives_market_data import CcxtDerivativesProvider
+
+    class FakeExchange:
+        def __init__(self, *args, **kwargs):
+            self.markets = {"BTC/USDT:USDT": {}}
+            self.timeout = None
+
+        def load_markets(self):
+            return self.markets
+
+        def fetch_funding_rate_history(self, symbol, since, limit):
+            raise NotImplementedError("funding history unsupported")
+
+        def fetch_funding_rate(self, symbol):
+            raise RuntimeError("current funding endpoint unavailable")
+
+        def fetch_open_interest_history(self, symbol, timeframe, since, limit):
+            return [{"timestamp": 1000, "openInterestValue": "123"}]
+
+        def fetch_open_interest(self, symbol):
+            raise RuntimeError("current OI endpoint unavailable")
+
+        def fetch_ticker(self, symbol):
+            return {"timestamp": 1000, "info": {"markPrice": "50000"}}
+
+    provider = CcxtDerivativesProvider(
+        "fake",
+        exchange_factory=lambda options: FakeExchange(),
+    )
+    frame = provider.fetch_derivatives(symbol="BTC/USDT:USDT", limit=10)
+
+    assert frame["funding_rate"].isna().all()
+    assert frame["open_interest"].notna().any()
+    assert frame["mark_price"].notna().any()
