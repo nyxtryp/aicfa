@@ -804,3 +804,18 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Added Gate/CCXT as the next derivatives fallback with `defaultType=swap`, preserving the no-fabrication rule.
 - Added focused regression coverage for Gate swap routing.
 - Do not rerun the full 32-market diagnostic yet. First run the three-market targeted verification for **BONK, XCU, NATGAS**.
+
+### 2026-10-04 — GATE CCXT CONSTRUCTOR FIX
+
+- The first targeted BONK/XCU/NATGAS verification did not reach market checks because the deployed CCXT package rejected `gateio` at provider construction time with `unsupported CCXT exchange: gateio`.
+- The Gate fallback itself is intentionally universal and remains part of the common futures derivatives chain; this was a CCXT constructor-surface compatibility issue, not an asset-specific routing problem.
+- Updated `CcxtDerivativesProvider` to retain the canonical exchange ID `gateio` while accepting a `gate` constructor alias when the installed CCXT build does not expose `ccxt.gateio`.
+- Added regression coverage for the constructor alias and preserved Gate's `defaultType=swap` routing.
+- Commits: `7ff15d9` (production fix), `611d9fd` (regression test).
+
+### Next exact action
+
+1. Deploy these commits through FrostDeploy.
+2. Run `tests/test_derivatives_market_data.py` on the VDS.
+3. Run only the targeted **BONK, XCU, NATGAS** full-data diagnostic.
+4. If those three are green, do not add asset-specific rules; proceed with the universal derivatives coverage verification before the final 143-market run.
