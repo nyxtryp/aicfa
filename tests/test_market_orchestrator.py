@@ -278,7 +278,20 @@ def test_market_diagnostics_expose_snapshot_and_horizon_timings(monkeypatch):
 
 
 def test_one_market_computes_primary_features_once(monkeypatch):
-    provider = _provider()
+    class FeatureSnapshotProvider(SnapshotProvider):
+        def fetch_ohlcv(self, **kwargs):
+            self.ohlcv_calls.append(kwargs)
+            rows = max(int(kwargs.get("limit") or 240), 240)
+            return pd.DataFrame({
+                "timestamp": list(range(1, rows + 1)),
+                "open": [100.0] * rows,
+                "high": [101.0] * rows,
+                "low": [99.0] * rows,
+                "close": [100.5] * rows,
+                "volume": [10.0] * rows,
+            })
+
+    provider = FallbackMarketDataProvider([FeatureSnapshotProvider()])
     calls = []
 
     def fake_build_features(frame):
