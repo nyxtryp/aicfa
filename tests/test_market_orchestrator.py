@@ -69,7 +69,7 @@ def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAI
             candidates=() if candidate is None else (candidate,),
         ),
         diagnostics=SimpleNamespace(
-            block_timings=tuple(SimpleNamespace(status="prefetched") for _ in execution.split()),
+            block_timings=tuple(SimpleNamespace(status="prefetched") for _ in range(4)),
             feature_duration_ms=0.1,
             evidence_duration_ms=0.1,
             setup_duration_ms=0.1,
