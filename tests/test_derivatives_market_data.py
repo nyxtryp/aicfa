@@ -66,7 +66,8 @@ def test_derivatives_evidence_marks_unavailable_data_without_fabrication():
         timeframe="1d",
     )
     assert result.observations == ()
-    assert "derivatives: no observations" in result.missing_context
+    assert "derivatives: no observations" in result.optional_missing_context
+    assert result.missing_context == ()
 
 
 def test_bybit_provider_aligns_independent_funding_oi_and_mark_timestamps(monkeypatch):
