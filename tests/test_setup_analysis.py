@@ -144,3 +144,55 @@ def test_lower_refinement_conflict_cannot_become_a_new_direction():
     direction, conflict = _resolve_direction(context)
     assert direction is None
     assert conflict == "lower confirmation conflicts with higher-timeframe structure"
+
+
+def test_broader_context_conflict_blocks_continuation_direction():
+    from aicfa.setup_analysis import build_multi_timeframe_context, _resolve_direction
+
+    def frame(direction):
+        return pd.DataFrame({"timestamp": [1], "smc_structure_direction": [direction]})
+
+    analyses = {
+        "1w": frame(-1),
+        "1d": frame(1),
+        "4h": frame(1),
+    }
+    context = build_multi_timeframe_context(
+        (),
+        analyses,
+        timeframes=("1w", "1d", "4h"),
+        mode="position",
+    )
+    direction, conflict = _resolve_direction(
+        context,
+        scenario="continuation",
+        supporting=("market_structure.bos", "displacement"),
+    )
+    assert direction is None
+    assert conflict == "broader higher-timeframe structure conflicts with setup direction"
+
+
+def test_reversal_can_change_direction_only_after_choch_and_sweep():
+    from aicfa.setup_analysis import build_multi_timeframe_context, _resolve_direction
+
+    def frame(direction):
+        return pd.DataFrame({"timestamp": [1], "smc_structure_direction": [direction]})
+
+    analyses = {
+        "1w": frame(-1),
+        "1d": frame(1),
+        "4h": frame(1),
+    }
+    context = build_multi_timeframe_context(
+        (),
+        analyses,
+        timeframes=("1w", "1d", "4h"),
+        mode="position",
+    )
+    direction, conflict = _resolve_direction(
+        context,
+        scenario="reversal",
+        supporting=("market_structure.choch", "liquidity.sweep"),
+    )
+    assert direction == "long"
+    assert conflict is None
