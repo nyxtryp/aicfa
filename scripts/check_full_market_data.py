@@ -7,6 +7,7 @@ Derivative-specific sources are reported from the current provider contract.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
@@ -141,7 +142,16 @@ def _probe_market(provider, item: dict, derivatives_provider) -> tuple[bool, lis
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--assets", nargs="*", help="Only probe these configured assets")
+    args = parser.parse_args()
     markets = json.loads(Path("config/market_universe.json").read_text())["markets"]
+    if args.assets:
+        wanted = {asset.upper() for asset in args.assets}
+        markets = [item for item in markets if str(item["asset"]).upper() in wanted]
+        missing = wanted - {str(item["asset"]).upper() for item in markets}
+        if missing:
+            raise SystemExit("unknown configured assets: " + ", ".join(sorted(missing)))
     provider = build_public_market_data_provider(timeout_seconds=10.0)
     derivatives_provider = FallbackDerivativesProvider()
 
