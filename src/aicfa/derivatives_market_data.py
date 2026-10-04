@@ -659,15 +659,6 @@ class CcxtDerivativesProvider:
         resolved_symbol = self._resolve_symbol(symbol, native_symbol=native_symbol)
         funding_rows = self._funding_rows(resolved_symbol, limit)
         oi_rows = self._oi_rows(resolved_symbol, limit)
-        if not funding_rows:
-            raise DerivativesTransportError(
-                f"{self.exchange} returned no funding observations"
-            )
-        if not oi_rows:
-            raise DerivativesTransportError(
-                f"{self.exchange} returned no open-interest observations"
-            )
-
         mark_row = None
         funding_method = getattr(self._exchange, "fetch_funding_rate", None)
         if callable(funding_method):
@@ -702,11 +693,6 @@ class CcxtDerivativesProvider:
                 ) or int(time.time() * 1000)
                 if mark is not None:
                     mark_row = {"timestamp": int(ts), "mark_price": mark}
-
-        if mark_row is None:
-            raise DerivativesTransportError(
-                f"{self.exchange} returned no mark-price observation"
-            )
 
         return _merge_sources(
             funding_rows=funding_rows,
