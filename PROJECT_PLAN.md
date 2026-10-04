@@ -830,3 +830,25 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Added focused tests for mixed-source derivative fields and native futures-symbol routing.
 - Commits: 5df0b5b (field-level fallback), c51f3c7 (allow partial provider observations), 01c6ef2 (pass native venue symbols), 28568f5 (tests).
 - Next: deploy, run the derivatives test suite, then verify only XCU first. After XCU is confirmed, handle BONK timeout separately. Do not rerun 32/143 yet.
+
+
+### 2026-10-04 — DERIVATIVES FALLBACK BOUNDARY + FIELD PROVENANCE
+
+- Completed the universal derivative field-level fallback implementation.
+- The derivatives core is explicitly defined as: funding_rate, open_interest, mark_price.
+- Optional liquidation fields remain best-effort context: liquidation_volume, long_liquidation_volume, short_liquidation_volume.
+- Each field is independently sourced and causally merged. A market may therefore receive funding, OI, mark price and liquidation context from different real futures venues.
+- The fallback now records field-level provenance (for example funding_rate=okx, open_interest=gateio) instead of reporting only a provider list.
+- The universal provider chain now uses a bounded per-provider timeout of 3 seconds by default.
+- The chain stops immediately once all three mandatory core fields have real observations. Missing optional liquidation data never keeps AICFA waiting on additional slow/unsupported venues.
+- No fabricated values were introduced; unavailable fields remain unavailable.
+- Added regression coverage proving that an unnecessary provider is not queried after core derivatives coverage is complete.
+- Commits: 7defb3a (bounded fallback + field provenance), 8dde57c (early-stop regression test).
+
+### Next exact action
+
+1. Deploy these two commits through FrostDeploy.
+2. Run tests/test_derivatives_market_data.py.
+3. Run the direct XCU full-data diagnostic.
+4. If XCU is green, run BONK and NATGAS targeted diagnostics.
+5. Only after those are green, rerun the broader derivatives-affected market set and compare against the 29/32 baseline.
