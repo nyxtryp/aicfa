@@ -8,6 +8,19 @@ from aicfa.market_universe import MarketUniverse, MonitoredMarket
 from aicfa.setup_analysis import SetupCandidate, SetupLevel
 
 
+
+class SnapshotProvider:
+    exchange = "test"
+
+    def resolve_symbol(self, asset, *, market_type):
+        return asset
+
+    def fetch_ohlcv(self, **kwargs):
+        return pd.DataFrame({
+            "timestamp": [1], "open": [100.0], "high": [101.0],
+            "low": [99.0], "close": [100.5], "volume": [10.0],
+        })
+
 def _candidate():
     return SetupCandidate(
         scenario="continuation",
@@ -53,6 +66,7 @@ def _result(asset, mode):
 
 
 def test_scan_once_reuses_lifecycle_state(monkeypatch):
+    monkeypatch.setattr("aicfa.autonomous_scan.build_public_market_data_provider", lambda **kwargs: SnapshotProvider())
     calls = []
 
     def fake_find_setup(request, **kwargs):
@@ -78,6 +92,7 @@ def test_scan_once_reuses_lifecycle_state(monkeypatch):
 
 
 def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
+    monkeypatch.setattr("aicfa.autonomous_scan.build_public_market_data_provider", lambda **kwargs: SnapshotProvider())
     first = _candidate()
     second = SetupCandidate(
         **{
@@ -120,6 +135,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
 
 
 def test_run_forever_can_be_stopped_after_a_scan(monkeypatch):
+    monkeypatch.setattr("aicfa.autonomous_scan.build_public_market_data_provider", lambda **kwargs: SnapshotProvider())
     def fake_find_setup(request, **kwargs):
         return _result(request.asset, request.mode)
 
@@ -140,6 +156,7 @@ def test_run_forever_can_be_stopped_after_a_scan(monkeypatch):
 
 
 def test_scan_batch_rotates_20_markets_and_revisits_after_ten_batches(monkeypatch):
+    monkeypatch.setattr("aicfa.autonomous_scan.build_public_market_data_provider", lambda **kwargs: SnapshotProvider())
     calls = []
 
     def fake_find_setup(request, **kwargs):
@@ -180,6 +197,7 @@ def test_scan_batch_rotates_20_markets_and_revisits_after_ten_batches(monkeypatc
 
 
 def test_run_forever_batches_scans_one_market_sequentially(monkeypatch):
+    monkeypatch.setattr("aicfa.autonomous_scan.build_public_market_data_provider", lambda **kwargs: SnapshotProvider())
     def fake_find_setup(request, **kwargs):
         return _result(request.asset, request.mode)
 
