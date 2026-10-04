@@ -761,3 +761,35 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 3. Run the full regression.
 4. Run the complete 143-market full-data diagnostic.
 5. Inspect actual coverage by source and only then decide whether any additional venue-specific adapters are justified.
+
+### 2026-10-04 — FULL 143-MARKET DATA DIAGNOSTIC: 104 GREEN / 39 FOLLOW-UP ITEMS
+
+- Completed the complete production full-data diagnostic across all **143 monitored futures markets**.
+- Scope: OHLCV `1w/1d/4h/1h/15m/5m`, trades, order book, order-book history, funding rate, open interest, mark price and optional public liquidation events.
+- Final result: **104/143 fully OK, 34/143 PARTIAL, 5/143 TIMEOUT**.
+- Full diagnostic elapsed time: **1349.94s (~22m 30s)**.
+- **32 PARTIAL markets** have complete primary market data but derivatives unavailable through the current Binance + Bybit derivatives layer: `PEPE, SHIB, BONK, FLOKI, RAY, XAU, XAG, XCU, XPT, WTI, BRENT, NATGAS, NIKKEI, SPY, QQQ, AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA, AVGO, AMD, MU, ARM, TSM, ASML, ORCL, PLTR, NFLX, COIN`.
+- For those 32, all six OHLCV timeframes, trades, order book and order-book history passed; derivatives failed with the recurring Binance HTTP 400 / Bybit `10001` errors.
+- **DJIA** is PARTIAL because `1w` OHLCV is unavailable from the resolved MEXC source; all other required primary market-data categories passed.
+- **JPM** is PARTIAL because `1w` OHLCV, trades, order book and order-book history fail on the current Bybit mapping; MEXC also returns no `1w` OHLCV rows. Other OHLCV timeframes pass.
+- **5 TIMEOUT markets:** `BABYDOGE, PONKE, MYRO, RDNT, GNS`. Each reached the diagnostic's 30-second per-market full-data timeout.
+- The diagnostic confirms the core architecture is broadly functional. The remaining failures are concentrated in derivatives venue coverage, two primary TradFi mappings/data gaps, and five slow/unresolved crypto futures.
+- No SMC, setup engine, Entry/SL/TP, RR, lifecycle or decision logic should be changed to solve these failures. Remediation belongs in market routing/acquisition and coverage handling.
+
+### 2026-10-04 — DATA COVERAGE REMEDIATION PLAN FOR THE 39 AFFECTED MARKETS
+
+- **Phase A — Derivatives coverage:** preserve the existing dedicated derivatives architecture (`funding + open interest + mark price + optional liquidation events -> causal alignment -> derivatives evidence -> scenario/setup/decision`). Extend routing so eligible verified futures venues can provide real derivatives data where Binance/Bybit do not. Never fabricate unsupported values.
+- Derivatives must remain contextual evidence, not a single-metric kill switch for an otherwise valid structural SMC setup.
+- Add tests for native derivatives-symbol routing, mapped-venue fallback, capability detection, and explicit unsupported fields.
+- **Phase B — DJIA/JPM:** verify authoritative native mappings first. Repair or replace only the invalid/unusable venue mapping/source. Do not substitute crypto/USDT lookalikes or bypass `venue_symbols` with generic resolution.
+- **Phase C — five timeouts:** investigate `BABYDOGE, PONKE, MYRO, RDNT, GNS` individually for stale mappings, slow fallback, unavailable futures contracts, endpoint-specific failures or excessive retries. Keep the 15-second symbol-resolution guard separate from the 30-second full-data diagnostic timeout. Remove a market only if it is genuinely unavailable as a usable futures market.
+- **Phase D — final 143-market verification:** run focused tests, full regression, then the complete 143-market diagnostic again. Compare against the baseline **104 OK / 34 PARTIAL / 5 TIMEOUT** and document every remaining exception explicitly.
+
+### Next exact action
+
+1. Start with **Phase A: derivatives routing/capability coverage** for the 32 markets whose primary market data is already healthy.
+2. Inspect the current derivatives provider/routing implementation and existing venue mappings before adding any new adapter.
+3. Implement the smallest extension that supplies real funding/OI/mark data from eligible mapped futures venues.
+4. Add focused regression tests and verify on the VDS.
+5. Then fix DJIA/JPM and investigate the five timeout markets.
+6. After the 39-market remediation, rerun the complete 143-market diagnostic and record the final before/after coverage.
