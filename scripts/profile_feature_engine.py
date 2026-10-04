@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from aicfa.features import build_features
-from aicfa.market_orchestrator import _acquire_primary_snapshot, _primary_snapshot_limits
+from aicfa.market_orchestrator import _acquire_primary_snapshot, _primary_snapshot_limits\nfrom aicfa.data_requirements import TradingMode
 from aicfa.market_universe import load_market_universe
 from aicfa.public_market_data import build_public_market_data_provider
 from aicfa.market_data import completed_ohlcv
@@ -34,7 +34,7 @@ def main() -> None:
 
     universe = load_market_universe(Path(args.universe))
     provider = build_public_market_data_provider(timeout_seconds=10.0)
-    modes = _primary_snapshot_limits(("intraday", "swing", "position"))
+    modes = _primary_snapshot_limits((TradingMode.INTRADAY, TradingMode.SWING, TradingMode.POSITION))
 
     for requested in args.assets:
         market = _market(universe, requested)
