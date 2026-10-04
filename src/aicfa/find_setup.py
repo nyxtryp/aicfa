@@ -347,7 +347,13 @@ def find_setup(
         timeframes=timeframes,
     )
     evidence_duration_ms = (time.perf_counter() - evidence_started) * 1000.0
+    refetched_timeframes: list[str] = []
     if market_evidence.missing_context and limit is None:
+        refetched_timeframes = sorted(
+            {item.split(":", 1)[0] for item in market_evidence.missing_context if ":" in item},
+            key=timeframes.index,
+        )
+        refetch_started = time.perf_counter()
         frames, limits, analyses = _expand_missing_context(
             provider,
             symbol=symbol,
@@ -359,6 +365,17 @@ def find_setup(
             now_ms=now_ms,
             analyses=analyses,
         )
+        refetch_elapsed = (time.perf_counter() - refetch_started) * 1000.0
+        for timeframe in refetched_timeframes:
+            block_timings.append(
+                DataBlockTiming(
+                    f"ohlcv:{timeframe}",
+                    "refetched",
+                    refetch_elapsed,
+                    len(frames[timeframe]),
+                    reason="missing_context expansion",
+                )
+            )
         base_analysis = analyses.get(execution_timeframe)
         if base_analysis is None:
             raise ValueError(f"AICFA analysis produced no completed {execution_timeframe} rows")
@@ -388,6 +405,16 @@ def find_setup(
             derivatives_analysis = pd.DataFrame()
             derivatives_source = f"unavailable: {exc}"
 
+        block_timings.append(
+            DataBlockTiming(
+                "derivatives",
+                "complete" if not derivatives_frame.empty else "unavailable",
+                0.0,
+                len(derivatives_frame),
+                provider=derivatives_source,
+                reason="" if not derivatives_frame.empty else derivatives_source,
+            )
+        )
         market_evidence = append_derivatives_evidence(
             market_evidence,
             derivatives_frame,
@@ -409,6 +436,7 @@ def find_setup(
     # explicitly requires them. Core chart/SMC analysis does not pay the
     # collection/storage cost for feeds it does not need.
     if request.market_type == "futures" or requirements.requires(DataKind.TRADES):
+        trade_started = time.perf_counter()
         trade_fetch = getattr(provider, "fetch_trades_with_source", None)
         trade_limit = 60
         if trade_fetch is not None:
@@ -432,6 +460,16 @@ def find_setup(
                 trades = trade_result
                 trades_provider = provider.__class__.__name__
 
+        block_timings.append(
+            DataBlockTiming(
+                "trades",
+                "complete" if not trades.empty else "unavailable",
+                (time.perf_counter() - trade_started) * 1000.0,
+                len(trades),
+                provider=trades_provider,
+                reason="" if not trades.empty else trades_provider,
+            )
+        )
         if not trades.empty:
             trade_work = trades.copy()
             trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
@@ -445,6 +483,7 @@ def find_setup(
             )
 
     if request.market_type == "futures" or requirements.requires(DataKind.ORDER_BOOK):
+        order_book_started = time.perf_counter()
         history_fetch = getattr(provider, "fetch_order_book_history_with_source", None)
         if history_fetch is not None:
             history_result = _safe_optional_call(
@@ -482,6 +521,16 @@ def find_setup(
                 order_book = book_result
                 order_book_provider = provider.__class__.__name__
 
+        block_timings.append(
+            DataBlockTiming(
+                "order_book",
+                "complete" if not order_book.empty else "unavailable",
+                (time.perf_counter() - order_book_started) * 1000.0,
+                len(order_book),
+                provider=order_book_provider,
+                reason="" if not order_book.empty else order_book_provider,
+            )
+        )
         if not order_book.empty:
             book_work = order_book.copy()
             book_work["timestamp"] = pd.to_datetime(book_work["timestamp"], unit="ms", utc=True)
@@ -489,6 +538,16 @@ def find_setup(
                 pd.DataFrame({"timestamp": book_work["timestamp"]}), order_book
             )
 
+        block_timings.append(
+            DataBlockTiming(
+                "order_book_history",
+                "complete" if not order_book_history.empty else "unavailable",
+                (time.perf_counter() - order_book_started) * 1000.0,
+                len(order_book_history),
+                provider=order_book_history_provider,
+                reason="" if not order_book_history.empty else order_book_history_provider,
+            )
+        )
         if not order_book_history.empty and not trades.empty:
             history_work = order_book_history.copy()
             history_work["timestamp"] = pd.to_datetime(history_work["timestamp"], unit="ms", utc=True)
