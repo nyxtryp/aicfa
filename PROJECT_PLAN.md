@@ -1184,3 +1184,13 @@ This stage is **not GREEN** until the repository contains the rotation engine an
 
 ### Immediate next action
 **Proceed to step 3: instrument the pipeline. Add observable block-level timing, coverage, row counts, refetch detection, setup counts, lifecycle events and errors. Do not modify SMC/setup decision rules unless a failing integration test proves a regression.**
+
+
+### 2026-10-04 — STEP 3 PIPELINE DIAGNOSTIC RUNNER ADDED
+
+- Added `scripts/diagnose_market_pipeline.py` to measure one configured market through the real `analyze_market_horizons()` production path.
+- The runner reports whole-market time, resolution/snapshot timing, all six primary OHLCV timeframes with rows/status/duration, Intraday/Swing/Position timing and decisions, emitted setup count, lifecycle events, pipeline feature/evidence/setup timing, optional data-block coverage/provider/duration, and OHLCV refetch detection.
+- This is measurement tooling only; it does not add trading logic, signal thresholds or a parallel scanner.
+- Production VDS data-layer diagnostic for XMR completed successfully: full six-timeframe OHLCV plus trades, order book, order-book history and futures derivatives were available from Binance in **6.51s**.
+- XMR was used only as the first real diagnostic sample because it is a currently configured futures market; it is not being treated as a special market or benchmark.
+- The next measurement set must include representative liquid crypto, smaller crypto and TradFi markets before any hard per-market budget is selected.
