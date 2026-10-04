@@ -2,7 +2,7 @@ import pandas as pd
 
 from aicfa.derivatives import build_derivatives
 from aicfa.derivatives_evidence import derivatives_completeness, append_derivatives_evidence
-from aicfa.derivatives_market_data import BybitDerivativesProvider, _frame
+from aicfa.derivatives_market_data import BinanceDerivativesProvider, BybitDerivativesProvider, _frame
 from aicfa.market_evidence import MarketEvidence
 
 
@@ -68,6 +68,68 @@ def test_derivatives_evidence_marks_unavailable_data_without_fabrication():
     assert result.observations == ()
     assert "derivatives: no observations" in result.optional_missing_context
     assert result.missing_context == ()
+
+
+def test_binance_provider_preserves_partial_fields_when_one_endpoint_fails(monkeypatch):
+    provider = BinanceDerivativesProvider()
+    responses = {
+        "funding": [
+            {"fundingTime": 1000, "fundingRate": "0.001"},
+        ],
+        "mark": {
+            "time": 1200,
+            "markPrice": "50000",
+            "lastFundingRate": "0.0012",
+        },
+    }
+
+    def fake_request(url, *, timeout_seconds):
+        if "fundingRate" in url:
+            return responses["funding"]
+        if "openInterestHist" in url:
+            raise RuntimeError("BONK OI history unavailable")
+        if "premiumIndex" in url:
+            return responses["mark"]
+        raise AssertionError(url)
+
+    monkeypatch.setattr(
+        "aicfa.derivatives_market_data._request_json",
+        fake_request,
+    )
+    frame = provider.fetch_derivatives(symbol="BONKUSDT", limit=10)
+
+    assert frame["funding_rate"].notna().any()
+    assert frame["mark_price"].notna().any()
+    assert frame["open_interest"].isna().all()
+
+
+def test_bybit_provider_preserves_partial_fields_when_one_endpoint_fails(monkeypatch):
+    provider = BybitDerivativesProvider()
+    responses = {
+        "funding/history": {
+            "retCode": 0,
+            "result": {"list": [
+                {"fundingRateTimestamp": "1000", "fundingRate": "0.001"}
+            ]},
+        },
+        "tickers": {
+            "retCode": 0,
+            "time": 1200,
+            "result": {"list": [{"markPrice": "50000", "fundingRate": "0.0012"}]},
+        },
+    }
+
+    def fake_get(path, params):
+        if path == "open-interest":
+            raise RuntimeError("BONK OI unavailable")
+        return responses[path]
+
+    monkeypatch.setattr(provider, "_get", fake_get)
+    frame = provider.fetch_derivatives(symbol="BONKUSDT", limit=10)
+
+    assert frame["funding_rate"].notna().any()
+    assert frame["mark_price"].notna().any()
+    assert frame["open_interest"].isna().all()
 
 
 def test_bybit_provider_aligns_independent_funding_oi_and_mark_timestamps(monkeypatch):
