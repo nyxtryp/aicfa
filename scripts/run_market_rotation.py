@@ -44,7 +44,7 @@ def main() -> None:
         scan = engine.last_state.result.markets[0] if engine.last_state is not None else None
         diagnostics = scan.diagnostics if scan is not None else None
         print(
-            f"[{metric.queue_position:03d}/{metric.queue_position + len(universe.markets) - metric.queue_position:03d}] "
+            f"[{metric.queue_position:03d}/{len(universe.markets):03d}] "
             f"{metric.asset} status={metric.status} "
             f"time={metric.duration_ms / 1000.0:.3f}s setups={metric.setup_count}",
             flush=True,
