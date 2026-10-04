@@ -1005,3 +1005,11 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Confirmed from the VDS diagnostic that `GNS/USDT` is absent from all 19 currently configured futures venues, so it is removed from `config/market_universe.json`.
 - External verification also found KuCoin had already delisted GNS USDT-margined perpetuals in 2024. citeturn0search11
 - No asset-specific resolver exception or fabricated market mapping was introduced.
+
+
+### 2026-10-04 — BABYDOGE REMOVED FROM MARKET UNIVERSE
+
+- Removed `BABYDOGE/USDT` from the configured futures market universe at the user's request.
+- No resolver/provider exception or special-case routing was added.
+- Production universe changed from 142 to **141 markets**.
+- Commit: `4d713624ade2d89ccf854fa0cf5ea5e3f459447d`.
