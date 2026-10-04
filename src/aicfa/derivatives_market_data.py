@@ -83,9 +83,6 @@ def _merge_sources(
     oi = pd.DataFrame(oi_rows)
     funding = pd.DataFrame(funding_rows)
 
-    if oi.empty:
-        return _frame([])
-
     oi["timestamp"] = pd.to_numeric(oi["timestamp"], errors="coerce")
     oi["open_interest"] = pd.to_numeric(oi["open_interest"], errors="coerce")
     oi = (
@@ -93,10 +90,22 @@ def _merge_sources(
         .sort_values("timestamp")
         .drop_duplicates("timestamp", keep="last")
     )
-    if oi.empty:
+    timeline_parts = []
+    if not oi.empty:
+        timeline_parts.append(oi[["timestamp"]].copy())
+    if not funding.empty:
+        funding_ts = pd.to_numeric(funding["timestamp"], errors="coerce").dropna()
+        if not funding_ts.empty:
+            timeline_parts.append(pd.DataFrame({"timestamp": funding_ts.astype("int64")}))
+    if mark_row is not None:
+        mark_ts = pd.to_numeric(pd.Series([mark_row.get("timestamp")]), errors="coerce").iloc[0]
+        mark_price = pd.to_numeric(pd.Series([mark_row.get("mark_price")]), errors="coerce").iloc[0]
+        if pd.notna(mark_ts) and pd.notna(mark_price):
+            timeline_parts.append(pd.DataFrame({"timestamp": [int(mark_ts)]}))
+    if not timeline_parts:
         return _frame([])
 
-    timeline = oi[["timestamp"]].copy()
+    timeline = pd.concat(timeline_parts, ignore_index=True)
     if mark_row is not None:
         mark_ts = pd.to_numeric(pd.Series([mark_row.get("timestamp")]), errors="coerce").iloc[0]
         mark_price = pd.to_numeric(pd.Series([mark_row.get("mark_price")]), errors="coerce").iloc[0]
@@ -115,16 +124,17 @@ def _merge_sources(
         .reset_index(drop=True)
     )
 
-    oi_state = pd.merge_asof(
-        timeline,
-        oi[["timestamp", "open_interest"]].sort_values("timestamp"),
-        on="timestamp",
-        direction="backward",
-        allow_exact_matches=True,
-    )
-
-    if funding.empty:
-        return _frame([])
+    if oi.empty:
+        oi_state = timeline.copy()
+        oi_state["open_interest"] = pd.NA
+    else:
+        oi_state = pd.merge_asof(
+            timeline,
+            oi[["timestamp", "open_interest"]].sort_values("timestamp"),
+            on="timestamp",
+            direction="backward",
+            allow_exact_matches=True,
+        )
     funding["timestamp"] = pd.to_numeric(funding["timestamp"], errors="coerce")
     funding["funding_rate"] = pd.to_numeric(funding["funding_rate"], errors="coerce")
     funding = (
@@ -133,15 +143,16 @@ def _merge_sources(
         .drop_duplicates("timestamp", keep="last")
     )
     if funding.empty:
-        return _frame([])
-
-    aligned = pd.merge_asof(
-        oi_state.sort_values("timestamp"),
-        funding[["timestamp", "funding_rate"]].sort_values("timestamp"),
-        on="timestamp",
-        direction="backward",
-        allow_exact_matches=True,
-    )
+        aligned = oi_state.copy()
+        aligned["funding_rate"] = pd.NA
+    else:
+        aligned = pd.merge_asof(
+            oi_state.sort_values("timestamp"),
+            funding[["timestamp", "funding_rate"]].sort_values("timestamp"),
+            on="timestamp",
+            direction="backward",
+            allow_exact_matches=True,
+        )
 
     if mark_row is not None:
         mark_ts = pd.to_numeric(pd.Series([mark_row.get("timestamp")]), errors="coerce").iloc[0]
@@ -381,7 +392,13 @@ class BybitDerivativesProvider:
 
 
 class FallbackDerivativesProvider:
-    """Capability-aware Binance -> Bybit fallback with no fabricated fields."""
+    """Universal per-field derivatives fallback across allowed venues."""
+
+    EXCHANGES = (
+        "binance", "bybit", "okx", "bitget", "gateio", "kucoin", "mexc",
+        "kraken", "coinbase", "bitfinex", "bingx", "htx", "coinex",
+        "whitebit", "cryptocom", "bitrue", "bitstamp", "gemini", "upbit",
+    )
 
     def __init__(self, providers=None) -> None:
         self.providers = tuple(
@@ -389,28 +406,103 @@ class FallbackDerivativesProvider:
             or (
                 BinanceDerivativesProvider(),
                 BybitDerivativesProvider(),
-                CcxtDerivativesProvider("okx"),
-                CcxtDerivativesProvider("mexc"),
-                CcxtDerivativesProvider("bitget"),
-                CcxtDerivativesProvider("gateio"),
+                *(CcxtDerivativesProvider(exchange) for exchange in self.EXCHANGES[2:]),
             )
         )
 
+    @staticmethod
+    def _native_symbol(provider, symbol: str, venue_symbols) -> str | None:
+        if not venue_symbols:
+            return None
+        provider_name = str(getattr(provider, "exchange", "")).lower()
+        aliases = {"gate": "gateio"}
+        for venue, native in venue_symbols:
+            if aliases.get(str(venue).lower(), str(venue).lower()) == provider_name:
+                return native
+        return None
+
+    @staticmethod
+    def _combine(frames: list[tuple[pd.DataFrame, str]]) -> tuple[pd.DataFrame, str]:
+        if not frames:
+            return _frame([]), ""
+        timeline = pd.concat(
+            [frame[["timestamp"]] for frame, _ in frames if not frame.empty],
+            ignore_index=True,
+        )
+        if timeline.empty:
+            return _frame([]), ""
+        timeline["timestamp"] = pd.to_numeric(timeline["timestamp"], errors="coerce")
+        timeline = (
+            timeline.dropna()
+            .astype({"timestamp": "int64"})
+            .drop_duplicates("timestamp")
+            .sort_values("timestamp")
+            .reset_index(drop=True)
+        )
+        result = timeline
+        for column in DERIVATIVE_COLUMNS[1:]:
+            source_frames = [
+                frame[["timestamp", column]].dropna(subset=[column]).copy()
+                for frame, _ in frames
+                if column in frame.columns and frame[column].notna().any()
+            ]
+            if not source_frames:
+                result[column] = pd.NA
+                continue
+            series = pd.concat(source_frames, ignore_index=True)
+            series["timestamp"] = pd.to_numeric(series["timestamp"], errors="coerce")
+            series[column] = pd.to_numeric(series[column], errors="coerce")
+            series = (
+                series.dropna(subset=["timestamp", column])
+                .sort_values("timestamp")
+                .drop_duplicates("timestamp", keep="last")
+            )
+            result = pd.merge_asof(
+                result.sort_values("timestamp"),
+                series[["timestamp", column]].sort_values("timestamp"),
+                on="timestamp",
+                direction="backward",
+                allow_exact_matches=True,
+            )
+        sources = ",".join(name for _, name in frames)
+        return _frame(result.to_dict("records")), sources
+
     def fetch_derivatives(
-        self, *, symbol: str, limit: int = 200
+        self,
+        *,
+        symbol: str,
+        limit: int = 200,
+        venue_symbols: tuple[tuple[str, str], ...] = (),
     ) -> tuple[pd.DataFrame, str]:
         attempts: list[str] = []
+        frames: list[tuple[pd.DataFrame, str]] = []
         for provider in self.providers:
+            native_symbol = self._native_symbol(provider, symbol, venue_symbols)
             try:
-                frame = provider.fetch_derivatives(symbol=symbol, limit=limit)
-                if frame.empty:
-                    raise ValueError("provider returned empty derivatives data")
-                return frame, provider.exchange
+                kwargs = {"symbol": symbol, "limit": limit}
+                if native_symbol is not None:
+                    kwargs["native_symbol"] = native_symbol
+                try:
+                    frame = provider.fetch_derivatives(**kwargs)
+                except TypeError:
+                    frame = provider.fetch_derivatives(symbol=symbol, limit=limit)
+                if not frame.empty:
+                    frames.append((frame, provider.exchange))
+                    combined, sources = self._combine(frames)
+                    required = ("funding_rate", "open_interest", "mark_price")
+                    if all(combined[column].notna().any() for column in required):
+                        return combined, sources
             except Exception as exc:
                 attempts.append(f"{provider.exchange}: {exc}")
-        raise RuntimeError(
-            "all derivatives providers failed: " + "; ".join(attempts)
-        )
+        combined, sources = self._combine(frames)
+        required = ("funding_rate", "open_interest", "mark_price")
+        if all(combined[column].notna().any() for column in required):
+            return combined, sources
+        missing = [name for name in required if not combined.empty and not combined[name].notna().any()]
+        detail = "; ".join(attempts)
+        if missing:
+            detail = f"{detail}; missing: {','.join(missing)}".strip("; ")
+        raise RuntimeError("all derivatives providers failed: " + detail)
 
 class CcxtDerivativesProvider:
     """Capability-aware public derivatives provider backed by CCXT.
@@ -457,6 +549,31 @@ class CcxtDerivativesProvider:
     def _load_markets(self) -> None:
         if not getattr(self._exchange, "markets", None):
             self._exchange.load_markets()
+
+    def _resolve_symbol(self, symbol: str, native_symbol: str | None = None) -> str:
+        self._load_markets()
+        if native_symbol:
+            return native_symbol
+        candidates = [
+            symbol,
+            f"{symbol}:USDT" if ":" not in symbol and "/" in symbol else symbol,
+        ]
+        for candidate in candidates:
+            if candidate in self._exchange.markets:
+                return candidate
+        base, _, quote = symbol.partition("/")
+        base = base.upper()
+        quote = quote.upper() or "USDT"
+        for market_symbol, market in self._exchange.markets.items():
+            if str(market.get("type", "")).lower() not in {"swap", "future"}:
+                continue
+            if str(market.get("quote", "")).upper() != quote:
+                continue
+            if str(market.get("settle", "")).upper() not in {"", quote}:
+                continue
+            if str(market.get("base", "")).upper() == base or str(market.get("baseId", "")).upper() == base:
+                return market_symbol
+        raise ValueError(f"{self.exchange} does not have market symbol {symbol}")
 
     @staticmethod
     def _number(value):
@@ -531,10 +648,17 @@ class CcxtDerivativesProvider:
                     rows.append({"timestamp": int(ts), "open_interest": value})
         return rows
 
-    def fetch_derivatives(self, *, symbol: str, limit: int = 200) -> pd.DataFrame:
+    def fetch_derivatives(
+        self,
+        *,
+        symbol: str,
+        limit: int = 200,
+        native_symbol: str | None = None,
+    ) -> pd.DataFrame:
         self._load_markets()
-        funding_rows = self._funding_rows(symbol, limit)
-        oi_rows = self._oi_rows(symbol, limit)
+        resolved_symbol = self._resolve_symbol(symbol, native_symbol=native_symbol)
+        funding_rows = self._funding_rows(resolved_symbol, limit)
+        oi_rows = self._oi_rows(resolved_symbol, limit)
         if not funding_rows:
             raise DerivativesTransportError(
                 f"{self.exchange} returned no funding observations"
@@ -548,7 +672,7 @@ class CcxtDerivativesProvider:
         funding_method = getattr(self._exchange, "fetch_funding_rate", None)
         if callable(funding_method):
             try:
-                current = funding_method(symbol)
+                current = funding_method(resolved_symbol)
             except Exception:
                 current = {}
             mark = self._number(current.get("markPrice")) if isinstance(current, dict) else None
@@ -563,7 +687,7 @@ class CcxtDerivativesProvider:
         if mark_row is None:
             ticker_method = getattr(self._exchange, "fetch_ticker", None)
             if callable(ticker_method):
-                ticker = ticker_method(symbol)
+                ticker = ticker_method(resolved_symbol)
                 info = ticker.get("info") if isinstance(ticker, dict) else {}
                 mark = self._number(
                     ticker.get("markPrice") if isinstance(ticker, dict) else None
