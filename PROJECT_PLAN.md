@@ -1062,3 +1062,10 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Derivatives fields are independently optional: funding, OI, mark and liquidations can be partially present. No fabricated values are allowed.
 - Knowledge-driven DataRequirementPlan remains the semantic requirement contract. Futures market type must not silently turn optional evidence into mandatory evidence.
 - Regression tests now enforce the corrected semantics: requirements stay knowledge-driven while futures collection opportunistically enriches the analysis.
+
+
+### 2026-10-04 — Full-suite regression cleanup
+- Full suite reached 492 passed / 2 failed.
+- MTF setup conflict was incorrectly classified as NEED_MORE_EVIDENCE when higher-timeframe structure conflicted with lower confirmation; this is now a material WAIT condition with an explicit conflict.
+- Market-universe regression was stale: the current 141-market universe is 110 crypto + 31 TradFi after removing five obsolete crypto markets and adding XMR plus SP500/NASDAQ100.
+- Updated regression coverage to match the current production universe contract.
