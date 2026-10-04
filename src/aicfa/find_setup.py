@@ -242,6 +242,7 @@ def find_setup(
     limit: int | None = None,
     resolver: Callable[[str, str], str] | None = None,
     derivatives_provider: object | None = None,
+    prefetched_frames: dict[str, pd.DataFrame] | None = None,
 ) -> FindSetupResult:
     """Resolve the asset, collect knowledge-required context, and run AICFA."""
     use_live_derivatives = provider is None
@@ -270,10 +271,16 @@ def find_setup(
     if limit is not None:
         limits = {timeframe: int(limit) for timeframe in timeframes}
 
-    frames = _fetch_frames(
-        provider, symbol=symbol, market_type=request.market_type,
-        timeframes=timeframes, limits=limits,
-    )
+    if prefetched_frames is not None:
+        missing = [timeframe for timeframe in timeframes if timeframe not in prefetched_frames]
+        if missing:
+            raise ValueError(f"prefetched OHLCV snapshot is missing timeframes: {missing}")
+        frames = {timeframe: prefetched_frames[timeframe].copy(deep=True) for timeframe in timeframes}
+    else:
+        frames = _fetch_frames(
+            provider, symbol=symbol, market_type=request.market_type,
+            timeframes=timeframes, limits=limits,
+        )
 
     execution_timeframe = profile.execution_timeframe
     base = completed_ohlcv(
