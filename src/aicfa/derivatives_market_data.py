@@ -403,3 +403,161 @@ class FallbackDerivativesProvider:
         raise RuntimeError(
             "all derivatives providers failed: " + "; ".join(attempts)
         )
+
+class CcxtDerivativesProvider:
+    """Capability-aware public derivatives provider backed by CCXT.
+
+    CCXT is used only for venues whose public derivatives methods are actually
+    supported by the exchange. Unsupported funding/OI history is not replaced
+    with fabricated values; a provider attempt fails and the fallback chain
+    continues to the next venue.
+    """
+
+    def __init__(
+        self,
+        exchange_id: str,
+        *,
+        timeout_seconds: float = 10.0,
+        exchange_factory=None,
+    ) -> None:
+        import ccxt
+
+        exchange_id = exchange_id.strip().lower()
+        if not exchange_id:
+            raise ValueError("exchange_id must not be empty")
+        factory = exchange_factory or getattr(ccxt, exchange_id, None)
+        if factory is None:
+            raise ValueError(f"unsupported CCXT exchange: {exchange_id}")
+        self.exchange = exchange_id
+        self.timeout_seconds = float(timeout_seconds)
+        self._exchange = (
+            factory({"enableRateLimit": True})
+            if callable(factory)
+            else factory
+        )
+        self._exchange.timeout = int(self.timeout_seconds * 1000)
+
+    def _load_markets(self) -> None:
+        if not getattr(self._exchange, "markets", None):
+            self._exchange.load_markets()
+
+    @staticmethod
+    def _number(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _funding_rows(self, symbol: str, limit: int) -> list[dict]:
+        rows = []
+        method = getattr(self._exchange, "fetch_funding_rate_history", None)
+        if callable(method):
+            history = method(symbol, None, min(int(limit), 200))
+            for item in history or []:
+                ts = item.get("timestamp") or item.get("fundingTimestamp")
+                rate = item.get("fundingRate")
+                ts = self._number(ts)
+                rate = self._number(rate)
+                if ts is not None and rate is not None:
+                    rows.append({"timestamp": int(ts), "funding_rate": rate})
+        if not rows:
+            current_method = getattr(self._exchange, "fetch_funding_rate", None)
+            if callable(current_method):
+                item = current_method(symbol)
+                ts = item.get("timestamp") or item.get("fundingTimestamp") or int(time.time() * 1000)
+                rate = item.get("fundingRate")
+                ts = self._number(ts)
+                rate = self._number(rate)
+                if ts is not None and rate is not None:
+                    rows.append({"timestamp": int(ts), "funding_rate": rate})
+        return rows
+
+    def _oi_rows(self, symbol: str, limit: int) -> list[dict]:
+        rows = []
+        method = getattr(self._exchange, "fetch_open_interest_history", None)
+        if callable(method):
+            oi_symbol = symbol
+            if self.exchange == "okx":
+                oi_symbol = symbol.split("/", 1)[0]
+            history = method(
+                oi_symbol,
+                "5m",
+                None,
+                min(int(limit), 200),
+            )
+            for item in history or []:
+                ts = item.get("timestamp")
+                value = item.get("openInterestValue")
+                if value is None:
+                    value = item.get("openInterestAmount")
+                ts = self._number(ts)
+                value = self._number(value)
+                if ts is not None and value is not None:
+                    rows.append({"timestamp": int(ts), "open_interest": value})
+        if not rows:
+            current_method = getattr(self._exchange, "fetch_open_interest", None)
+            if callable(current_method):
+                item = current_method(symbol)
+                ts = item.get("timestamp") or int(time.time() * 1000)
+                value = item.get("openInterestValue")
+                if value is None:
+                    value = item.get("openInterestAmount")
+                ts = self._number(ts)
+                value = self._number(value)
+                if ts is not None and value is not None:
+                    rows.append({"timestamp": int(ts), "open_interest": value})
+        return rows
+
+    def fetch_derivatives(self, *, symbol: str, limit: int = 200) -> pd.DataFrame:
+        self._load_markets()
+        funding_rows = self._funding_rows(symbol, limit)
+        oi_rows = self._oi_rows(symbol, limit)
+        if not funding_rows:
+            raise DerivativesTransportError(
+                f"{self.exchange} returned no funding observations"
+            )
+        if not oi_rows:
+            raise DerivativesTransportError(
+                f"{self.exchange} returned no open-interest observations"
+            )
+
+        mark_row = None
+        funding_method = getattr(self._exchange, "fetch_funding_rate", None)
+        if callable(funding_method):
+            current = funding_method(symbol)
+            mark = self._number(current.get("markPrice"))
+            ts = self._number(
+                current.get("timestamp")
+                or current.get("fundingTimestamp")
+                or int(time.time() * 1000)
+            )
+            if mark is not None and ts is not None:
+                mark_row = {"timestamp": int(ts), "mark_price": mark}
+
+        if mark_row is None:
+            ticker_method = getattr(self._exchange, "fetch_ticker", None)
+            if callable(ticker_method):
+                ticker = ticker_method(symbol)
+                info = ticker.get("info") if isinstance(ticker, dict) else {}
+                mark = self._number(
+                    ticker.get("markPrice") if isinstance(ticker, dict) else None
+                )
+                if mark is None and isinstance(info, dict):
+                    mark = self._number(info.get("markPrice"))
+                ts = self._number(
+                    ticker.get("timestamp") if isinstance(ticker, dict) else None
+                ) or int(time.time() * 1000)
+                if mark is not None:
+                    mark_row = {"timestamp": int(ts), "mark_price": mark}
+
+        if mark_row is None:
+            raise DerivativesTransportError(
+                f"{self.exchange} returned no mark-price observation"
+            )
+
+        return _merge_sources(
+            funding_rows=funding_rows,
+            oi_rows=oi_rows,
+            mark_row=mark_row,
+            liquidation_rows=[],
+        )
