@@ -198,3 +198,21 @@ def test_ccxt_gateio_provider_uses_swap_market_type():
     from aicfa.derivatives_market_data import CcxtDerivativesProvider
     CcxtDerivativesProvider("gateio", exchange_factory=factory)
     assert seen["options"]["defaultType"] == "swap"
+
+def test_ccxt_gateio_accepts_gate_constructor_alias(monkeypatch):
+    class FakeExchange:
+        def __init__(self, options):
+            self.options = options
+            self.markets = {}
+            self.timeout = None
+
+    def factory(options):
+        return FakeExchange(options)
+
+    fake_ccxt = type("FakeCCXT", (), {"gate": factory})()
+    monkeypatch.setitem(__import__("sys").modules, "ccxt", fake_ccxt)
+
+    from aicfa.derivatives_market_data import CcxtDerivativesProvider
+    provider = CcxtDerivativesProvider("gateio")
+    assert provider.exchange == "gateio"
+    assert provider._exchange.options["options"]["defaultType"] == "swap"
