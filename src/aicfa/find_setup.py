@@ -254,7 +254,9 @@ def find_setup(
     symbol = normalize_asset(resolver(request.asset, request.market_type))
 
     profile = mode_timeframe_profile(request.mode)
-    requirements = default_setup_requirements(symbol, mode=request.mode)
+    requirements = default_setup_requirements(
+        symbol, mode=request.mode, market_type=request.market_type
+    )
     timeframes = requirements.required_timeframes
     if not timeframes:
         raise ValueError("knowledge requirements produced no timeframes")
