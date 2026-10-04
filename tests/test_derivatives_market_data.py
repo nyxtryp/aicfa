@@ -181,3 +181,20 @@ def test_ccxt_derivatives_falls_back_to_current_oi_and_mark_info():
     assert frame["funding_rate"].notna().any()
     assert frame["open_interest"].notna().any()
     assert frame.iloc[-1]["mark_price"] == 2.5
+
+
+def test_ccxt_gateio_provider_uses_swap_market_type():
+    class FakeExchange:
+        def __init__(self, options):
+            self.options = options
+            self.markets = {}
+            self.timeout = None
+
+    seen = {}
+    def factory(options):
+        seen.update(options)
+        return FakeExchange(options)
+
+    from aicfa.derivatives_market_data import CcxtDerivativesProvider
+    CcxtDerivativesProvider("gateio", exchange_factory=factory)
+    assert seen["options"]["defaultType"] == "swap"
