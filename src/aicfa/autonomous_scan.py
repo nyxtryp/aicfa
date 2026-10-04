@@ -65,6 +65,35 @@ class AutonomousScanState:
     result: MultiMarketScan
 
 
+@dataclass(frozen=True)
+class RotationMarketMetric:
+    """Measured outcome for one deterministic queue position."""
+
+    cycle_id: int
+    queue_position: int
+    asset: str
+    status: str
+    duration_ms: float
+    setup_count: int
+    error: str = ""
+
+
+@dataclass(frozen=True)
+class RotationCycle:
+    """One finite pass over every configured market in deterministic order."""
+
+    cycle_id: int
+    started_at_ms: int
+    finished_at_ms: int
+    total_duration_ms: float
+    market_count: int
+    completed_markets: int
+    timeout_markets: int
+    error_markets: int
+    setup_count: int
+    markets: tuple[RotationMarketMetric, ...]
+
+
 class AutonomousScanEngine:
     """Continuously scan one configured universe with persistent in-process state.
 
@@ -94,6 +123,8 @@ class AutonomousScanEngine:
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
         self._scan_number = 0
         self._last_state: AutonomousScanState | None = None
+        self._cycle_id = 0
+        self._last_cycle: RotationCycle | None = None
 
     @property
     def last_state(self) -> AutonomousScanState | None:
@@ -102,6 +133,14 @@ class AutonomousScanEngine:
     @property
     def scan_number(self) -> int:
         return self._scan_number
+
+    @property
+    def cycle_id(self) -> int:
+        return self._cycle_id
+
+    @property
+    def last_cycle(self) -> RotationCycle | None:
+        return self._last_cycle
 
     def active_setups(
         self,
@@ -220,6 +259,65 @@ class AutonomousScanEngine:
         self._last_state = state
         return state
 
+    def run_cycle(
+        self,
+        *,
+        now_ms: int | None = None,
+    ) -> RotationCycle:
+        """Run exactly one finite rotation over all configured markets."""
+        if not self.universe.markets:
+            raise ValueError("market universe must not be empty")
+
+        started_at_ms = self._clock_ms() if now_ms is None else now_ms
+        started = time.perf_counter()
+        self._cycle_id += 1
+        cycle_id = self._cycle_id
+        metrics: list[RotationMarketMetric] = []
+
+        for queue_position, market in enumerate(self.universe.markets, start=1):
+            market_started = time.perf_counter()
+            try:
+                state = self.scan_market(queue_position - 1, now_ms=started_at_ms)
+                scan = state.result.markets[0]
+                diagnostics = scan.diagnostics
+                status = diagnostics.status if diagnostics is not None else "completed"
+                error = diagnostics.error if diagnostics is not None else ""
+                setup_count = len(scan.setups)
+            except Exception as exc:
+                status = "error"
+                error = f"{type(exc).__name__}: {exc}"
+                setup_count = 0
+
+            metrics.append(
+                RotationMarketMetric(
+                    cycle_id=cycle_id,
+                    queue_position=queue_position,
+                    asset=market.asset,
+                    status=status,
+                    duration_ms=(time.perf_counter() - market_started) * 1000.0,
+                    setup_count=setup_count,
+                    error=error,
+                )
+            )
+
+        finished_at_ms = self._clock_ms()
+        timeout_markets = sum(item.status == "timeout" for item in metrics)
+        error_markets = sum(item.status == "error" for item in metrics)
+        cycle = RotationCycle(
+            cycle_id=cycle_id,
+            started_at_ms=started_at_ms,
+            finished_at_ms=finished_at_ms,
+            total_duration_ms=(time.perf_counter() - started) * 1000.0,
+            market_count=len(metrics),
+            completed_markets=sum(item.status == "completed" for item in metrics),
+            timeout_markets=timeout_markets,
+            error_markets=error_markets,
+            setup_count=sum(item.setup_count for item in metrics),
+            markets=tuple(metrics),
+        )
+        self._last_cycle = cycle
+        return cycle
+
     def run_forever_batches(
         self, *, interval_seconds: float = BATCH_SCAN_INTERVAL_SECONDS,
         batch_size: int = DEFAULT_MARKETS_PER_BATCH,
@@ -269,4 +367,4 @@ class AutonomousScanEngine:
             sleep(interval_seconds)
 
 
-__all__ = ["AutonomousScanEngine", "AutonomousScanState", "BATCH_SCAN_INTERVAL_SECONDS", "DEFAULT_MARKET_TIMEOUT_SECONDS", "DEFAULT_MARKETS_PER_BATCH", "MAIN_SCAN_INTERVAL_SECONDS", "MarketExecutionTimeout"]
+__all__ = ["AutonomousScanEngine", "AutonomousScanState", "BATCH_SCAN_INTERVAL_SECONDS", "DEFAULT_MARKET_TIMEOUT_SECONDS", "DEFAULT_MARKETS_PER_BATCH", "MAIN_SCAN_INTERVAL_SECONDS", "MarketExecutionTimeout", "RotationCycle", "RotationMarketMetric"]
