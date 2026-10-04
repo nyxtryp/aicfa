@@ -627,8 +627,6 @@ class FallbackDerivativesProvider:
                 return combined, sources
 
         combined, sources = self._combine(frames)
-        if not combined.empty:
-            combined = combined.dropna(subset=["funding_rate", "open_interest"]).reset_index(drop=True)
         if all(combined[column].notna().any() for column in DERIVATIVE_COVERAGE_FIELDS):
             return combined, sources
         missing = [
