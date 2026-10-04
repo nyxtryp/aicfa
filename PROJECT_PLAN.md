@@ -974,3 +974,22 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 2. Run the derivative-focused tests.
 3. Re-run only BONK full-data diagnostic.
 4. If BONK is still partial, inspect which individual fields remain unavailable and continue provider-level capability/fallback work rather than adding an asset-specific exception.
+
+
+### 2026-10-04 — BONK OKX DIRECT DERIVATIVES PATH
+
+- VDS verification after the partial-endpoint fix: derivative tests passed (20/20), but BONK remained PARTIAL at 17.19s with the OKX CCXT provider timing out at the 3-second provider boundary; all remaining fallback venues were unsupported or also timed out.
+- The concrete bottleneck is now provider transport/market discovery, not missing BONK primary market data: primary OHLCV, trades, order book and history are all green.
+- Added a direct, keyless OKX public REST derivatives provider for the universal fallback. It requests funding-rate history, open interest and mark price directly from OKX public V5 endpoints and runs the three independent requests concurrently, so slow CCXT market discovery cannot consume the provider budget.
+- The direct provider accepts AICFA canonical symbols and authoritative native venue symbols, maps them to OKX *-USDT-SWAP instrument IDs, preserves partial real fields, and does not fabricate missing observations.
+- Replaced the OKX CCXT provider in the default fallback chain with the direct OKX provider. CCXT remains available for the other venues.
+- Added unit coverage for complete and partial direct OKX responses.
+- Source commit: 0c2c080106350e8d088909491cb416d13dcf2ba1.
+- Test commit: 84dc63390cb2ca5ef2aa87031e0f07d39b9b8f65.
+
+### Next exact action
+
+1. Deploy the latest source/test/plan commits through FrostDeploy.
+2. Run tests/test_derivatives_market_data.py and tests/test_derivatives_contextual.py.
+3. Re-run scripts/check_full_market_data.py --assets BONK.
+4. If BONK becomes green, run the affected-market diagnostic next; do not add asset-specific exceptions.
