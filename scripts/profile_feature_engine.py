@@ -14,7 +14,7 @@ from aicfa.features import build_features
 from aicfa.market_orchestrator import _acquire_primary_snapshot, _primary_snapshot_limits
 from aicfa.market_universe import load_market_universe
 from aicfa.public_market_data import build_public_market_data_provider
-from aicfa.ohlcv import completed_ohlcv
+from aicfa.market_data import completed_ohlcv
 
 
 def _market(universe, requested: str):
