@@ -15,6 +15,7 @@ from .data_requirements import TradingMode, default_setup_requirements, mode_tim
 from .public_market_data import build_public_market_data_provider
 from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarketDataProvider
 from .find_setup import FindSetupRequest, FindSetupResult, find_setup
+from .derivatives_market_data import FallbackDerivativesProvider
 from .market_universe import MarketUniverse
 from .setup_lifecycle import SetupIdentity, SetupLifecycle, SetupLifecycleResult
 from .trade_description import TradeDescription, build_trade_description
@@ -160,6 +161,8 @@ def analyze_market_horizons(
     resolver: Callable[[str, str], str] | None = None,
     modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
     lifecycle: SetupLifecycle | None = None,
+    venue_symbols: tuple[tuple[str, str], ...] = (),
+    derivatives_provider: FallbackDerivativesProvider | None = None,
 ) -> MarketHorizonScan:
     """Run the existing FindSetup pipeline once per primary horizon.
 
@@ -186,6 +189,9 @@ def analyze_market_horizons(
     snapshot_elapsed = sum(getattr(item, "duration_ms", 0.0) for item in snapshot_metrics)
     resolution_elapsed = max(0.0, acquisition_elapsed - snapshot_elapsed)
     resolved = lambda _asset, _market_type: symbol
+    shared_derivatives_provider = derivatives_provider
+    if market_type == "futures" and shared_derivatives_provider is None:
+        shared_derivatives_provider = FallbackDerivativesProvider()
 
     results: list[FindSetupResult] = []
     horizon_timings: list[HorizonTiming] = []
@@ -204,6 +210,7 @@ def analyze_market_horizons(
             now_ms=now_ms,
             resolver=resolved,
             prefetched_frames=prefetched_frames,
+            derivatives_provider=shared_derivatives_provider,
         )
         results.append(result)
         pipeline_diagnostics = getattr(result, "diagnostics", None)
@@ -293,6 +300,7 @@ def scan_markets(
     resolver: Callable[[str, str], str] | None = None,
     modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
     lifecycle: SetupLifecycle | None = None,
+    venue_symbols_by_asset: dict[str, tuple[tuple[str, str], ...]] | None = None,
 ) -> MultiMarketScan:
     """Scan each configured market independently across the primary horizons."""
     normalized_assets = tuple(asset.strip() for asset in assets if asset.strip())
@@ -308,6 +316,7 @@ def scan_markets(
             resolver=resolver,
             modes=modes,
             lifecycle=lifecycle,
+            venue_symbols=(venue_symbols_by_asset or {}).get(asset, ()),
         )
         for asset in normalized_assets
     )
@@ -343,6 +352,7 @@ def scan_universe(
             resolver=resolver,
             modes=modes,
             lifecycle=lifecycle,
+            venue_symbols=market.venue_symbols,
         )
         for market in universe.markets
     )
