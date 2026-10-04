@@ -234,6 +234,7 @@ def build_zone_reaction(
     # Buckets are broad price ranges, so a single bucket may contain many
     # historical zones. Keep a lazily-built index sorted by zone low; candle
     # lookup can then binary-search the relevant price slice.
+    zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
     zone_bucket_level_sorted: dict[int, list[tuple[float, int]]] = {}
     occupied_bucket_key_set: set[int] = set()
     occupied_bucket_keys: list[int] = []
@@ -242,6 +243,7 @@ def build_zone_reaction(
     # becomes O(n) again when the wide-zone set grows.
     wide_bucket_step = bucket_step * 65
     wide_zone_buckets: dict[int, list[int]] = {}
+    wide_zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
     wide_zone_bucket_level_sorted: dict[int, list[tuple[float, int]]] = {}
     wide_occupied_bucket_key_set: set[int] = set()
     wide_occupied_bucket_keys: list[int] = []
