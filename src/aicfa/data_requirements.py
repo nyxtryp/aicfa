@@ -233,6 +233,7 @@ def requirements_for_concepts(
     concepts: Iterable[str],
     *,
     mode: TradingMode | str | None = None,
+    market_type: str = "spot",
 ) -> DataRequirementPlan:
     """Build a request-scoped plan from explicit knowledge concepts.
 
@@ -251,6 +252,13 @@ def requirements_for_concepts(
     context_needs = frozenset().union(*(item.context_needs for item in requirements))
     timeframe_roles = frozenset().union(*(item.timeframe_roles for item in requirements))
 
+    if market_type == "futures":
+        data_kinds = data_kinds | frozenset({
+            DataKind.TRADES, DataKind.ORDER_BOOK, DataKind.FUNDING,
+            DataKind.OPEN_INTEREST, DataKind.LIQUIDATIONS, DataKind.MARK_PRICE,
+        })
+        context_needs = context_needs | frozenset({ContextNeed.POSITIONING_CONTEXT})
+
     return DataRequirementPlan(
         asset=asset.strip(),
         concepts=normalized,
@@ -262,7 +270,12 @@ def requirements_for_concepts(
     )
 
 
-def default_setup_requirements(asset: str, *, mode: TradingMode | str | None = None) -> DataRequirementPlan:
+def default_setup_requirements(
+    asset: str,
+    *,
+    mode: TradingMode | str | None = None,
+    market_type: str = "spot",
+) -> DataRequirementPlan:
     """Return the knowledge-driven baseline for an unconstrained setup search.
 
     This is a concept set, not a fixed candle-depth recipe. Additional
@@ -281,4 +294,5 @@ def default_setup_requirements(asset: str, *, mode: TradingMode | str | None = N
             "wyckoff.spring",
         ),
         mode=mode,
+        market_type=market_type,
     )
