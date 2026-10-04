@@ -275,3 +275,22 @@ def test_market_diagnostics_expose_snapshot_and_horizon_timings(monkeypatch):
     assert result.diagnostics.setup_duration_ms >= 0
     assert result.diagnostics.lifecycle_event_count == 0
     assert all(item.status == "prefetched" for item in result.diagnostics.block_timings)
+
+
+def test_one_market_computes_primary_features_once(monkeypatch):
+    provider = _provider()
+    calls = []
+
+    def fake_build_features(frame):
+        calls.append(len(frame))
+        return frame.copy()
+
+    def fake_find_setup(request, **kwargs):
+        return _fake_result(request.asset, request.mode, decision="WAIT")
+
+    monkeypatch.setattr("aicfa.market_orchestrator.build_features", fake_build_features)
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    analyze_market_horizons("BTC/USDT", provider=provider, now_ms=1000)
+
+    assert len(calls) == 6
