@@ -31,7 +31,6 @@
 - Added contract coverage in test commit `21e2e7e8c2a2a82df0c5de0c51a1543989713a1e` — `test: define fold outcome statistics contract`.
 - Corrected test construction to use the real `BatchEvaluation` contract, including required `results`, in commits `afb3968a1efb64497c922fcf1954990b8089aad7`, `bc9b2c9a056d5b740432e35c6789d6676d890562`, and `781fb414ee590efd8502984044c4a0197430db7a`.
 - Fold statistics preserve each fold independently: TP/SL/TIMEOUT/AMBIGUOUS counts, resolved count, TP rate among resolved outcomes, and mean gross return among resolved outcomes.
-- No cross-fold pooling or cross-fold average is created.
 - Focused server validation: `tests/test_evaluation.py` = **21 passed in 0.54s**.
 - Full server regression: **423 passed in 79.60s (0:01:19)**.
 - Result: **0 failed, 0 skipped**.
@@ -115,7 +114,6 @@ Continue Task 9 from the existing chronological purged-fold foundation with the 
   - `ffefb583656d150fe487e23d3cc2a593b15abd2b` — `feat: add read-only journal feed API`
   - `5b959e03c6a86639161767b4a384ac64272a0a3b` — `test: add read-only journal feed API contract`
   - `038a445704f843eecf9a06cae308064f825c194d` — `feat: add journal feed runner`
-- Next exact action: deploy these commits to FrostDeploy, run focused journal/feed tests, then start the feed locally on the VDS and verify the three read endpoints against the real `events.jsonl` before exposing it through Caddy/site routing.
 
 # 2026-10-05 — CONSOLIDATED MASTER STATUS / ROADMAP
 
@@ -364,7 +362,14 @@ Implemented:
 
 VDS verification succeeded against the real journal.
 
-Current state: manually running on 127.0.0.1:8090. It is not yet persistent/systemd and not yet exposed through Caddy.
+### 2.14 Feed productionization — GREEN
+- Created systemd unit `aicfa-journal-feed.service`.
+- Service uses `User=fd-aicfa`, `WorkingDirectory=/srv/frostdeploy/aicfa/current`, `AICFA_DATA_DIR=/srv/frostdeploy/aicfa/shared/data`, `PYTHONPATH=/srv/frostdeploy/aicfa/current/src`.
+- `Restart=always`, `RestartSec=3`.
+- Enabled at boot.
+- Manual `nohup` process was removed after the port conflict.
+- Final VDS state verified: **active (running)**, API health **ok**, listening on `127.0.0.1:8090`.
+- This establishes the feed as a persistent local service.
 
 ## 3. ORIGINAL VISION ITEMS NOT YET FINISHED
 
@@ -394,19 +399,29 @@ These were in the original technical specification and must remain in the plan:
 
 ## 4. NEW MASTER ROADMAP
 
-### STEP 11 — Productionize the live feed — NEXT
-1. Replace manual `nohup` with systemd.
-2. Auto-start/restart after reboot/failure.
-3. Load production environment including `AICFA_DATA_DIR`.
-4. Verify permissions and ownership.
-5. Expose feed through Caddy.
-6. Define production API route.
-7. Verify external read-only access.
-8. Keep scanner and feed processes separated.
+### STEP 11 — Productionize the live feed — ACTIVE / CADDY NEXT
+Completed:
+1. Replace manual `nohup` with systemd — **DONE**.
+2. Auto-start/restart after reboot/failure — **DONE**.
+3. Load production environment including `AICFA_DATA_DIR` — **DONE**.
+4. Verify permissions and ownership — **DONE**.
+5. Expose feed through Caddy — **NEXT**.
+6. Define production API route — **NEXT**.
+7. Verify external read-only access — **NEXT**.
+8. Keep scanner and feed processes separated — **DONE**.
+
+### STEP 11.1 — Caddy integration preparation — DONE
+- Inspected the live VDS Caddy installation and configuration.
+- Current config file: `/etc/caddy/Caddyfile`.
+- Current Caddy configuration is only the default `:80` site serving `/usr/share/caddy` via `file_server`.
+- No existing AICFA reverse-proxy route was found.
+- Therefore Caddy integration must be added without disturbing unrelated services.
+- Before exposing the API, choose the intended AICFA public hostname/path and add a narrow reverse-proxy route to `127.0.0.1:8090`.
+- After modification, validate Caddy configuration before reload, reload Caddy, then test both local and external API access.
+- Do not expose write methods; the journal feed remains read-only.
 
 ### STEP 12 — First AICFA monitoring website
 Build the first real product surface directly on the centralized scanner/feed.
-
 Minimum:
 - live setup feed;
 - active setups;
@@ -420,7 +435,6 @@ Minimum:
 - diagnostics;
 - historical events;
 - visible WAIT/no-trade states.
-
 The website must consume central results, never run a full market scan per user.
 
 ### STEP 13 — Stable event model
@@ -433,7 +447,6 @@ Add explicit:
 - TP2/completed;
 - outcome recorded;
 - data degraded/recovered.
-
 Add stable event/setup IDs, ordering, deduplication, replay/history and consumer cursors.
 
 ### STEP 14 — Live setup → historical outcome loop
@@ -463,7 +476,6 @@ Turn current evaluation primitives into repeatable experiments:
 
 ### STEP 16 — Experience Database
 Separate long-lived learning memory from raw journal.
-
 Store:
 - setup context;
 - canonical market state;
@@ -483,12 +495,10 @@ Retrieve causal historical situations by:
 - setup family;
 - MTF context;
 - historical outcomes.
-
 Similarity is context, not a guarantee.
 
 ### STEP 18 — First own AICFA model
 Start with transparent statistical baselines, then compact ML/PyTorch models.
-
 Initial targets:
 - direction;
 - expected move;
@@ -497,7 +507,6 @@ Initial targets:
 - time-to-outcome;
 - false breakout;
 - setup/scenario quality.
-
 Use chronological train/validation/test and evaluate by horizon/regime. Models augment the causal representation; they do not replace it blindly.
 
 ### STEP 19 — AICFA Brain / Scenario / Risk / Decision
@@ -517,7 +526,6 @@ AICFA should determine:
 - what information is missing;
 - what is available but unnecessary;
 - what additional information has enough expected value to acquire.
-
 Possible sources:
 - another timeframe;
 - another exchange;
@@ -528,13 +536,11 @@ Possible sources:
 
 ### STEP 21 — Vision / screenshot analysis
 Chart screenshot becomes another input modality to the same canonical AICFA representation.
-
 AICFA should:
 - identify asset/timeframe when possible;
 - extract visible structure;
 - request additional screenshots/timeframes when needed;
 - map visual evidence into the same Market State/Setup representation.
-
 No disconnected vision-only logic.
 
 ### STEP 22 — Paper Trading
@@ -576,7 +582,6 @@ Only after paper trading/validation:
 - order reconciliation;
 - emergency stop;
 - audit log.
-
 Execution is never required for the analytical product.
 
 ### STEP 26 — Versioning / lineage
@@ -590,7 +595,6 @@ Version:
 - scanner;
 - experiments;
 - deployment.
-
 Every important result must be traceable to its inputs/version.
 
 ### STEP 27 — Reliability / data quality
@@ -673,7 +677,8 @@ NOW
 - Setup lifecycle: GREEN.
 - Persistent journal: GREEN.
 - Read-only feed code/tests: GREEN.
-- Feed productionization: NEXT.
+- Feed systemd productionization: **GREEN / DONE**.
+- Caddy integration: **NEXT**.
 - User-facing website: NOT STARTED.
 - Experience loop: ARCHITECTURE DEFINED; needs live outcome accumulation.
 - Own ML model: NOT YET PRODUCTION.
@@ -707,3 +712,4 @@ The persistence/feed architecture itself worked correctly; the invalid target is
 - New models require controlled validation before promotion.
 - Execution remains separate from analysis.
 - Production data stays in persistent storage.
+- Infrastructure changes must be recorded in this plan before moving to the next stage.
