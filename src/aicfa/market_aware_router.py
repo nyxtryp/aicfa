@@ -324,6 +324,8 @@ class MarketAwareFallbackProvider:
                     frame=frame, attempts=tuple(attempts),
                 )
             except Exception as exc:
+                if exc.__class__.__name__ == "MarketExecutionTimeout":
+                    raise
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
         raise RuntimeError(
             "all market data providers failed: "
