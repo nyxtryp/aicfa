@@ -1234,3 +1234,41 @@ Next verification:
 - run one full 141-market finite production rotation;
 - inspect real seven-block coverage, timeouts/errors, total/average/max market duration, and setup generation;
 - only then set the next production optimization target from measured data.
+
+### 2026-10-04 — POST-ROTATION PERFORMANCE DIAGNOSTIC / OPTIMIZATION PASS
+
+The first real production rotation was intentionally stopped after 79/141 markets because the observed distribution already proved the current execution path was too slow for practical rotation: most markets were ~13–16s, several were ~17–19s, and PEPE/SHIB exceeded 30s while BONK/FLOKI/IOTA/SWARMS hit the 20s budget.
+
+Root cause found in the production architecture:
+- the shared six-timeframe OHLCV snapshot was already reused correctly;
+- however, deterministic `build_features()` was recomputed for overlapping timeframes independently inside Intraday, Swing and Position;
+- this caused the same 4h/1h/15m (and other shared) feature work to be rebuilt multiple times per market;
+- the measured feature stage was the dominant cost, so this duplicated CPU work was the first optimization target;
+- optional futures enrichment also had a routing gap: the market-aware venue router did not expose trades/order-book/order-book-history even though the underlying providers supported them;
+- the hard whole-market timeout could also be swallowed by broad best-effort exception handlers.
+
+Implemented without changing SMC/setup decision rules:
+- compute the six primary feature frames once per market in `market_orchestrator`;
+- pass those analyses into all three primary horizons through `find_setup`;
+- preserve the existing shared MTF snapshot and independent horizon setup semantics;
+- route auxiliary futures feeds through the market-aware fallback using venue-native symbols;
+- preserve the hard market timeout through optional-enrichment and routing exception boundaries.
+
+Commits:
+- `9bc8834b3b7c060d4f64b96832ee2f3a497c2423` — shared feature reuse + timeout propagation in FindSetup;
+- `61ff1e7d874dbf136667ac3bd583b6bd0973b920` — one primary feature computation per market;
+- `40038fad1cf2f2ba158cb1d8171d4c708263c8f4` — auxiliary routing + timeout propagation in market-aware router;
+- `a9490f077a0f14a74361b72c36209750419565e5` — timeout propagation in fallback adapter;
+- `9536b2f0cca4e7fcde231761834879d970aca3da` — auxiliary routing regression coverage;
+- `a78fabb07aade197a5e19f9b664124da0107f011` — shared feature computation regression coverage.
+
+Next verification remains strictly within this plan:
+1. deploy these commits to FrostDeploy;
+2. run targeted rotation/orchestrator/router/timeout tests;
+3. run single-market BTC diagnostic and compare feature/horizon/total timings against the pre-optimization baseline;
+4. run representative BTC/ETH/XMR/SP500/NASDAQ100 diagnostics;
+5. only if those are green, resume a finite 141-market rotation;
+6. inspect seven-block coverage, timeout/error rate, cycle throughput and setup generation;
+7. only after a successful finite cycle proceed to lifecycle repeated scans and persistent journal/website feed.
+
+Do not lower analytical depth, remove SMC components, add fixed signal filters, or introduce a parallel scanner merely to improve timing.
