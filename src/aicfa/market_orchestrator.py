@@ -43,6 +43,13 @@ class MarketScanDiagnostics:
     snapshot_metrics: tuple[object, ...]
     horizon_timings: tuple[HorizonTiming, ...]
     refetched_between_horizons: bool
+    block_timings: tuple[object, ...] = ()
+    feature_duration_ms: float = 0.0
+    evidence_duration_ms: float = 0.0
+    setup_duration_ms: float = 0.0
+    lifecycle_event_count: int = 0
+    status: str = "completed"
+    error: str = ""
 
 
 @dataclass(frozen=True)
@@ -182,6 +189,11 @@ def analyze_market_horizons(
 
     results: list[FindSetupResult] = []
     horizon_timings: list[HorizonTiming] = []
+    block_timings: list[object] = []
+    feature_duration_ms = 0.0
+    evidence_duration_ms = 0.0
+    setup_duration_ms = 0.0
+    refetched_timeframes: set[str] = set()
     setups: list[HorizonSetup] = []
     lifecycle_results: list[SetupLifecycleResult] = []
     for mode in normalized_modes:
@@ -194,6 +206,13 @@ def analyze_market_horizons(
             prefetched_frames=prefetched_frames,
         )
         results.append(result)
+        pipeline_diagnostics = getattr(result, "diagnostics", None)
+        if pipeline_diagnostics is not None:
+            block_timings.extend(getattr(pipeline_diagnostics, "block_timings", ()))
+            feature_duration_ms += getattr(pipeline_diagnostics, "feature_duration_ms", 0.0)
+            evidence_duration_ms += getattr(pipeline_diagnostics, "evidence_duration_ms", 0.0)
+            setup_duration_ms += getattr(pipeline_diagnostics, "setup_duration_ms", 0.0)
+            refetched_timeframes.update(getattr(pipeline_diagnostics, "refetched_timeframes", ()))
         horizon_timings.append(HorizonTiming(
             mode=mode,
             duration_ms=(time.perf_counter() - horizon_started) * 1000.0,
@@ -255,7 +274,13 @@ def analyze_market_horizons(
             snapshot_duration_ms=snapshot_elapsed,
             snapshot_metrics=snapshot_metrics,
             horizon_timings=tuple(horizon_timings),
-            refetched_between_horizons=False,
+            refetched_between_horizons=bool(refetched_timeframes),
+            block_timings=tuple(block_timings),
+            feature_duration_ms=feature_duration_ms,
+            evidence_duration_ms=evidence_duration_ms,
+            setup_duration_ms=setup_duration_ms,
+            lifecycle_event_count=len(lifecycle_results),
+        )
         ),
     )
 
