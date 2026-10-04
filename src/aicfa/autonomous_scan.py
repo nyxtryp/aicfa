@@ -263,6 +263,7 @@ class AutonomousScanEngine:
         self,
         *,
         now_ms: int | None = None,
+        on_market: Callable[[RotationMarketMetric], None] | None = None,
     ) -> RotationCycle:
         """Run exactly one finite rotation over all configured markets."""
         if not self.universe.markets:
@@ -288,17 +289,18 @@ class AutonomousScanEngine:
                 error = f"{type(exc).__name__}: {exc}"
                 setup_count = 0
 
-            metrics.append(
-                RotationMarketMetric(
-                    cycle_id=cycle_id,
-                    queue_position=queue_position,
-                    asset=market.asset,
-                    status=status,
-                    duration_ms=(time.perf_counter() - market_started) * 1000.0,
-                    setup_count=setup_count,
-                    error=error,
-                )
+            metric = RotationMarketMetric(
+                cycle_id=cycle_id,
+                queue_position=queue_position,
+                asset=market.asset,
+                status=status,
+                duration_ms=(time.perf_counter() - market_started) * 1000.0,
+                setup_count=setup_count,
+                error=error,
             )
+            metrics.append(metric)
+            if on_market is not None:
+                on_market(metric)
 
         finished_at_ms = self._clock_ms()
         timeout_markets = sum(item.status == "timeout" for item in metrics)
