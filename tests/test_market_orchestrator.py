@@ -68,6 +68,13 @@ def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAI
             decision=SimpleNamespace(value="ready" if candidate is not None and decision == "LONG" else "wait"),
             candidates=() if candidate is None else (candidate,),
         ),
+        diagnostics=SimpleNamespace(
+            block_timings=tuple(SimpleNamespace(status="prefetched") for _ in execution.split()),
+            feature_duration_ms=0.1,
+            evidence_duration_ms=0.1,
+            setup_duration_ms=0.1,
+            refetched_timeframes=(),
+        ),
     )
 
 
@@ -260,3 +267,11 @@ def test_market_diagnostics_expose_snapshot_and_horizon_timings(monkeypatch):
     assert all(item.duration_ms >= 0 for item in result.diagnostics.horizon_timings)
     assert all(item.setup_count == 0 for item in result.diagnostics.horizon_timings)
     assert result.diagnostics.refetched_between_horizons is False
+    assert result.diagnostics.status == "completed"
+    assert result.diagnostics.error == ""
+    assert len(result.diagnostics.block_timings) == 12
+    assert result.diagnostics.feature_duration_ms >= 0
+    assert result.diagnostics.evidence_duration_ms >= 0
+    assert result.diagnostics.setup_duration_ms >= 0
+    assert result.diagnostics.lifecycle_event_count == 0
+    assert all(item.status == "prefetched" for item in result.diagnostics.block_timings)
