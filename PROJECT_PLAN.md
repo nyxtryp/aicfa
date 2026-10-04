@@ -947,3 +947,12 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - The already-green PEPE/XAU/XAG/XCU/WTI/NATGAS results remain untouched.
 - No speculative universal symbol normalization was reintroduced into the derivatives provider.
 - VDS verification is still required after this commit; no claim is made about the remaining 143-market coverage until the corrected diagnostic is run.
+
+### 2026-10-04 — DERIVATIVES CORE PATH / LIQUIDATION ISOLATION
+
+- The corrected 8-market diagnostic confirmed the canonical-symbol integration fix: ETH, SOL, LTC, APT, XCU and NATGAS are fully green (6/8).
+- BTC still failed because the highest-priority Binance derivative attempt timed out, and the fallback batch also timed out across the tested venues. BONK retained OI coverage but was missing funding and mark.
+- Code audit found a concrete architectural cause: Binance/Bybit derivative providers fetched the optional liquidation websocket inside the same provider call as required funding/OI/mark. A slow/no-event websocket could consume the provider's 3-second hard budget and discard otherwise valid core derivative fields.
+- Fixed in production commit `b95d6108f2b0d1ede3884267b17f8d7a6db1182c`: Binance/Bybit core derivative fetches no longer block on liquidation collection. Liquidations remain explicitly optional event context and are not allowed to veto funding/OI/mark acquisition.
+- No symbol normalization was added. The canonical asset + authoritative venue mapping contract remains unchanged.
+- Next verification: derivative unit tests, then BTC/BONK targeted diagnostic. 
