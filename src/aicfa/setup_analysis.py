@@ -723,9 +723,7 @@ def analyze_setups(
             )
         )
         if direction_conflict:
-            direction_conflicts.append(
-                f"{hypothesis.scenario}: {direction_conflict}"
-            )
+            direction_conflicts.append(direction_conflict)
             continue
         if direction is None and not legacy_mode:
             missing.append(f"{hypothesis.scenario}: setup direction is not structurally established")
