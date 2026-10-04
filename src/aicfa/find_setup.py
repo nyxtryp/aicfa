@@ -556,7 +556,7 @@ def find_setup(
                 symbol=symbol,
                 market_type=request.market_type,
                 snapshots=8,
-                interval_seconds=1.0,
+                interval_seconds=0.25,
             )
             if isinstance(history_result, tuple) and len(history_result) == 2 and isinstance(history_result[1], Exception):
                 order_book_history_provider = f"unavailable: {history_result[1]}"
@@ -564,27 +564,34 @@ def find_setup(
                 order_book_history = history_result.frame
                 order_book_history_provider = history_result.provider
 
-        book_fetch = getattr(provider, "fetch_order_book_with_source", None)
-        if book_fetch is not None:
-            book_result = _safe_optional_call(
-                book_fetch,
-                symbol=symbol, market_type=request.market_type, limit=1,
-            )
-            if isinstance(book_result, tuple) and len(book_result) == 2 and isinstance(book_result[1], Exception):
-                order_book_provider = f"unavailable: {book_result[1]}"
-            else:
-                order_book = book_result.frame
-                order_book_provider = book_result.provider
+        # The final history snapshot is already a current order-book snapshot.
+        # Reuse it when available instead of issuing a ninth REST request.
+        book_result = None
+        if not order_book_history.empty:
+            order_book = order_book_history.tail(1).copy(deep=True)
+            order_book_provider = order_book_history_provider
         else:
-            book_result = _safe_optional_call(
-                provider.fetch_order_book,
-                symbol=symbol, market_type=request.market_type, limit=1,
-            )
-            if isinstance(book_result, tuple) and len(book_result) == 2 and isinstance(book_result[1], Exception):
-                order_book_provider = f"unavailable: {book_result[1]}"
+            book_fetch = getattr(provider, "fetch_order_book_with_source", None)
+                if book_fetch is not None:
+                book_result = _safe_optional_call(
+                    book_fetch,
+                    symbol=symbol, market_type=request.market_type, limit=1,
+                )
+                if isinstance(book_result, tuple) and len(book_result) == 2 and isinstance(book_result[1], Exception):
+                    order_book_provider = f"unavailable: {book_result[1]}"
+                else:
+                    order_book = book_result.frame
+                    order_book_provider = book_result.provider
             else:
-                order_book = book_result
-                order_book_provider = provider.__class__.__name__
+                book_result = _safe_optional_call(
+                    provider.fetch_order_book,
+                    symbol=symbol, market_type=request.market_type, limit=1,
+                )
+                if isinstance(book_result, tuple) and len(book_result) == 2 and isinstance(book_result[1], Exception):
+                    order_book_provider = f"unavailable: {book_result[1]}"
+                else:
+                    order_book = book_result
+                    order_book_provider = provider.__class__.__name__
 
         block_timings.append(
             DataBlockTiming(
