@@ -11,6 +11,7 @@ import time
 from typing import Callable, Sequence
 
 from .data_requirements import TradingMode
+from .public_market_data import build_public_market_data_provider
 from .market_orchestrator import (
     PRIMARY_TRADING_MODES,
     MarketHorizonScan,
@@ -53,7 +54,7 @@ class AutonomousScanEngine:
         clock_ms: Callable[[], int] | None = None,
     ) -> None:
         self.universe = universe
-        self.provider = provider
+        self.provider = provider or build_public_market_data_provider(timeout_seconds=10.0)
         self.resolver = resolver
         self.modes = tuple(modes)
         self.lifecycle = SetupLifecycle()
