@@ -513,19 +513,7 @@ class FallbackDerivativesProvider:
         return _frame(result.to_dict("records")), sources
 
     def _fetch_provider_with_timeout(self, provider, kwargs):
-        """
-
-        cache_key = (
-            symbol.strip().upper(),
-            int(limit),
-            tuple(sorted((str(v), str(s)) for v, s in venue_symbols)),
-        )
-        now = time.monotonic()
-        with self._cache_lock:
-            cached = self._cache.get(cache_key)
-            if cached is not None and now - cached[0] < self.cache_ttl_seconds:
-                return cached[1].copy(deep=True), cached[2]
-Hard-bound one provider attempt so one venue cannot stall fallback."""
+        """Hard-bound one provider attempt so one venue cannot stall fallback."""
         executor = ThreadPoolExecutor(max_workers=1)
         future = executor.submit(provider.fetch_derivatives, **kwargs)
         try:
@@ -563,22 +551,22 @@ Hard-bound one provider attempt so one venue cannot stall fallback."""
         limit: int = 200,
         venue_symbols: tuple[tuple[str, str], ...] = (),
     ) -> tuple[pd.DataFrame, str]:
-        """Fetch derivative evidence with bounded parallel venue fallback.
+        """Fetch derivative evidence with bounded parallel venue fallback."""
+        cache_key = (
+            symbol.strip().upper(),
+            int(limit),
+            tuple(sorted((str(v), str(s)) for v, s in venue_symbols)),
+        )
+        now = time.monotonic()
+        with self._cache_lock:
+            cached = self._cache.get(cache_key)
+            if cached is not None and now - cached[0] < self.cache_ttl_seconds:
+                return cached[1].copy(deep=True), cached[2]
 
-        Providers are attempted in small concurrent batches so one slow or
-        unsupported venue cannot consume the whole fallback budget. Results
-        are still combined field-by-field and the batch loop stops as soon as
-        funding, open interest and mark price have real observations.
-        """
         attempts: list[str] = []
         frames: list[tuple[pd.DataFrame, str]] = []
         providers = iter(self.providers)
 
-        # Probe the highest-priority provider alone first. This preserves the
-        # strict early-stop contract: if it supplies all coverage fields, no
-        # lower-priority provider is even called. Only after that probe fails
-        # to complete coverage do we fan out the remaining venues in bounded
-        # concurrent batches.
         try:
             first = next(providers)
         except StopIteration:
@@ -651,6 +639,7 @@ Hard-bound one provider attempt so one venue cannot stall fallback."""
             with self._cache_lock:
                 self._cache[cache_key] = (time.monotonic(), combined.copy(deep=True), sources)
             return combined, sources
+
         missing = [
             name for name in DERIVATIVE_COVERAGE_FIELDS
             if combined.empty or not combined[name].notna().any()
