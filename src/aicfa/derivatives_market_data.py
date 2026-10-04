@@ -459,7 +459,10 @@ class CcxtDerivativesProvider:
         rows = []
         method = getattr(self._exchange, "fetch_funding_rate_history", None)
         if callable(method):
-            history = method(symbol, None, min(int(limit), 200))
+            try:
+                history = method(symbol, None, min(int(limit), 200))
+            except Exception:
+                history = []
             for item in history or []:
                 ts = item.get("timestamp") or item.get("fundingTimestamp")
                 rate = item.get("fundingRate")
@@ -486,12 +489,15 @@ class CcxtDerivativesProvider:
             oi_symbol = symbol
             if self.exchange == "okx":
                 oi_symbol = symbol.split("/", 1)[0]
-            history = method(
-                oi_symbol,
-                "5m",
-                None,
-                min(int(limit), 200),
-            )
+            try:
+                history = method(
+                    oi_symbol,
+                    "5m",
+                    None,
+                    min(int(limit), 200),
+                )
+            except Exception:
+                history = []
             for item in history or []:
                 ts = item.get("timestamp")
                 value = item.get("openInterestValue")
@@ -531,8 +537,11 @@ class CcxtDerivativesProvider:
         mark_row = None
         funding_method = getattr(self._exchange, "fetch_funding_rate", None)
         if callable(funding_method):
-            current = funding_method(symbol)
-            mark = self._number(current.get("markPrice"))
+            try:
+                current = funding_method(symbol)
+            except Exception:
+                current = {}
+            mark = self._number(current.get("markPrice")) if isinstance(current, dict) else None
             ts = self._number(
                 current.get("timestamp")
                 or current.get("fundingTimestamp")
@@ -550,7 +559,10 @@ class CcxtDerivativesProvider:
                     ticker.get("markPrice") if isinstance(ticker, dict) else None
                 )
                 if mark is None and isinstance(info, dict):
-                    mark = self._number(info.get("markPrice"))
+                    for key in ("markPrice", "markPx", "mark_price"):
+                        mark = self._number(info.get(key))
+                        if mark is not None:
+                            break
                 ts = self._number(
                     ticker.get("timestamp") if isinstance(ticker, dict) else None
                 ) or int(time.time() * 1000)
