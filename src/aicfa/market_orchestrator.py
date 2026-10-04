@@ -280,7 +280,6 @@ def analyze_market_horizons(
             evidence_duration_ms=evidence_duration_ms,
             setup_duration_ms=setup_duration_ms,
             lifecycle_event_count=len(lifecycle_results),
-        )
         ),
     )
 
