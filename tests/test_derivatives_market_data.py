@@ -111,3 +111,47 @@ def test_bybit_provider_aligns_independent_funding_oi_and_mark_timestamps(monkey
     assert frame.iloc[-1]["mark_price"] == 50000.0
     complete, missing = derivatives_completeness(frame)
     assert complete, missing
+
+def test_ccxt_derivatives_provider_normalizes_funding_oi_and_mark():
+    class FakeExchange:
+        def __init__(self, *args, **kwargs):
+            self.markets = {"BTC/USDT:USDT": {}}
+            self.timeout = None
+        def load_markets(self):
+            return self.markets
+        def fetch_funding_rate_history(self, symbol, since, limit):
+            return [{"timestamp": 1000, "fundingRate": "0.001"}]
+        def fetch_open_interest_history(self, symbol, timeframe, since, limit):
+            return [{"timestamp": 1000, "openInterestValue": "1000"}]
+        def fetch_funding_rate(self, symbol):
+            return {"timestamp": 1000, "fundingRate": 0.001, "markPrice": 50000}
+
+    from aicfa.derivatives_market_data import CcxtDerivativesProvider
+    provider = CcxtDerivativesProvider("fake", exchange_factory=lambda exchange_id: FakeExchange())
+    frame = provider.fetch_derivatives(symbol="BTC/USDT:USDT", limit=10)
+    assert frame["funding_rate"].notna().any()
+    assert frame["open_interest"].notna().any()
+    assert frame["mark_price"].notna().any()
+    assert frame.iloc[-1]["mark_price"] == 50000.0
+
+def test_ccxt_okx_open_interest_history_uses_base_currency():
+    class FakeExchange:
+        def __init__(self, *args, **kwargs):
+            self.markets = {"XAU/USDT:USDT": {}}
+            self.timeout = None
+            self.seen_oi_symbol = None
+        def load_markets(self):
+            return self.markets
+        def fetch_funding_rate_history(self, symbol, since, limit):
+            return [{"timestamp": 1000, "fundingRate": "0.001"}]
+        def fetch_open_interest_history(self, symbol, timeframe, since, limit):
+            self.seen_oi_symbol = symbol
+            return [{"timestamp": 1000, "openInterestValue": "123"}]
+        def fetch_funding_rate(self, symbol):
+            return {"timestamp": 1000, "fundingRate": 0.001, "markPrice": 3000}
+
+    from aicfa.derivatives_market_data import CcxtDerivativesProvider
+    fake = FakeExchange()
+    provider = CcxtDerivativesProvider("okx", exchange_factory=lambda exchange_id: fake)
+    provider.fetch_derivatives(symbol="XAU/USDT:USDT", limit=10)
+    assert fake.seen_oi_symbol == "XAU"
