@@ -581,14 +581,33 @@ def _target_levels(
 
 
 
-def _resolve_direction(context: MultiTimeframeContext) -> tuple[str | None, str | None]:
-    """Resolve direction from higher-timeframe structure, never from 1m alone."""
+def _resolve_direction(
+    context: MultiTimeframeContext,
+    *,
+    scenario: str | None = None,
+    supporting: tuple[str, ...] = (),
+) -> tuple[str | None, str | None]:
+    """Resolve direction from the MTF structural hierarchy."""
     if context.structure_direction is None:
         return None, None
+    direction = context.structure_direction
+    broader_row = context.latest_rows.get(context.context_timeframe)
+    if broader_row is not None:
+        broader_value = _structure_direction(broader_row)
+        if broader_value:
+            broader_direction = "long" if broader_value > 0 else "short"
+            if broader_direction != direction:
+                reversal_confirmed = (
+                    scenario == "reversal"
+                    and "market_structure.choch" in supporting
+                    and "liquidity.sweep" in supporting
+                )
+                if not reversal_confirmed:
+                    return None, "broader higher-timeframe structure conflicts with setup direction"
     confirmations = set(context.confirmation_directions)
-    if confirmations and context.structure_direction not in confirmations:
+    if confirmations and direction not in confirmations:
         return None, "lower confirmation conflicts with higher-timeframe structure"
-    return context.structure_direction, None
+    return direction, None
 
 
 def analyze_setups(
@@ -656,18 +675,7 @@ def analyze_setups(
             reasons=(f"complete {context.mode.value} timeframe state is required",),
         )
 
-    direction, direction_conflict = (
-        (None, None) if legacy_mode else _resolve_direction(context)
-    )
-    if direction_conflict:
-        return SetupAssessment(
-            decision=SetupDecision.WAIT,
-            candidates=(),
-            missing_context=(),
-            conflicts=evidence_assessment.conflicts + (direction_conflict,),
-            reasons=("higher-timeframe structure and lower-timeframe confirmation conflict",),
-        )
-    if direction is None and not legacy_mode:
+    if not legacy_mode and context.structure_direction is None:
         return SetupAssessment(
             decision=SetupDecision.NEED_MORE_EVIDENCE,
             candidates=(),
@@ -698,6 +706,22 @@ def analyze_setups(
             continue
         if not zones:
             missing.append(f"{hypothesis.scenario}: no contextual setup zone is visible")
+            continue
+
+        direction, direction_conflict = (
+            (None, None)
+            if legacy_mode
+            else _resolve_direction(
+                context,
+                scenario=hypothesis.scenario,
+                supporting=supporting,
+            )
+        )
+        if direction_conflict:
+            missing.append(f"{hypothesis.scenario}: {direction_conflict}")
+            continue
+        if direction is None and not legacy_mode:
+            missing.append(f"{hypothesis.scenario}: setup direction is not structurally established")
             continue
 
         confirmations, invalidations = _knowledge_requirements(supporting)
@@ -769,7 +793,7 @@ def analyze_setups(
             SetupCandidate(
                 scenario=hypothesis.scenario,
                 supporting_concepts=supporting,
-                zone_concepts=zones,
+                zone_concepts=scenario_zones if not legacy_mode else zones,
                 zone_locations=locations,
                 entry_condition=entry_conditions,
                 invalidation=invalidations,
