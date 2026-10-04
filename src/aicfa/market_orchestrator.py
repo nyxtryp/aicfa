@@ -211,6 +211,7 @@ def analyze_market_horizons(
             resolver=resolved,
             prefetched_frames=prefetched_frames,
             derivatives_provider=shared_derivatives_provider,
+            derivatives_venue_symbols=venue_symbols,
         )
         results.append(result)
         pipeline_diagnostics = getattr(result, "diagnostics", None)
