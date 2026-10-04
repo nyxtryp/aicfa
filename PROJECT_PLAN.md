@@ -1051,3 +1051,14 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Default live market-data provider now uses the production multi-venue router rather than the legacy Binance+Bybit-only pair.
 - Derivatives timelines no longer fail wholesale when early rows lack funding/OI; incomplete causal rows are discarded while valid rows and optional mark/liquidation fields are preserved.
 - Spot behavior remains knowledge-driven; futures explicitly opt into the complete seven-block collection contract.
+
+
+## 2026-10-04 — CORRECTION: seven-block futures data is enrichment, not a requirement
+- The previous "futures seven-block collection hardening" wording was too strict and is superseded by this rule.
+- Full AICFA analysis does not require 7/7 market-data blocks. OHLCV + MTF structure/SMC remain the structural core.
+- For futures, AICFA should attempt to collect all seven available blocks: OHLCV, trades, order book, funding, open interest, liquidations, mark price.
+- These extra blocks are best-effort enrichment. If a venue/feed is unavailable, slow, partial or unsupported, analysis continues with the data that was actually obtained.
+- Missing fields are reported as unavailable/partial; they must not become a structural missing_context gate by themselves.
+- Derivatives fields are independently optional: funding, OI, mark and liquidations can be partially present. No fabricated values are allowed.
+- Knowledge-driven DataRequirementPlan remains the semantic requirement contract. Futures market type must not silently turn optional evidence into mandatory evidence.
+- Regression tests now enforce the corrected semantics: requirements stay knowledge-driven while futures collection opportunistically enriches the analysis.
