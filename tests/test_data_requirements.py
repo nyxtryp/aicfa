@@ -71,3 +71,16 @@ def test_microstructure_knowledge_maps_to_distinct_data_kinds():
 
     assert flow.data_kinds == {DataKind.OHLCV, DataKind.TRADES}
     assert book.data_kinds == {DataKind.OHLCV, DataKind.ORDER_BOOK}
+
+
+def test_futures_setup_requires_all_seven_data_blocks():
+    plan = default_setup_requirements("BTC", mode=TradingMode.INTRADAY, market_type="futures")
+    assert plan.data_kinds == {
+        DataKind.OHLCV,
+        DataKind.TRADES,
+        DataKind.ORDER_BOOK,
+        DataKind.FUNDING,
+        DataKind.OPEN_INTEREST,
+        DataKind.LIQUIDATIONS,
+        DataKind.MARK_PRICE,
+    }
