@@ -115,8 +115,12 @@ def _probe_market(provider, item: dict, derivatives_provider) -> tuple[bool, lis
 
     if market_type == "futures":
         try:
+            # Derivatives fallback consumes AICFA's canonical asset symbol.
+            # The resolved primary-market symbol may be venue-native (for example
+            # BTCUSDT), and must not be reused as a universal derivatives identifier.
+            # Explicit venue_symbols remain authoritative native mappings.
             derivatives, derivatives_source = derivatives_provider.fetch_derivatives(
-                symbol=symbol,
+                symbol=asset,
                 limit=DERIVATIVES_LIMIT,
                 venue_symbols=mappings,
             )
