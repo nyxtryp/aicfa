@@ -236,9 +236,6 @@ def build_zone_reaction(
     # lookup can then binary-search the relevant price slice.
     zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
     zone_bucket_level_sorted: dict[int, list[tuple[float, int]]] = {}
-    dirty_zone_buckets: set[int] = set()
-    dirty_wide_zone_buckets: set[int] = set()
-    occupied_bucket_key_set: set[int] = set()
     occupied_bucket_keys: list[int] = []
     occupied_bucket_keys_dirty = False
     # Wide zones use a coarser logarithmic index; a global scan per candle
@@ -247,7 +244,6 @@ def build_zone_reaction(
     wide_zone_buckets: dict[int, list[int]] = {}
     wide_zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
     wide_zone_bucket_level_sorted: dict[int, list[tuple[float, int]]] = {}
-    wide_occupied_bucket_key_set: set[int] = set()
     wide_occupied_bucket_keys: list[int] = []
     wide_occupied_bucket_keys_dirty = False
     wide_zones: list[int] = []
@@ -288,22 +284,18 @@ def build_zone_reaction(
                 if bucket is None:
                     wide_zone_buckets[bucket_id] = [zone_id]
                     wide_occupied_bucket_keys.append(bucket_id)
-                    wide_occupied_bucket_key_set.add(bucket_id)
                     wide_occupied_bucket_keys_dirty = True
                 else:
                     bucket.append(zone_id)
-                    dirty_wide_zone_buckets.add(bucket_id)
         else:
             for bucket_id in range(first, last + 1):
                 bucket = zone_buckets.get(bucket_id)
                 if bucket is None:
                     zone_buckets[bucket_id] = [zone_id]
                     occupied_bucket_keys.append(bucket_id)
-                    occupied_bucket_key_set.add(bucket_id)
                     occupied_bucket_keys_dirty = True
                 else:
                     bucket.append(zone_id)
-                    dirty_zone_buckets.add(bucket_id)
 
 
     def _append_zone(*, source, side, low, high, created):
@@ -417,12 +409,7 @@ def build_zone_reaction(
                 continue
 
             ordered = cache.get(bucket_id)
-            dirty = (
-                bucket_id in dirty_wide_zone_buckets
-                if kind == "wide"
-                else bucket_id in dirty_zone_buckets
-            )
-            if ordered is None or dirty:
+            if ordered is None or len(ordered) != len(raw_bucket):
                 ordered = sorted(
                     (
                         (float(zone_low[zone_id] + zone_high[zone_id]) * 0.5, zone_id)
@@ -431,11 +418,6 @@ def build_zone_reaction(
                     key=lambda item: item[0],
                 )
                 cache[bucket_id] = ordered
-                if kind == "wide":
-                    dirty_wide_zone_buckets.discard(bucket_id)
-                else:
-                    dirty_zone_buckets.discard(bucket_id)
-
             # Exact nearest-neighbour search in the midpoint-sorted bucket.
             # Expand only while the next midpoint can still beat the current
             # best distance; this avoids scanning unrelated historical zones.
@@ -546,27 +528,17 @@ def build_zone_reaction(
         candle_low = float(lows[i])
         candle_high = float(highs[i])
 
-        def _append_bucket_candidates(bucket_ids, source_buckets, sorted_buckets):
-            for bucket_id in bucket_ids:
-                raw_bucket = source_buckets.get(bucket_id)
-                if not raw_bucket:
+        def _append_bucket_candidates(bucket_ids, source_buckets):
+        for bucket_id in bucket_ids:
+            raw_bucket = source_buckets.get(bucket_id)
+            if not raw_bucket:
+                continue
+            for zone_id in raw_bucket:
+                if zone_low[zone_id] > candle_high:
                     continue
-                ordered = sorted_buckets.get(bucket_id)
-                if ordered is None:
-                    ordered = sorted(
-                        (float(zone_low[zone_id]), zone_id)
-                        for zone_id in raw_bucket
-                    )
-                    sorted_buckets[bucket_id] = ordered
-                    if sorted_buckets is wide_zone_bucket_sorted:
-                        dirty_wide_zone_buckets.discard(bucket_id)
-                    else:
-                        dirty_zone_buckets.discard(bucket_id)
-                stop = bisect.bisect_right(ordered, (candle_high, max_zones))
-                for _, zone_id in ordered[:stop]:
-                    if zone_high[zone_id] >= candle_low and candidate_marks[zone_id] != stamp:
-                        candidate_marks[zone_id] = stamp
-                        candidate_ids.append(zone_id)
+                if zone_high[zone_id] >= candle_low and candidate_marks[zone_id] != stamp:
+                    candidate_marks[zone_id] = stamp
+                    candidate_ids.append(zone_id)
 
         # Wide zones are indexed by coarse logarithmic buckets as well.
         # Never scan the full historical wide-zone list on every candle.
@@ -577,13 +549,11 @@ def build_zone_reaction(
         _append_bucket_candidates(
             wide_occupied_bucket_keys[wide_start:wide_stop],
             wide_zone_buckets,
-            wide_zone_bucket_sorted,
         )
 
         _append_bucket_candidates(
             range(first_bucket, last_bucket + 1),
             zone_buckets,
-            zone_bucket_sorted,
         )
         if candidate_ids:
             idx = np.asarray(
