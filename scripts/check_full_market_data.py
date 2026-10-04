@@ -116,7 +116,9 @@ def _probe_market(provider, item: dict, derivatives_provider) -> tuple[bool, lis
     if market_type == "futures":
         try:
             derivatives, derivatives_source = derivatives_provider.fetch_derivatives(
-                symbol=symbol, limit=DERIVATIVES_LIMIT
+                symbol=symbol,
+                limit=DERIVATIVES_LIMIT,
+                venue_symbols=mappings,
             )
             required = ("funding_rate", "open_interest", "mark_price")
             missing = [name for name in required if name not in derivatives.columns or derivatives[name].notna().sum() == 0]
