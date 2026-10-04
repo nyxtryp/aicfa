@@ -434,6 +434,12 @@ class CcxtDerivativesProvider:
         if not exchange_id:
             raise ValueError("exchange_id must not be empty")
         factory = exchange_factory or getattr(ccxt, exchange_id, None)
+        # Some CCXT builds expose Gate under an alternate constructor name.
+        # Keep the canonical provider ID as ``gateio`` while accepting that
+        # constructor alias so the universal fallback is not rejected merely
+        # by the installed CCXT package surface.
+        if factory is None and exchange_id == "gateio":
+            factory = getattr(ccxt, "gate", None)
         if factory is None:
             raise ValueError(f"unsupported CCXT exchange: {exchange_id}")
         self.exchange = exchange_id
