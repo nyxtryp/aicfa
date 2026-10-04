@@ -37,6 +37,14 @@ from .derivatives_market_data import FallbackDerivativesProvider
 CAUSAL_TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
 
 
+def _safe_optional_call(call, **kwargs):
+    """Best-effort enrichment: optional feed failure never blocks structural analysis."""
+    try:
+        return call(**kwargs)
+    except Exception as exc:
+        return None, exc
+
+
 @dataclass(frozen=True)
 class FindSetupRequest:
     """Normalized single-command request."""
@@ -253,9 +261,7 @@ def find_setup(
     symbol = normalize_asset(resolver(request.asset, request.market_type))
 
     profile = mode_timeframe_profile(request.mode)
-    requirements = default_setup_requirements(
-        symbol, mode=request.mode, market_type=request.market_type
-    )
+    requirements = default_setup_requirements(symbol, mode=request.mode)
     timeframes = requirements.required_timeframes
     if not timeframes:
         raise ValueError("knowledge requirements produced no timeframes")
@@ -356,20 +362,29 @@ def find_setup(
     # Collect auxiliary market feeds only when the active knowledge plan
     # explicitly requires them. Core chart/SMC analysis does not pay the
     # collection/storage cost for feeds it does not need.
-    if requirements.requires(DataKind.TRADES):
+    if request.market_type == "futures" or requirements.requires(DataKind.TRADES):
         trade_fetch = getattr(provider, "fetch_trades_with_source", None)
         trade_limit = 60
         if trade_fetch is not None:
-            trade_result = trade_fetch(
-                symbol=symbol, market_type=request.market_type, limit=trade_limit
+            trade_result = _safe_optional_call(
+                trade_fetch,
+                symbol=symbol, market_type=request.market_type, limit=trade_limit,
             )
-            trades = trade_result.frame
-            trades_provider = trade_result.provider
+            if isinstance(trade_result, tuple) and len(trade_result) == 2 and isinstance(trade_result[1], Exception):
+                trades_provider = f"unavailable: {trade_result[1]}"
+            else:
+                trades = trade_result.frame
+                trades_provider = trade_result.provider
         else:
-            trades = provider.fetch_trades(
-                symbol=symbol, market_type=request.market_type, limit=trade_limit
+            trade_result = _safe_optional_call(
+                provider.fetch_trades,
+                symbol=symbol, market_type=request.market_type, limit=trade_limit,
             )
-            trades_provider = provider.__class__.__name__
+            if isinstance(trade_result, tuple) and len(trade_result) == 2 and isinstance(trade_result[1], Exception):
+                trades_provider = f"unavailable: {trade_result[1]}"
+            else:
+                trades = trade_result
+                trades_provider = provider.__class__.__name__
 
         if not trades.empty:
             trade_work = trades.copy()
@@ -383,30 +398,43 @@ def find_setup(
                 pd.DataFrame({"timestamp": [latest_trade_timestamp]}), trades
             )
 
-    if requirements.requires(DataKind.ORDER_BOOK):
+    if request.market_type == "futures" or requirements.requires(DataKind.ORDER_BOOK):
         history_fetch = getattr(provider, "fetch_order_book_history_with_source", None)
         if history_fetch is not None:
-            history_result = history_fetch(
+            history_result = _safe_optional_call(
+                history_fetch,
                 symbol=symbol,
                 market_type=request.market_type,
                 snapshots=8,
                 interval_seconds=1.0,
             )
-            order_book_history = history_result.frame
-            order_book_history_provider = history_result.provider
+            if isinstance(history_result, tuple) and len(history_result) == 2 and isinstance(history_result[1], Exception):
+                order_book_history_provider = f"unavailable: {history_result[1]}"
+            else:
+                order_book_history = history_result.frame
+                order_book_history_provider = history_result.provider
 
         book_fetch = getattr(provider, "fetch_order_book_with_source", None)
         if book_fetch is not None:
-            book_result = book_fetch(
-                symbol=symbol, market_type=request.market_type, limit=1
+            book_result = _safe_optional_call(
+                book_fetch,
+                symbol=symbol, market_type=request.market_type, limit=1,
             )
-            order_book = book_result.frame
-            order_book_provider = book_result.provider
+            if isinstance(book_result, tuple) and len(book_result) == 2 and isinstance(book_result[1], Exception):
+                order_book_provider = f"unavailable: {book_result[1]}"
+            else:
+                order_book = book_result.frame
+                order_book_provider = book_result.provider
         else:
-            order_book = provider.fetch_order_book(
-                symbol=symbol, market_type=request.market_type, limit=1
+            book_result = _safe_optional_call(
+                provider.fetch_order_book,
+                symbol=symbol, market_type=request.market_type, limit=1,
             )
-            order_book_provider = provider.__class__.__name__
+            if isinstance(book_result, tuple) and len(book_result) == 2 and isinstance(book_result[1], Exception):
+                order_book_provider = f"unavailable: {book_result[1]}"
+            else:
+                order_book = book_result
+                order_book_provider = provider.__class__.__name__
 
         if not order_book.empty:
             book_work = order_book.copy()
