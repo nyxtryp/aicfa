@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+import time
 from typing import Callable
 
 import pandas as pd
@@ -62,6 +63,26 @@ class FindSetupRequest:
 
 
 @dataclass(frozen=True)
+class DataBlockTiming:
+    block: str
+    status: str
+    duration_ms: float
+    rows: int = 0
+    provider: str = ""
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class FindSetupDiagnostics:
+    block_timings: tuple[DataBlockTiming, ...] = ()
+    feature_duration_ms: float = 0.0
+    evidence_duration_ms: float = 0.0
+    setup_duration_ms: float = 0.0
+    decision_duration_ms: float = 0.0
+    refetched_timeframes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class FindSetupResult:
     """Complete deterministic result for one requested asset."""
 
@@ -91,6 +112,7 @@ class FindSetupResult:
     order_book_provider: str
     decision: str
     reason: str
+    diagnostics: FindSetupDiagnostics = FindSetupDiagnostics()
 
 
 _ASSET_RE = re.compile(r"\b([A-Za-z0-9]{2,20}(?:[/_-][A-Za-z0-9]{2,20})?)\b")
@@ -271,15 +293,26 @@ def find_setup(
     if limit is not None:
         limits = {timeframe: int(limit) for timeframe in timeframes}
 
+    block_timings: list[DataBlockTiming] = []
     if prefetched_frames is not None:
         missing = [timeframe for timeframe in timeframes if timeframe not in prefetched_frames]
         if missing:
             raise ValueError(f"prefetched OHLCV snapshot is missing timeframes: {missing}")
         frames = {timeframe: prefetched_frames[timeframe].copy(deep=True) for timeframe in timeframes}
+        block_timings.extend(
+            DataBlockTiming(f"ohlcv:{tf}", "prefetched", 0.0, len(frames[tf]))
+            for tf in timeframes
+        )
     else:
+        fetch_started = time.perf_counter()
         frames = _fetch_frames(
             provider, symbol=symbol, market_type=request.market_type,
             timeframes=timeframes, limits=limits,
+        )
+        elapsed = (time.perf_counter() - fetch_started) * 1000.0
+        block_timings.extend(
+            DataBlockTiming(f"ohlcv:{tf}", "fetched", elapsed, len(frames[tf]))
+            for tf in timeframes
         )
 
     execution_timeframe = profile.execution_timeframe
@@ -291,6 +324,7 @@ def find_setup(
 
     completed_frames: dict[str, pd.DataFrame] = {}
     analyses: dict[str, pd.DataFrame] = {}
+    feature_started = time.perf_counter()
     for timeframe, frame in frames.items():
         completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
         if completed.empty:
@@ -299,17 +333,20 @@ def find_setup(
         timeframe_analysis = build_features(completed)
         if not timeframe_analysis.empty:
             analyses[timeframe] = timeframe_analysis
+    feature_duration_ms = (time.perf_counter() - feature_started) * 1000.0
 
     base_analysis = analyses.get(execution_timeframe)
     if base_analysis is None:
         raise ValueError(f"AICFA analysis produced no completed {execution_timeframe} rows")
     analysis = base_analysis
 
+    evidence_started = time.perf_counter()
     market_evidence = build_market_evidence_from_frames(
         analyses,
         asset=symbol,
         timeframes=timeframes,
     )
+    evidence_duration_ms = (time.perf_counter() - evidence_started) * 1000.0
     if market_evidence.missing_context and limit is None:
         frames, limits, analyses = _expand_missing_context(
             provider,
@@ -326,9 +363,11 @@ def find_setup(
         if base_analysis is None:
             raise ValueError(f"AICFA analysis produced no completed {execution_timeframe} rows")
         analysis = base_analysis
+        evidence_started = time.perf_counter()
         market_evidence = build_market_evidence_from_frames(
             analyses, asset=symbol, timeframes=timeframes,
         )
+        evidence_duration_ms += (time.perf_counter() - evidence_started) * 1000.0
     derivatives_frame = pd.DataFrame()
     derivatives_analysis = pd.DataFrame()
     derivatives_source = ""
@@ -494,8 +533,11 @@ def find_setup(
         derivatives=derivatives_frame,
     )
 
+    reasoning_started = time.perf_counter()
     evidence_assessment = assess_market_evidence(market_evidence)
+    evidence_duration_ms += (time.perf_counter() - reasoning_started) * 1000.0
     scenario_assessment = assess_scenarios(evidence_assessment)
+    setup_started = time.perf_counter()
     setup_assessment = analyze_setups(
         evidence_assessment,
         scenario_assessment,
@@ -504,10 +546,13 @@ def find_setup(
         timeframes=timeframes,
         mode=request.mode,
     )
+    setup_duration_ms = (time.perf_counter() - setup_started) * 1000.0
+    decision_started = time.perf_counter()
     decision_assessment = decide(
         setup_assessment,
         observations=evidence_assessment.observations,
     )
+    decision_duration_ms = (time.perf_counter() - decision_started) * 1000.0
 
     return FindSetupResult(
         request=request,
@@ -536,4 +581,11 @@ def find_setup(
         derivatives_provider=derivatives_source,
         decision=decision_assessment.action.value.upper().replace("_", " "),
         reason="; ".join(decision_assessment.reasons),
+        diagnostics=FindSetupDiagnostics(
+            block_timings=tuple(block_timings),
+            feature_duration_ms=feature_duration_ms,
+            evidence_duration_ms=evidence_duration_ms,
+            setup_duration_ms=setup_duration_ms,
+            decision_duration_ms=decision_duration_ms,
+        ),
     )
