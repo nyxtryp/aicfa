@@ -917,3 +917,23 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 3. Run focused FindSetup/decision/MTF tests.
 4. Re-run only **BTC ETH SOL LTC APT BONK** first; these are the remaining crypto cases from the 12-market probe.
 5. Do not touch the six already-green markets or add asset-specific exceptions unless the new diagnostic proves a real venue-specific capability gap.
+
+### 2026-10-04 — DERIVATIVES REGRESSION AUDIT: REMOVE UNPROVEN SYMBOL FIX / PRESERVE PARTIAL PROVIDER FIELDS
+
+- Audited the recent derivatives symbol-normalization change against the previous known implementation.
+- The BTCUSDT → BTC/USDT normalization was not sufficiently established as the cause of the observed diagnostic behavior and was removed rather than retained as an unverified universal change.
+- Removed its regression test and removed the corresponding unverified plan entry.
+- Identified a separate real robustness gap in CcxtDerivativesProvider: failures in current funding/OI endpoints or ticker lookup could discard otherwise valid fields already obtained from the same venue.
+- Hardened current funding, current OI and ticker fallbacks so an unavailable optional/current endpoint leaves that field unavailable while preserving other real derivative observations from the provider.
+- Added regression coverage for partial CCXT derivative observations.
+- Production commit: cdf49bcfc7fd53a20a3320437906791a7b0797c5.
+- Test commit: ed8122e0e0d2c1b267485ff1b423cead03028d55.
+- The live VDS diagnostic still needs to be rerun after deployment; no claim is made that BTC/ETH/SOL/LTC/APT or the full 143-market universe is fixed until that verification is actually performed.
+
+### Next exact action
+
+1. Deploy the latest source/test commits through FrostDeploy.
+2. Run the complete derivatives-focused test files on the VDS.
+3. Run the expanded 12-market diagnostic again.
+4. Compare BTC/ETH/SOL/LTC/APT/BONK against the prior green/partial behavior.
+5. Only then continue to the complete affected-market and final 143-market verification.
