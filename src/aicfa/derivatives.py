@@ -46,8 +46,9 @@ def _validate(df: pd.DataFrame) -> pd.DataFrame:
     ):
         x[col] = pd.to_numeric(x[col], errors="coerce")
 
-    if x[["funding_rate", "open_interest"]].isna().any().any():
-        raise ValueError("funding_rate/open_interest must be numeric and non-null")
+    x = x.dropna(subset=["funding_rate", "open_interest"]).reset_index(drop=True)
+    if x.empty:
+        raise ValueError("no complete funding_rate/open_interest observations")
     if (x["open_interest"] < 0).any():
         raise ValueError("open_interest must be non-negative")
 
