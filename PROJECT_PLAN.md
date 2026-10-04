@@ -898,22 +898,22 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 
 ### 2026-10-04 — DERIVATIVES FALLBACK PARALLEL BATCH FIX
 
-- Targeted XCU/BONK/NATGAS verification showed the hard per-provider timeout was working, but the fallback still attempted 19 venues sequentially. This allowed several 3-second provider timeouts to accumulate and caused BONK to hit the diagnostic's 30-second market timeout.
-- NATGAS is now fully green and demonstrated the intended field-level architecture: funding/OI from OKX and mark price from Gate.
-- XCU still lacked mark price because the Gate attempt itself reached the 3-second provider boundary; BONK still reached the 30-second diagnostic boundary.
-- Changed FallbackDerivativesProvider to execute provider attempts in bounded concurrent batches of 6 instead of serially traversing the full venue list.
-- Each individual provider attempt retains the existing hard timeout, so a blocked venue is still abandoned rather than allowed to hold the fallback indefinitely.
-- Field-level aggregation and provenance are unchanged: funding, open interest and mark price remain independently sourced from real venue observations; no values are fabricated.
-- The fallback still stops immediately after a batch when all three preferred derivative coverage fields are present.
-- Added regression coverage proving slow provider attempts are handled in bounded parallel batches.
-- Production commit: 4a44acbccf8cf32b3faaa6e095b56492018be527.
-- Test commit: 852cb35e10d8d34f4e6695bcec43f1ba0d86b197.
+
+### 2026-10-04 — DERIVATIVES SYMBOL-NORMALIZATION FIX
+
+- Expanded the real-data diagnostic from the three problematic markets to 12 futures markets: XCU, BONK, NATGAS, XAU, WTI, XAG, PEPE, APT, BTC, ETH, LTC, SOL.
+- Result: **6/12 fully OK**. PEPE, XAU, XAG, XCU, WTI and NATGAS are green with complete OHLCV/trades/order-book data plus funding/OI/mark. PEPE/XAU/XAG/WTI obtain mark from Bitget; XCU/NATGAS obtain mark from Gate while funding/OI come from OKX.
+- The four major liquid crypto tests BTC/ETH/SOL/LTC and APT failed derivatives acquisition because the resolved primary-market symbol was a native-style value such as BTCUSDT and was passed unchanged into the universal fallback. That format is valid for some REST endpoints but is not a valid CCXT unified futures symbol for the CCXT providers, so the fallback could not discover the corresponding BTC/USDT:USDT market.
+- BONK remained partial with only mark_price missing; the other fields were also unavailable in this run. The failure is now separated from the generic crypto-symbol issue because BONK already uses a CCXT-style BONK/USDT:USDT primary symbol and still needs provider-level investigation.
+- Added canonical symbol normalization at the universal derivatives boundary: native-style BTCUSDT, ETHUSDT, etc. are normalized to BTC/USDT, ETH/USDT, etc. before CCXT/provider fallback. Explicit venue_symbols still take precedence through native_symbol, so authoritative venue-specific mappings are not overwritten.
+- Added a focused regression test proving a native-style resolved symbol is normalized before provider attempts.
+- Production commit: 2cb9e3b6acc304947f93ae6c447b90a8f46aa4f1.
+- Test commit: b1b2e0c9c75829455a3281a81f094fb900a54458.
 
 ### Next exact action
 
-1. Deploy the two new commits through FrostDeploy.
-2. Run tests/test_derivatives_market_data.py.
-3. Run tests/test_derivatives_contextual.py.
-4. Run focused FindSetup/decision/MTF tests.
-5. Re-run targeted XCU BONK NATGAS full-data diagnostics.
-6. Only after those results, decide whether any venue-specific adapter work is still necessary.
+1. Deploy the symbol-normalization production/test commits through FrostDeploy.
+2. Run tests/test_derivatives_market_data.py and tests/test_derivatives_contextual.py.
+3. Run focused FindSetup/decision/MTF tests.
+4. Re-run only **BTC ETH SOL LTC APT BONK** first; these are the remaining crypto cases from the 12-market probe.
+5. Do not touch the six already-green markets or add asset-specific exceptions unless the new diagnostic proves a real venue-specific capability gap.
