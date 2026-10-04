@@ -438,7 +438,8 @@ class FallbackDerivativesProvider:
             or (
                 BinanceDerivativesProvider(timeout_seconds=self.provider_timeout_seconds),
                 BybitDerivativesProvider(timeout_seconds=self.provider_timeout_seconds),
-                *(CcxtDerivativesProvider(exchange, timeout_seconds=self.provider_timeout_seconds) for exchange in self.EXCHANGES[2:]),
+                OkxDerivativesProvider(timeout_seconds=self.provider_timeout_seconds),
+                *(CcxtDerivativesProvider(exchange, timeout_seconds=self.provider_timeout_seconds) for exchange in self.EXCHANGES[3:]),
             )
         )
 
@@ -636,6 +637,86 @@ class FallbackDerivativesProvider:
         if missing:
             detail = f"{detail}; missing: {','.join(missing)}".strip("; ")
         raise RuntimeError("all derivatives providers failed: " + detail)
+
+class OkxDerivativesProvider:
+    """Direct OKX public derivatives provider for fast, keyless coverage."""
+
+    exchange = "okx"
+
+    def __init__(self, *, timeout_seconds: float = 10.0) -> None:
+        self.timeout_seconds = float(timeout_seconds)
+
+    @staticmethod
+    def _instrument_id(symbol: str, native_symbol: str | None = None) -> str:
+        if native_symbol:
+            native = str(native_symbol).strip().upper()
+            if native.endswith("-SWAP"):
+                return native
+            if "/" in native:
+                base, quote = native.split("/", 1)
+                quote = quote.split(":", 1)[0]
+                return f"{base}-{quote}-SWAP"
+            return native
+        canonical = symbol.strip().upper().replace("-", "/").replace("_", "/")
+        base, _, quote = canonical.partition("/")
+        return f"{base}-{quote or 'USDT'}-SWAP"
+
+    def _get(self, path: str, params: dict[str, object]):
+        return _request_json(
+            "https://www.okx.com/api/v5/" + path + "?" + urlencode(params),
+            timeout_seconds=min(self.timeout_seconds, 2.5),
+        )
+
+    def fetch_derivatives(self, *, symbol: str, limit: int = 200, native_symbol: str | None = None) -> pd.DataFrame:
+        inst_id = self._instrument_id(symbol, native_symbol=native_symbol)
+        timeout = min(self.timeout_seconds, 2.5)
+        endpoints = {
+            "funding": ("public/funding-rate-history", {"instId": inst_id, "limit": min(int(limit), 100)}),
+            "oi": ("public/open-interest", {"instType": "SWAP", "instId": inst_id}),
+            "mark": ("public/mark-price", {"instType": "SWAP", "instId": inst_id}),
+        }
+
+        def request(kind: str):
+            path, params = endpoints[kind]
+            try:
+                return self._get(path, params)
+            except Exception:
+                return None
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {kind: executor.submit(request, kind) for kind in endpoints}
+            payloads = {kind: future.result(timeout=timeout) for kind, future in futures.items()}
+
+        funding_rows: list[dict] = []
+        funding = payloads["funding"]
+        if isinstance(funding, dict) and funding.get("code") == "0":
+            for item in funding.get("data", []):
+                try:
+                    funding_rows.append({"timestamp": int(item["fundingTime"]), "funding_rate": float(item["fundingRate"])})
+                except (KeyError, TypeError, ValueError):
+                    continue
+
+        oi_rows: list[dict] = []
+        oi = payloads["oi"]
+        if isinstance(oi, dict) and oi.get("code") == "0":
+            for item in oi.get("data", []):
+                try:
+                    value = item.get("oiUsd") or item.get("oiCcy") or item.get("oi")
+                    oi_rows.append({"timestamp": int(item["ts"]), "open_interest": float(value)})
+                except (KeyError, TypeError, ValueError):
+                    continue
+
+        mark_row = None
+        mark = payloads["mark"]
+        if isinstance(mark, dict) and mark.get("code") == "0" and mark.get("data"):
+            try:
+                item = mark["data"][0]
+                mark_row = {"timestamp": int(item["ts"]), "mark_price": float(item["markPx"])}
+            except (KeyError, TypeError, ValueError):
+                mark_row = None
+
+        return _merge_sources(funding_rows=funding_rows, oi_rows=oi_rows, mark_row=mark_row, liquidation_rows=[])
+
 
 class CcxtDerivativesProvider:
     """Capability-aware public derivatives provider backed by CCXT.
