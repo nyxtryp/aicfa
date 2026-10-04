@@ -43,6 +43,10 @@ def _safe_optional_call(call, **kwargs):
     try:
         return call(**kwargs)
     except Exception as exc:
+        # The whole-market execution budget must propagate through optional
+        # enrichment instead of being swallowed by its best-effort boundary.
+        if exc.__class__.__name__ == "MarketExecutionTimeout":
+            raise
         return None, exc
 
 
@@ -266,6 +270,7 @@ def find_setup(
     derivatives_provider: object | None = None,
     derivatives_venue_symbols: tuple[tuple[str, str], ...] = (),
     prefetched_frames: dict[str, pd.DataFrame] | None = None,
+    prefetched_analyses: dict[str, pd.DataFrame] | None = None,
 ) -> FindSetupResult:
     """Resolve the asset, collect knowledge-required context, and run AICFA."""
     use_live_derivatives = provider is None
@@ -325,16 +330,28 @@ def find_setup(
 
     completed_frames: dict[str, pd.DataFrame] = {}
     analyses: dict[str, pd.DataFrame] = {}
-    feature_started = time.perf_counter()
-    for timeframe, frame in frames.items():
-        completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
-        if completed.empty:
-            continue
-        completed_frames[timeframe] = completed
-        timeframe_analysis = build_features(completed)
-        if not timeframe_analysis.empty:
-            analyses[timeframe] = timeframe_analysis
-    feature_duration_ms = (time.perf_counter() - feature_started) * 1000.0
+    if prefetched_analyses is not None:
+        missing_analyses = [timeframe for timeframe in timeframes if timeframe not in prefetched_analyses]
+        if missing_analyses:
+            raise ValueError(f"prefetched feature analysis is missing timeframes: {missing_analyses}")
+        for timeframe in timeframes:
+            completed = completed_ohlcv(frames[timeframe], timeframe=timeframe, now_ms=now_ms)
+            if completed.empty:
+                continue
+            completed_frames[timeframe] = completed
+            analyses[timeframe] = prefetched_analyses[timeframe].copy(deep=True)
+        feature_duration_ms = 0.0
+    else:
+        feature_started = time.perf_counter()
+        for timeframe, frame in frames.items():
+            completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
+            if completed.empty:
+                continue
+            completed_frames[timeframe] = completed
+            timeframe_analysis = build_features(completed)
+            if not timeframe_analysis.empty:
+                analyses[timeframe] = timeframe_analysis
+        feature_duration_ms = (time.perf_counter() - feature_started) * 1000.0
 
     base_analysis = analyses.get(execution_timeframe)
     if base_analysis is None:
@@ -410,6 +427,8 @@ def find_setup(
                 baseline_window=24,
             )
         except Exception as exc:
+            if exc.__class__.__name__ == "MarketExecutionTimeout":
+                raise
             derivatives_frame = pd.DataFrame()
             derivatives_analysis = pd.DataFrame()
             derivatives_source = f"unavailable: {exc}"
