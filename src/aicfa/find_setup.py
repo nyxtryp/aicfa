@@ -572,7 +572,7 @@ def find_setup(
             order_book_provider = order_book_history_provider
         else:
             book_fetch = getattr(provider, "fetch_order_book_with_source", None)
-                if book_fetch is not None:
+            if book_fetch is not None:
                 book_result = _safe_optional_call(
                     book_fetch,
                     symbol=symbol, market_type=request.market_type, limit=1,
