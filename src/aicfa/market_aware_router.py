@@ -170,6 +170,102 @@ class MarketAwareFallbackProvider:
         self._resolved.clear()
         self._by_symbol.clear()
 
+    def _resolved_provider_candidates(self, symbol: str, market_type: str):
+        resolved = self._by_symbol.get((symbol.upper(), market_type))
+        if resolved is None:
+            raise ValueError("symbol was not resolved through MarketAwareFallbackProvider")
+        mapped = self._market_symbols.get((resolved.asset, market_type), {})
+        if mapped:
+            return tuple(
+                (provider, mapped.get(provider_name(provider).strip().lower()))
+                for provider in self._providers
+                if provider_name(provider).strip().lower() in mapped
+            )
+        start = self._providers.index(next(
+            p for p in self._providers if provider_name(p) == resolved.provider
+        ))
+        return tuple(
+            (provider, resolved.symbol if index == start else None)
+            for index, provider in enumerate(self._providers[start:], start=start)
+        )
+
+    def _fetch_aux_recent_with_source(self, method_name: str, *, symbol: str,
+                                      market_type: str, limit: int):
+        from .market_data_router import MarketFetchResult, ProviderAttempt
+        attempts: list[ProviderAttempt] = []
+        resolved = self._by_symbol.get((symbol.upper(), market_type))
+        if resolved is None:
+            raise ValueError("symbol was not resolved through MarketAwareFallbackProvider")
+        for provider, mapped_symbol in self._resolved_provider_candidates(symbol, market_type):
+            try:
+                method = getattr(provider, method_name, None)
+                if method is None:
+                    raise ValueError(f"provider does not support {method_name}")
+                venue_symbol = mapped_symbol
+                if venue_symbol is None:
+                    resolver = getattr(provider, "resolve_symbol", None)
+                    if resolver is None:
+                        raise ValueError("symbol resolver unavailable")
+                    venue_symbol = str(resolver(resolved.asset, market_type=market_type))
+                frame = method(symbol=venue_symbol, market_type=market_type, limit=limit)
+                if frame is None or frame.empty:
+                    raise ValueError(f"provider returned no {method_name.removeprefix('fetch_')} rows")
+                return MarketFetchResult(provider=provider_name(provider), symbol=venue_symbol,
+                                         frame=frame, attempts=tuple(attempts))
+            except Exception as exc:
+                attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
+        raise RuntimeError("all market data providers failed: " +
+                           "; ".join(f"{x.provider}: {x.error}" for x in attempts))
+
+    def fetch_trades_with_source(self, *, symbol: str, market_type: str, limit: int):
+        return self._fetch_aux_recent_with_source("fetch_trades", symbol=symbol,
+                                                  market_type=market_type, limit=limit)
+
+    def fetch_trades(self, *, symbol: str, market_type: str, limit: int):
+        return self.fetch_trades_with_source(symbol=symbol, market_type=market_type, limit=limit).frame
+
+    def fetch_order_book_with_source(self, *, symbol: str, market_type: str, limit: int = 1):
+        return self._fetch_aux_recent_with_source("fetch_order_book", symbol=symbol,
+                                                  market_type=market_type, limit=limit)
+
+    def fetch_order_book(self, *, symbol: str, market_type: str, limit: int = 1):
+        return self.fetch_order_book_with_source(symbol=symbol, market_type=market_type, limit=limit).frame
+
+    def fetch_order_book_history_with_source(self, *, symbol: str, market_type: str,
+                                             snapshots: int, interval_seconds: float):
+        from .market_data_router import MarketFetchResult, ProviderAttempt
+        attempts: list[ProviderAttempt] = []
+        resolved = self._by_symbol.get((symbol.upper(), market_type))
+        if resolved is None:
+            raise ValueError("symbol was not resolved through MarketAwareFallbackProvider")
+        for provider, mapped_symbol in self._resolved_provider_candidates(symbol, market_type):
+            try:
+                method = getattr(provider, "fetch_order_book_history", None)
+                if method is None:
+                    raise ValueError("provider does not support fetch_order_book_history")
+                venue_symbol = mapped_symbol
+                if venue_symbol is None:
+                    resolver = getattr(provider, "resolve_symbol", None)
+                    if resolver is None:
+                        raise ValueError("symbol resolver unavailable")
+                    venue_symbol = str(resolver(resolved.asset, market_type=market_type))
+                frame = method(symbol=venue_symbol, market_type=market_type,
+                               snapshots=snapshots, interval_seconds=interval_seconds)
+                if frame is None or frame.empty:
+                    raise ValueError("provider returned no order-book history rows")
+                return MarketFetchResult(provider=provider_name(provider), symbol=venue_symbol,
+                                         frame=frame, attempts=tuple(attempts))
+            except Exception as exc:
+                attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
+        raise RuntimeError("all order-book history providers failed: " +
+                           "; ".join(f"{x.provider}: {x.error}" for x in attempts))
+
+    def fetch_order_book_history(self, *, symbol: str, market_type: str,
+                                 snapshots: int, interval_seconds: float):
+        return self.fetch_order_book_history_with_source(symbol=symbol, market_type=market_type,
+                                                         snapshots=snapshots,
+                                                         interval_seconds=interval_seconds).frame
+
     def fetch_ohlcv(self, *, symbol: str, market_type: str, timeframe: str, since_ms: int | None, limit: int):
         return self.fetch_ohlcv_with_source(
             symbol=symbol, market_type=market_type, timeframe=timeframe,
