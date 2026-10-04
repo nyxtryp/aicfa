@@ -793,3 +793,14 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 4. Add focused regression tests and verify on the VDS.
 5. Then fix DJIA/JPM and investigate the five timeout markets.
 6. After the 39-market remediation, rerun the complete 143-market diagnostic and record the final before/after coverage.
+
+### 2026-10-04 — PHASE A DERIVATIVES FOLLOW-UP: 29/32 TARGETS GREEN
+
+- After adding the CCXT derivatives fallback chain and capability-aware current funding/OI/mark fallbacks, the targeted 32-market verification completed with **29/32 fully OK** and **3/32 PARTIAL**.
+- All 29 GREEN markets had complete OHLCV `1w/1d/4h/1h/15m/5m`, trades, order book, order-book history, funding, open interest and mark price.
+- The remaining three — **BONK, XCU and NATGAS** — have complete primary market data and fail only in derivatives acquisition.
+- The failure is not an instruction to prefer OKX. The derivatives architecture is a capability-aware fallback chain and must switch between eligible futures venues until one supplies real funding + OI + mark price.
+- Web/venue verification identified **Gate** as an additional real futures source for all three targets: Gate lists `BONK_USDT`, `XCU_USDT` and `NG_USDT` perpetual contracts. OKX also lists XCU and NG perpetuals, but the current OKX adapter is unable to obtain a valid mark-price observation for these three cases.
+- Added Gate/CCXT as the next derivatives fallback with `defaultType=swap`, preserving the no-fabrication rule.
+- Added focused regression coverage for Gate swap routing.
+- Do not rerun the full 32-market diagnostic yet. First run the three-market targeted verification for **BONK, XCU, NATGAS**.
