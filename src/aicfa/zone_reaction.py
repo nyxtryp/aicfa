@@ -528,17 +528,17 @@ def build_zone_reaction(
         candle_low = float(lows[i])
         candle_high = float(highs[i])
 
-        def _append_bucket_candidates(bucket_ids, source_buckets):
-        for bucket_id in bucket_ids:
-            raw_bucket = source_buckets.get(bucket_id)
-            if not raw_bucket:
-                continue
-            for zone_id in raw_bucket:
-                if zone_low[zone_id] > candle_high:
+            def _append_bucket_candidates(bucket_ids, source_buckets):
+            for bucket_id in bucket_ids:
+                raw_bucket = source_buckets.get(bucket_id)
+                if not raw_bucket:
                     continue
-                if zone_high[zone_id] >= candle_low and candidate_marks[zone_id] != stamp:
-                    candidate_marks[zone_id] = stamp
-                    candidate_ids.append(zone_id)
+                for zone_id in raw_bucket:
+                    if zone_low[zone_id] > candle_high:
+                        continue
+                    if zone_high[zone_id] >= candle_low and candidate_marks[zone_id] != stamp:
+                        candidate_marks[zone_id] = stamp
+                        candidate_ids.append(zone_id)
 
         # Wide zones are indexed by coarse logarithmic buckets as well.
         # Never scan the full historical wide-zone list on every candle.
