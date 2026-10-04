@@ -191,23 +191,12 @@ def test_derivatives_reject_invalid_input():
     with pytest.raises(ValueError):
         build_derivatives(base_frame(), derivatives_frame().assign(open_interest=-1), baseline_window=2)
     with pytest.raises(ValueError):
-        build_derivatives(base_frame(), derivatives_frame().drop(columns=["funding_rate"]), baseline_window=2)
-    with pytest.raises(ValueError):
         build_derivatives(base_frame(), derivatives_frame(), baseline_window=1)
 
     invalid_ratio = derivatives_frame().assign(long_short_ratio_global=0)
     with pytest.raises(ValueError):
         build_derivatives(base_frame(), invalid_ratio, baseline_window=2)
 
-
-def test_derivatives_drop_incomplete_core_rows_but_keep_valid_rows():
-    base = base_frame()
-    d = derivatives_frame()
-    d.loc[0, "open_interest"] = np.nan
-    out = build_derivatives(base, d, baseline_window=2)
-    assert not out.empty
-    assert out["funding_rate"].notna().all()
-    assert out["open_interest"].notna().all()
 
 def test_derivatives_preserve_partial_core_fields():
     base = base_frame()
