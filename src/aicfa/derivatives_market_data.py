@@ -532,6 +532,37 @@ class FallbackDerivativesProvider:
         frames: list[tuple[pd.DataFrame, str]] = []
         providers = iter(self.providers)
 
+        # Probe the highest-priority provider alone first. This preserves the
+        # strict early-stop contract: if it supplies all coverage fields, no
+        # lower-priority provider is even called. Only after that probe fails
+        # to complete coverage do we fan out the remaining venues in bounded
+        # concurrent batches.
+        try:
+            first = next(providers)
+        except StopIteration:
+            first = None
+
+        if first is not None:
+            try:
+                frame = self._attempt_provider(
+                    first,
+                    symbol=symbol,
+                    limit=limit,
+                    venue_symbols=venue_symbols,
+                )
+                if not frame.empty:
+                    frames.append((frame, first.exchange))
+            except Exception as exc:
+                attempts.append(f"{first.exchange}: {exc}")
+
+            combined, sources = self._combine(frames)
+            covered = {
+                column for column in DERIVATIVE_COVERAGE_FIELDS
+                if combined[column].notna().any()
+            }
+            if covered == set(DERIVATIVE_COVERAGE_FIELDS):
+                return combined, sources
+
         while True:
             batch = []
             for _ in range(DERIVATIVE_MAX_CONCURRENT_PROVIDERS):
