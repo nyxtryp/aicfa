@@ -591,6 +591,13 @@ def _resolve_direction(
     if context.structure_direction is None:
         return None, None
     direction = context.structure_direction
+
+    # Report the most specific direct contradiction first. This preserves the
+    # actual lower-timeframe confirmation conflict when both MTF checks disagree.
+    confirmations = set(context.confirmation_directions)
+    if confirmations and direction not in confirmations:
+        return None, "lower confirmation conflicts with higher-timeframe structure"
+
     broader_row = context.latest_rows.get(context.context_timeframe)
     if broader_row is not None:
         broader_value = _structure_direction(broader_row)
@@ -604,9 +611,6 @@ def _resolve_direction(
                 )
                 if not reversal_confirmed:
                     return None, "broader higher-timeframe structure conflicts with setup direction"
-    confirmations = set(context.confirmation_directions)
-    if confirmations and direction not in confirmations:
-        return None, "lower confirmation conflicts with higher-timeframe structure"
     return direction, None
 
 
