@@ -15,6 +15,8 @@ from .data_requirements import TradingMode, default_setup_requirements, mode_tim
 from .public_market_data import build_public_market_data_provider
 from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarketDataProvider
 from .find_setup import FindSetupRequest, FindSetupResult, find_setup
+from .market_data import completed_ohlcv
+from .features import build_features
 from .derivatives_market_data import FallbackDerivativesProvider
 from .market_universe import MarketUniverse
 from .setup_lifecycle import SetupIdentity, SetupLifecycle, SetupLifecycleResult
@@ -189,6 +191,19 @@ def analyze_market_horizons(
     snapshot_elapsed = sum(getattr(item, "duration_ms", 0.0) for item in snapshot_metrics)
     resolution_elapsed = max(0.0, acquisition_elapsed - snapshot_elapsed)
     resolved = lambda _asset, _market_type: symbol
+    # The six primary MTF frames are shared by all three horizons. Compute
+    # their deterministic features once and reuse them instead of rebuilding
+    # the same overlapping context for each horizon.
+    feature_started = time.perf_counter()
+    prefetched_analyses: dict[str, object] = {}
+    for timeframe, frame in prefetched_frames.items():
+        completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
+        if completed.empty:
+            continue
+        analysis = build_features(completed)
+        if not analysis.empty:
+            prefetched_analyses[timeframe] = analysis
+    shared_feature_elapsed = (time.perf_counter() - feature_started) * 1000.0
     shared_derivatives_provider = derivatives_provider
     if market_type == "futures" and shared_derivatives_provider is None:
         shared_derivatives_provider = FallbackDerivativesProvider()
@@ -196,7 +211,7 @@ def analyze_market_horizons(
     results: list[FindSetupResult] = []
     horizon_timings: list[HorizonTiming] = []
     block_timings: list[object] = []
-    feature_duration_ms = 0.0
+    feature_duration_ms = shared_feature_elapsed
     evidence_duration_ms = 0.0
     setup_duration_ms = 0.0
     refetched_timeframes: set[str] = set()
@@ -210,6 +225,7 @@ def analyze_market_horizons(
             now_ms=now_ms,
             resolver=resolved,
             prefetched_frames=prefetched_frames,
+            prefetched_analyses=prefetched_analyses,
             derivatives_provider=shared_derivatives_provider,
             derivatives_venue_symbols=venue_symbols,
         )
