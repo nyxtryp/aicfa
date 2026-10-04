@@ -1033,3 +1033,14 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - The three additions increase the configured universe from 138 to 141 markets.
 - No S&P 500/Nasdaq ETF was substituted for the requested indices. SPY and QQQ remain separate ETF instruments.
 - No special trading signal, confidence score, RR filter or asset-specific analysis rule was introduced.
+
+
+### 2026-10-04 — SMC/MTF SETUP CONTRACT CORRECTION
+
+- Corrected the setup-direction contract in src/aicfa/setup_analysis.py.
+- Continuation setups now require agreement between the broader higher-timeframe context and the structural timeframe; a lower timeframe may confirm but must not create a new directional bias.
+- A reversal is allowed to change direction only when the supporting evidence contains both market_structure.choch and liquidity.sweep.
+- Scenario candidates no longer expose unrelated opposite-direction zone concepts as their actionable zone evidence; the selected scenario-specific zone family is used.
+- Added regression coverage for broader-context conflict and the CHoCH+sweep reversal exception.
+- This correction follows the SMC/ICT causal sequence: higher-timeframe bias → liquidity/draw → structural confirmation → PD-array entry, rather than treating an isolated OB/FVG as a trade. The Inner Circle Traders' current framework explicitly describes HTF bias as the directional filter and requires structural confirmation before PD-array entry. citeturn1search9turn1search1
+- The APT example that triggered this correction must be re-tested: a Position continuation LONG with 1W bearish structure and 1D bullish structure must not be emitted as a valid continuation setup.
