@@ -17,6 +17,10 @@ import pandas as pd
 import websocket
 
 
+DERIVATIVE_CORE_FIELDS = ("funding_rate", "open_interest", "mark_price")
+DERIVATIVE_OPTIONAL_FIELDS = ("liquidation_volume", "long_liquidation_volume", "short_liquidation_volume")
+DERIVATIVE_PROVIDER_TIMEOUT_SECONDS = 3.0
+
 DERIVATIVE_COLUMNS = (
     "timestamp",
     "funding_rate",
@@ -392,7 +396,7 @@ class BybitDerivativesProvider:
 
 
 class FallbackDerivativesProvider:
-    """Universal per-field derivatives fallback across allowed venues."""
+    """Universal per-field derivatives fallback across allowed venues.\n\n    Each derivative field is independently sourced and causally merged. The\n    chain stops as soon as the mandatory core (funding, OI, mark) is complete;\n    liquidation fields remain best-effort context and never justify waiting on\n    slow or unsupported venues.\n    """
 
     EXCHANGES = (
         "binance", "bybit", "okx", "bitget", "gateio", "kucoin", "mexc",
@@ -400,13 +404,14 @@ class FallbackDerivativesProvider:
         "whitebit", "cryptocom", "bitrue", "bitstamp", "gemini", "upbit",
     )
 
-    def __init__(self, providers=None) -> None:
+    def __init__(self, providers=None, *, provider_timeout_seconds: float = DERIVATIVE_PROVIDER_TIMEOUT_SECONDS) -> None:
+        self.provider_timeout_seconds = float(provider_timeout_seconds)
         self.providers = tuple(
             providers
             or (
-                BinanceDerivativesProvider(),
-                BybitDerivativesProvider(),
-                *(CcxtDerivativesProvider(exchange) for exchange in self.EXCHANGES[2:]),
+                BinanceDerivativesProvider(timeout_seconds=self.provider_timeout_seconds),
+                BybitDerivativesProvider(timeout_seconds=self.provider_timeout_seconds),
+                *(CcxtDerivativesProvider(exchange, timeout_seconds=self.provider_timeout_seconds) for exchange in self.EXCHANGES[2:]),
             )
         )
 
@@ -464,7 +469,15 @@ class FallbackDerivativesProvider:
                 direction="backward",
                 allow_exact_matches=True,
             )
-        sources = ",".join(name for _, name in frames)
+        field_sources = []
+        for column in DERIVATIVE_COLUMNS[1:]:
+            names = [
+                name for frame, name in frames
+                if column in frame.columns and frame[column].notna().any()
+            ]
+            if names:
+                field_sources.append(f"{column}={names[0]}")
+        sources = ",".join(field_sources)
         return _frame(result.to_dict("records")), sources
 
     def fetch_derivatives(
@@ -489,13 +502,16 @@ class FallbackDerivativesProvider:
                 if not frame.empty:
                     frames.append((frame, provider.exchange))
                     combined, sources = self._combine(frames)
-                    required = ("funding_rate", "open_interest", "mark_price")
-                    if all(combined[column].notna().any() for column in required):
+                    covered_core = {
+                        column for column in DERIVATIVE_CORE_FIELDS
+                        if combined[column].notna().any()
+                    }
+                    if covered_core == set(DERIVATIVE_CORE_FIELDS):
                         return combined, sources
             except Exception as exc:
                 attempts.append(f"{provider.exchange}: {exc}")
         combined, sources = self._combine(frames)
-        required = ("funding_rate", "open_interest", "mark_price")
+        required = DERIVATIVE_CORE_FIELDS
         if all(combined[column].notna().any() for column in required):
             return combined, sources
         missing = [name for name in required if not combined.empty and not combined[name].notna().any()]
