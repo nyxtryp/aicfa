@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -431,8 +432,11 @@ class FallbackDerivativesProvider:
         "whitebit", "cryptocom", "bitrue", "bitstamp", "gemini", "upbit",
     )
 
-    def __init__(self, providers=None, *, provider_timeout_seconds: float = DERIVATIVE_PROVIDER_TIMEOUT_SECONDS) -> None:
+    def __init__(self, providers=None, *, provider_timeout_seconds: float = DERIVATIVE_PROVIDER_TIMEOUT_SECONDS, cache_ttl_seconds: float = 60.0) -> None:
         self.provider_timeout_seconds = float(provider_timeout_seconds)
+        self.cache_ttl_seconds = float(cache_ttl_seconds)
+        self._cache_lock = threading.Lock()
+        self._cache: dict[tuple[str, int, tuple[tuple[str, str], ...]], tuple[float, pd.DataFrame, str]] = {}
         self.providers = tuple(
             providers
             or (
@@ -509,7 +513,19 @@ class FallbackDerivativesProvider:
         return _frame(result.to_dict("records")), sources
 
     def _fetch_provider_with_timeout(self, provider, kwargs):
-        """Hard-bound one provider attempt so one venue cannot stall fallback."""
+        """
+
+        cache_key = (
+            symbol.strip().upper(),
+            int(limit),
+            tuple(sorted((str(v), str(s)) for v, s in venue_symbols)),
+        )
+        now = time.monotonic()
+        with self._cache_lock:
+            cached = self._cache.get(cache_key)
+            if cached is not None and now - cached[0] < self.cache_ttl_seconds:
+                return cached[1].copy(deep=True), cached[2]
+Hard-bound one provider attempt so one venue cannot stall fallback."""
         executor = ThreadPoolExecutor(max_workers=1)
         future = executor.submit(provider.fetch_derivatives, **kwargs)
         try:
@@ -587,6 +603,8 @@ class FallbackDerivativesProvider:
                 if combined[column].notna().any()
             }
             if covered == set(DERIVATIVE_COVERAGE_FIELDS):
+                with self._cache_lock:
+                    self._cache[cache_key] = (time.monotonic(), combined.copy(deep=True), sources)
                 return combined, sources
 
         while True:
@@ -624,10 +642,14 @@ class FallbackDerivativesProvider:
                 if combined[column].notna().any()
             }
             if covered == set(DERIVATIVE_COVERAGE_FIELDS):
+                with self._cache_lock:
+                    self._cache[cache_key] = (time.monotonic(), combined.copy(deep=True), sources)
                 return combined, sources
 
         combined, sources = self._combine(frames)
         if all(combined[column].notna().any() for column in DERIVATIVE_COVERAGE_FIELDS):
+            with self._cache_lock:
+                self._cache[cache_key] = (time.monotonic(), combined.copy(deep=True), sources)
             return combined, sources
         missing = [
             name for name in DERIVATIVE_COVERAGE_FIELDS
