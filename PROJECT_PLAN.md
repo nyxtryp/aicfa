@@ -993,3 +993,15 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 2. Run tests/test_derivatives_market_data.py and tests/test_derivatives_contextual.py.
 3. Re-run scripts/check_full_market_data.py --assets BONK.
 4. If BONK becomes green, run the affected-market diagnostic next; do not add asset-specific exceptions.
+
+
+### 2026-10-04 — FUTURES MARKET RESOLVER HARD TIMEOUT / GNS REMOVAL
+
+- VDS diagnostics exposed a separate primary-market resolver bottleneck: the derivatives fallback already has its own 3-second provider boundary, but futures symbol resolution in `MarketAwareFallbackProvider` was sequential and CCXT-backed market discovery could use the normal 10-second transport timeout per venue.
+- This explains why unsupported/missing futures markets could reach the diagnostic's 30-second market timeout before the resolver exhausted the venue chain.
+- Changed generic market symbol resolution to a bounded fallback: first priority venue is probed alone, then remaining venues are probed in batches of up to 6, with a hard 3-second resolution budget per batch. A successful venue wins by configured priority; unsupported/slow venues are recorded and skipped.
+- Explicit authoritative `venue_symbols` mappings remain unchanged and bypass generic discovery.
+- Added regression tests proving a slow resolver is bypassed and that a missing market does not serialize all venue waits.
+- Confirmed from the VDS diagnostic that `GNS/USDT` is absent from all 19 currently configured futures venues, so it is removed from `config/market_universe.json`.
+- External verification also found KuCoin had already delisted GNS USDT-margined perpetuals in 2024. citeturn0search11
+- No asset-specific resolver exception or fabricated market mapping was introduced.
