@@ -25,6 +25,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Diagnose one full AICFA market pipeline")
     parser.add_argument("--assets", nargs="+", required=True, help="Configured asset/base symbol")
     parser.add_argument("--universe", default="config/market_universe.json")
+    parser.add_argument("--verbose", action="store_true", help="Print every per-horizon block timing")
     args = parser.parse_args()
 
     universe = load_market_universe(Path(args.universe))
@@ -81,7 +82,20 @@ def main() -> None:
                 flush=True,
             )
             print("  BLOCKS", flush=True)
-            for item in diagnostics.block_timings:
+            if args.verbose:
+                block_items = diagnostics.block_timings
+            else:
+                seen_blocks = set()
+                block_items = []
+                for item in diagnostics.block_timings:
+                    base_block = item.block.split(":", 1)[0]
+                    if base_block in seen_blocks and not item.block.startswith("ohlcv:"):
+                        continue
+                    if base_block == "ohlcv" and item.block in seen_blocks:
+                        continue
+                    seen_blocks.add(item.block if item.block.startswith("ohlcv:") else base_block)
+                    block_items.append(item)
+            for item in block_items:
                 provider_name = f" provider={item.provider}" if item.provider else ""
                 reason = f" reason={item.reason}" if item.reason else ""
                 print(
