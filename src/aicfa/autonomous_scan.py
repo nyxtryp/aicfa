@@ -6,7 +6,10 @@ thresholds, setup limits, or a second scanner.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
+import signal
+import threading
 import time
 from typing import Callable, Sequence
 
@@ -25,6 +28,32 @@ from .setup_lifecycle import ActiveSetup, SetupLifecycle
 MAIN_SCAN_INTERVAL_SECONDS = 300
 BATCH_SCAN_INTERVAL_SECONDS = 0
 DEFAULT_MARKETS_PER_BATCH = 1
+# Representative production diagnostics peaked at 13.708s. Keep measured
+# headroom for normal provider variance while guaranteeing queue advancement.
+DEFAULT_MARKET_TIMEOUT_SECONDS = 20.0
+
+
+class MarketExecutionTimeout(TimeoutError):
+    """Raised when one market exceeds its whole-market execution budget."""
+
+
+@contextmanager
+def _market_timeout(seconds: float):
+    if seconds <= 0:
+        yield
+        return
+    if threading.current_thread() is not threading.main_thread():
+        raise RuntimeError("hard market timeout requires execution on the main thread")
+    previous = signal.getsignal(signal.SIGALRM)
+    def _handler(_signum, _frame):
+        raise MarketExecutionTimeout(f"market exceeded hard execution budget of {seconds:.1f}s")
+    signal.signal(signal.SIGALRM, _handler)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0.0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 @dataclass(frozen=True)
@@ -52,10 +81,14 @@ class AutonomousScanEngine:
         resolver: Callable[[str, str], str] | None = None,
         modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
         clock_ms: Callable[[], int] | None = None,
+        market_timeout_seconds: float = DEFAULT_MARKET_TIMEOUT_SECONDS,
     ) -> None:
         self.universe = universe
         self.provider = provider or build_public_market_data_provider(timeout_seconds=10.0)
         self.resolver = resolver
+        if market_timeout_seconds <= 0:
+            raise ValueError("market_timeout_seconds must be greater than zero")
+        self.market_timeout_seconds = float(market_timeout_seconds)
         self.modes = tuple(modes)
         self.lifecycle = SetupLifecycle()
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
@@ -151,10 +184,37 @@ class AutonomousScanEngine:
             raise ValueError(f"market_index must be between 0 and {len(self.universe.markets) - 1}")
         timestamp = self._clock_ms() if now_ms is None else now_ms
         market = MarketUniverse((self.universe.markets[market_index],))
-        result = scan_universe(
-            market, provider=self.provider, now_ms=timestamp, resolver=self.resolver,
-            modes=self.modes, lifecycle=self.lifecycle,
-        )
+        try:
+            with _market_timeout(self.market_timeout_seconds):
+                result = scan_universe(
+                    market,
+                    provider=self.provider,
+                    now_ms=timestamp,
+                    resolver=self.resolver,
+                    modes=self.modes,
+                    lifecycle=self.lifecycle,
+                )
+        except MarketExecutionTimeout as exc:
+            market_asset = self.universe.markets[market_index].asset
+            from .market_orchestrator import MarketScanDiagnostics
+            from .market_orchestrator import MarketHorizonScan
+            timed_out = MarketHorizonScan(
+                asset=market_asset,
+                results=(),
+                setups=(),
+                lifecycle_results=(),
+                diagnostics=MarketScanDiagnostics(
+                    total_duration_ms=self.market_timeout_seconds * 1000.0,
+                    resolution_duration_ms=0.0,
+                    snapshot_duration_ms=0.0,
+                    snapshot_metrics=(),
+                    horizon_timings=(),
+                    refetched_between_horizons=False,
+                    status="timeout",
+                    error=str(exc),
+                ),
+            )
+            result = MultiMarketScan(markets=(timed_out,))
         self._scan_number += 1
         state = AutonomousScanState(scan_number=self._scan_number, scanned_at_ms=timestamp, result=result)
         self._last_state = state
@@ -209,4 +269,4 @@ class AutonomousScanEngine:
             sleep(interval_seconds)
 
 
-__all__ = ["AutonomousScanEngine", "AutonomousScanState", "BATCH_SCAN_INTERVAL_SECONDS", "DEFAULT_MARKETS_PER_BATCH", "MAIN_SCAN_INTERVAL_SECONDS"]
+__all__ = ["AutonomousScanEngine", "AutonomousScanState", "BATCH_SCAN_INTERVAL_SECONDS", "DEFAULT_MARKET_TIMEOUT_SECONDS", "DEFAULT_MARKETS_PER_BATCH", "MAIN_SCAN_INTERVAL_SECONDS", "MarketExecutionTimeout"]
