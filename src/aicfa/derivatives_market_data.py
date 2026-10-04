@@ -86,8 +86,8 @@ def _merge_sources(
     its latest known observation; the current mark is added at its own timestamp.
     This preserves causality while producing rows accepted by build_derivatives.
     """
-    oi = pd.DataFrame(oi_rows)
-    funding = pd.DataFrame(funding_rows)
+    oi = pd.DataFrame(oi_rows, columns=["timestamp", "open_interest"])
+    funding = pd.DataFrame(funding_rows, columns=["timestamp", "funding_rate"])
 
     oi["timestamp"] = pd.to_numeric(oi["timestamp"], errors="coerce")
     oi["open_interest"] = pd.to_numeric(oi["open_interest"], errors="coerce")
