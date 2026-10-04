@@ -25,7 +25,7 @@ def test_scan_market_timeout_records_failure_and_advances(monkeypatch):
     assert market.asset == "BTC/USDT"
     assert market.diagnostics is not None
     assert market.diagnostics.status == "timeout"
-    assert "0.0s" not in market.diagnostics.error
+    assert "hard execution budget" in market.diagnostics.error
 
     second = engine.scan_market(1, now_ms=2_000)
     assert second.scan_number == 2
