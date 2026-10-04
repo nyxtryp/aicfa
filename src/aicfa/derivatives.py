@@ -11,7 +11,8 @@ import numpy as np
 import pandas as pd
 
 
-_REQUIRED = {"timestamp", "funding_rate", "open_interest"}
+_REQUIRED = {"timestamp"}
+_CORE_NUMERIC = {"funding_rate", "open_interest"}
 _OPTIONAL_NONNEGATIVE = {
     "liquidation_volume",
     "futures_volume",
@@ -36,9 +37,8 @@ def _validate(df: pd.DataFrame) -> pd.DataFrame:
     x["timestamp"] = pd.to_datetime(x["timestamp"], utc=True)
     x = x.sort_values("timestamp").drop_duplicates("timestamp", keep="last").reset_index(drop=True)
 
-    numeric = _REQUIRED - {"timestamp"}
     for col in (
-        numeric
+        (_CORE_NUMERIC & set(x.columns))
         | (_OPTIONAL_NONNEGATIVE & set(x.columns))
         | (_OPTIONAL_RATIO & set(x.columns))
         | (_OPTIONAL_SIGNED & set(x.columns))
@@ -46,10 +46,12 @@ def _validate(df: pd.DataFrame) -> pd.DataFrame:
     ):
         x[col] = pd.to_numeric(x[col], errors="coerce")
 
-    x = x.dropna(subset=["funding_rate", "open_interest"]).reset_index(drop=True)
+    for col in _CORE_NUMERIC:
+        if col not in x.columns:
+            x[col] = np.nan
     if x.empty:
-        raise ValueError("no complete funding_rate/open_interest observations")
-    if (x["open_interest"] < 0).any():
+        raise ValueError("derivatives frame has no timestamp observations")
+    if x["open_interest"].dropna().lt(0).any():
         raise ValueError("open_interest must be non-negative")
 
     for col in _OPTIONAL_NONNEGATIVE & set(x.columns):
