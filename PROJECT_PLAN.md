@@ -1044,3 +1044,10 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Added regression coverage for broader-context conflict and the CHoCH+sweep reversal exception.
 - This correction follows the SMC/ICT causal sequence: higher-timeframe bias → liquidity/draw → structural confirmation → PD-array entry, rather than treating an isolated OB/FVG as a trade. The Inner Circle Traders' current framework explicitly describes HTF bias as the directional filter and requires structural confirmation before PD-array entry. citeturn1search9turn1search1
 - The APT example that triggered this correction must be re-tested: a Position continuation LONG with 1W bearish structure and 1D bullish structure must not be emitted as a valid continuation setup.
+
+
+## 2026-10-04 — Futures seven-block collection hardening
+- Futures setup collection now requests all seven market-data blocks: OHLCV, trades, order book, funding, open interest, liquidations, mark price.
+- Default live market-data provider now uses the production multi-venue router rather than the legacy Binance+Bybit-only pair.
+- Derivatives timelines no longer fail wholesale when early rows lack funding/OI; incomplete causal rows are discarded while valid rows and optional mark/liquidation fields are preserved.
+- Spot behavior remains knowledge-driven; futures explicitly opt into the complete seven-block collection contract.
