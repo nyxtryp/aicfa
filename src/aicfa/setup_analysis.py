@@ -687,6 +687,7 @@ def analyze_setups(
     zones, locations = _zone_data(evidence_observations)
     candidates: list[SetupCandidate] = []
     missing: list[str] = []
+    direction_conflicts: list[str] = []
     directional_observations = {
         item.timeframe: item.direction
         for item in _observed(evidence_observations)
@@ -718,7 +719,9 @@ def analyze_setups(
             )
         )
         if direction_conflict:
-            missing.append(f"{hypothesis.scenario}: {direction_conflict}")
+            direction_conflicts.append(
+                f"{hypothesis.scenario}: {direction_conflict}"
+            )
             continue
         if direction is None and not legacy_mode:
             missing.append(f"{hypothesis.scenario}: setup direction is not structurally established")
@@ -809,6 +812,15 @@ def analyze_setups(
         )
 
     if not candidates:
+        conflicts = _unique(list(evidence_assessment.conflicts) + direction_conflicts)
+        if conflicts:
+            return SetupAssessment(
+                decision=SetupDecision.WAIT,
+                candidates=(),
+                missing_context=_unique(missing),
+                conflicts=conflicts,
+                reasons=("higher-timeframe structure conflicts with confirmation",),
+            )
         return SetupAssessment(
             decision=SetupDecision.NEED_MORE_EVIDENCE,
             candidates=(),
