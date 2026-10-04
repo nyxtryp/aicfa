@@ -997,8 +997,7 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 
 ### 2026-10-04 — FUTURES MARKET RESOLVER HARD TIMEOUT / GNS REMOVAL
 
-- VDS diagnostics exposed a separate primary-market resolver bottleneck: the derivatives fallback already has its own 3-second provider boundary, but futures symbol resolution in `MarketAwareFallbackProvider` was sequential and CCXT-backed market discovery could use the normal 10-second transport timeout per venue.
-- This explains why unsupported/missing futures markets could reach the diagnostic's 30-second market timeout before the resolver exhausted the venue chain.
+- VDS diagnostics exposed a separate primary-market resolver bottleneck: the derivatives fallback already has its own 3-second provider boundary, but futures symbol resolution in `MarketAwareFallbackProvider` was sequential and CCXT-backed market discovery could use the normal 10-second transport timeout per venue.- This explains why unsupported/missing futures markets could reach the diagnostic's 30-second market timeout before the resolver exhausted the venue chain.
 - Changed generic market symbol resolution to a bounded fallback: first priority venue is probed alone, then remaining venues are probed in batches of up to 6, with a hard 3-second resolution budget per batch. A successful venue wins by configured priority; unsupported/slow venues are recorded and skipped.
 - Explicit authoritative `venue_symbols` mappings remain unchanged and bypass generic discovery.
 - Added regression tests proving a slow resolver is bypassed and that a missing market does not serialize all venue waits.
@@ -1025,3 +1024,12 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - `RDNT`: Binance Futures delisted the RDNT contract in March 2026; Bitget also delisted RDNTUSDT futures in March 2026. citeturn0search5turn0search2
 - `MYRO`: Bitget's current delisting records show MYROUSDT futures were delisted in November 2025. citeturn0search7
 - Market-universe commit: `47792629cf34f4a7cda56213754fc0e00ebce722`.
+
+### 2026-10-04 — S&P 500 / NASDAQ-100 / XMR RETURNED TO MARKET UNIVERSE
+
+- Added SP500/USDT as a dedicated TradFi index market. It uses USDT-margined index perpetuals rather than the existing SPY ETF: OKX US500/USDT:USDT and MEXC SPX500/USDT:USDT.
+- Added NASDAQ100/USDT as a dedicated TradFi index market. It uses OKX US100/USDT:USDT and MEXC NAS100/USDT:USDT, explicitly distinct from the existing QQQ ETF.
+- Restored XMR/USDT to the crypto futures universe. Current venue evidence confirms active XMR USDT perpetuals on Bybit, Gate and KuCoin; generic resolution remains available for the configured venue set, with no asset-specific resolver rule.
+- The three additions increase the configured universe from 138 to 141 markets.
+- No S&P 500/Nasdaq ETF was substituted for the requested indices. SPY and QQQ remain separate ETF instruments.
+- No special trading signal, confidence score, RR filter or asset-specific analysis rule was introduced.

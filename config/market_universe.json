@@ -1,6 +1,12 @@
 {
   "markets": [
     {
+      "asset": "XMR/USDT",
+      "market_type": "futures",
+      "asset_class": "crypto",
+      "category": "crypto"
+    },
+    {
       "asset": "BTC/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
@@ -992,6 +998,28 @@
       "venue_symbols": {
         "bybit": "JPM/USDT:USDT",
         "mexc": "JPMSTOCK/USDT:USDT"
+      }
+    },
+    {
+      "asset": "SP500/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "index",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "okx": "US500/USDT:USDT",
+        "mexc": "SPX500/USDT:USDT"
+      }
+    },
+    {
+      "asset": "NASDAQ100/USDT",
+      "market_type": "futures",
+      "asset_class": "tradfi",
+      "category": "index",
+      "instrument_type": "perpetual",
+      "venue_symbols": {
+        "okx": "US100/USDT:USDT",
+        "mexc": "NAS100/USDT:USDT"
       }
     }
   ]
