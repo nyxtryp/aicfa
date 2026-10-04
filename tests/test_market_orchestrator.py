@@ -241,7 +241,7 @@ def test_one_market_acquires_full_primary_snapshot_once(monkeypatch):
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
 
-    result = analyze_market_horizons("BTC/USDT", provider=provider, now_ms=1000)
+    result = analyze_market_horizons("BTC/USDT", provider=provider, now_ms=10_000_000_000)
 
     assert len(result.results) == 3
     assert all(keys == ("1w", "1d", "4h", "1h", "15m", "5m") for _, keys in calls)
@@ -281,7 +281,7 @@ def test_one_market_computes_primary_features_once(monkeypatch):
     class FeatureSnapshotProvider(SnapshotProvider):
         def fetch_ohlcv(self, **kwargs):
             self.ohlcv_calls.append(kwargs)
-            rows = max(int(kwargs.get("limit") or 240), 240)
+            rows = max(int(kwargs.get("limit") or 240), 1000)
             return pd.DataFrame({
                 "timestamp": list(range(1, rows + 1)),
                 "open": [100.0] * rows,
