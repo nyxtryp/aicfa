@@ -337,18 +337,6 @@
       "category": "crypto"
     },
     {
-      "asset": "PONKE/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
-      "asset": "MYRO/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
       "asset": "PNUT/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
@@ -572,12 +560,6 @@
     },
     {
       "asset": "STG/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
-      "asset": "RDNT/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
       "category": "crypto"
