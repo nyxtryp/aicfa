@@ -65,6 +65,7 @@ def test_run_cycle_records_timeout_and_continues(monkeypatch):
                 snapshot_duration_ms=0.0,
                 snapshot_metrics=(),
                 horizon_timings=(),
+                refetched_between_horizons=False,
                 status=status,
                 error="budget exceeded" if status == "timeout" else "",
             ),
