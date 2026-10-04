@@ -1080,3 +1080,89 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - The MTF setup test exposed an ordering issue: when both the broader structure and the direct confirmation conflicted, the engine reported the broader conflict first.
 - The direction resolver now reports the most specific direct lower-confirmation conflict first, while preserving the broader higher-timeframe conflict as the fallback.
 - Commit: `caf243114bb7e32db896e0107a252756359456dc`.
+
+
+## 2026-10-04 — ACTIVE PLAN: MARKET ROTATION ENGINE / PRODUCTION SCANNER DIAGNOSTIC
+
+**This is now the active implementation plan. Follow it strictly before adding new trading logic or website work.**
+
+### Goal
+Turn the existing analytical core into a measurable autonomous market-rotation engine. Do not create a parallel scanner or generic signal engine. Reuse CentralMarketScanner, market_orchestrator, find_setup, the existing MTF/SMC pipeline and SetupLifecycle.
+
+### Non-negotiable analysis contract
+- Primary horizons: **Intraday, Swing, Position**.
+- Scalping remains isolated for the later dedicated fast product.
+- One configured market is processed as one analytical unit.
+- Resolve the market once.
+- Acquire one shared MTF OHLCV snapshot for the full primary context: **1w / 1d / 4h / 1h / 15m / 5m**.
+- Reuse that snapshot across Intraday, Swing and Position; do not refetch overlapping timeframes merely because horizons differ.
+- OHLCV/MTF is the structural core. Futures Trades, Order Book, Funding, Open Interest, Liquidations and Mark Price are best-effort enrichment and must never independently gate a structurally valid setup.
+- Preserve every independently valid setup; no fixed number of signals, no forced signal, no arbitrary confidence score and no fixed RR filter.
+
+### Per-market execution contract to implement and measure
+queue → resolve → shared MTF OHLCV → optional enrichment → features/evidence → Intraday → Swing → Position → lifecycle → emit → metrics → next market
+
+For every market record:
+- queue position and cycle ID;
+- start/end/total time;
+- resolution time;
+- per-timeframe OHLCV status, row count and duration for 1w/1d/4h/1h/15m/5m;
+- Trades, Order Book, Funding, OI, Liquidations, Mark Price status: complete / partial / unavailable, plus duration where available;
+- feature/evidence/setup timing;
+- Intraday/Swing/Position timing;
+- number of emitted setups and lifecycle events;
+- final status/error and reason;
+- whether any data was refetched between horizons.
+
+### Time-budget contract
+A production hard budget must be defined and enforced at the **whole-market** level, not inferred from individual provider timeouts. The implementation must make timeout behavior observable and guarantee that a slow market cannot block the queue indefinitely.
+
+Do not choose an arbitrary number merely to make tests pass. First instrument the real pipeline, measure representative markets, then set the smallest practical hard per-market budget that allows normal complete analysis while guaranteeing queue progress. Also define a cycle budget/rotation policy after measuring the per-market distribution.
+
+### Queue/rotation contract
+- Markets are processed in a deterministic queue order.
+- Each market gets its own bounded execution budget.
+- A failed/slow market is recorded and the queue advances; one market must never stall the entire rotation.
+- The system must complete a measurable cycle over the configured universe and report cycle duration, markets attempted, completed, failed/timed out, and throughput.
+- Continuous 24/7 looping comes only after one full finite cycle is proven and instrumented.
+
+### Required verification sequence — do not skip steps
+1. **Repository/code audit already completed:** use the existing architecture; no duplicate scanner.
+2. **Fix/implement shared MTF acquisition:** one resolution + one full MTF snapshot per market, reusable by all three horizons.
+3. **Instrument the pipeline:** block-level timings, coverage, row counts, refetch detection, setup counts, lifecycle events and errors.
+4. **Implement bounded per-market execution:** hard whole-market timeout with guaranteed queue advancement.
+5. **Implement deterministic market queue and finite rotation.**
+6. **Run representative real-market diagnostics** (liquid crypto, smaller crypto, TradFi) and measure actual timing/coverage before choosing production budgets.
+7. **Run the complete configured 141-market rotation** after the representative run is green.
+8. **Validate setup generation on the rotation:** all three horizons, all emitted candidates, WAIT/NO TRADE, no forced signals.
+9. **Validate lifecycle across repeated scans** and confirm distinct horizon setups remain independent.
+10. **Only then** begin persistent live setup journal integration and website setup feed.
+
+### Explicit open questions that must be answered by implementation/diagnostics
+- How many data blocks does each market actually receive?
+- How many OHLCV rows does each timeframe actually receive?
+- How long does each block take?
+- What is the total per-market time?
+- What percentage of markets complete full primary MTF coverage?
+- How many markets complete optional futures enrichment?
+- How many markets produce valid setups per horizon?
+- How many markets return WAIT/NO TRADE?
+- How many markets fail/timeout and why?
+- How long does one complete 141-market cycle take?
+- Are any overlapping MTF frames fetched more than once?
+- Does one slow/failed market ever block the next market?
+
+### Definition of done for this stage
+This stage is **not GREEN** until the repository contains the rotation engine and tests for its contracts, and the VDS has a successful measured finite rotation of the configured universe. `494 passed` alone is not sufficient evidence for this stage.
+
+### Current status
+- Setup Engine: GREEN by automated regression.
+- Full regression: **494 passed, 0 failed** (latest verified VDS run).
+- Autonomous production rotation: **NOT GREEN / not yet implemented and measured**.
+- Shared MTF snapshot across horizons: **NOT GREEN / not yet implemented**.
+- Whole-market hard timeout: **NOT GREEN / not yet implemented**.
+- Deterministic finite queue + cycle metrics: **NOT GREEN / not yet implemented**.
+- 141-market measured rotation: **NOT GREEN / not yet run after these contracts are implemented**.
+
+### Immediate next action
+**Start implementation at step 2: shared MTF acquisition. Do not modify SMC/setup decision rules unless a failing integration test proves a regression.**
