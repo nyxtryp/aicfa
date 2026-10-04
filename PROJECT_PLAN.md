@@ -1013,3 +1013,15 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - No resolver/provider exception or special-case routing was added.
 - Production universe changed from 142 to **141 markets**.
 - Commit: `4d713624ade2d89ccf854fa0cf5ea5e3f459447d`.
+
+
+### 2026-10-04 — DELISTED FUTURES MARKETS REMOVED
+
+- Removed `PONKE/USDT`, `MYRO/USDT` and `RDNT/USDT` from the configured futures market universe.
+- This follows current exchange/delisting evidence and the production resolver's inability to resolve active futures markets for these assets across the configured venue set.
+- No asset-specific resolver exception or fabricated venue mapping was added.
+- Production universe changed from **141 to 138 markets**.
+- `PONKE`: Binance Futures delisted PONKEUSDT in November 2025; Bybit also delisted PONKEUSDT in April 2026. citeturn0search0turn0search1
+- `RDNT`: Binance Futures delisted the RDNT contract in March 2026; Bitget also delisted RDNTUSDT futures in March 2026. citeturn0search5turn0search2
+- `MYRO`: Bitget's current delisting records show MYROUSDT futures were delisted in November 2025. citeturn0search7
+- Market-universe commit: `47792629cf34f4a7cda56213754fc0e00ebce722`.
