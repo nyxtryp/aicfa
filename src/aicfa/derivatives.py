@@ -25,7 +25,7 @@ _OPTIONAL_RATIO = {
     "long_short_ratio_top_trader",
 }
 _OPTIONAL_SIGNED = {"basis", "basis_pct"}
-_OPTIONAL_PRICE = {"spot_price", "futures_price"}
+_OPTIONAL_PRICE = {"spot_price", "futures_price", "mark_price"}
 
 
 def _validate(df: pd.DataFrame) -> pd.DataFrame:
@@ -122,6 +122,7 @@ def build_derivatives(
             ).replace([np.inf, -np.inf], np.nan)
             d[f"{col}_zscore"] = _zscore_against_past(d[col], baseline_window)
 
+    # Mark price is an independently available derivative state field.
     # Spot/futures relationship is calculated only when both source prices
     # are present at the same derivative observation. Both prices and the
     # resulting relationship are then treated as latest-known state.
