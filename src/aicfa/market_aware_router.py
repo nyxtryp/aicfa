@@ -1,10 +1,14 @@
 """Market-aware fallback routing with venue-specific symbol resolution."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from typing import Sequence
 
 from .market_data import MarketDataProvider
+
+MARKET_RESOLUTION_TIMEOUT_SECONDS = 3.0
+MARKET_RESOLUTION_MAX_CONCURRENT_PROVIDERS = 6
 
 
 @dataclass(frozen=True)
@@ -83,13 +87,12 @@ class MarketAwareFallbackProvider:
 
         mapped = self._market_symbols.get(key, {})
         attempts: list[MarketResolutionAttempt] = []
-        for provider in self._providers:
-            provider_id = provider_name(provider).strip().lower()
 
-            # Explicit venue mappings are authoritative. Never replace a
-            # verified native symbol with a generic resolver result from an
-            # unmapped venue.
-            if mapped:
+        # Explicit venue mappings are authoritative. Never replace a verified
+        # native symbol with a generic resolver result from an unmapped venue.
+        if mapped:
+            for provider in self._providers:
+                provider_id = provider_name(provider).strip().lower()
                 if provider_id not in mapped:
                     continue
                 resolved = ResolvedMarket(
@@ -102,14 +105,43 @@ class MarketAwareFallbackProvider:
                 self._by_symbol[(resolved.symbol.upper(), market_type)] = resolved
                 return resolved
 
-            resolver = getattr(provider, "resolve_symbol", None)
-            if resolver is None:
+        # Generic discovery must not serialize slow or unsupported venues.
+        # Probe the first priority venue alone, then bounded batches of six.
+        providers = list(self._providers)
+        batches: list[list[tuple[int, MarketDataProvider]]] = []
+        if providers:
+            batches.append([(0, providers[0])])
+            for start_index in range(1, len(providers), MARKET_RESOLUTION_MAX_CONCURRENT_PROVIDERS):
+                batch = providers[start_index:start_index + MARKET_RESOLUTION_MAX_CONCURRENT_PROVIDERS]
+                batches.append(list(enumerate(batch, start=start_index)))
+
+        for batch in batches:
+            executor = ThreadPoolExecutor(max_workers=len(batch))
+            futures = {
+                executor.submit(self._resolve_provider, provider, asset, market_type): (index, provider)
+                for index, provider in batch
+            }
+            done, pending = wait(futures, timeout=MARKET_RESOLUTION_TIMEOUT_SECONDS)
+
+            successful: list[tuple[int, str, MarketDataProvider]] = []
+            for future in done:
+                index, provider = futures[future]
+                try:
+                    successful.append((index, str(future.result()), provider))
+                except Exception as exc:
+                    attempts.append(MarketResolutionAttempt(provider_name(provider), str(exc)))
+
+            for future in pending:
+                index, provider = futures[future]
                 attempts.append(MarketResolutionAttempt(
-                    provider_name(provider), "symbol resolver unavailable"
+                    provider_name(provider),
+                    f"resolver timed out after {MARKET_RESOLUTION_TIMEOUT_SECONDS:.1f}s",
                 ))
-                continue
-            try:
-                symbol = str(resolver(asset, market_type=market_type))
+
+            executor.shutdown(wait=False, cancel_futures=True)
+
+            if successful:
+                _, symbol, provider = min(successful, key=lambda item: item[0])
                 resolved = ResolvedMarket(
                     asset=key[0],
                     market_type=market_type,
@@ -119,12 +151,16 @@ class MarketAwareFallbackProvider:
                 self._resolved[key] = resolved
                 self._by_symbol[(symbol.upper(), market_type)] = resolved
                 return resolved
-            except Exception as exc:
-                attempts.append(MarketResolutionAttempt(
-                    provider_name(provider), str(exc)
-                ))
+
         details = "; ".join(f"{x.provider}: {x.error}" for x in attempts)
         raise ValueError(f"unable to resolve market {asset}: {details}")
+
+    @staticmethod
+    def _resolve_provider(provider: MarketDataProvider, asset: str, market_type: str) -> str:
+        resolver = getattr(provider, "resolve_symbol", None)
+        if resolver is None:
+            raise ValueError("symbol resolver unavailable")
+        return str(resolver(asset, market_type=market_type))
 
     def resolve_symbol(self, asset: str, *, market_type: str = "spot") -> str:
         """Resolve an asset through the fallback chain and return its venue-native symbol."""
