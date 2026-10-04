@@ -469,25 +469,7 @@
       "category": "crypto"
     },
     {
-      "asset": "LPT/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
       "asset": "AKT/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
-      "asset": "HNT/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
-      "asset": "AIOZ/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
       "category": "crypto"
@@ -512,12 +494,6 @@
     },
     {
       "asset": "IMX/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
-      "asset": "MNT/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
       "category": "crypto"
@@ -565,12 +541,6 @@
       "category": "crypto"
     },
     {
-      "asset": "STG/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
       "asset": "PIXEL/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
@@ -596,12 +566,6 @@
     },
     {
       "asset": "PYTH/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
-      "asset": "RAY/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
       "category": "crypto"
@@ -707,18 +671,6 @@
       }
     },
     {
-      "asset": "WTI/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "energy",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "CL/USDT:USDT",
-        "okx": "CL/USDT:USDT",
-        "mexc": "USOIL/USDT:USDT"
-      }
-    },
-    {
       "asset": "BRENT/USDT",
       "market_type": "futures",
       "asset_class": "tradfi",
@@ -742,16 +694,6 @@
       }
     },
     {
-      "asset": "DJIA/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "index",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "mexc": "US30/USDT:USDT"
-      }
-    },
-    {
       "asset": "NIKKEI/USDT",
       "market_type": "futures",
       "asset_class": "tradfi",
@@ -760,18 +702,6 @@
       "venue_symbols": {
         "okx": "JP225/USDT:USDT",
         "mexc": "JP225/USDT:USDT"
-      }
-    },
-    {
-      "asset": "SPY/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "etf",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "SPY/USDT:USDT",
-        "okx": "SPY/USDT:USDT",
-        "mexc": "SPY/USDT:USDT"
       }
     },
     {
@@ -796,18 +726,6 @@
         "bybit": "AAPL/USDT:USDT",
         "okx": "AAPL/USDT:USDT",
         "mexc": "AAPLSTOCK/USDT:USDT"
-      }
-    },
-    {
-      "asset": "MSFT/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "MSFT/USDT:USDT",
-        "okx": "MSFT/USDT:USDT",
-        "mexc": "MSFTSTOCK/USDT:USDT"
       }
     },
     {
@@ -954,18 +872,6 @@
       }
     },
     {
-      "asset": "PLTR/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "PLTR/USDT:USDT",
-        "okx": "PLTR/USDT:USDT",
-        "mexc": "PLTRSTOCK/USDT:USDT"
-      }
-    },
-    {
       "asset": "NFLX/USDT",
       "market_type": "futures",
       "asset_class": "tradfi",
@@ -987,17 +893,6 @@
         "bybit": "COIN/USDT:USDT",
         "okx": "COIN/USDT:USDT",
         "mexc": "COINBASE/USDT:USDT"
-      }
-    },
-    {
-      "asset": "JPM/USDT",
-      "market_type": "futures",
-      "asset_class": "tradfi",
-      "category": "stock",
-      "instrument_type": "perpetual",
-      "venue_symbols": {
-        "bybit": "JPM/USDT:USDT",
-        "mexc": "JPMSTOCK/USDT:USDT"
       }
     },
     {
