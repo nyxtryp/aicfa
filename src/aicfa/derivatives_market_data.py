@@ -273,21 +273,33 @@ class BinanceDerivativesProvider:
 
     def fetch_derivatives(self, *, symbol: str, limit: int = 200) -> pd.DataFrame:
         symbol = symbol.replace("/", "").replace("-", "").replace("_", "").upper()
-        funding = _request_json(
-            "https://fapi.binance.com/fapi/v1/fundingRate?"
-            + urlencode({"symbol": symbol, "limit": min(int(limit), 1000)}),
-            timeout_seconds=self.timeout_seconds,
-        )
-        oi = _request_json(
-            "https://fapi.binance.com/futures/data/openInterestHist?"
-            + urlencode({"symbol": symbol, "period": "5m", "limit": min(int(limit), 500)}),
-            timeout_seconds=self.timeout_seconds,
-        )
-        mark = _request_json(
-            "https://fapi.binance.com/fapi/v1/premiumIndex?"
-            + urlencode({"symbol": symbol}),
-            timeout_seconds=self.timeout_seconds,
-        )
+        # Each field is independently optional at provider level. A venue
+        # may reject OI history for a particular contract while still exposing
+        # funding and mark; one failed endpoint must not discard those real fields.
+        try:
+            funding = _request_json(
+                "https://fapi.binance.com/fapi/v1/fundingRate?"
+                + urlencode({"symbol": symbol, "limit": min(int(limit), 1000)}),
+                timeout_seconds=self.timeout_seconds,
+            )
+        except Exception:
+            funding = []
+        try:
+            oi = _request_json(
+                "https://fapi.binance.com/futures/data/openInterestHist?"
+                + urlencode({"symbol": symbol, "period": "5m", "limit": min(int(limit), 500)}),
+                timeout_seconds=self.timeout_seconds,
+            )
+        except Exception:
+            oi = []
+        try:
+            mark = _request_json(
+                "https://fapi.binance.com/fapi/v1/premiumIndex?"
+                + urlencode({"symbol": symbol}),
+                timeout_seconds=self.timeout_seconds,
+            )
+        except Exception:
+            mark = None
         # Liquidations are optional event context. They must never sit on the
         # critical funding/OI/mark path because the websocket window can consume
         # the whole provider budget and discard otherwise valid core fields.
@@ -309,7 +321,7 @@ class BinanceDerivativesProvider:
             if isinstance(item, dict)
         ]
         mark_row = None
-        if isinstance(mark, dict):
+        if isinstance(mark, dict) and mark.get("markPrice") is not None:
             mark_row = {
                 "timestamp": int(mark.get("time") or time.time() * 1000),
                 "mark_price": float(mark["markPrice"]),
@@ -347,15 +359,26 @@ class BybitDerivativesProvider:
 
     def fetch_derivatives(self, *, symbol: str, limit: int = 200) -> pd.DataFrame:
         symbol = symbol.replace("/", "").replace("-", "").replace("_", "").upper()
-        funding = self._get(
-            "funding/history",
-            {"category": "linear", "symbol": symbol, "limit": min(int(limit), 200)},
-        )
-        oi = self._get(
-            "open-interest",
-            {"category": "linear", "symbol": symbol, "intervalTime": "5min", "limit": min(int(limit), 200)},
-        )
-        ticker = self._get("tickers", {"category": "linear", "symbol": symbol})
+        # Funding, OI and mark are acquired independently. A contract-specific
+        # endpoint failure must not erase other real fields from the same venue.
+        try:
+            funding = self._get(
+                "funding/history",
+                {"category": "linear", "symbol": symbol, "limit": min(int(limit), 200)},
+            )
+        except Exception:
+            funding = {"result": {"list": []}}
+        try:
+            oi = self._get(
+                "open-interest",
+                {"category": "linear", "symbol": symbol, "intervalTime": "5min", "limit": min(int(limit), 200)},
+            )
+        except Exception:
+            oi = {"result": {"list": []}}
+        try:
+            ticker = self._get("tickers", {"category": "linear", "symbol": symbol})
+        except Exception:
+            ticker = {"result": {"list": []}}
         # Liquidations are optional event context. They must never sit on the
         # critical funding/OI/mark path because the websocket window can consume
         # the whole provider budget and discard otherwise valid core fields.
