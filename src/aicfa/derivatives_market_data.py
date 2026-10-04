@@ -565,7 +565,23 @@ class FallbackDerivativesProvider:
 
         attempts: list[str] = []
         frames: list[tuple[pd.DataFrame, str]] = []
-        providers = iter(self.providers)
+        # Explicit venue mappings are authoritative for configured markets.
+        # Do not probe unrelated exchanges that cannot carry the instrument.
+        if venue_symbols:
+            mapped_venues = {
+                str(venue).strip().lower()
+                for venue, _ in venue_symbols
+                if str(venue).strip()
+            }
+            aliases = {"gate": "gateio"}
+            mapped_venues = {aliases.get(venue, venue) for venue in mapped_venues}
+            eligible = tuple(
+                provider for provider in self.providers
+                if provider.exchange.strip().lower() in mapped_venues
+            )
+        else:
+            eligible = self.providers
+        providers = iter(eligible)
 
         try:
             first = next(providers)
