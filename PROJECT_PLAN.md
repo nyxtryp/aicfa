@@ -1069,3 +1069,9 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - MTF setup conflict was incorrectly classified as NEED_MORE_EVIDENCE when higher-timeframe structure conflicted with lower confirmation; this is now a material WAIT condition with an explicit conflict.
 - Market-universe regression was stale: the current 141-market universe is 110 crypto + 31 TradFi after removing five obsolete crypto markets and adding XMR plus SP500/NASDAQ100.
 - Updated regression coverage to match the current production universe contract.
+
+
+### 2026-10-04 — MTF conflict reason specificity
+- The MTF setup test exposed an ordering issue: when both the broader structure and the direct confirmation conflicted, the engine reported the broader conflict first.
+- The direction resolver now reports the most specific direct lower-confirmation conflict first, while preserving the broader higher-timeframe conflict as the fallback.
+- Commit: `caf243114bb7e32db896e0107a252756359456dc`.
