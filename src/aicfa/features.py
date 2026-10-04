@@ -73,15 +73,9 @@ def build_features(
 
     from .premium_discount import build_premium_discount
     premium_discount=build_premium_discount(x)
-    out = _merge_columns(out, liquidity, ["structural_dealing_range_high","structural_dealing_range_low",
+    out = _merge_columns(out, premium_discount, ["structural_dealing_range_high","structural_dealing_range_low",
                     "structural_equilibrium","structural_dealing_range_position",
-                    "structural_premium_discount","premium","discount","equilibrium"]:
-        out[column]=premium_discount[column].to_numpy()
-    out["dealing_range_high"]=out["structural_dealing_range_high"]
-    out["dealing_range_low"]=out["structural_dealing_range_low"]
-    out["dealing_range_equilibrium"]=out["structural_equilibrium"]
-    out["dealing_range_position"]=out["structural_dealing_range_position"]
-    out["premium_discount"]=out["structural_premium_discount"]
+                    "structural_premium_discount","premium","discount","equilibrium"])
 
     prev_high=h.shift(1).rolling(30,min_periods=30).max()
     prev_low=l.shift(1).rolling(30,min_periods=30).min()
@@ -92,14 +86,13 @@ def build_features(
 
     from .structure import build_structure
     structure=build_structure(x)
-    out = _merge_columns(out, volume_volatility, ["swing_high","swing_low","hh","hl","lh","ll","bos_up","bos_down",
+    out = _merge_columns(out, structure, ["swing_high","swing_low","hh","hl","lh","ll","bos_up","bos_down",
                     "choch_up","choch_down","mss_up","mss_down","swing_high_price",
-                    "swing_low_price","structure_direction"]:
-        out[column]=structure[column].to_numpy()
+                    "swing_low_price","structure_direction"])
 
     from .liquidity import build_liquidity
     liquidity=build_liquidity(x)
-    for column in [
+    out = _merge_columns(out, liquidity, [
         "equal_high","equal_low","buy_side_liquidity","sell_side_liquidity",
         "sweep_high","sweep_low","sweep_high_reclaim","sweep_low_reclaim",
         "buy_side_liquidity_price","sell_side_liquidity_price",
@@ -119,24 +112,22 @@ def build_features(
 
     from .displacement import build_displacement
     displacement=build_displacement(x)
-    for column in ["displacement_range_expansion","displacement_body_expansion",
+    out = _merge_columns(out, displacement, ["displacement_range_expansion","displacement_body_expansion",
                     "displacement_close_efficiency","displacement_relative_volume",
                     "displacement_close_location","impulsive_close_up","impulsive_close_down",
                     "directional_displacement","displacement_up","displacement_down",
-                    "displacement","displacement_bos_up","displacement_bos_down"]:
-        out[column]=displacement[column].to_numpy()
+                    "displacement","displacement_bos_up","displacement_bos_down"])
 
     from .fvg import build_fvg
     fvg=build_fvg(x)
-    for column in ["fvg_bullish","fvg_bearish","fvg","fvg_size","fvg_size_pct",
+    out = _merge_columns(out, fvg, ["fvg_bullish","fvg_bearish","fvg","fvg_size","fvg_size_pct",
                     "fvg_displacement_bullish","fvg_displacement_bearish","fvg_mitigated",
                     "fvg_filled","fvg_invalidated","fvg_active","fvg_bullish_low",
-                    "fvg_bullish_high","fvg_bearish_low","fvg_bearish_high"]:
-        out[column]=fvg[column].to_numpy()
+                    "fvg_bullish_high","fvg_bearish_low","fvg_bearish_high"])
 
     from .order_blocks import build_order_blocks
     order_blocks=build_order_blocks(x)
-    for column in ["order_block_bullish","order_block_bearish","order_block",
+    out = _merge_columns(out, order_blocks, ["order_block_bullish","order_block_bearish","order_block",
                     "order_block_mitigated","order_block_invalidated","order_block_active",
                     "breaker_bullish","breaker_bearish","breaker",
                     "order_block_displacement_bullish","order_block_displacement_bearish",
@@ -145,8 +136,7 @@ def build_features(
                     "order_block_bullish_state","order_block_bearish_state",
                     "order_block_bullish_penetration","order_block_bearish_penetration",
                     "order_block_bullish_volume_ratio","order_block_bearish_volume_ratio",
-                    "order_block_bullish_volume_confirmed","order_block_bearish_volume_confirmed"]:
-        out[column]=order_blocks[column].to_numpy()
+                    "order_block_bullish_volume_confirmed","order_block_bearish_volume_confirmed"])
 
     from .zone_reaction import build_zone_reaction
     zone_reaction = build_zone_reaction(
@@ -168,7 +158,7 @@ def build_features(
 
     from .volume_volatility import build_volume_volatility
     volume_volatility = build_volume_volatility(x)
-    for column in [
+    out = _merge_columns(out, volume_volatility, [
         "realized_volatility","true_range","atr","atr_pct","range_zscore",
         "volume_zscore","relative_volume_causal","volatility_ratio",
         "volatility_expansion","volatility_compression","volume_expansion",
@@ -191,7 +181,7 @@ def build_features(
     unified_smc=build_unified_smc(x,structure=structure,liquidity=liquidity,
         displacement=displacement,fvg=fvg,order_blocks=order_blocks,
         premium_discount=premium_discount,volume_evidence=volume_evidence)
-    for column in ["smc_structure_direction","smc_structure_event","smc_structure_shift",
+    out = _merge_columns(out, unified_smc, ["smc_structure_direction","smc_structure_event","smc_structure_shift",
                     "smc_liquidity_event","smc_sweep_low_reclaim","smc_sweep_high_reclaim",
                     "smc_buy_side_liquidity","smc_sell_side_liquidity",
                     "smc_external_buy_side_liquidity","smc_external_sell_side_liquidity",
@@ -217,14 +207,12 @@ def build_features(
                     "smc_volume_evidence_breakout_up","smc_volume_evidence_breakout_down",
                     "smc_volume_evidence_rejection_high","smc_volume_evidence_rejection_low",
                     "smc_volume_evidence_liquidity_sweep_high","smc_volume_evidence_liquidity_sweep_low",
-                    "smc_volume_evidence_displacement_up","smc_volume_evidence_displacement_down"]:
-        out[column]=unified_smc[column].to_numpy()
+                    "smc_volume_evidence_displacement_up","smc_volume_evidence_displacement_down"])
 
     if multi_timeframe_frames is not None:
         from .multi_timeframe import build_multi_timeframe_structure
         mtf=build_multi_timeframe_structure(x,multi_timeframe_frames)
-        for column in mtf.columns:
-            if column.startswith("mtf_"): out[column]=mtf[column].to_numpy()
+        out = _merge_columns(out, mtf, prefix="mtf_")
 
     from .scenarios import build_scenarios
     scenarios=build_scenarios(out)
