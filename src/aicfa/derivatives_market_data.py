@@ -21,6 +21,7 @@ import websocket
 DERIVATIVE_COVERAGE_FIELDS = ("funding_rate", "open_interest", "mark_price")
 DERIVATIVE_OPTIONAL_FIELDS = ("liquidation_volume", "long_liquidation_volume", "short_liquidation_volume")
 DERIVATIVE_PROVIDER_TIMEOUT_SECONDS = 3.0
+DERIVATIVE_MAX_CONCURRENT_PROVIDERS = 6
 
 DERIVATIVE_COLUMNS = (
     "timestamp",
@@ -496,6 +497,23 @@ class FallbackDerivativesProvider:
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
 
+    def _provider_kwargs(self, provider, symbol: str, limit: int, venue_symbols):
+        native_symbol = self._native_symbol(provider, symbol, venue_symbols)
+        kwargs = {"symbol": symbol, "limit": limit}
+        if native_symbol is not None:
+            kwargs["native_symbol"] = native_symbol
+        return kwargs
+
+    def _attempt_provider(self, provider, *, symbol: str, limit: int, venue_symbols):
+        kwargs = self._provider_kwargs(provider, symbol, limit, venue_symbols)
+        try:
+            return self._fetch_provider_with_timeout(provider, kwargs)
+        except TypeError:
+            return self._fetch_provider_with_timeout(
+                provider,
+                {"symbol": symbol, "limit": limit},
+            )
+
     def fetch_derivatives(
         self,
         *,
@@ -503,37 +521,61 @@ class FallbackDerivativesProvider:
         limit: int = 200,
         venue_symbols: tuple[tuple[str, str], ...] = (),
     ) -> tuple[pd.DataFrame, str]:
+        """Fetch derivative evidence with bounded parallel venue fallback.
+
+        Providers are attempted in small concurrent batches so one slow or
+        unsupported venue cannot consume the whole fallback budget. Results
+        are still combined field-by-field and the batch loop stops as soon as
+        funding, open interest and mark price have real observations.
+        """
         attempts: list[str] = []
         frames: list[tuple[pd.DataFrame, str]] = []
-        for provider in self.providers:
-            native_symbol = self._native_symbol(provider, symbol, venue_symbols)
-            try:
-                kwargs = {"symbol": symbol, "limit": limit}
-                if native_symbol is not None:
-                    kwargs["native_symbol"] = native_symbol
+        providers = iter(self.providers)
+
+        while True:
+            batch = []
+            for _ in range(DERIVATIVE_MAX_CONCURRENT_PROVIDERS):
                 try:
-                    frame = self._fetch_provider_with_timeout(provider, kwargs)
-                except TypeError:
-                    frame = self._fetch_provider_with_timeout(
+                    batch.append(next(providers))
+                except StopIteration:
+                    break
+            if not batch:
+                break
+
+            with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+                futures = {
+                    executor.submit(
+                        self._attempt_provider,
                         provider,
-                        {"symbol": symbol, "limit": limit},
-                    )
-                if not frame.empty:
-                    frames.append((frame, provider.exchange))
-                    combined, sources = self._combine(frames)
-                    covered_core = {
-                        column for column in DERIVATIVE_COVERAGE_FIELDS
-                        if combined[column].notna().any()
-                    }
-                    if covered_core == set(DERIVATIVE_COVERAGE_FIELDS):
-                        return combined, sources
-            except Exception as exc:
-                attempts.append(f"{provider.exchange}: {exc}")
+                        symbol=symbol,
+                        limit=limit,
+                        venue_symbols=venue_symbols,
+                    ): provider
+                    for provider in batch
+                }
+                for future, provider in futures.items():
+                    try:
+                        frame = future.result()
+                        if not frame.empty:
+                            frames.append((frame, provider.exchange))
+                    except Exception as exc:
+                        attempts.append(f"{provider.exchange}: {exc}")
+
+            combined, sources = self._combine(frames)
+            covered = {
+                column for column in DERIVATIVE_COVERAGE_FIELDS
+                if combined[column].notna().any()
+            }
+            if covered == set(DERIVATIVE_COVERAGE_FIELDS):
+                return combined, sources
+
         combined, sources = self._combine(frames)
-        required = DERIVATIVE_COVERAGE_FIELDS
-        if all(combined[column].notna().any() for column in required):
+        if all(combined[column].notna().any() for column in DERIVATIVE_COVERAGE_FIELDS):
             return combined, sources
-        missing = [name for name in required if not combined.empty and not combined[name].notna().any()]
+        missing = [
+            name for name in DERIVATIVE_COVERAGE_FIELDS
+            if combined.empty or not combined[name].notna().any()
+        ]
         detail = "; ".join(attempts)
         if missing:
             detail = f"{detail}; missing: {','.join(missing)}".strip("; ")
