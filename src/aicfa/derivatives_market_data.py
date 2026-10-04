@@ -17,7 +17,7 @@ import pandas as pd
 import websocket
 
 
-DERIVATIVE_CORE_FIELDS = ("funding_rate", "open_interest", "mark_price")
+DERIVATIVE_COVERAGE_FIELDS = ("funding_rate", "open_interest", "mark_price")
 DERIVATIVE_OPTIONAL_FIELDS = ("liquidation_volume", "long_liquidation_volume", "short_liquidation_volume")
 DERIVATIVE_PROVIDER_TIMEOUT_SECONDS = 3.0
 
@@ -503,7 +503,7 @@ class FallbackDerivativesProvider:
                     frames.append((frame, provider.exchange))
                     combined, sources = self._combine(frames)
                     covered_core = {
-                        column for column in DERIVATIVE_CORE_FIELDS
+                        column for column in DERIVATIVE_COVERAGE_FIELDS
                         if combined[column].notna().any()
                     }
                     if covered_core == set(DERIVATIVE_CORE_FIELDS):
