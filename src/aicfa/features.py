@@ -12,6 +12,19 @@ import pandas as pd
 EPS = 1e-12
 
 
+def _merge_columns(out: pd.DataFrame, frame: pd.DataFrame, columns=None, *, prefix: str | None = None) -> pd.DataFrame:
+    """Append a feature block in one DataFrame operation instead of per-column assignment."""
+    if prefix is not None:
+        columns = [column for column in frame.columns if column.startswith(prefix)]
+    elif columns is None:
+        columns = list(frame.columns)
+    if not columns:
+        return out
+    block = frame.loc[:, columns].copy()
+    block.index = out.index
+    return pd.concat([out, block], axis=1)
+
+
 def build_features(
     df: pd.DataFrame,
     *,
@@ -60,7 +73,7 @@ def build_features(
 
     from .premium_discount import build_premium_discount
     premium_discount=build_premium_discount(x)
-    for column in ["structural_dealing_range_high","structural_dealing_range_low",
+    out = _merge_columns(out, liquidity, ["structural_dealing_range_high","structural_dealing_range_low",
                     "structural_equilibrium","structural_dealing_range_position",
                     "structural_premium_discount","premium","discount","equilibrium"]:
         out[column]=premium_discount[column].to_numpy()
@@ -79,7 +92,7 @@ def build_features(
 
     from .structure import build_structure
     structure=build_structure(x)
-    for column in ["swing_high","swing_low","hh","hl","lh","ll","bos_up","bos_down",
+    out = _merge_columns(out, volume_volatility, ["swing_high","swing_low","hh","hl","lh","ll","bos_up","bos_down",
                     "choch_up","choch_down","mss_up","mss_down","swing_high_price",
                     "swing_low_price","structure_direction"]:
         out[column]=structure[column].to_numpy()
@@ -102,8 +115,7 @@ def build_features(
         "liquidity_pool_created_high","liquidity_pool_created_low",
         "liquidity_pool_swept_high","liquidity_pool_swept_low",
         "liquidity_pool_invalidated_high","liquidity_pool_invalidated_low",
-    ]:
-        out[column]=liquidity[column].to_numpy()
+    ])
 
     from .displacement import build_displacement
     displacement=build_displacement(x)
@@ -144,21 +156,15 @@ def build_features(
         order_blocks=order_blocks,
         liquidity=liquidity,
     )
-    for column in zone_reaction.columns:
-        if column.startswith("zone_"):
-            out[column] = zone_reaction[column].to_numpy()
+    out = _merge_columns(out, zone_reaction, prefix="zone_")
 
     from .price_action import build_price_action
     price_action = build_price_action(x)
-    for column in price_action.columns:
-        if column.startswith("pa_"):
-            out[column] = price_action[column].to_numpy()
+    out = _merge_columns(out, price_action, prefix="pa_")
 
     from .wyckoff import build_wyckoff
     wyckoff = build_wyckoff(x)
-    for column in wyckoff.columns:
-        if column.startswith("wyckoff_"):
-            out[column] = wyckoff[column].to_numpy()
+    out = _merge_columns(out, wyckoff, prefix="wyckoff_")
 
     from .volume_volatility import build_volume_volatility
     volume_volatility = build_volume_volatility(x)
@@ -167,8 +173,7 @@ def build_features(
         "volume_zscore","relative_volume_causal","volatility_ratio",
         "volatility_expansion","volatility_compression","volume_expansion",
         "volume_dry_up","volatility_regime","volume_regime",
-    ]:
-        out[column] = volume_volatility[column].to_numpy()
+    ])
 
     if derivatives_frame is not None:
         from .derivatives import build_derivatives
@@ -180,9 +185,7 @@ def build_features(
     volume_evidence = build_volume_evidence(
         x, structure=structure, liquidity=liquidity, displacement=displacement
     )
-    for column in volume_evidence.columns:
-        if column.startswith("volume_evidence_"):
-            out[column] = volume_evidence[column].to_numpy()
+    out = _merge_columns(out, volume_evidence, prefix="volume_evidence_")
 
     from .unified_smc import build_unified_smc
     unified_smc=build_unified_smc(x,structure=structure,liquidity=liquidity,
@@ -225,26 +228,19 @@ def build_features(
 
     from .scenarios import build_scenarios
     scenarios=build_scenarios(out)
-    for column in scenarios.columns:
-        if column.startswith("scenario_"): out[column]=scenarios[column].to_numpy()
+    out = _merge_columns(out, scenarios, prefix="scenario_")
 
     from .setup_detection import build_setup_candidates
     setup_candidates = build_setup_candidates(out)
-    for column in setup_candidates.columns:
-        if column.startswith("setup_"):
-            out[column] = setup_candidates[column].to_numpy()
+    out = _merge_columns(out, setup_candidates, prefix="setup_")
 
     from .market_state import build_market_state
     market_state = build_market_state(out)
-    for column in market_state.columns:
-        if column.startswith("market_state_"):
-            out[column] = market_state[column].to_numpy()
+    out = _merge_columns(out, market_state, prefix="market_state_")
 
     from .setup_events import build_setup_events
     setup_events = build_setup_events(out)
-    for column in setup_events.columns:
-        if column.startswith("setup_event_"):
-            out[column] = setup_events[column].to_numpy()
+    out = _merge_columns(out, setup_events, prefix="setup_event_")
 
     for n in (15,60):
         out[f"return_{n}"]=c.pct_change(n)
