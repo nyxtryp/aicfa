@@ -239,3 +239,24 @@ def test_one_market_acquires_full_primary_snapshot_once(monkeypatch):
     assert len(result.results) == 3
     assert all(keys == ("1w", "1d", "4h", "1h", "15m", "5m") for _, keys in calls)
     assert len(provider.providers[0].ohlcv_calls) == 6
+
+
+def test_market_diagnostics_expose_snapshot_and_horizon_timings(monkeypatch):
+    provider = _provider()
+
+    def fake_find_setup(request, **kwargs):
+        return _fake_result(request.asset, request.mode, decision="WAIT")
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    result = analyze_market_horizons("BTC/USDT", provider=provider, now_ms=1000)
+
+    assert result.diagnostics is not None
+    assert result.diagnostics.total_duration_ms >= 0
+    assert result.diagnostics.snapshot_duration_ms >= 0
+    assert [item.timeframe for item in result.diagnostics.snapshot_metrics] == ["1w", "1d", "4h", "1h", "15m", "5m"]
+    assert [item.rows for item in result.diagnostics.snapshot_metrics] == [1] * 6
+    assert len(result.diagnostics.horizon_timings) == 3
+    assert all(item.duration_ms >= 0 for item in result.diagnostics.horizon_timings)
+    assert all(item.setup_count == 0 for item in result.diagnostics.horizon_timings)
+    assert result.diagnostics.refetched_between_horizons is False
