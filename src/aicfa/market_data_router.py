@@ -59,6 +59,8 @@ class FallbackMarketDataProvider:
             try:
                 return str(resolver(asset, market_type=market_type))
             except Exception as exc:
+                if exc.__class__.__name__ == "MarketExecutionTimeout":
+                    raise
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
         raise ValueError(format_attempts("unable to resolve asset", attempts))
 
@@ -82,6 +84,8 @@ class FallbackMarketDataProvider:
                 return MarketFetchResult(provider=provider_name(provider),
                     symbol=symbol, frame=frame, attempts=tuple(attempts))
             except Exception as exc:
+                if exc.__class__.__name__ == "MarketExecutionTimeout":
+                    raise
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
         raise RuntimeError(format_attempts("all market data providers failed", attempts))
 
@@ -109,6 +113,8 @@ class FallbackMarketDataProvider:
                     attempts=tuple(attempts),
                 )
             except Exception as exc:
+                if exc.__class__.__name__ == "MarketExecutionTimeout":
+                    raise
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
         raise RuntimeError(format_attempts("all market data providers failed", attempts))
 
@@ -154,6 +160,8 @@ class FallbackMarketDataProvider:
                     attempts=tuple(attempts),
                 )
             except Exception as exc:
+                if exc.__class__.__name__ == "MarketExecutionTimeout":
+                    raise
                 attempts.append(ProviderAttempt(provider_name(provider), str(exc)))
         raise RuntimeError(format_attempts("all order-book history providers failed", attempts))
 
