@@ -1272,3 +1272,14 @@ Next verification remains strictly within this plan:
 7. only after a successful finite cycle proceed to lifecycle repeated scans and persistent journal/website feed.
 
 Do not lower analytical depth, remove SMC components, add fixed signal filters, or introduce a parallel scanner merely to improve timing.
+
+
+### 2026-10-05 — STEP 10 — PERSISTENT AUTONOMOUS SCAN JOURNAL
+
+- Added append-only JSONL persistent journal in `src/aicfa/persistent_journal.py`.
+- Journal path can be configured with `AICFA_JOURNAL_PATH`; otherwise production uses `AICFA_DATA_DIR/journal/events.jsonl` when `AICFA_DATA_DIR` is set.
+- `AutonomousScanEngine` now persists completed scan snapshots and finite rotation-cycle summaries without changing analytical/setup logic.
+- Journal records preserve structured market diagnostics, explainable setup objects, lifecycle results, and rotation metrics for the future website feed.
+- Added JSONL read API for recent feed events.
+- Focused journal contract: append/read and bounded recent-event retrieval.
+- Next exact action: expose the journal through a lightweight website/API feed; the feed must be read-only and must not create or alter setups.
