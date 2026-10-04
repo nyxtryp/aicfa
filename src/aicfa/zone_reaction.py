@@ -234,19 +234,18 @@ def build_zone_reaction(
     # Buckets are broad price ranges, so a single bucket may contain many
     # historical zones. Keep a lazily-built index sorted by zone low; candle
     # lookup can then binary-search the relevant price slice.
-    zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
     zone_bucket_level_sorted: dict[int, list[tuple[float, int]]] = {}
-    # Keep occupied bucket ids sorted. _active_level() can then inspect the
-    # nearest occupied price buckets directly instead of walking thousands of
-    # empty radius buckets on long histories.
+    occupied_bucket_key_set: set[int] = set()
     occupied_bucket_keys: list[int] = []
+    occupied_bucket_keys_dirty = False
     # Wide zones use a coarser logarithmic index; a global scan per candle
     # becomes O(n) again when the wide-zone set grows.
     wide_bucket_step = bucket_step * 65
     wide_zone_buckets: dict[int, list[int]] = {}
-    wide_zone_bucket_sorted: dict[int, list[tuple[float, int]]] = {}
     wide_zone_bucket_level_sorted: dict[int, list[tuple[float, int]]] = {}
+    wide_occupied_bucket_key_set: set[int] = set()
     wide_occupied_bucket_keys: list[int] = []
+    wide_occupied_bucket_keys_dirty = False
     wide_zones: list[int] = []
     # Reuse a marker array for per-candle candidate deduplication rather than
     # allocating and hashing a new Python set on every row.
@@ -266,6 +265,7 @@ def build_zone_reaction(
         return int(np.floor(np.log(max(value, 1e-300)) / bucket_step))
 
     def _register_zone(zone_id: int):
+        nonlocal occupied_bucket_keys_dirty, wide_occupied_bucket_keys_dirty
         lo = float(zone_low[zone_id])
         hi = float(zone_high[zone_id])
         side = int(zone_side[zone_id])
@@ -283,31 +283,21 @@ def build_zone_reaction(
                 bucket = wide_zone_buckets.get(bucket_id)
                 if bucket is None:
                     wide_zone_buckets[bucket_id] = [zone_id]
-                    bisect.insort(wide_occupied_bucket_keys, bucket_id)
+                    wide_occupied_bucket_key_set.add(bucket_id)
+                    wide_occupied_bucket_keys_dirty = True
                 else:
                     bucket.append(zone_id)
-                    ordered = wide_zone_bucket_sorted.get(bucket_id)
-                    if ordered is not None:
-                        bisect.insort(ordered, (lo, zone_id))
-                    level_ordered = wide_zone_bucket_level_sorted.get(bucket_id)
-                    if level_ordered is not None:
-                        midpoint = (lo + hi) * 0.5
-                        bisect.insort(level_ordered, (midpoint, zone_id))
+                    wide_zone_bucket_level_sorted.pop(bucket_id, None)
         else:
             for bucket_id in range(first, last + 1):
                 bucket = zone_buckets.get(bucket_id)
                 if bucket is None:
                     zone_buckets[bucket_id] = [zone_id]
-                    bisect.insort(occupied_bucket_keys, bucket_id)
+                    occupied_bucket_key_set.add(bucket_id)
+                    occupied_bucket_keys_dirty = True
                 else:
                     bucket.append(zone_id)
-                    ordered = zone_bucket_sorted.get(bucket_id)
-                    if ordered is not None:
-                        bisect.insort(ordered, (lo, zone_id))
-                    level_ordered = zone_bucket_level_sorted.get(bucket_id)
-                    if level_ordered is not None:
-                        midpoint = (lo + hi) * 0.5
-                        bisect.insort(level_ordered, (midpoint, zone_id))
+                    zone_bucket_level_sorted.pop(bucket_id, None)
 
 
     def _append_zone(*, source, side, low, high, created):
@@ -361,6 +351,13 @@ def build_zone_reaction(
     }
 
     def _active_level(close: float, side: int):
+        nonlocal occupied_bucket_keys_dirty, wide_occupied_bucket_keys_dirty
+        if occupied_bucket_keys_dirty:
+            occupied_bucket_keys[:] = sorted(occupied_bucket_key_set)
+            occupied_bucket_keys_dirty = False
+        if wide_occupied_bucket_keys_dirty:
+            wide_occupied_bucket_keys[:] = sorted(wide_occupied_bucket_key_set)
+            wide_occupied_bucket_keys_dirty = False
         # Query the same nearest occupied buckets as before, but use a lazy
         # index sorted by zone midpoint.  The old path materialized every zone
         # in each selected bucket and then ran NumPy over the whole historical
