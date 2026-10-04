@@ -368,3 +368,46 @@ def test_fallback_hard_bounds_a_slow_provider_before_trying_next_venue():
     assert out["open_interest"].notna().any()
     assert out["mark_price"].notna().any()
     assert sources == "funding_rate=fast,open_interest=fast,mark_price=fast"
+
+
+def test_fallback_runs_provider_attempts_in_bounded_parallel_batches():
+    import time
+    from aicfa.derivatives_market_data import FallbackDerivativesProvider
+
+    class Provider:
+        def __init__(self, exchange, frame=None, delay=0):
+            self.exchange = exchange
+            self.frame = frame
+            self.delay = delay
+            self.calls = 0
+
+        def fetch_derivatives(self, **kwargs):
+            self.calls += 1
+            if self.delay:
+                time.sleep(self.delay)
+            return self.frame
+
+    def frame(**values):
+        row = {"timestamp": 1000}
+        row.update(values)
+        return pd.DataFrame([row])
+
+    slow = [Provider(f"slow_{i}", delay=0.5) for i in range(5)]
+    fast = Provider("fast", frame=frame(
+        funding_rate=0.001,
+        open_interest=123.0,
+        mark_price=50000.0,
+    ))
+
+    started = time.monotonic()
+    out, sources = FallbackDerivativesProvider(
+        providers=tuple(slow + [fast]),
+        provider_timeout_seconds=0.05,
+    ).fetch_derivatives(symbol="XCU/USDT", limit=5)
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 0.5
+    assert out["funding_rate"].notna().any()
+    assert out["open_interest"].notna().any()
+    assert out["mark_price"].notna().any()
+    assert sources == "funding_rate=fast,open_interest=fast,mark_price=fast"
