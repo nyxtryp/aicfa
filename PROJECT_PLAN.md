@@ -713,3 +713,16 @@ The persistence/feed architecture itself worked correctly; the invalid target is
 - Execution remains separate from analysis.
 - Production data stays in persistent storage.
 - Infrastructure changes must be recorded in this plan before moving to the next stage.
+
+
+### 2026-10-05 — STEP 11.2 — PUBLIC HOSTNAME SELECTED: ai.aicfa.ru
+
+- Current production/public hostname for the AICFA feed is **ai.aicfa.ru**.
+- The root domain **aicfa.ru** remains the AICFA brand domain and may be used differently later.
+- DNS is managed through REG.RU.
+- Current REG.RU zone already points:
+  - `A @ → 95.163.244.138`
+  - `A www → 95.163.244.138`
+- Next infrastructure action: add `A ai → 95.163.244.138` in REG.RU.
+- Then configure Caddy to reverse-proxy only `ai.aicfa.ru` to the local read-only journal feed at `127.0.0.1:8090`.
+- Future hostname/domain changes remain possible without changing the AICFA analytical core.
