@@ -155,3 +155,29 @@ def test_ccxt_okx_open_interest_history_uses_base_currency():
     provider = CcxtDerivativesProvider("okx", exchange_factory=lambda exchange_id: fake)
     provider.fetch_derivatives(symbol="XAU/USDT:USDT", limit=10)
     assert fake.seen_oi_symbol == "XAU"
+
+
+def test_ccxt_derivatives_falls_back_to_current_oi_and_mark_info():
+    class FakeExchange:
+        def __init__(self, *args, **kwargs):
+            self.markets = {"PEPE/USDT:USDT": {}}
+            self.timeout = None
+        def load_markets(self):
+            return self.markets
+        def fetch_funding_rate_history(self, symbol, since, limit):
+            raise NotImplementedError("history unsupported")
+        def fetch_funding_rate(self, symbol):
+            return {"timestamp": 2000, "fundingRate": 0.001, "markPrice": None}
+        def fetch_open_interest_history(self, symbol, timeframe, since, limit):
+            raise NotImplementedError("history unsupported")
+        def fetch_open_interest(self, symbol):
+            return {"timestamp": 2000, "openInterestValue": "123"}
+        def fetch_ticker(self, symbol):
+            return {"timestamp": 2000, "last": "2", "info": {"markPx": "2.5"}}
+
+    from aicfa.derivatives_market_data import CcxtDerivativesProvider
+    provider = CcxtDerivativesProvider("okx", exchange_factory=lambda exchange_id: FakeExchange())
+    frame = provider.fetch_derivatives(symbol="PEPE/USDT:USDT", limit=10)
+    assert frame["funding_rate"].notna().any()
+    assert frame["open_interest"].notna().any()
+    assert frame.iloc[-1]["mark_price"] == 2.5
