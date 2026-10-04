@@ -19,6 +19,7 @@ def test_run_cycle_has_deterministic_queue_and_metrics(monkeypatch):
                 snapshot_duration_ms=0.0,
                 snapshot_metrics=(),
                 horizon_timings=(),
+                refetched_between_horizons=False,
             ),
         )
         return AutonomousScanState(
