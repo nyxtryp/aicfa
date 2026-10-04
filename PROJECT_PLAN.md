@@ -1212,3 +1212,25 @@ A measured initial whole-market hard budget of **20 seconds** is now enforced by
 Important diagnostic finding retained for follow-up: the production horizon path currently wraps the MarketAwareFallbackProvider inside the generic fallback adapter, so optional trades/order-book feeds report unsupported-provider coverage; the standalone full-data checker still proves the underlying derivatives/data layer works. This is a routing/integration issue, not a reason to block OHLCV/SMC analysis.
 
 Next: verify the timeout regression on VDS, then build the deterministic finite 141-market rotation/cycle metrics and measure a real full rotation before tightening the budget or optimizing the feature bottleneck.
+
+
+## 2026-10-04 — STEP 6: PRODUCTION SEVEN-BLOCK ROTATION DIAGNOSTICS
+
+Implemented:
+- finite production rotation runner: \`scripts/run_market_rotation.py\`;
+- per-market progress output for the configured universe;
+- canonical OHLCV MTF diagnostics for \`1w/1d/4h/1h/15m/5m\`;
+- explicit diagnostics for the six optional enrichment kinds:
+  \`Trades\`, \`Order Book\`, \`Funding\`, \`Open Interest\`, \`Liquidations\`, \`Mark Price\`;
+- missing optional enrichment never blocks structural analysis;
+- request-scoped caching for trades/order book/history across the three primary horizons;
+- request-scoped derivatives provider/cache reuse across the three primary horizons;
+- configured venue symbols forwarded into derivatives fallback;
+- actual derivatives fetch duration recorded;
+- finite rotation exposes live per-market progress and final slowest-market metrics.
+
+Next verification:
+- deploy the latest commits to FrostDeploy;
+- run one full 141-market finite production rotation;
+- inspect real seven-block coverage, timeouts/errors, total/average/max market duration, and setup generation;
+- only then set the next production optimization target from measured data.
