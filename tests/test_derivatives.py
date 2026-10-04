@@ -208,3 +208,25 @@ def test_derivatives_drop_incomplete_core_rows_but_keep_valid_rows():
     assert not out.empty
     assert out["funding_rate"].notna().all()
     assert out["open_interest"].notna().all()
+
+def test_derivatives_preserve_partial_core_fields():
+    base = base_frame()
+    d = derivatives_frame()
+    d.loc[0, "open_interest"] = np.nan
+    d.loc[2, "funding_rate"] = np.nan
+    out = build_derivatives(base, d, baseline_window=2)
+    assert not out.empty
+    assert out["funding_rate"].notna().any()
+    assert out["open_interest"].notna().any()
+    assert pd.isna(out.loc[0, "open_interest"])
+    assert pd.isna(out.loc[2, "funding_rate"])
+
+
+def test_derivatives_allow_mark_only_context():
+    base = base_frame()
+    ts = pd.date_range("2026-01-01", periods=3, freq="2min", tz="UTC")
+    d = pd.DataFrame({"timestamp": ts, "mark_price": [100.0, 101.0, 102.0]})
+    out = build_derivatives(base, d, baseline_window=2)
+    assert out["mark_price"].notna().any()
+    assert out["funding_rate"].isna().all()
+    assert out["open_interest"].isna().all()
