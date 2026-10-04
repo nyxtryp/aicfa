@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 import pandas as pd
@@ -486,6 +487,12 @@ def find_setup(
             timeframe=profile.context_timeframe,
         )
 
+    # The seven data blocks are independent enrichments. Fetch the slow
+    # optional feeds concurrently so a slow order-book history request does
+    # not serialize derivatives and trades behind it.
+    #
+    # Keep the structural OHLCV/SMC path synchronous; this only changes
+    # acquisition of optional futures enrichment.
     trades = pd.DataFrame()
     order_book = pd.DataFrame()
     order_flow_analysis = pd.DataFrame()
