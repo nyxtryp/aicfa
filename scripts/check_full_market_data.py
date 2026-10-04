@@ -147,11 +147,30 @@ def main() -> None:
     args = parser.parse_args()
     markets = json.loads(Path("config/market_universe.json").read_text())["markets"]
     if args.assets:
-        wanted = {asset.upper() for asset in args.assets}
-        markets = [item for item in markets if str(item["asset"]).upper() in wanted]
-        missing = wanted - {str(item["asset"]).upper() for item in markets}
+        # CLI accepts either configured asset names (e.g. PEPE/USDT) or
+        # base symbols (e.g. PEPE) for convenient targeted diagnostics.
+        requested = {asset.upper() for asset in args.assets}
+        configured = {
+            str(item["asset"]).upper(): item
+            for item in markets
+        }
+        aliases = {
+            key: key.split("/", 1)[0]
+            for key in configured
+        }
+        wanted_assets = {
+            configured_name
+            for configured_name, base_symbol in aliases.items()
+            if configured_name in requested or base_symbol in requested
+        }
+        matched_bases = {
+            aliases[configured_name]
+            for configured_name in wanted_assets
+        }
+        missing = requested - matched_bases
         if missing:
             raise SystemExit("unknown configured assets: " + ", ".join(sorted(missing)))
+        markets = [item for item in markets if str(item["asset"]).upper() in wanted_assets]
     provider = build_public_market_data_provider(timeout_seconds=10.0)
     derivatives_provider = FallbackDerivativesProvider()
 
