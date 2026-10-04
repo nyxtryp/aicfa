@@ -149,12 +149,21 @@ class CcxtMarketDataProvider:
             raise ValueError("limit must be positive")
         rows = self._exchange.fetch_trades(symbol, limit=int(limit))
         normalized = []
+        side_map = {"buy": 1, "sell": -1}
         for row in rows:
+            raw_side = row.get("side")
+            if isinstance(raw_side, str):
+                side = side_map.get(raw_side.strip().lower())
+            else:
+                try:
+                    side = float(raw_side) if raw_side is not None else None
+                except (TypeError, ValueError):
+                    side = None
             normalized.append([
                 row.get("timestamp"),
                 row.get("price"),
                 row.get("amount"),
-                row.get("side"),
+                side,
             ])
         frame = pd.DataFrame(normalized, columns=_TRADE_COLUMNS)
         if frame.empty:
