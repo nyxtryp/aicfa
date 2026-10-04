@@ -27,6 +27,14 @@ class SnapshotKey:
     data_profile: str
 
 @dataclass(frozen=True)
+class SnapshotMetric:
+    timeframe: str
+    status: str
+    rows: int
+    duration_ms: float
+
+
+@dataclass(frozen=True)
 class _Snapshot:
     created_at: float
     results: dict[str, MarketFetchResult]
@@ -222,6 +230,7 @@ class SharedSnapshotMarketDataProvider:
         self._clock = clock
         self._lock = threading.Lock()
         self._snapshots: dict[SnapshotKey, _Snapshot] = {}
+        self._last_snapshot_metrics: tuple[SnapshotMetric, ...] = ()
 
     def resolve_symbol(self, asset: str, *, market_type: str = "spot") -> str:
         return self._provider.resolve_symbol(asset, market_type=market_type)
@@ -252,14 +261,35 @@ class SharedSnapshotMarketDataProvider:
         with self._lock:
             cached = self._snapshots.get(key)
             if cached is not None and now - cached.created_at < self._ttl_seconds:
+                self._last_snapshot_metrics = tuple(
+                    SnapshotMetric(tf, "cached", len(item.frame), 0.0)
+                    for tf, item in cached.results.items()
+                )
                 return clone_snapshot(cached)
-            fetched = self._provider.fetch_ohlcv_snapshot(
-                symbol=symbol, market_type=market_type, timeframes=normalized,
-                since_ms=since_ms, limit=limit, limits=limits)
+            fetched = {}
+            metrics: list[SnapshotMetric] = []
+            for tf in normalized:
+                started = self._clock()
+                try:
+                    result = self._provider.fetch_ohlcv_snapshot(
+                        symbol=symbol, market_type=market_type, timeframes=(tf,),
+                        since_ms=since_ms, limit=limit,
+                        limits=({tf: limits[tf]} if limits is not None else None),
+                    )[tf]
+                    fetched[tf] = result
+                    metrics.append(SnapshotMetric(tf, "complete", len(result.frame), (self._clock() - started) * 1000.0))
+                except Exception:
+                    metrics.append(SnapshotMetric(tf, "unavailable", 0, (self._clock() - started) * 1000.0))
+                    raise
+            self._last_snapshot_metrics = tuple(metrics)
             snapshot = _Snapshot(now, {tf: clone_result(result) for tf, result in fetched.items()})
             self._discard_expired(now)
             self._snapshots[key] = snapshot
             return clone_snapshot(snapshot)
+
+    @property
+    def last_snapshot_metrics(self) -> tuple[SnapshotMetric, ...]:
+        return self._last_snapshot_metrics
 
     def fetch_trades_with_source(self, *, symbol: str, market_type: str, limit: int):
         return self._provider.fetch_trades_with_source(
