@@ -288,9 +288,10 @@ class BinanceDerivativesProvider:
             + urlencode({"symbol": symbol}),
             timeout_seconds=self.timeout_seconds,
         )
-        liquidation_rows = _collect_binance_liquidations(
-            symbol, timeout_seconds=self.timeout_seconds
-        )
+        # Liquidations are optional event context. They must never sit on the
+        # critical funding/OI/mark path because the websocket window can consume
+        # the whole provider budget and discard otherwise valid core fields.
+        liquidation_rows: list[dict] = []
 
         funding_rows = [
             {"timestamp": int(item["fundingTime"]), "funding_rate": float(item["fundingRate"])}
@@ -355,9 +356,10 @@ class BybitDerivativesProvider:
             {"category": "linear", "symbol": symbol, "intervalTime": "5min", "limit": min(int(limit), 200)},
         )
         ticker = self._get("tickers", {"category": "linear", "symbol": symbol})
-        liquidation_rows = _collect_bybit_liquidations(
-            symbol, timeout_seconds=self.timeout_seconds
-        )
+        # Liquidations are optional event context. They must never sit on the
+        # critical funding/OI/mark path because the websocket window can consume
+        # the whole provider budget and discard otherwise valid core fields.
+        liquidation_rows: list[dict] = []
 
         funding_rows = [
             {
