@@ -337,12 +337,6 @@
       "category": "crypto"
     },
     {
-      "asset": "BABYDOGE/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
       "asset": "PONKE/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
