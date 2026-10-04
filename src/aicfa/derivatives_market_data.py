@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -480,6 +481,21 @@ class FallbackDerivativesProvider:
         sources = ",".join(field_sources)
         return _frame(result.to_dict("records")), sources
 
+    def _fetch_provider_with_timeout(self, provider, kwargs):
+        """Hard-bound one provider attempt so one venue cannot stall fallback."""
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(provider.fetch_derivatives, **kwargs)
+        try:
+            return future.result(timeout=self.provider_timeout_seconds)
+        except FuturesTimeoutError as exc:
+            future.cancel()
+            raise TimeoutError(
+                f"{provider.exchange} derivative provider timed out after "
+                f"{self.provider_timeout_seconds:.1f}s"
+            ) from exc
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
     def fetch_derivatives(
         self,
         *,
@@ -496,9 +512,12 @@ class FallbackDerivativesProvider:
                 if native_symbol is not None:
                     kwargs["native_symbol"] = native_symbol
                 try:
-                    frame = provider.fetch_derivatives(**kwargs)
+                    frame = self._fetch_provider_with_timeout(provider, kwargs)
                 except TypeError:
-                    frame = provider.fetch_derivatives(symbol=symbol, limit=limit)
+                    frame = self._fetch_provider_with_timeout(
+                        provider,
+                        {"symbol": symbol, "limit": limit},
+                    )
                 if not frame.empty:
                     frames.append((frame, provider.exchange))
                     combined, sources = self._combine(frames)
@@ -554,7 +573,10 @@ class CcxtDerivativesProvider:
         self.timeout_seconds = float(timeout_seconds)
         options = {"enableRateLimit": True}
         if exchange_id == "gateio":
-            options["options"] = {"defaultType": "swap"}
+            options["options"] = {
+                "defaultType": "swap",
+                "fetchCurrencies": False,
+            }
         self._exchange = (
             factory(options)
             if callable(factory)
