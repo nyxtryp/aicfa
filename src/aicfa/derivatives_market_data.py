@@ -385,7 +385,14 @@ class FallbackDerivativesProvider:
 
     def __init__(self, providers=None) -> None:
         self.providers = tuple(
-            providers or (BinanceDerivativesProvider(), BybitDerivativesProvider())
+            providers
+            or (
+                BinanceDerivativesProvider(),
+                BybitDerivativesProvider(),
+                CcxtDerivativesProvider("okx"),
+                CcxtDerivativesProvider("mexc"),
+                CcxtDerivativesProvider("bitget"),
+            )
         )
 
     def fetch_derivatives(
