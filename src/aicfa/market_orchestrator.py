@@ -9,7 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Sequence
 
-from .data_requirements import TradingMode, mode_timeframe_profile
+from .analysis_depth import resolve_analysis_depth
+from .data_requirements import TradingMode, default_setup_requirements, mode_timeframe_profile
+from .public_market_data import build_public_market_data_provider
+from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarketDataProvider
 from .find_setup import FindSetupRequest, FindSetupResult, find_setup
 from .market_universe import MarketUniverse
 from .setup_lifecycle import SetupIdentity, SetupLifecycle, SetupLifecycleResult
@@ -59,6 +62,55 @@ class MultiMarketScan:
         )
 
 
+def _shared_provider(provider: object | None) -> SharedSnapshotMarketDataProvider:
+    """Normalize one provider into the request-scoped shared MTF provider."""
+    if provider is None:
+        provider = build_public_market_data_provider(timeout_seconds=10.0)
+    if isinstance(provider, SharedSnapshotMarketDataProvider):
+        return provider
+    if isinstance(provider, FallbackMarketDataProvider):
+        return SharedSnapshotMarketDataProvider(provider, ttl_seconds=60.0)
+    return SharedSnapshotMarketDataProvider(
+        FallbackMarketDataProvider([provider]), ttl_seconds=60.0
+    )
+
+
+def _primary_snapshot_limits(modes: Sequence[TradingMode]) -> dict[str, int]:
+    """Take the maximum role-aware history depth required by any primary horizon."""
+    merged: dict[str, int] = {}
+    for mode in modes:
+        plan = default_setup_requirements("AICFA", mode=mode)
+        depth = resolve_analysis_depth(plan, timeframes=plan.required_timeframes)
+        for timeframe, requirement in depth.items():
+            merged[timeframe] = max(merged.get(timeframe, 0), requirement.minimum_rows)
+    return merged
+
+
+def _acquire_primary_snapshot(
+    provider: object | None,
+    *,
+    asset: str,
+    market_type: str,
+    modes: Sequence[TradingMode],
+    resolver: Callable[[str, str], str] | None,
+) -> tuple[SharedSnapshotMarketDataProvider, str, dict[str, object]]:
+    """Resolve once and acquire the full primary MTF OHLCV snapshot once."""
+    shared = _shared_provider(provider)
+    symbol = str(resolver(asset, market_type)) if resolver is not None else str(
+        shared.resolve_symbol(asset, market_type=market_type)
+    )
+    limits = _primary_snapshot_limits(modes)
+    snapshot = shared.fetch_ohlcv_snapshot(
+        symbol=symbol,
+        market_type=market_type,
+        timeframes=tuple(limits),
+        since_ms=None,
+        limits=limits,
+        data_profile="primary-mtf",
+    )
+    return shared, symbol, {timeframe: item.frame for timeframe, item in snapshot.items()}
+
+
 def _latest_execution_price(result: FindSetupResult, mode: TradingMode) -> float:
     """Read the latest completed execution close used by lifecycle evaluation."""
     timeframe = mode_timeframe_profile(mode).execution_timeframe
@@ -91,15 +143,25 @@ def analyze_market_horizons(
     if any(mode is TradingMode.SCALPING for mode in normalized_modes):
         raise ValueError("scalping is isolated from the primary horizon scan")
 
+    shared_provider, symbol, prefetched_frames = _acquire_primary_snapshot(
+        provider,
+        asset=asset,
+        market_type=market_type,
+        modes=normalized_modes,
+        resolver=resolver,
+    )
+    resolved = lambda _asset, _market_type: symbol
+
     results: list[FindSetupResult] = []
     setups: list[HorizonSetup] = []
     lifecycle_results: list[SetupLifecycleResult] = []
     for mode in normalized_modes:
         result = find_setup(
             FindSetupRequest(asset=asset, market_type=market_type, mode=mode),
-            provider=provider,
+            provider=shared_provider,
             now_ms=now_ms,
-            resolver=resolver,
+            resolver=resolved,
+            prefetched_frames=prefetched_frames,
         )
         results.append(result)
         candidates = getattr(result.setup_assessment, "candidates", ())
