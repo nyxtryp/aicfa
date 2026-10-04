@@ -216,3 +216,71 @@ def test_ccxt_gateio_accepts_gate_constructor_alias(monkeypatch):
     provider = CcxtDerivativesProvider("gateio")
     assert provider.exchange == "gateio"
     assert provider._exchange.options["options"]["defaultType"] == "swap"
+
+
+def test_fallback_can_combine_derivative_fields_from_different_venues():
+    from aicfa.derivatives_market_data import FallbackDerivativesProvider
+
+    class Provider:
+        def __init__(self, exchange, frame):
+            self.exchange = exchange
+            self.frame = frame
+
+        def fetch_derivatives(self, **kwargs):
+            return self.frame
+
+    def frame(**values):
+        row = {"timestamp": 1000}
+        row.update(values)
+        return pd.DataFrame([row])
+
+    provider = FallbackDerivativesProvider(providers=(
+        Provider("funding_venue", frame(funding_rate=0.001)),
+        Provider("oi_venue", frame(open_interest=123.0)),
+        Provider("mark_venue", frame(mark_price=50000.0)),
+    ))
+    out, sources = provider.fetch_derivatives(
+        symbol="XCU/USDT",
+        limit=5,
+    )
+    assert out["funding_rate"].notna().any()
+    assert out["open_interest"].notna().any()
+    assert out["mark_price"].notna().any()
+    assert sources == "funding_venue,oi_venue,mark_venue"
+
+
+def test_ccxt_provider_uses_explicit_native_futures_symbol():
+    class FakeExchange:
+        def __init__(self, *args, **kwargs):
+            self.markets = {"COPPER/USDT:USDT": {"type": "swap"}}
+            self.timeout = None
+            self.seen = []
+
+        def load_markets(self):
+            return self.markets
+
+        def fetch_funding_rate_history(self, symbol, since, limit):
+            self.seen.append(("funding", symbol))
+            return [{"timestamp": 1000, "fundingRate": "0.001"}]
+
+        def fetch_open_interest_history(self, symbol, timeframe, since, limit):
+            self.seen.append(("oi", symbol))
+            return [{"timestamp": 1000, "openInterestValue": "123"}]
+
+        def fetch_funding_rate(self, symbol):
+            self.seen.append(("current", symbol))
+            return {"timestamp": 1000, "fundingRate": 0.001, "markPrice": 50000}
+
+    from aicfa.derivatives_market_data import CcxtDerivativesProvider
+    fake = FakeExchange()
+    provider = CcxtDerivativesProvider(
+        "bitget",
+        exchange_factory=lambda options: fake,
+    )
+    frame = provider.fetch_derivatives(
+        symbol="XCU/USDT",
+        native_symbol="COPPER/USDT:USDT",
+        limit=5,
+    )
+    assert frame["open_interest"].notna().any()
+    assert all(symbol == "COPPER/USDT:USDT" for _, symbol in fake.seen)
