@@ -894,3 +894,26 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 3. Run focused FindSetup/decision tests again to confirm no regression.
 4. Re-run targeted `XCU BONK NATGAS` full-data diagnostics.
 5. If green, continue the broader derivatives-affected market verification.
+
+
+### 2026-10-04 — DERIVATIVES FALLBACK PARALLEL BATCH FIX
+
+- Targeted XCU/BONK/NATGAS verification showed the hard per-provider timeout was working, but the fallback still attempted 19 venues sequentially. This allowed several 3-second provider timeouts to accumulate and caused BONK to hit the diagnostic's 30-second market timeout.
+- NATGAS is now fully green and demonstrated the intended field-level architecture: funding/OI from OKX and mark price from Gate.
+- XCU still lacked mark price because the Gate attempt itself reached the 3-second provider boundary; BONK still reached the 30-second diagnostic boundary.
+- Changed FallbackDerivativesProvider to execute provider attempts in bounded concurrent batches of 6 instead of serially traversing the full venue list.
+- Each individual provider attempt retains the existing hard timeout, so a blocked venue is still abandoned rather than allowed to hold the fallback indefinitely.
+- Field-level aggregation and provenance are unchanged: funding, open interest and mark price remain independently sourced from real venue observations; no values are fabricated.
+- The fallback still stops immediately after a batch when all three preferred derivative coverage fields are present.
+- Added regression coverage proving slow provider attempts are handled in bounded parallel batches.
+- Production commit: 4a44acbccf8cf32b3faaa6e095b56492018be527.
+- Test commit: 852cb35e10d8d34f4e6695bcec43f1ba0d86b197.
+
+### Next exact action
+
+1. Deploy the two new commits through FrostDeploy.
+2. Run tests/test_derivatives_market_data.py.
+3. Run tests/test_derivatives_contextual.py.
+4. Run focused FindSetup/decision/MTF tests.
+5. Re-run targeted XCU BONK NATGAS full-data diagnostics.
+6. Only after those results, decide whether any venue-specific adapter work is still necessary.
