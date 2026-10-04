@@ -23,6 +23,7 @@ from .market_orchestrator import (
 )
 from .market_universe import MarketUniverse
 from .setup_lifecycle import ActiveSetup, SetupLifecycle
+from .persistent_journal import PersistentJournal
 
 
 MAIN_SCAN_INTERVAL_SECONDS = 300
@@ -111,6 +112,7 @@ class AutonomousScanEngine:
         modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
         clock_ms: Callable[[], int] | None = None,
         market_timeout_seconds: float = DEFAULT_MARKET_TIMEOUT_SECONDS,
+        journal: PersistentJournal | None = None,
     ) -> None:
         self.universe = universe
         self.provider = provider or build_public_market_data_provider(timeout_seconds=10.0)
@@ -118,6 +120,7 @@ class AutonomousScanEngine:
         if market_timeout_seconds <= 0:
             raise ValueError("market_timeout_seconds must be greater than zero")
         self.market_timeout_seconds = float(market_timeout_seconds)
+        self.journal = journal if journal is not None else PersistentJournal.from_env()
         self.modes = tuple(modes)
         self.lifecycle = SetupLifecycle()
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
@@ -125,6 +128,10 @@ class AutonomousScanEngine:
         self._last_state: AutonomousScanState | None = None
         self._cycle_id = 0
         self._last_cycle: RotationCycle | None = None
+
+    def _journal_state(self, state: AutonomousScanState) -> None:
+        if self.journal is not None:
+            self.journal.record_scan(state)
 
     @property
     def last_state(self) -> AutonomousScanState | None:
@@ -194,6 +201,7 @@ class AutonomousScanEngine:
             result=result,
         )
         self._last_state = state
+        self._journal_state(state)
         return state
 
     def scan_once(self, *, now_ms: int | None = None) -> AutonomousScanState:
@@ -214,6 +222,7 @@ class AutonomousScanEngine:
             result=result,
         )
         self._last_state = state
+        self._journal_state(state)
         return state
 
 
@@ -257,6 +266,7 @@ class AutonomousScanEngine:
         self._scan_number += 1
         state = AutonomousScanState(scan_number=self._scan_number, scanned_at_ms=timestamp, result=result)
         self._last_state = state
+        self._journal_state(state)
         return state
 
     def run_cycle(
@@ -318,6 +328,8 @@ class AutonomousScanEngine:
             markets=tuple(metrics),
         )
         self._last_cycle = cycle
+        if self.journal is not None:
+            self.journal.record_cycle(cycle)
         return cycle
 
     def run_forever_batches(
