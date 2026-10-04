@@ -100,12 +100,14 @@ def _acquire_primary_snapshot(
         shared.resolve_symbol(asset, market_type=market_type)
     )
     limits = _primary_snapshot_limits(modes)
+    primary_timeframes = ("1w", "1d", "4h", "1h", "15m", "5m")
+    timeframes = tuple(timeframe for timeframe in primary_timeframes if timeframe in limits)
     snapshot = shared.fetch_ohlcv_snapshot(
         symbol=symbol,
         market_type=market_type,
-        timeframes=tuple(limits),
+        timeframes=timeframes,
         since_ms=None,
-        limits=limits,
+        limits={timeframe: limits[timeframe] for timeframe in timeframes},
         data_profile="primary-mtf",
     )
     return shared, symbol, {timeframe: item.frame for timeframe, item in snapshot.items()}
