@@ -84,3 +84,11 @@ def test_futures_setup_requires_all_seven_data_blocks():
         DataKind.LIQUIDATIONS,
         DataKind.MARK_PRICE,
     }
+
+def test_futures_setup_requirements_remain_knowledge_driven():
+    plan = default_setup_requirements("BTC", mode=TradingMode.INTRADAY)
+    assert plan.data_kinds == {DataKind.OHLCV}
+    assert DataKind.FUNDING not in plan.data_kinds
+    assert DataKind.OPEN_INTEREST not in plan.data_kinds
+    assert DataKind.LIQUIDATIONS not in plan.data_kinds
+    assert DataKind.MARK_PRICE not in plan.data_kinds
