@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 import pandas as pd
