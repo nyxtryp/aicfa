@@ -589,12 +589,6 @@
       "category": "crypto"
     },
     {
-      "asset": "GNS/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
       "asset": "PIXEL/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
