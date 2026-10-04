@@ -819,3 +819,14 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 2. Run `tests/test_derivatives_market_data.py` on the VDS.
 3. Run only the targeted **BONK, XCU, NATGAS** full-data diagnostic.
 4. If those three are green, do not add asset-specific rules; proceed with the universal derivatives coverage verification before the final 143-market run.
+
+### 2026-10-04 — UNIVERSAL DERIVATIVE FIELD-LEVEL FALLBACK
+
+- Confirmed the required architecture is broader than whole-provider fallback: a futures asset may expose different derivative fields on different venues.
+- Implemented universal field-level aggregation in FallbackDerivativesProvider: funding, open interest and mark price are collected independently across the allowed venue set and combined causally without fabricating missing values.
+- Expanded the derivatives CCXT fallback to the configured 19 allowed exchanges.
+- Added native futures-symbol routing: authoritative venue_symbols are passed into derivatives acquisition, while CCXT can resolve a futures symbol from loaded markets when no explicit mapping is supplied.
+- Providers are no longer rejected merely because one derivative field is unavailable; another venue can supply that field. The final result is accepted only when funding + open interest + mark price are all actually present somewhere in the collected real observations.
+- Added focused tests for mixed-source derivative fields and native futures-symbol routing.
+- Commits: 5df0b5b (field-level fallback), c51f3c7 (allow partial provider observations), 01c6ef2 (pass native venue symbols), 28568f5 (tests).
+- Next: deploy, run the derivatives test suite, then verify only XCU first. After XCU is confirmed, handle BONK timeout separately. Do not rerun 32/143 yet.
