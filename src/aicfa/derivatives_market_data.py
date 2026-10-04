@@ -514,17 +514,6 @@ class FallbackDerivativesProvider:
                 {"symbol": symbol, "limit": limit},
             )
 
-    @staticmethod
-    def _canonical_symbol(symbol: str) -> str:
-        """Normalize a resolved native-style symbol to the CCXT/public base form."""
-        value = str(symbol).strip().upper()
-        if "/" in value:
-            return value
-        for quote in ("USDT", "USDC", "BUSD"):
-            if value.endswith(quote) and len(value) > len(quote):
-                return f"{value[:-len(quote)]}/{quote}"
-        return value
-
     def fetch_derivatives(
         self,
         *,
@@ -539,7 +528,6 @@ class FallbackDerivativesProvider:
         are still combined field-by-field and the batch loop stops as soon as
         funding, open interest and mark price have real observations.
         """
-        symbol = self._canonical_symbol(symbol)
         attempts: list[str] = []
         frames: list[tuple[pd.DataFrame, str]] = []
         providers = iter(self.providers)
