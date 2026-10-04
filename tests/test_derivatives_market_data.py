@@ -209,7 +209,7 @@ def test_ccxt_gateio_accepts_gate_constructor_alias(monkeypatch):
     def factory(options):
         return FakeExchange(options)
 
-    fake_ccxt = type("FakeCCXT", (), {"gate": factory})()
+    fake_ccxt = type("FakeCCXT", (), {"gate": staticmethod(factory)})()
     monkeypatch.setitem(__import__("sys").modules, "ccxt", fake_ccxt)
 
     from aicfa.derivatives_market_data import CcxtDerivativesProvider
