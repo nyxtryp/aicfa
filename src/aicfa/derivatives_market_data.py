@@ -396,7 +396,7 @@ class BybitDerivativesProvider:
 
 
 class FallbackDerivativesProvider:
-    """Universal per-field derivatives fallback across allowed venues.\n\n    Each derivative field is independently sourced and causally merged. The\n    chain stops as soon as the mandatory core (funding, OI, mark) is complete;\n    liquidation fields remain best-effort context and never justify waiting on\n    slow or unsupported venues.\n    """
+    """Universal per-field derivatives fallback across allowed venues.\n\n    Each derivative field is independently sourced and causally merged. The\n    chain stops as soon as the minimum coverage target (funding, OI, mark) is complete;\n    liquidation fields remain best-effort context and never justify treating derivatives as a setup prerequisite or waiting on\n    slow or unsupported venues.\n    """
 
     EXCHANGES = (
         "binance", "bybit", "okx", "bitget", "gateio", "kucoin", "mexc",
@@ -506,12 +506,12 @@ class FallbackDerivativesProvider:
                         column for column in DERIVATIVE_COVERAGE_FIELDS
                         if combined[column].notna().any()
                     }
-                    if covered_core == set(DERIVATIVE_CORE_FIELDS):
+                    if covered_core == set(DERIVATIVE_COVERAGE_FIELDS):
                         return combined, sources
             except Exception as exc:
                 attempts.append(f"{provider.exchange}: {exc}")
         combined, sources = self._combine(frames)
-        required = DERIVATIVE_CORE_FIELDS
+        required = DERIVATIVE_COVERAGE_FIELDS
         if all(combined[column].notna().any() for column in required):
             return combined, sources
         missing = [name for name in required if not combined.empty and not combined[name].notna().any()]
