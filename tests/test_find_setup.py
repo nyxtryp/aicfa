@@ -312,3 +312,19 @@ def test_find_setup_does_not_expose_trade_cvd_without_explicit_requirement():
 
     assert result.cvd_analysis.empty
     assert getattr(provider, "trade_calls", []) == []
+
+def test_find_setup_reuses_order_book_history_snapshot_for_futures():
+    provider = FakeProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT", market_type="futures", mode="intraday"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert not result.order_book_history.empty
+    assert result.order_book.shape[0] == 1
+    assert provider.history_calls == [("BTC/USDT", "futures", 8, 0.25)]
+    assert getattr(provider, "book_calls", []) == []
+
