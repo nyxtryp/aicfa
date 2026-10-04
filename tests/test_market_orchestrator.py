@@ -13,7 +13,29 @@ from aicfa.market_orchestrator import (
 )
 from aicfa.market_universe import MarketUniverse, MonitoredMarket
 from aicfa.setup_lifecycle import SetupLifecycle, SetupLifecycleStatus
+from aicfa.market_data_router import FallbackMarketDataProvider
 
+
+
+class SnapshotProvider:
+    exchange = "test"
+
+    def __init__(self):
+        self.ohlcv_calls = []
+
+    def resolve_symbol(self, asset, *, market_type):
+        return asset
+
+    def fetch_ohlcv(self, **kwargs):
+        self.ohlcv_calls.append(kwargs)
+        return pd.DataFrame({
+            "timestamp": [1], "open": [100.0], "high": [101.0],
+            "low": [99.0], "close": [100.5], "volume": [10.0],
+        })
+
+
+def _provider():
+    return FallbackMarketDataProvider([SnapshotProvider()])
 
 def _candidate(direction="long", scenario="continuation"):
     return SetupCandidate(
@@ -59,7 +81,7 @@ def test_one_market_runs_all_three_primary_horizons(monkeypatch):
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
 
-    result = analyze_market_horizons("BTC/USDT", now_ms=1000)
+    result = analyze_market_horizons("BTC/USDT", provider=_provider(), now_ms=1000)
 
     assert [item.mode for item in result.results] == list(PRIMARY_TRADING_MODES)
     assert calls == list(PRIMARY_TRADING_MODES)
@@ -75,7 +97,7 @@ def test_multiple_markets_keep_results_independent(monkeypatch):
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
 
-    result = scan_markets(["BTC/USDT", "ETH/USDT"], now_ms=1000)
+    result = scan_markets(["BTC/USDT", "ETH/USDT"], provider=_provider(), now_ms=1000)
 
     assert [market.asset for market in result.markets] == ["BTC/USDT", "ETH/USDT"]
     assert len(result.setups) == 6
@@ -107,7 +129,7 @@ def test_distinct_concurrent_horizon_setups_are_preserved(monkeypatch):
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
 
-    result = analyze_market_horizons("SOL/USDT", now_ms=1000)
+    result = analyze_market_horizons("SOL/USDT", provider=_provider(), now_ms=1000)
 
     assert len(result.setups) == 3
     assert [item.candidate.direction for item in result.setups] == ["long", "long", "short"]
@@ -137,7 +159,7 @@ def test_configured_market_universe_controls_assets_and_market_type(monkeypatch)
         MonitoredMarket("ETH/USDT", "futures"),
     ))
 
-    result = scan_universe(universe, now_ms=1000)
+    result = scan_universe(universe, provider=_provider(), now_ms=1000)
 
     assert [market.asset for market in result.markets] == ["BTC/USDT", "ETH/USDT"]
     assert calls == [
@@ -158,7 +180,7 @@ def test_orchestrator_updates_existing_lifecycle_without_duplicate(monkeypatch):
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
 
-    first = analyze_market_horizons("BTC/USDT", now_ms=1_000, lifecycle=lifecycle)
+    first = analyze_market_horizons("BTC/USDT", provider=_provider(), now_ms=1_000, lifecycle=lifecycle)
     second = analyze_market_horizons("BTC/USDT", now_ms=2_000, lifecycle=lifecycle)
 
     assert len(first.setups) == 3
@@ -194,9 +216,26 @@ def test_orchestrator_keeps_two_same_horizon_geometries_independent(monkeypatch)
 
     monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
 
-    result = analyze_market_horizons("BTC/USDT", now_ms=1_000, lifecycle=lifecycle)
+    result = analyze_market_horizons("BTC/USDT", provider=_provider(), now_ms=1_000, lifecycle=lifecycle)
 
     assert len(result.lifecycle_results) == 3
     assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 1
     assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="swing")) == 1
     assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="position")) == 1
+
+
+def test_one_market_acquires_full_primary_snapshot_once(monkeypatch):
+    provider = _provider()
+    calls = []
+
+    def fake_find_setup(request, **kwargs):
+        calls.append((request.mode, tuple(kwargs["prefetched_frames"])))
+        return _fake_result(request.asset, request.mode, decision="WAIT")
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    result = analyze_market_horizons("BTC/USDT", provider=provider, now_ms=1000)
+
+    assert len(result.results) == 3
+    assert all(keys == ("1w", "1d", "4h", "1h", "15m", "5m") for _, keys in calls)
+    assert len(provider.providers[0].ohlcv_calls) == 6
