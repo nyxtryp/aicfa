@@ -44,6 +44,7 @@ def main() -> None:
                 provider=provider,
                 now_ms=int(time.time() * 1000),
                 market_type=market.market_type,
+                venue_symbols=market.venue_symbols,
             )
             diagnostics = scan.diagnostics
             if diagnostics is None:
