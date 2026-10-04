@@ -1164,5 +1164,23 @@ This stage is **not GREEN** until the repository contains the rotation engine an
 - Deterministic finite queue + cycle metrics: **NOT GREEN / not yet implemented**.
 - 141-market measured rotation: **NOT GREEN / not yet run after these contracts are implemented**.
 
+### Progress update — shared MTF acquisition completed
+- Implemented one request-scoped primary MTF snapshot in `market_orchestrator`: resolve the market once, fetch the canonical six-timeframe primary context once, then pass the same prefetched frames into Intraday, Swing and Position.
+- `find_setup` now accepts a validated `prefetched_frames` snapshot and does not refetch those OHLCV frames when supplied.
+- The orchestrator keeps the canonical timeframe order: **1w / 1d / 4h / 1h / 15m / 5m**.
+- The scan engine now reuses one production market-data provider instance instead of constructing a fresh provider for each market operation.
+- Targeted regression after the implementation/fix: **33 passed, 0 failed**.
+- Fix commit: `c1f5a8e83ff58ab8cf4774a818037aa0c9c13d3b`.
+- No SMC/setup decision rules were changed.
+
+### Current status
+- Setup Engine: GREEN by automated regression.
+- Full regression: **494 passed, 0 failed** (latest verified VDS run).
+- Shared MTF snapshot across horizons: **GREEN by targeted regression (33 passed)**.
+- Autonomous production rotation: **NOT GREEN / not yet implemented and measured**.
+- Whole-market hard timeout: **NOT GREEN / not yet implemented**.
+- Deterministic finite queue + cycle metrics: **NOT GREEN / not yet implemented**.
+- 141-market measured rotation: **NOT GREEN / not yet run**.
+
 ### Immediate next action
-**Start implementation at step 2: shared MTF acquisition. Do not modify SMC/setup decision rules unless a failing integration test proves a regression.**
+**Proceed to step 3: instrument the pipeline. Add observable block-level timing, coverage, row counts, refetch detection, setup counts, lifecycle events and errors. Do not modify SMC/setup decision rules unless a failing integration test proves a regression.**
