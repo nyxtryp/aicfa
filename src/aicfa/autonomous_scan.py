@@ -280,7 +280,7 @@ class AutonomousScanEngine:
                 state = self.scan_market(queue_position - 1, now_ms=started_at_ms)
                 scan = state.result.markets[0]
                 diagnostics = scan.diagnostics
-                status = diagnostics.status if diagnostics is not None else "completed"
+                status = str(diagnostics.status).strip().lower() if diagnostics is not None else "completed"
                 error = diagnostics.error if diagnostics is not None else ""
                 setup_count = len(scan.setups)
             except Exception as exc:
