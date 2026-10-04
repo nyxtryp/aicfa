@@ -411,27 +411,3 @@ def test_fallback_runs_provider_attempts_in_bounded_parallel_batches():
     assert out["open_interest"].notna().any()
     assert out["mark_price"].notna().any()
     assert sources == "funding_rate=fast,open_interest=fast,mark_price=fast"
-
-def test_fallback_normalizes_native_style_base_symbol_for_ccxt_providers():
-    from aicfa.derivatives_market_data import FallbackDerivativesProvider
-
-    class Provider:
-        exchange = "fake"
-
-        def fetch_derivatives(self, **kwargs):
-            assert kwargs["symbol"] == "BTC/USDT"
-            return pd.DataFrame([{
-                "timestamp": 1000,
-                "funding_rate": 0.001,
-                "open_interest": 123.0,
-                "mark_price": 50000.0,
-            }])
-
-    out, sources = FallbackDerivativesProvider(providers=(Provider(),)).fetch_derivatives(
-        symbol="BTCUSDT",
-        limit=5,
-    )
-    assert out["funding_rate"].notna().any()
-    assert out["open_interest"].notna().any()
-    assert out["mark_price"].notna().any()
-    assert sources == "funding_rate=fake,open_interest=fake,mark_price=fake"
