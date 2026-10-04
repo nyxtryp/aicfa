@@ -264,6 +264,7 @@ def find_setup(
     limit: int | None = None,
     resolver: Callable[[str, str], str] | None = None,
     derivatives_provider: object | None = None,
+    derivatives_venue_symbols: tuple[tuple[str, str], ...] = (),
     prefetched_frames: dict[str, pd.DataFrame] | None = None,
 ) -> FindSetupResult:
     """Resolve the asset, collect knowledge-required context, and run AICFA."""
@@ -392,10 +393,17 @@ def find_setup(
         derivatives_started = time.perf_counter()
         try:
             derivatives_source_provider = derivatives_provider or FallbackDerivativesProvider()
-            derivatives_frame, derivatives_source = derivatives_source_provider.fetch_derivatives(
-                symbol=symbol,
-                limit=200,
-            )
+            try:
+                derivatives_frame, derivatives_source = derivatives_source_provider.fetch_derivatives(
+                    symbol=symbol,
+                    limit=200,
+                    venue_symbols=derivatives_venue_symbols,
+                )
+            except TypeError:
+                derivatives_frame, derivatives_source = derivatives_source_provider.fetch_derivatives(
+                    symbol=symbol,
+                    limit=200,
+                )
             derivatives_analysis = build_derivatives(
                 base,
                 derivatives_frame,
