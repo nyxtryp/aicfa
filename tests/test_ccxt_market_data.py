@@ -72,7 +72,7 @@ def test_ccxt_adapter_normalizes_public_market_data():
     assert list(candles.columns) == ["timestamp", "open", "high", "low", "close", "volume"]
     assert candles.iloc[0]["close"] == 1.5
     assert list(trades.columns) == ["timestamp", "price", "volume", "side"]
-    assert trades.iloc[0]["side"] == "buy"
+    assert trades.iloc[0]["side"] == 1
     assert list(book.columns) == [
         "timestamp", "bid_price", "bid_size", "ask_price", "ask_size"
     ]
