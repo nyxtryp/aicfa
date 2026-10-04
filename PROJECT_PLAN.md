@@ -116,3 +116,594 @@ Continue Task 9 from the existing chronological purged-fold foundation with the 
   - `5b959e03c6a86639161767b4a384ac64272a0a3b` — `test: add read-only journal feed API contract`
   - `038a445704f843eecf9a06cae308064f825c194d` — `feat: add journal feed runner`
 - Next exact action: deploy these commits to FrostDeploy, run focused journal/feed tests, then start the feed locally on the VDS and verify the three read endpoints against the real `events.jsonl` before exposing it through Caddy/site routing.
+
+# 2026-10-05 — CONSOLIDATED MASTER STATUS / ROADMAP
+
+This section is the current source of truth and supersedes stale historical "next exact action" notes above.
+
+## 1. ORIGINAL PRODUCT VISION — PRESERVED
+
+AICFA remains a specialized AI / Market Brain for digital financial assets, not a wrapper around ChatGPT/Claude/Gemini or another third-party LLM.
+
+Final target:
+```
+MARKET DATA
+→ CAUSAL MARKET REPRESENTATION
+→ MARKET STATE
+→ SETUP / SCENARIO DETECTION
+→ HISTORICAL OUTCOME + VALIDATION
+→ AICFA OWN MODELS / BRAIN
+→ RISK / DECISION
+→ PAPER TRADING
+→ EXPERIENCE
+→ CONTROLLED MODEL IMPROVEMENT
+```
+
+The system must be able to return WAIT / NO TRADE / INSUFFICIENT INFORMATION. SMC is evidence and a measurable research hypothesis, not truth.
+
+## 2. EVERYTHING COMPLETED SO FAR
+
+### 2.1 Data foundation — GREEN
+- Python project/package structure.
+- OHLCV acquisition/downloader.
+- Persistent `AICFA_DATA_DIR` storage outside release directories.
+- Historical/live-data separation.
+- 1m, 5m, 15m, 1h, 4h, 1d, 1w, 1M timeframe support.
+- Causal timestamp handling.
+- Future-outcome label engine.
+- Dataset/label infrastructure.
+- Leak-safe dataset construction.
+- Data-contract and timestamp hardening.
+
+### 2.2 Causal market representation — GREEN
+- Price.
+- Volatility.
+- Market structure.
+- Confirmed swings.
+- HH/HL/LH/LL.
+- Causal BOS / CHoCH / MSS provenance.
+- Liquidity and liquidity reaction.
+- SMC role-aware analysis.
+- Premium/discount context.
+- Volume evidence.
+- Market regime/context.
+- MTF representation.
+- Feature provenance.
+- Deterministic chart/structure representation.
+
+### 2.3 SMC / zone lifecycle — GREEN
+The intended internal chain is implemented:
+```
+Confirmed Swing
+→ causal BOS/CHoCH/MSS
+→ Liquidity
+→ Order Block lifecycle
+→ FVG lifecycle
+→ Zone Reaction
+→ Volume Evidence
+→ Structural Entry / SL / TP
+```
+Implemented:
+- causal Order Block lifecycle;
+- causal FVG lifecycle;
+- unified zone reaction;
+- active/broken zone states;
+- zone indexing/performance optimizations;
+- structural entry conditions;
+- structural invalidation;
+- structural targets;
+- fixed RR validity gate removed.
+
+### 2.4 Derivatives / order flow / microstructure — GREEN AS OPTIONAL ENRICHMENT
+Seven canonical data kinds are supported:
+1. OHLCV
+2. TRADES
+3. ORDER_BOOK
+4. FUNDING
+5. OPEN_INTEREST
+6. LIQUIDATIONS
+7. MARK_PRICE
+
+Implemented where available:
+- funding;
+- open interest;
+- mark price;
+- liquidations;
+- trades;
+- order book;
+- order-book history;
+- level-by-level depth/liquidity;
+- absorption context;
+- trade-level CVD / taker delta;
+- live microstructure context;
+- provider provenance.
+
+Missing optional derivatives/microstructure data does not structurally block OHLCV/MTF analysis.
+
+### 2.5 Multi-exchange routing — GREEN
+Implemented:
+- generic CCXT adapter;
+- capability-aware source factory;
+- venue-aware symbol resolution;
+- multi-source fallback;
+- explicit venue mappings;
+- independent derivative-source fallback;
+- bounded fallback attempts;
+- provider provenance;
+- partial-source handling;
+- market-aware auxiliary feed routing;
+- production multi-provider chain.
+
+### 2.6 Three primary horizons — GREEN
+Primary system:
+- Intraday: 5m–1h.
+- Swing: 1h–1d.
+- Position: 4h–1w.
+
+Shared primary MTF:
+`1w / 1d / 4h / 1h / 15m / 5m`.
+
+Profiles:
+- Intraday: 4h → 1h → 15m → 5m.
+- Swing: 1d → 4h → 1h.
+- Position: 1w → 1d → 4h.
+
+The horizons share one analytical core.
+
+Scalping is intentionally separate and deferred:
+- 15m / 5m / 1m;
+- low-latency/microstructure logic;
+- separate website surface;
+- future streaming/WebSocket requirement.
+
+### 2.7 Explainable setup contract — GREEN
+Setup preserves:
+- asset/market/horizon/direction;
+- scenario;
+- Entry zone;
+- structural SL/invalidation;
+- TP levels;
+- geometry-derived RR;
+- structure/liquidity evidence;
+- OB/FVG evidence;
+- zone location/reaction;
+- volume evidence;
+- entry/invalidation conditions;
+- source/confirmation timeframes;
+- timestamp/freshness;
+- lifecycle status.
+
+No fixed setup count, confidence score or fixed RR filter.
+
+### 2.8 Historical evaluation — GREEN
+Implemented:
+- conservative causal single-setup evaluator;
+- batch evaluation;
+- causal label purging;
+- chronological purged folds;
+- TP/SL/TIMEOUT/AMBIGUOUS;
+- RR ↔ outcome analysis;
+- fold-local statistics;
+- fold-local RR analysis;
+- cost-adjusted fold returns;
+- historical per-setup outcome journal;
+- Long/Short directional statistics.
+
+Unresolved outcomes remain explicit. No unsupported profitability/predictive-performance claim is made.
+
+### 2.9 Autonomous scanner — GREEN
+Implemented:
+- autonomous market scanner;
+- configurable market universe;
+- one-market analytical unit;
+- shared six-TF snapshot;
+- shared feature computation per market;
+- Intraday + Swing + Position in one scan;
+- preservation of all independent setups;
+- deterministic finite rotations;
+- bounded whole-market execution;
+- observable diagnostics;
+- recurring scan state;
+- setup lifecycle integration;
+- independent setup identities/horizons;
+- WAIT does not destroy a still-valid active setup;
+- duplicate suppression;
+- TP1/TP2/invalidation/expiration lifecycle.
+
+### 2.10 Production diagnostics/performance — GREEN
+Implemented:
+- single-market pipeline diagnostics;
+- MTF/horizon/block timings;
+- seven-block coverage diagnostics;
+- compact production diagnostics;
+- rotation progress;
+- hard timeout preservation;
+- shared MTF/features;
+- derivatives/provider reuse;
+- parallel optional acquisition;
+- order-book history reuse;
+- feature profiler;
+- extensive zone/liquidity indexing and performance work.
+
+The current design intentionally accepts multi-second market analysis instead of speculative over-optimization.
+
+### 2.11 Market universe — GREEN / MAINTENANCE
+Implemented:
+- durable configurable universe;
+- crypto + selected TradFi perpetual targets;
+- venue mappings;
+- live routing verification;
+- cleanup/removal of failing or low-priority markets.
+
+Universe remains configuration, not scanner logic.
+
+### 2.12 Persistent scan journal — GREEN
+Implemented:
+- append-only JSONL journal;
+- scan records;
+- rotation-cycle records;
+- diagnostics;
+- setups;
+- lifecycle results;
+- configurable journal path.
+
+Production VDS verification succeeded with a real XMRUSDT Intraday SHORT setup persisted with lifecycle ACTIVE.
+
+### 2.13 Read-only journal feed — CODE/TEST GREEN
+Implemented:
+- `src/aicfa/journal_feed.py`;
+- `scripts/journal_feed.py`;
+- `/api/health`;
+- `/api/journal/events`;
+- `/api/journal/scans`;
+- `/api/journal/setups`;
+- read-only HTTP contract;
+- CORS read access;
+- 500-event cap;
+- POST/PUT/DELETE → 405.
+
+VDS verification succeeded against the real journal.
+
+Current state: manually running on 127.0.0.1:8090. It is not yet persistent/systemd and not yet exposed through Caddy.
+
+## 3. ORIGINAL VISION ITEMS NOT YET FINISHED
+
+These were in the original technical specification and must remain in the plan:
+
+- first own predictive ML/PyTorch model;
+- learned AICFA Brain;
+- Scenario/Risk/Decision layer above deterministic setup detection;
+- Historical Similarity Engine;
+- Knowledge Base as a maintained machine-readable system;
+- Experience Database distinct from raw event journal;
+- Active Information Gathering;
+- Information Value / value-of-information logic;
+- Vision / screenshot analysis;
+- full product-level backtesting/research environment;
+- paper trading;
+- controlled retraining;
+- model promotion/rollback;
+- model/data/version lineage;
+- event subscriptions and alerts;
+- user watchlists/monitoring;
+- centralized multi-user architecture;
+- production web/API platform;
+- data-quality/source-health monitoring;
+- separate low-latency Scalping module;
+- optional validated execution adapter, strictly separated from analysis.
+
+## 4. NEW MASTER ROADMAP
+
+### STEP 11 — Productionize the live feed — NEXT
+1. Replace manual `nohup` with systemd.
+2. Auto-start/restart after reboot/failure.
+3. Load production environment including `AICFA_DATA_DIR`.
+4. Verify permissions and ownership.
+5. Expose feed through Caddy.
+6. Define production API route.
+7. Verify external read-only access.
+8. Keep scanner and feed processes separated.
+
+### STEP 12 — First AICFA monitoring website
+Build the first real product surface directly on the centralized scanner/feed.
+
+Minimum:
+- live setup feed;
+- active setups;
+- Intraday/Swing/Position;
+- LONG/SHORT/WAIT;
+- Entry/SL/TP/RR;
+- structure/liquidity/OB/FVG/volume evidence;
+- freshness;
+- lifecycle;
+- data coverage;
+- diagnostics;
+- historical events;
+- visible WAIT/no-trade states.
+
+The website must consume central results, never run a full market scan per user.
+
+### STEP 13 — Stable event model
+Add explicit:
+- setup created;
+- setup updated/strengthened;
+- setup invalidated;
+- setup expired;
+- TP1;
+- TP2/completed;
+- outcome recorded;
+- data degraded/recovered.
+
+Add stable event/setup IDs, ordering, deduplication, replay/history and consumer cursors.
+
+### STEP 14 — Live setup → historical outcome loop
+```
+LIVE SETUP
+→ immutable setup record
+→ future candles
+→ causal outcome
+→ TP/SL/TIMEOUT/AMBIGUOUS
+→ historical statistics
+→ experience dataset
+```
+Original Entry/SL/TP geometry must never be rewritten.
+
+### STEP 15 — Research/backtest platform
+Turn current evaluation primitives into repeatable experiments:
+- historical setup generation;
+- market/horizon/direction segmentation;
+- regime segmentation;
+- costs/slippage;
+- chronological walk-forward;
+- baselines/benchmarks;
+- reproducible dataset/experiment IDs;
+- stored results;
+- leakage audit;
+- out-of-sample reporting.
+
+### STEP 16 — Experience Database
+Separate long-lived learning memory from raw journal.
+
+Store:
+- setup context;
+- canonical market state;
+- data coverage;
+- scenario/SMC evidence;
+- derivatives/microstructure;
+- regime;
+- outcome;
+- timing;
+- model/software metadata.
+
+### STEP 17 — Historical Similarity
+Retrieve causal historical situations by:
+- structure;
+- liquidity;
+- volatility/regime;
+- setup family;
+- MTF context;
+- historical outcomes.
+
+Similarity is context, not a guarantee.
+
+### STEP 18 — First own AICFA model
+Start with transparent statistical baselines, then compact ML/PyTorch models.
+
+Initial targets:
+- direction;
+- expected move;
+- volatility;
+- risk;
+- time-to-outcome;
+- false breakout;
+- setup/scenario quality.
+
+Use chronological train/validation/test and evaluate by horizon/regime. Models augment the causal representation; they do not replace it blindly.
+
+### STEP 19 — AICFA Brain / Scenario / Risk / Decision
+```
+Market State
+→ Setup Candidates
+→ Historical Similarity / Experience
+→ Own Models
+→ Scenario Engine
+→ Risk Engine
+→ Decision Engine
+→ LONG / SHORT / WAIT / NO TRADE
+```
+
+### STEP 20 — Active Information Gathering
+AICFA should determine:
+- what information is missing;
+- what is available but unnecessary;
+- what additional information has enough expected value to acquire.
+
+Possible sources:
+- another timeframe;
+- another exchange;
+- order-book history;
+- derivatives field;
+- trade flow;
+- higher/lower timeframe context.
+
+### STEP 21 — Vision / screenshot analysis
+Chart screenshot becomes another input modality to the same canonical AICFA representation.
+
+AICFA should:
+- identify asset/timeframe when possible;
+- extract visible structure;
+- request additional screenshots/timeframes when needed;
+- map visual evidence into the same Market State/Setup representation.
+
+No disconnected vision-only logic.
+
+### STEP 22 — Paper Trading
+Implement:
+- virtual positions;
+- real-time setup tracking;
+- fees/slippage;
+- position sizing;
+- stop/target handling;
+- portfolio risk;
+- audit trail;
+- comparison with historical expectations.
+
+### STEP 23 — Scalping
+Separate module:
+- 15m/5m/1m;
+- streaming/WebSocket-capable data;
+- microstructure/order flow;
+- fast updates;
+- independent performance budget/evaluation;
+- no contamination of primary Intraday/Swing/Position logic.
+
+### STEP 24 — Alerts / personal monitoring
+Add:
+- watchlists;
+- horizon/setup subscriptions;
+- lifecycle alerts;
+- deduplication;
+- cooldown/rate limits;
+- delivery history.
+
+### STEP 25 — Optional execution boundary
+Only after paper trading/validation:
+- explicit opt-in;
+- authentication;
+- duplicate-order protection;
+- balance/position verification;
+- risk limits;
+- order reconciliation;
+- emergency stop;
+- audit log.
+
+Execution is never required for the analytical product.
+
+### STEP 26 — Versioning / lineage
+Version:
+- market data;
+- feature schema;
+- labels;
+- datasets;
+- models;
+- configuration;
+- scanner;
+- experiments;
+- deployment.
+
+Every important result must be traceable to its inputs/version.
+
+### STEP 27 — Reliability / data quality
+Monitor:
+- stale candles;
+- missing TFs;
+- exchange outages;
+- provider degradation;
+- mapping failures;
+- timestamp anomalies;
+- duplicates/gaps;
+- derivative inconsistencies;
+- scan latency;
+- journal/feed health.
+
+### STEP 28 — Multi-user product
+Only after intelligence is validated:
+- centralized computation;
+- accounts;
+- watchlists;
+- personalized monitoring;
+- API;
+- web interface;
+- usage limits;
+- optional commercial layer.
+
+## 5. CURRENT PRIORITY
+
+```
+NOW
+ ↓
+11  Persistent feed + Caddy
+ ↓
+12  Live AICFA website
+ ↓
+13  Stable event/setup IDs
+ ↓
+14  Live → historical outcomes
+ ↓
+15  Research/backtest platform
+ ↓
+16  Experience Database
+ ↓
+17  Historical Similarity
+ ↓
+18  First Own Model
+ ↓
+19  AICFA Brain / Risk / Decision
+ ↓
+20  Active Information Gathering
+ ↓
+21  Vision
+ ↓
+22  Paper Trading
+ ↓
+23  Scalping
+ ↓
+24  Alerts / personal monitoring
+ ↓
+25  Optional execution
+ ↓
+26  Versioning/lineage
+ ↓
+27  Reliability/data quality
+ ↓
+28  Multi-user platform
+```
+
+## 6. CURRENT STATUS
+
+- Foundation: GREEN.
+- Causal market representation: GREEN.
+- SMC/zone lifecycle: GREEN.
+- Derivatives/microstructure enrichment: GREEN.
+- Multi-source routing: GREEN.
+- Three primary horizons: GREEN.
+- Explainable setup contract: GREEN.
+- Historical causal evaluation: GREEN.
+- Autonomous scanner: GREEN.
+- Setup lifecycle: GREEN.
+- Persistent journal: GREEN.
+- Read-only feed code/tests: GREEN.
+- Feed productionization: NEXT.
+- User-facing website: NOT STARTED.
+- Experience loop: ARCHITECTURE DEFINED; needs live outcome accumulation.
+- Own ML model: NOT YET PRODUCTION.
+- Vision: PLANNED.
+- Paper trading: PLANNED.
+- Scalping: PLANNED / INTENTIONALLY SEPARATE.
+- Live execution: OUTSIDE CURRENT CORE.
+
+## 7. CURRENT CORRECTNESS ISSUE
+
+A real XMRUSDT Intraday SHORT setup persisted by the production scanner contained a second TP at `0.0`. This is invalid target geometry and must be fixed in setup generation/data validation before TP levels are presented as production-grade on the website.
+
+The persistence/feed architecture itself worked correctly; the invalid target is a separate analytical/data-contract bug.
+
+## 8. RULES THAT MUST NOT BE LOST
+
+- AICFA is not a third-party LLM wrapper.
+- No future data in causal features.
+- No forced signals.
+- No fixed signal count.
+- No fixed RR validity gate.
+- No arbitrary confidence score.
+- SMC is evidence/hypothesis, not truth.
+- Missing optional derivatives/microstructure data does not block the structural core.
+- All primary horizons share one causal architecture.
+- Scalping stays isolated.
+- Analyze each market centrally once; users consume results.
+- Setup geometry is immutable after creation.
+- Lifecycle is separate from setup creation.
+- Journal is immutable event history; Experience is learning memory.
+- New models require controlled validation before promotion.
+- Execution remains separate from analysis.
+- Production data stays in persistent storage.
