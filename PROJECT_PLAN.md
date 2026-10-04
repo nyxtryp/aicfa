@@ -956,3 +956,21 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 - Fixed in production commit `b95d6108f2b0d1ede3884267b17f8d7a6db1182c`: Binance/Bybit core derivative fetches no longer block on liquidation collection. Liquidations remain explicitly optional event context and are not allowed to veto funding/OI/mark acquisition.
 - No symbol normalization was added. The canonical asset + authoritative venue mapping contract remains unchanged.
 - Next verification: derivative unit tests, then BTC/BONK targeted diagnostic. 
+
+
+### 2026-10-04 — DERIVATIVES PARTIAL-ENDPOINT PRESERVATION
+
+- The corrected BTC/BONK diagnostic showed BTC is now fully green: Binance supplied funding, OI and mark, confirming the liquidation-path isolation fix worked.
+- BONK remained partial because Binance returned HTTP 400 and Bybit returned API error 10001, while the CCXT fallback venues mostly hit the 3-second provider boundary. The direct Binance/Bybit providers still had one robustness gap: if any one of their funding/OI/mark HTTP calls failed, the entire provider attempt was discarded.
+- Hardened Binance and Bybit derivative providers so funding, open interest and mark are acquired independently. A contract-specific endpoint failure now leaves only that field unavailable and preserves other real fields from the same venue for field-level fallback.
+- Added regression tests for partial Binance and Bybit provider observations.
+- No fabricated derivative values, symbol normalization, asset-specific exception or trading-rule change was introduced.
+- Production commit: `793a648c7a6ab130a7aed54eca91ff7dfd63d0b9`.
+- Test commit: `90b1a6332f2422e7b533a284f0d6255b6e81a600`.
+
+### Next exact action
+
+1. Deploy the latest source/test commits through FrostDeploy.
+2. Run the derivative-focused tests.
+3. Re-run only BONK full-data diagnostic.
+4. If BONK is still partial, inspect which individual fields remain unavailable and continue provider-level capability/fallback work rather than adding an asset-specific exception.
