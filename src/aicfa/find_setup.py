@@ -389,6 +389,7 @@ def find_setup(
     derivatives_analysis = pd.DataFrame()
     derivatives_source = ""
     if requirements.requires(DataKind.FUNDING) or derivatives_provider is not None:
+        derivatives_started = time.perf_counter()
         try:
             derivatives_source_provider = derivatives_provider or FallbackDerivativesProvider()
             derivatives_frame, derivatives_source = derivatives_source_provider.fetch_derivatives(
@@ -405,14 +406,51 @@ def find_setup(
             derivatives_analysis = pd.DataFrame()
             derivatives_source = f"unavailable: {exc}"
 
+        derivatives_elapsed = (time.perf_counter() - derivatives_started) * 1000.0
         block_timings.append(
             DataBlockTiming(
                 "derivatives",
                 "complete" if not derivatives_frame.empty else "unavailable",
-                0.0,
+                derivatives_elapsed,
                 len(derivatives_frame),
                 provider=derivatives_source,
                 reason="" if not derivatives_frame.empty else derivatives_source,
+            )
+        )
+        for block_name, column in (
+            ("funding", "funding_rate"),
+            ("open_interest", "open_interest"),
+            ("mark_price", "mark_price"),
+        ):
+            covered = (
+                not derivatives_frame.empty
+                and column in derivatives_frame.columns
+                and derivatives_frame[column].notna().any()
+            )
+            block_timings.append(
+                DataBlockTiming(
+                    block_name,
+                    "complete" if covered else "unavailable",
+                    derivatives_elapsed,
+                    int(derivatives_frame[column].notna().sum()) if column in derivatives_frame.columns else 0,
+                    provider=derivatives_source,
+                    reason="" if covered else f"missing {column}",
+                )
+            )
+        liquidation_column = "liquidation_volume"
+        liquidation_events = (
+            int(derivatives_frame[liquidation_column].notna().sum())
+            if liquidation_column in derivatives_frame.columns and not derivatives_frame.empty
+            else 0
+        )
+        block_timings.append(
+            DataBlockTiming(
+                "liquidations",
+                "complete" if liquidation_events else "no_events",
+                derivatives_elapsed,
+                liquidation_events,
+                provider=derivatives_source,
+                reason="" if liquidation_events else "no liquidation events observed in provider window",
             )
         )
         market_evidence = append_derivatives_evidence(
@@ -646,5 +684,6 @@ def find_setup(
             evidence_duration_ms=evidence_duration_ms,
             setup_duration_ms=setup_duration_ms,
             decision_duration_ms=decision_duration_ms,
+            refetched_timeframes=tuple(refetched_timeframes),
         ),
     )
