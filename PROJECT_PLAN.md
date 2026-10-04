@@ -1072,6 +1072,11 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 
 
 ### 2026-10-04 — MTF conflict reason specificity
+- Corrected the final conflict aggregation so the canonical MTF conflict reason is preserved without a scenario-name prefix.
+- The setup engine now exposes exactly `lower confirmation conflicts with higher-timeframe structure` in the conflict contract while still returning material WAIT.
+- This keeps the conflict machine-readable/stable for callers and regression tests instead of coupling it to individual scenario names.
+- Source commit: `e9519e21ea9fee4a20c3b9fdf3d985df939ddb46`.
+
 - The MTF setup test exposed an ordering issue: when both the broader structure and the direct confirmation conflicted, the engine reported the broader conflict first.
 - The direction resolver now reports the most specific direct lower-confirmation conflict first, while preserving the broader higher-timeframe conflict as the fallback.
 - Commit: `caf243114bb7e32db896e0107a252756359456dc`.
