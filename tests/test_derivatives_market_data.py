@@ -70,6 +70,46 @@ def test_derivatives_evidence_marks_unavailable_data_without_fabrication():
     assert result.missing_context == ()
 
 
+
+def test_fallback_derivatives_uses_only_explicitly_mapped_venues():
+    class FakeProvider:
+        def __init__(self, exchange, calls, value):
+            self.exchange = exchange
+            self.calls = calls
+            self.value = value
+
+        def fetch_derivatives(self, *, symbol, limit, native_symbol=None):
+            self.calls.append(self.exchange)
+            return pd.DataFrame({
+                "timestamp": [1000],
+                "funding_rate": [0.001],
+                "open_interest": [self.value],
+                "liquidation_volume": [None],
+                "long_liquidation_volume": [None],
+                "short_liquidation_volume": [None],
+                "mark_price": [50000.0],
+            })
+
+    from aicfa.derivatives_market_data import FallbackDerivativesProvider
+    calls = []
+    provider = FallbackDerivativesProvider(
+        providers=(
+            FakeProvider("binance", calls, 1),
+            FakeProvider("okx", calls, 2),
+            FakeProvider("mexc", calls, 3),
+        ),
+        cache_ttl_seconds=0,
+    )
+    frame, sources = provider.fetch_derivatives(
+        symbol="US500/USDT:USDT",
+        limit=10,
+        venue_symbols=(("okx", "US500/USDT:USDT"), ("mexc", "SPX500/USDT:USDT")),
+    )
+    assert not frame.empty
+    assert calls == ["okx"]
+    assert sources == "funding_rate=okx,open_interest=okx,mark_price=okx"
+
+
 def test_binance_provider_preserves_partial_fields_when_one_endpoint_fails(monkeypatch):
     provider = BinanceDerivativesProvider()
     responses = {
