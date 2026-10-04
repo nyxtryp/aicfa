@@ -1194,3 +1194,21 @@ This stage is **not GREEN** until the repository contains the rotation engine an
 - Production VDS data-layer diagnostic for XMR completed successfully: full six-timeframe OHLCV plus trades, order book, order-book history and futures derivatives were available from Binance in **6.51s**.
 - XMR was used only as the first real diagnostic sample because it is a currently configured futures market; it is not being treated as a special market or benchmark.
 - The next measurement set must include representative liquid crypto, smaller crypto and TradFi markets before any hard per-market budget is selected.
+
+
+## 2026-10-04 — STEP 4 WHOLE-MARKET EXECUTION BUDGET
+
+Representative production measurements on the VDS:
+- BTC: 12.539s
+- ETH: 12.447s
+- XMR: 12.694s
+- SP500: 13.708s (slowest representative market)
+- NASDAQ100: 9.765s
+
+The dominant cost is feature construction: 7.111–9.084s per market. OHLCV snapshot acquisition was 1.960–4.641s; resolution was 0.001–0.637s. No horizon refetch occurred for the crypto sample; SP500 performed one 1w missing-context refetch.
+
+A measured initial whole-market hard budget of **20 seconds** is now enforced by AutonomousScanEngine.scan_market(). The budget is based on the observed 13.708s maximum plus operational headroom, not an arbitrary signal threshold. A timeout is recorded as a structured market result with status=timeout and the sequential queue can advance to the next configured market.
+
+Important diagnostic finding retained for follow-up: the production horizon path currently wraps the MarketAwareFallbackProvider inside the generic fallback adapter, so optional trades/order-book feeds report unsupported-provider coverage; the standalone full-data checker still proves the underlying derivatives/data layer works. This is a routing/integration issue, not a reason to block OHLCV/SMC analysis.
+
+Next: verify the timeout regression on VDS, then build the deterministic finite 141-market rotation/cycle metrics and measure a real full rotation before tightening the budget or optimizing the feature bottleneck.
