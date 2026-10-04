@@ -510,3 +510,52 @@ def test_ccxt_provider_preserves_partial_fields_when_optional_current_calls_fail
     assert frame["funding_rate"].isna().all()
     assert frame["open_interest"].notna().any()
     assert frame["mark_price"].notna().any()
+
+
+def test_okx_direct_provider_combines_funding_oi_and_mark(monkeypatch):
+    from aicfa.derivatives_market_data import OkxDerivativesProvider
+
+    responses = {
+        "public/funding-rate-history": {
+            "code": "0",
+            "data": [{"fundingTime": "1000", "fundingRate": "0.001"}],
+        },
+        "public/open-interest": {
+            "code": "0",
+            "data": [{"ts": "1100", "oiUsd": "123456"}],
+        },
+        "public/mark-price": {
+            "code": "0",
+            "data": [{"ts": "1200", "markPx": "50000"}],
+        },
+    }
+
+    def fake_get(path, params):
+        return responses[path]
+
+    provider = OkxDerivativesProvider()
+    monkeypatch.setattr(provider, "_get", fake_get)
+    frame = provider.fetch_derivatives(symbol="BONK/USDT", limit=10)
+
+    assert frame["funding_rate"].notna().any()
+    assert frame["open_interest"].notna().any()
+    assert frame["mark_price"].notna().any()
+
+
+def test_okx_direct_provider_keeps_partial_fields(monkeypatch):
+    from aicfa.derivatives_market_data import OkxDerivativesProvider
+
+    def fake_get(path, params):
+        if path == "public/open-interest":
+            raise RuntimeError("OI unavailable")
+        if path == "public/funding-rate-history":
+            return {"code": "0", "data": [{"fundingTime": "1000", "fundingRate": "0.001"}]}
+        return {"code": "0", "data": [{"ts": "1200", "markPx": "50000"}]}
+
+    provider = OkxDerivativesProvider()
+    monkeypatch.setattr(provider, "_get", fake_get)
+    frame = provider.fetch_derivatives(symbol="BONK/USDT", limit=10)
+
+    assert frame["funding_rate"].notna().any()
+    assert frame["mark_price"].notna().any()
+    assert frame["open_interest"].isna().all()
