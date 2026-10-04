@@ -874,3 +874,23 @@ PYTHONWARNINGS=ignore PYTHONPATH=src .venv/bin/python scripts/verify_tradfi_targ
 3. Run focused FindSetup/decision tests to verify missing derivatives cannot gate a structural setup.
 4. Re-run XCU, then BONK/NATGAS targeted diagnostics using the universal field-level fallback.
 5. Only after those checks, continue the broader affected-market verification.
+
+
+### 2026-10-04 — DERIVATIVES FALLBACK HARD TIMEOUT FIX
+
+- Targeted verification of XCU/BONK/NATGAS exposed a real implementation gap: the configured 3-second provider timeout was only passed into individual CCXT/HTTP operations; a provider attempt containing multiple operations could still exceed that boundary and stall the universal fallback.
+- Added a hard per-provider attempt timeout around `FallbackDerivativesProvider`, so a slow/blocked venue is abandoned after the configured provider timeout and the next eligible venue is tried.
+- A timed-out provider is not allowed to block fallback completion while its underlying network/CCXT call unwinds.
+- Kept field-level aggregation unchanged: funding, open interest and mark price remain independently sourced and causally combined; no value is fabricated.
+- Hardened Gate/CCXT swap initialization by disabling unnecessary currency fetching, avoiding the unrelated spot-currency request observed during XCU diagnostics.
+- Added regression coverage proving a slow provider is bypassed within the hard timeout and Gate keeps swap routing without currency discovery.
+- Production commit: `eef91da14458d6c8f6b0e902509508f5a16d0c2b`.
+- Test commit: `228bbdafea2af78ff522c7dd8917d065efba4ec3`.
+
+### Next exact action
+
+1. Deploy these two commits through FrostDeploy.
+2. Run `tests/test_derivatives_market_data.py` and `tests/test_derivatives_contextual.py`.
+3. Run focused FindSetup/decision tests again to confirm no regression.
+4. Re-run targeted `XCU BONK NATGAS` full-data diagnostics.
+5. If green, continue the broader derivatives-affected market verification.
