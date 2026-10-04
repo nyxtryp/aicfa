@@ -36,3 +36,43 @@ def test_router_falls_back_using_the_second_venues_own_symbol():
     assert result.symbol == "TON/USDT:USDT"
     assert first.calls == ["TON/USDT"]
     assert second.calls == ["TON/USDT:USDT"]
+
+
+class SlowResolverProvider(Provider):
+    def __init__(self, name, symbol, delay):
+        super().__init__(name, symbol)
+        self.delay = delay
+
+    def resolve_symbol(self, asset, *, market_type="spot"):
+        import time
+        time.sleep(self.delay)
+        return super().resolve_symbol(asset, market_type=market_type)
+
+
+def test_router_bypasses_slow_resolver_and_uses_next_venue():
+    slow = SlowResolverProvider("slow", "SLOW/USDT", 10.0)
+    second = Provider("second", "TON/USDT:USDT")
+    router = MarketAwareFallbackProvider([slow, second])
+    import time
+    started = time.monotonic()
+    resolved = router.resolve_market("TON/USDT", market_type="futures")
+    elapsed = time.monotonic() - started
+    assert resolved.provider == "second"
+    assert resolved.symbol == "TON/USDT:USDT"
+    assert elapsed < 4.5
+
+
+def test_router_missing_market_does_not_serialize_all_venues():
+    providers = [SlowResolverProvider(f"slow-{index}", None, 10.0) for index in range(7)]
+    router = MarketAwareFallbackProvider(providers)
+    import time
+    started = time.monotonic()
+    try:
+        router.resolve_market("MISSING/USDT", market_type="futures")
+    except ValueError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected unresolved market")
+    elapsed = time.monotonic() - started
+    assert "resolver timed out after 3.0s" in message
+    assert elapsed < 7.5
