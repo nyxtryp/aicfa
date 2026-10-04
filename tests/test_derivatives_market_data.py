@@ -246,8 +246,47 @@ def test_fallback_can_combine_derivative_fields_from_different_venues():
     assert out["funding_rate"].notna().any()
     assert out["open_interest"].notna().any()
     assert out["mark_price"].notna().any()
-    assert sources == "funding_venue,oi_venue,mark_venue"
+    assert sources == "funding_rate=funding_venue,open_interest=oi_venue,mark_price=mark_venue"
 
+
+
+def test_fallback_stops_after_core_is_complete():
+    from aicfa.derivatives_market_data import FallbackDerivativesProvider
+
+    class Provider:
+        def __init__(self, exchange, frame=None, should_fail=False):
+            self.exchange = exchange
+            self.frame = frame
+            self.should_fail = should_fail
+            self.calls = 0
+
+        def fetch_derivatives(self, **kwargs):
+            self.calls += 1
+            if self.should_fail:
+                raise AssertionError("slow/unnecessary provider was queried")
+            return self.frame
+
+    def frame(**values):
+        row = {"timestamp": 1000}
+        row.update(values)
+        return pd.DataFrame([row])
+
+    first = Provider("core_venue", frame(
+        funding_rate=0.001,
+        open_interest=123.0,
+        mark_price=50000.0,
+    ))
+    slow = Provider("slow_optional_venue", should_fail=True)
+
+    out, sources = FallbackDerivativesProvider(
+        providers=(first, slow)
+    ).fetch_derivatives(symbol="XCU/USDT", limit=5)
+
+    assert out["funding_rate"].notna().any()
+    assert out["open_interest"].notna().any()
+    assert out["mark_price"].notna().any()
+    assert slow.calls == 0
+    assert sources == "funding_rate=core_venue,open_interest=core_venue,mark_price=core_venue"
 
 def test_ccxt_provider_uses_explicit_native_futures_symbol():
     class FakeExchange:
