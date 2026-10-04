@@ -711,13 +711,17 @@ class CcxtDerivativesProvider:
         if not rows:
             current_method = getattr(self._exchange, "fetch_funding_rate", None)
             if callable(current_method):
-                item = current_method(symbol)
-                ts = item.get("timestamp") or item.get("fundingTimestamp") or int(time.time() * 1000)
-                rate = item.get("fundingRate")
-                ts = self._number(ts)
-                rate = self._number(rate)
-                if ts is not None and rate is not None:
-                    rows.append({"timestamp": int(ts), "funding_rate": rate})
+                try:
+                    item = current_method(symbol)
+                except Exception:
+                    item = None
+                if isinstance(item, dict):
+                    ts = item.get("timestamp") or item.get("fundingTimestamp") or int(time.time() * 1000)
+                    rate = item.get("fundingRate")
+                    ts = self._number(ts)
+                    rate = self._number(rate)
+                    if ts is not None and rate is not None:
+                        rows.append({"timestamp": int(ts), "funding_rate": rate})
         return rows
 
     def _oi_rows(self, symbol: str, limit: int) -> list[dict]:
@@ -748,15 +752,19 @@ class CcxtDerivativesProvider:
         if not rows:
             current_method = getattr(self._exchange, "fetch_open_interest", None)
             if callable(current_method):
-                item = current_method(symbol)
-                ts = item.get("timestamp") or int(time.time() * 1000)
-                value = item.get("openInterestValue")
-                if value is None:
-                    value = item.get("openInterestAmount")
-                ts = self._number(ts)
-                value = self._number(value)
-                if ts is not None and value is not None:
-                    rows.append({"timestamp": int(ts), "open_interest": value})
+                try:
+                    item = current_method(symbol)
+                except Exception:
+                    item = None
+                if isinstance(item, dict):
+                    ts = item.get("timestamp") or int(time.time() * 1000)
+                    value = item.get("openInterestValue")
+                    if value is None:
+                        value = item.get("openInterestAmount")
+                    ts = self._number(ts)
+                    value = self._number(value)
+                    if ts is not None and value is not None:
+                        rows.append({"timestamp": int(ts), "open_interest": value})
         return rows
 
     def fetch_derivatives(
@@ -789,21 +797,21 @@ class CcxtDerivativesProvider:
         if mark_row is None:
             ticker_method = getattr(self._exchange, "fetch_ticker", None)
             if callable(ticker_method):
-                ticker = ticker_method(resolved_symbol)
-                info = ticker.get("info") if isinstance(ticker, dict) else {}
-                mark = self._number(
-                    ticker.get("markPrice") if isinstance(ticker, dict) else None
-                )
-                if mark is None and isinstance(info, dict):
-                    for key in ("markPrice", "markPx", "mark_price"):
-                        mark = self._number(info.get(key))
-                        if mark is not None:
-                            break
-                ts = self._number(
-                    ticker.get("timestamp") if isinstance(ticker, dict) else None
-                ) or int(time.time() * 1000)
-                if mark is not None:
-                    mark_row = {"timestamp": int(ts), "mark_price": mark}
+                try:
+                    ticker = ticker_method(resolved_symbol)
+                except Exception:
+                    ticker = None
+                if isinstance(ticker, dict):
+                    info = ticker.get("info")
+                    mark = self._number(ticker.get("markPrice"))
+                    if mark is None and isinstance(info, dict):
+                        for key in ("markPrice", "markPx", "mark_price"):
+                            mark = self._number(info.get(key))
+                            if mark is not None:
+                                break
+                    ts = self._number(ticker.get("timestamp")) or int(time.time() * 1000)
+                    if mark is not None:
+                        mark_row = {"timestamp": int(ts), "mark_price": mark}
 
         return _merge_sources(
             funding_rows=funding_rows,
