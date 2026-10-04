@@ -528,7 +528,7 @@ def build_zone_reaction(
         candle_low = float(lows[i])
         candle_high = float(highs[i])
 
-            def _append_bucket_candidates(bucket_ids, source_buckets):
+        def _append_bucket_candidates(bucket_ids, source_buckets):
             for bucket_id in bucket_ids:
                 raw_bucket = source_buckets.get(bucket_id)
                 if not raw_bucket:
