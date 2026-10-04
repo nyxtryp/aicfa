@@ -231,6 +231,7 @@ class SharedSnapshotMarketDataProvider:
         self._lock = threading.Lock()
         self._snapshots: dict[SnapshotKey, _Snapshot] = {}
         self._last_snapshot_metrics: tuple[SnapshotMetric, ...] = ()
+        self._aux_cache: dict[tuple[object, ...], tuple[float, MarketFetchResult]] = {}
 
     def resolve_symbol(self, asset: str, *, market_type: str = "spot") -> str:
         return self._provider.resolve_symbol(asset, market_type=market_type)
@@ -291,24 +292,55 @@ class SharedSnapshotMarketDataProvider:
     def last_snapshot_metrics(self) -> tuple[SnapshotMetric, ...]:
         return self._last_snapshot_metrics
 
+    def _aux_get(self, key: tuple[object, ...]):
+        cached = self._aux_cache.get(key)
+        if cached is not None and self._clock() - cached[0] < self._ttl_seconds:
+            return clone_result(cached[1])
+        return None
+
+    def _aux_put(self, key: tuple[object, ...], result: MarketFetchResult):
+        self._aux_cache[key] = (self._clock(), clone_result(result))
+        return clone_result(result)
+
     def fetch_trades_with_source(self, *, symbol: str, market_type: str, limit: int):
-        return self._provider.fetch_trades_with_source(
-            symbol=symbol, market_type=market_type, limit=limit
+        key = ("trades", market_type, symbol, int(limit))
+        cached = self._aux_get(key)
+        if cached is not None:
+            return cached
+        return self._aux_put(
+            key,
+            self._provider.fetch_trades_with_source(
+                symbol=symbol, market_type=market_type, limit=limit
+            ),
         )
 
     def fetch_order_book_with_source(self, *, symbol: str, market_type: str, limit: int = 1):
-        return self._provider.fetch_order_book_with_source(
-            symbol=symbol, market_type=market_type, limit=limit
+        key = ("order_book", market_type, symbol, int(limit))
+        cached = self._aux_get(key)
+        if cached is not None:
+            return cached
+        return self._aux_put(
+            key,
+            self._provider.fetch_order_book_with_source(
+                symbol=symbol, market_type=market_type, limit=limit
+            ),
         )
 
     def fetch_order_book_history_with_source(
         self, *, symbol: str, market_type: str, snapshots: int, interval_seconds: float
     ):
-        return self._provider.fetch_order_book_history_with_source(
-            symbol=symbol,
-            market_type=market_type,
-            snapshots=snapshots,
-            interval_seconds=interval_seconds,
+        key = ("order_book_history", market_type, symbol, int(snapshots), float(interval_seconds))
+        cached = self._aux_get(key)
+        if cached is not None:
+            return cached
+        return self._aux_put(
+            key,
+            self._provider.fetch_order_book_history_with_source(
+                symbol=symbol,
+                market_type=market_type,
+                snapshots=snapshots,
+                interval_seconds=interval_seconds,
+            ),
         )
 
     def fetch_order_book_history(
@@ -332,6 +364,7 @@ class SharedSnapshotMarketDataProvider:
     def clear(self) -> None:
         with self._lock:
             self._snapshots.clear()
+            self._aux_cache.clear()
 
 def clone_result(result: MarketFetchResult) -> MarketFetchResult:
     return MarketFetchResult(result.provider, result.symbol, result.frame.copy(deep=True), result.attempts)
