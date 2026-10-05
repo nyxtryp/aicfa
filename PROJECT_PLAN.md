@@ -420,22 +420,166 @@ Completed:
 - After modification, validate Caddy configuration before reload, reload Caddy, then test both local and external API access.
 - Do not expose write methods; the journal feed remains read-only.
 
-### STEP 12 — First AICFA monitoring website
-Build the first real product surface directly on the centralized scanner/feed.
-Minimum:
-- live setup feed;
-- active setups;
-- Intraday/Swing/Position;
-- LONG/SHORT/WAIT;
-- Entry/SL/TP/RR;
-- structure/liquidity/OB/FVG/volume evidence;
-- freshness;
-- lifecycle;
-- data coverage;
-- diagnostics;
-- historical events;
-- visible WAIT/no-trade states.
-The website must consume central results, never run a full market scan per user.
+### 2026-10-05 — STEP 11.2 — ВЫБРАН ПУБЛИЧНЫЙ HOSTNAME: aicfa.nyxtryp.ru
+
+- Текущий production/public hostname для AICFA Feed: **aicfa.nyxtryp.ru**.
+- Корневой домен **aicfa.ru** остаётся основным публичным брендовым доменом AICFA и должен оставаться видимым пользователю в адресной строке.
+- **aicfa.ru уже привязан к HTML-сайту AICFA Web**, который развёрнут через проект AICFA Web и технически представлен hostname **aicfa-web.nyxtryp.ru**.
+- **aicfa-web.nyxtryp.ru — технический/platform hostname, а не пользовательский адрес.** Пользователь не должен на него перенаправляться и не должен его видеть.
+- Публичная схема AICFA:
+  - **aicfa.ru** — публичный адрес и бренд, который видит пользователь;
+  - **aicfa.nyxtryp.ru** — production Feed / application backend;
+  - **aicfa-web.nyxtryp.ru** — технический hostname деплоя AICFA Web, не показываемый пользователю.
+- Публичный сайт должен использовать Feed/application через **aicfa.nyxtryp.ru**, но браузер пользователя должен продолжать показывать **aicfa.ru**.
+- DNS управляется через REG.RU.
+- Текущие записи REG.RU для корневого домена:
+  - A @ → 95.163.244.138
+  - A www → 95.163.244.138
+- Реализация DNS/reverse-proxy должна сохранять **aicfa.ru как видимый публичный hostname**.
+- Пользовательский redirect с **aicfa.ru** на **aicfa.nyxtryp.ru** или **aicfa-web.nyxtryp.ru** запрещён.
+
+### STEP 12 — ПЕРВЫЙ НАСТОЯЩИЙ САЙТ МОНИТОРИНГА AICFA
+
+Создать полноценный, качественно оформленный пользовательский интерфейс AICFA поверх централизованного Scanner/Feed.
+
+Это должен быть **настоящий production-grade проект**, а не техническая страница или простая API-витрина. Нужны профессиональные визуальная иерархия, навигация, типографика, карточки сетапов, живая лента, состояния, поиск и понятная работа на мобильных и десктопных экранах.
+
+### Публичный адрес
+
+- Пользователь открывает **aicfa.ru** и остаётся на **aicfa.ru**.
+- **aicfa.nyxtryp.ru** используется как production Feed/application endpoint и не должен становиться адресом страницы в браузере.
+- **aicfa-web.nyxtryp.ru** является техническим/platform hostname и также не должен отображаться пользователю.
+- При переходах внутри продукта браузер продолжает показывать **aicfa.ru**.
+
+### Основные элементы сайта
+
+1. **Строка поиска / запроса для будущего ИИ**
+   - заметное поле для будущего взаимодействия с AICFA AI;
+   - на первом этапе это может быть подготовленный интерфейсный элемент без незавершённой AI-логики;
+   - поиск не должен запускать полный market scan на каждый пользовательский запрос.
+
+2. **Живая лента сетапов**
+   - новые найденные сетапы автоматически появляются;
+   - сетапы показываются последовательно, друг за другом;
+   - пользователь не запускает сканирование вручную;
+   - лента обновляется по мере появления новых центральных результатов.
+
+3. **Активные сетапы**
+   - текущие живые сетапы;
+   - lifecycle;
+   - направление;
+   - горизонт;
+   - актуальность.
+
+4. **Основные горизонты**
+   - Intraday;
+   - Swing;
+   - Position.
+
+5. **Состояния / направление**
+   - LONG;
+   - SHORT;
+   - WAIT;
+   - NO TRADE.
+
+6. **Торговая геометрия**
+   - Entry;
+   - SL;
+   - TP;
+   - RR.
+
+7. **Доказательная часть сетапа**
+   - market structure;
+   - liquidity;
+   - OB;
+   - FVG;
+   - volume evidence.
+
+8. **Свежесть данных**
+   - timestamp;
+   - возраст результата;
+   - актуальность данных.
+
+9. **Lifecycle сетапа**
+   - создан;
+   - активен;
+   - усилен/обновлён;
+   - TP1;
+   - TP2/completed;
+   - invalidated;
+   - expired;
+   - outcome recorded.
+
+10. **Покрытие данных**
+    - доступные timeframe;
+    - доступность источников;
+    - состояние необходимых данных;
+    - отсутствие обязательной информации должно быть явно видно.
+
+11. **Диагностика**
+    - релевантные production diagnostics;
+    - состояние источников;
+    - scan/processing timing;
+    - проблемы качества данных, если они есть.
+
+12. **Исторические события**
+    - предыдущие сетапы;
+    - lifecycle events;
+    - результаты;
+    - история отдельно от текущей живой ленты.
+
+13. **WAIT / NO TRADE**
+    - полноценные видимые результаты AICFA;
+    - отсутствие сделки не должно выглядеть ошибкой или пустым экраном.
+
+### Автоматическая выдача сетапов и звук
+
+- Сетапы поступают **автоматически друг за другом** из центрального AICFA Scanner/Feed.
+- Пользователь не запускает полный анализ рынка вручную для каждого нового сетапа.
+- При обнаружении нового релевантного сетапа сайт должен выдавать **звуковое уведомление**.
+- Звук привязан к появлению нового события/сетапа, а не к постоянному обновлению страницы.
+- Необходимо учитывать browser autoplay restrictions: если браузер запрещает автоматический звук до первого взаимодействия пользователя, интерфейс должен предложить включить звук/уведомления и после разрешения воспроизводить сигнал.
+- Для одного и того же события/сетапа должна быть защита от повторного звука.
+
+### Главное архитектурное правило
+
+Сайт **не должен запускать полный рыночный анализ для каждого пользователя**.
+
+Центральный поток:
+
+```
+AICFA Scanner
+      ↓
+Journal / Feed
+      ↓
+AICFA Website
+      ↓
+Пользователи
+```
+
+Один централизованный Scanner анализирует рынок, сохраняет результаты в Journal, Feed отдаёт уже рассчитанные результаты, а сайт только отображает и распространяет их пользователям.
+
+### Требование к публичному URL
+
+Публичный UI должен быть отделён от технических hostname:
+
+```
+Пользователь
+   ↓
+aicfa.ru
+   ↓
+AICFA Web UI
+   ↓
+центральный Feed
+   ↓
+aicfa.nyxtryp.ru
+```
+
+При этом **aicfa.nyxtryp.ru не должен становиться адресом страницы в браузере**. Предпочтительный принцип — same-origin/proxy/API integration через публичный **aicfa.ru**, а не пользовательский redirect.
+
+### Следующий этап
+
+После завершения production-grade сайта перейти к **STEP 13 — СТАБИЛЬНАЯ МОДЕЛЬ СОБЫТИЙ**.
 
 ### STEP 13 — Stable event model
 Add explicit:
@@ -713,16 +857,3 @@ The persistence/feed architecture itself worked correctly; the invalid target is
 - Execution remains separate from analysis.
 - Production data stays in persistent storage.
 - Infrastructure changes must be recorded in this plan before moving to the next stage.
-
-
-### 2026-10-05 — STEP 11.2 — PUBLIC HOSTNAME SELECTED: ai.aicfa.ru
-
-- Current production/public hostname for the AICFA feed is **ai.aicfa.ru**.
-- The root domain **aicfa.ru** remains the AICFA brand domain and may be used differently later.
-- DNS is managed through REG.RU.
-- Current REG.RU zone already points:
-  - `A @ → 95.163.244.138`
-  - `A www → 95.163.244.138`
-- Next infrastructure action: add `A ai → 95.163.244.138` in REG.RU.
-- Then configure Caddy to reverse-proxy only `ai.aicfa.ru` to the local read-only journal feed at `127.0.0.1:8090`.
-- Future hostname/domain changes remain possible without changing the AICFA analytical core.
