@@ -64,6 +64,8 @@ class HorizonSetup:
     description: TradeDescription
     identity: SetupIdentity | None = None
     lifecycle_result: SetupLifecycleResult | None = None
+    evidence_concepts: tuple[str, ...] = ()
+    decision_action: str = "wait"
 
 
 @dataclass(frozen=True)
@@ -262,6 +264,16 @@ def analyze_market_horizons(
             for item in mode_lifecycle
             if item.identity is not None
         }
+        if str(result.decision_assessment.action.value) not in {"long", "short"}:
+            continue
+
+        evidence_concepts = tuple(
+            dict.fromkeys(
+                item.concept_id
+                for item in getattr(result.evidence_assessment, "observations", ())
+                if item.state == "observed" and item.confidence >= 0.5
+            )
+        )
         for candidate in candidates:
             description = build_trade_description(result, candidate, now_ms=now_ms)
             identity = (
@@ -283,6 +295,8 @@ def analyze_market_horizons(
                     lifecycle_result=(
                         lifecycle_by_identity.get(identity) if identity is not None else None
                     ),
+                    evidence_concepts=evidence_concepts,
+                    decision_action=str(result.decision_assessment.action.value),
                 )
             )
 
