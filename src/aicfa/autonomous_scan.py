@@ -24,6 +24,7 @@ from .market_orchestrator import (
 from .market_universe import MarketUniverse
 from .setup_lifecycle import ActiveSetup, SetupLifecycle
 from .persistent_journal import PersistentJournal
+from .setup_registry import SetupRegistry
 
 
 MAIN_SCAN_INTERVAL_SECONDS = 300
@@ -124,6 +125,7 @@ class AutonomousScanEngine:
             raise ValueError("market_timeout_seconds must be greater than zero")
         self.market_timeout_seconds = float(market_timeout_seconds)
         self.journal = journal if journal is not None else PersistentJournal.from_env()
+        self.registry = SetupRegistry.from_env()
         self.modes = tuple(modes)
         self.lifecycle = SetupLifecycle()
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
@@ -135,6 +137,8 @@ class AutonomousScanEngine:
     def _journal_state(self, state: AutonomousScanState) -> None:
         if self.journal is not None:
             self.journal.record_scan(state)
+        if self.registry is not None:
+            self.registry.record_scan(state)
 
     @property
     def last_state(self) -> AutonomousScanState | None:
