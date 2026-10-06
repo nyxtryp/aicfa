@@ -1,12 +1,6 @@
 {
   "markets": [
     {
-      "asset": "XMR/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
       "asset": "BTC/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
