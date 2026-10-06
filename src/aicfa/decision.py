@@ -60,6 +60,7 @@ def decide(
     setup_assessment: SetupAssessment,
     *,
     observations: tuple[VisualObservation, ...] = (),
+    current_price: float | None = None,
 ) -> DecisionAssessment:
     """Gate setup candidates into LONG/SHORT/WAIT/NO_TRADE.
 
@@ -165,6 +166,61 @@ def decide(
             ),
         )
 
+    # A confirmed reaction is not an invitation to chase price after it has
+    # already left the actionable zone. Final LONG/SHORT remains actionable
+    # only while price is inside the zone or close enough for a retest.
+    if current_price is not None:
+        for candidate in setup_assessment.candidates:
+            if len(candidate.entry_zone) < 2:
+                continue
+            entry_low = min(level.value for level in candidate.entry_zone)
+            entry_high = max(level.value for level in candidate.entry_zone)
+            first_target = candidate.target_levels[0].value if candidate.target_levels else None
+            tolerance = abs(float(current_price)) * 0.0075
+            if side == "long":
+                if first_target is not None and current_price >= first_target:
+                    return DecisionAssessment(
+                        action=DecisionAction.WAIT, candidates=(),
+                        missing_context=setup_assessment.missing_context + ("the first long target has already been reached",),
+                        conflicts=setup_assessment.conflicts,
+                        reasons=("confirmed setup is no longer actionable at the current price; target already reached",),
+                    )
+                if current_price > entry_high + tolerance:
+                    return DecisionAssessment(
+                        action=DecisionAction.WAIT, candidates=(),
+                        missing_context=setup_assessment.missing_context + ("price is above the actionable long entry zone",),
+                        conflicts=setup_assessment.conflicts,
+                        reasons=("price has already left the long entry zone; wait for a retest instead of chasing",),
+                    )
+                if current_price < entry_low - tolerance:
+                    return DecisionAssessment(
+                        action=DecisionAction.WAIT, candidates=(),
+                        missing_context=setup_assessment.missing_context + ("price is below the actionable long entry zone",),
+                        conflicts=setup_assessment.conflicts,
+                        reasons=("current price is outside the long entry geometry",),
+                    )
+            else:
+                if first_target is not None and current_price <= first_target:
+                    return DecisionAssessment(
+                        action=DecisionAction.WAIT, candidates=(),
+                        missing_context=setup_assessment.missing_context + ("the first short target has already been reached",),
+                        conflicts=setup_assessment.conflicts,
+                        reasons=("confirmed setup is no longer actionable at the current price; target already reached",),
+                    )
+                if current_price < entry_low - tolerance:
+                    return DecisionAssessment(
+                        action=DecisionAction.WAIT, candidates=(),
+                        missing_context=setup_assessment.missing_context + ("price is below the actionable short entry zone",),
+                        conflicts=setup_assessment.conflicts,
+                        reasons=("price has already left the short entry zone; wait for a retest instead of chasing",),
+                    )
+                if current_price > entry_high + tolerance:
+                    return DecisionAssessment(
+                        action=DecisionAction.WAIT, candidates=(),
+                        missing_context=setup_assessment.missing_context + ("price is above the actionable short entry zone",),
+                        conflicts=setup_assessment.conflicts,
+                        reasons=("current price is outside the short entry geometry",),
+                    )
     action = DecisionAction.LONG if side == "long" else DecisionAction.SHORT
     candidates = tuple(
         DecisionCandidate(
