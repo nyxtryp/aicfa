@@ -21,6 +21,7 @@ if str(SRC) not in sys.path:
 
 from aicfa.autonomous_scan import AutonomousScanEngine
 from aicfa.market_universe import load_market_universe
+from aicfa.market_control import serve_control
 
 
 DEFAULT_UNIVERSE_PATH = ROOT / "config" / "market_universe.json"
@@ -44,6 +45,14 @@ def main() -> None:
     universe_path = _universe_path()
     universe = load_market_universe(universe_path)
     engine = AutonomousScanEngine(universe)
+    control_thread = threading.Thread(
+        target=serve_control,
+        args=(engine,),
+        kwargs={"host": "127.0.0.1", "port": int(os.environ.get("AICFA_CONTROL_PORT", "8091"))},
+        name="aicfa-market-control",
+        daemon=True,
+    )
+    control_thread.start()
 
     print(
         f"AICFA autonomous worker started: markets={len(universe.markets)} "
