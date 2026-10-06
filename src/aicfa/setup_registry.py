@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .data_requirements import TradingMode, mode_timeframe_profile, normalize_trading_mode
-from .persistent_journal import _jsonable
+from .persistent_journal import _jsonable, _visual_geometry
 
 
 TIMEFRAME_MS = {
