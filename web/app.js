@@ -66,7 +66,7 @@ function scenarioText(s){
  };
  return map[String(s.scenario||"").toLowerCase()]||"Scenario is supported by the currently observed market evidence.";
 }
-function chartTf(mode){const m=String(mode||"").toUpperCase();return m==="POSITION"?"4h":m==="SWING"?"1h":"5m"}
+function chartTf(mode,setup){const entry=Array.isArray(setup?.entry_zone)?setup.entry_zone[0]:null;if(entry?.timeframe)return String(entry.timeframe);const m=String(mode||"").toUpperCase();return m==="POSITION"?"4h":m==="SWING"?"1h":"5m"}
 function renderCandleChart(node,candles,s){
  if(!candles?.length){node.innerHTML='<div class="chart-empty">NO OHLCV DATA</div>';return}
  if(!window.LightweightCharts){node.innerHTML='<div class="chart-empty">CHART LIBRARY UNAVAILABLE</div>';return}
@@ -103,11 +103,11 @@ async function hydrateCharts(){
 }
 function setupCard(x){
  const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
- const why=(s.rationale||[]).filter(v=>!v.startsWith("MTF hierarchy:")).join(" "),hierarchy=(s.rationale||[]).filter(v=>v.startsWith("MTF hierarchy:")).join(" · "),side=dir(s);
+ const why=(s.rationale||[]).filter(v=>!v.startsWith("MTF hierarchy:")),hierarchy=(s.rationale||[]).filter(v=>v.startsWith("MTF hierarchy:")).join(" · "),side=dir(s),tf=chartTf(x.mode,s);
  return '<article class="setup '+side.toLowerCase()+'">'+
  '<header class="setup-head"><div class="symbol-block"><b>'+esc(x.asset)+'</b><span>'+esc(hor(x.mode))+' / '+esc(s.scenario||"SETUP")+'</span></div><div class="signal"><i></i><strong>'+esc(side)+'</strong></div></header>'+
- '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(chartTf(x.mode).toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-timeframe="'+chartTf(x.mode)+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP <b>'+esc(tp)+'</b></span></div></section>'+
- '<aside class="setup-side"><div class="scenario"><span class="panel-kicker">SCENARIO</span><p>'+esc(scenarioText(s))+'</p></div><div class="evidence"><span class="panel-kicker">EVIDENCE</span>'+evidence(s,x)+'</div><div class="decision"><span class="panel-kicker">WHY '+esc(side)+'</span><p>'+esc(why||"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></aside></div></article>';
+ '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:s.chart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP <b>'+esc(tp)+'</b></span></div></section>'+
+ '<aside class="setup-side"><div class="scenario"><span class="panel-kicker">SCENARIO</span><p>'+esc(scenarioText(s))+'</p></div><div class="evidence"><span class="panel-kicker">EVIDENCE</span>'+evidence(s,x)+'</div><div class="decision"><span class="panel-kicker">WHY '+esc(side)+'</span><p>'+esc(why.length?why.join(" · "):"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></aside></div></article>';
 }
 function waitCards(ms){
  const out=[];
