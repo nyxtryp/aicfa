@@ -23,8 +23,11 @@ DATA_DIR = Path(os.getenv("AICFA_DATA_DIR", str(ROOT.parent / "data")))
 RAW_DIR = DATA_DIR / "raw"
 
 def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
-    normalized = symbol.strip().upper().replace("/", "_")
-    if "_" not in normalized and normalized.endswith("USDT"):
+    raw = symbol.strip().upper()
+    normalized = raw.replace("/", "_").replace(":", "_")
+    if normalized.endswith("_USDT_USDT"):
+        normalized = normalized[:-5]
+    elif normalized.endswith("USDT") and "_" not in normalized:
         normalized = normalized[:-4] + "_USDT"
     if not normalized or any(part in normalized for part in ("..", "/", "\\")):
         raise ValueError("invalid symbol")
@@ -34,18 +37,67 @@ def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
         limit = max(20, min(int(limit), 300))
     except (TypeError, ValueError):
         limit = 160
-    path = RAW_DIR / normalized / f"{timeframe}.csv"
-    if not path.is_file():
-        raise FileNotFoundError(path)
+
+    candidates = [
+        RAW_DIR / normalized / f"{timeframe}.csv",
+        RAW_DIR / normalized.replace("_USDT", "_USDT_USDT") / f"{timeframe}.csv",
+    ]
+    if raw.endswith(":USDT"):
+        candidates.append(RAW_DIR / raw.replace("/", "_").replace(":", "_") / f"{timeframe}.csv")
+
     rows = []
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        for row in reader:
-            try:
-                rows.append({"timestamp": int(row["timestamp"]), "open": float(row["open"]), "high": float(row["high"]), "low": float(row["low"]), "close": float(row["close"]), "volume": float(row["volume"])})
-            except (KeyError, TypeError, ValueError):
-                continue
-    return json.dumps({"symbol": symbol, "timeframe": timeframe, "candles": rows[-limit:]}, separators=(",", ":")).encode("utf-8")
+    path = next((p for p in candidates if p.is_file()), None)
+    if path is not None:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                try:
+                    rows.append({
+                        "timestamp": int(row["timestamp"]),
+                        "open": float(row["open"]),
+                        "high": float(row["high"]),
+                        "low": float(row["low"]),
+                        "close": float(row["close"]),
+                        "volume": float(row["volume"]),
+                    })
+                except (KeyError, TypeError, ValueError):
+                    continue
+
+    # Scanner markets can be Binance USD-M perpetuals (e.g. PEPE/USDT:USDT)
+    # while the historical downloader currently stores spot symbols locally.
+    # For a chart only, use Binance's public kline endpoint when no local file
+    # exists. This is read-only and keeps the scanner/journal untouched.
+    if not rows:
+        from urllib.parse import urlencode
+        quote = normalized.replace("_", "")
+        if raw.endswith(":USDT"):
+            endpoint = "https://fapi.binance.com/fapi/v1/klines"
+        else:
+            endpoint = "https://api.binance.com/api/v3/klines"
+        query = urlencode({"symbol": quote, "interval": timeframe, "limit": limit})
+        try:
+            with urlopen(Request(endpoint + "?" + query, method="GET"), timeout=8) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            for row in payload:
+                rows.append({
+                    "timestamp": int(row[0]),
+                    "open": float(row[1]),
+                    "high": float(row[2]),
+                    "low": float(row[3]),
+                    "close": float(row[4]),
+                    "volume": float(row[5]),
+                })
+        except Exception:
+            rows = []
+
+    if not rows:
+        raise FileNotFoundError(normalized)
+
+    return json.dumps(
+        {"symbol": symbol, "timeframe": timeframe, "candles": rows[-limit:]},
+        separators=(",", ":"),
+    ).encode("utf-8")
+
 
 class Handler(SimpleHTTPRequestHandler):
     server_version = "AICFA-Web/1.0"
