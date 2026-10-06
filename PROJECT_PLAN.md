@@ -399,25 +399,23 @@ These were in the original technical specification and must remain in the plan:
 
 ## 4. NEW MASTER ROADMAP
 
-### STEP 11 — Productionize the live feed — ACTIVE / CADDY NEXT
+### STEP 11 — Productionize the live feed — GREEN / DONE
 Completed:
 1. Replace manual `nohup` with systemd — **DONE**.
 2. Auto-start/restart after reboot/failure — **DONE**.
 3. Load production environment including `AICFA_DATA_DIR` — **DONE**.
 4. Verify permissions and ownership — **DONE**.
-5. Expose feed through Caddy — **NEXT**.
-6. Define production API route — **NEXT**.
-7. Verify external read-only access — **NEXT**.
+5. Expose the AICFA platform through FrostDeploy/Caddy — **DONE**.
+6. Define production project/domain routing under the `aicfa.ru` platform domain — **DONE**.
+7. Verify external read-only access — **DONE**.
 8. Keep scanner and feed processes separated — **DONE**.
 
-### STEP 11.1 — Caddy integration preparation — DONE
+### STEP 11.1 — Caddy/FrostDeploy integration — GREEN / SUPERSEDED
 - Inspected the live VDS Caddy installation and configuration.
 - Current config file: `/etc/caddy/Caddyfile`.
-- Current Caddy configuration is only the default `:80` site serving `/usr/share/caddy` via `file_server`.
-- No existing AICFA reverse-proxy route was found.
-- Therefore Caddy integration must be added without disturbing unrelated services.
-- Before exposing the API, choose the intended AICFA public hostname/path and add a narrow reverse-proxy route to `127.0.0.1:8090`.
-- After modification, validate Caddy configuration before reload, reload Caddy, then test both local and external API access.
+- The earlier standalone `/etc/caddy/Caddyfile` reverse-proxy approach is no longer the production architecture.
+- FrostDeploy owns the public project routing/TLS layer for the `aicfa.ru` platform domain.
+- The Journal Feed remains a local read-only service and is consumed through the platform architecture rather than by exposing a separate ad-hoc Caddy hostname.
 - Do not expose write methods; the journal feed remains read-only.
 
 ### 2026-10-06 — STEP 11.2 — НОВАЯ ПЛАТФОРМЕННАЯ АРХИТЕКТУРА: aicfa.ru КАК ДОМЕН FROSTDEPLOY
@@ -517,8 +515,8 @@ A * → IP AICFA VDS
 ### Публичный адрес
 
 - Пользователь открывает **aicfa.ru** и остаётся на **aicfa.ru**.
-- **aicfa.nyxtryp.ru** используется как production Feed/application endpoint и не должен становиться адресом страницы в браузере.
-- **aicfa-web.nyxtryp.ru** является техническим/platform hostname и также не должен отображаться пользователю.
+- Technical Feed/application hostnames are internal platform details and must not become the user-facing browser URL.
+- The user-facing product URL is **aicfa.ru**.
 - При переходах внутри продукта браузер продолжает показывать **aicfa.ru**.
 
 ### Основные элементы сайта
@@ -642,7 +640,7 @@ AICFA Web UI
    ↓
 центральный Feed
    ↓
-aicfa.nyxtryp.ru
+Journal / Feed service
 ```
 
 При этом **aicfa.nyxtryp.ru не должен становиться адресом страницы в браузере**. Предпочтительный принцип — same-origin/proxy/API integration через публичный **aicfa.ru**, а не пользовательский redirect.
@@ -892,8 +890,8 @@ NOW
 - Persistent journal: GREEN.
 - Read-only feed code/tests: GREEN.
 - Feed systemd productionization: **GREEN / DONE**.
-- Caddy integration: **NEXT**.
-- User-facing website: NOT STARTED.
+- Caddy/FrostDeploy platform routing: **GREEN / DONE**.
+- User-facing website: **NEXT — STEP 12 implementation**.
 - Experience loop: ARCHITECTURE DEFINED; needs live outcome accumulation.
 - Own ML model: NOT YET PRODUCTION.
 - Vision: PLANNED.
