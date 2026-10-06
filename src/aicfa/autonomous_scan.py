@@ -59,11 +59,14 @@ def _market_timeout(seconds: float):
 
 @dataclass(frozen=True)
 class AutonomousScanState:
-    """Latest autonomous scan snapshot."""
+    """Latest autonomous scan snapshot with live rotation position."""
 
     scan_number: int
     scanned_at_ms: int
     result: MultiMarketScan
+    rotation_id: int = 0
+    queue_position: int = 0
+    universe_size: int = 0
 
 
 @dataclass(frozen=True)
@@ -226,7 +229,14 @@ class AutonomousScanEngine:
         return state
 
 
-    def scan_market(self, market_index: int, *, now_ms: int | None = None) -> AutonomousScanState:
+    def scan_market(
+        self,
+        market_index: int,
+        *,
+        now_ms: int | None = None,
+        rotation_id: int = 0,
+        queue_position: int = 0,
+    ) -> AutonomousScanState:
         """Run exactly one configured market and preserve lifecycle state."""
         if market_index < 0 or market_index >= len(self.universe.markets):
             raise ValueError(f"market_index must be between 0 and {len(self.universe.markets) - 1}")
@@ -264,7 +274,14 @@ class AutonomousScanEngine:
             )
             result = MultiMarketScan(markets=(timed_out,))
         self._scan_number += 1
-        state = AutonomousScanState(scan_number=self._scan_number, scanned_at_ms=timestamp, result=result)
+        state = AutonomousScanState(
+            scan_number=self._scan_number,
+            scanned_at_ms=timestamp,
+            result=result,
+            rotation_id=rotation_id,
+            queue_position=queue_position,
+            universe_size=len(self.universe.markets),
+        )
         self._last_state = state
         self._journal_state(state)
         return state
@@ -348,16 +365,21 @@ class AutonomousScanEngine:
         if not self.universe.markets:
             raise ValueError("market universe must not be empty")
         market_index = 0
+        rotation_id = 1
+        universe_size = len(self.universe.markets)
         while True:
             if should_stop is not None and should_stop():
                 return
             asset = self.universe.markets[market_index].asset
+            queue_position = market_index + 1
             try:
-                state = self.scan_market(market_index)
+                state = self.scan_market(market_index, rotation_id=rotation_id, queue_position=queue_position)
             except Exception as exc:
                 if on_error is not None:
                     on_error(asset, exc)
-                market_index = (market_index + 1) % len(self.universe.markets)
+                market_index = (market_index + 1) % universe_size
+                if market_index == 0:
+                    rotation_id += 1
                 if interval_seconds:
                     sleep(interval_seconds)
                 continue
@@ -365,7 +387,9 @@ class AutonomousScanEngine:
                 on_scan(state)
             if should_stop is not None and should_stop():
                 return
-            market_index = (market_index + 1) % len(self.universe.markets)
+            market_index = (market_index + 1) % universe_size
+            if market_index == 0:
+                rotation_id += 1
             if interval_seconds:
                 sleep(interval_seconds)
     def run_forever(
