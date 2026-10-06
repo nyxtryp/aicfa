@@ -9,7 +9,7 @@ const life=s=>String(pick(s,"lifecycle","status")||"").toUpperCase();
 const tm=ms=>ms?new Date(Number(ms)).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"—";
 function scans(){return state.events.filter(e=>e.event_type==="scan").sort((a,b)=>Number(b.timestamp_ms||0)-Number(a.timestamp_ms||0))}
 function latest(rows){const m=new Map();for(const e of rows)for(const x of e.payload?.markets||[]){const o=m.get(x.asset);if(!o||Number(e.timestamp_ms)>Number(o.timestamp_ms))m.set(x.asset,{...x,timestamp_ms:e.timestamp_ms})}return [...m.values()]}
-function active(ms){const out=[];for(const m of ms)for(const s of m.setups||[]){const c=s.candidate||s;if((dir(c)==="LONG"||dir(c)==="SHORT")&&(life(s.lifecycle_result)==="ACTIVE"||!s.lifecycle_result))out.push({asset:m.asset,mode:s.mode,setup:c,lifecycle:s.lifecycle_result})}return out}
+function active(ms){const out=[];for(const m of ms)for(const s of m.setups||[]){const c=s.candidate||s;if((dir(c)==="LONG"||dir(c)==="SHORT")&&(life(s.lifecycle_result)==="ACTIVE"||!s.lifecycle_result))out.push({asset:m.asset,mode:s.mode,setup:c,lifecycle:s.lifecycle_result,evidence_concepts:s.evidence_concepts||[],decision_action:s.decision_action||""})}return out}
 function conceptSet(s,x){return new Set([...(s.supporting_concepts||[]),...(s.zone_concepts||[]),...(x?.evidence_concepts||[])])}
 function evidence(s,x){const c=conceptSet(s,x);const rows=[
 ["Market Structure",c.has("market_structure.bos")||c.has("market_structure.choch"),c.has("market_structure.bos")?"BOS confirmed":c.has("market_structure.choch")?"CHoCH observed":"Not confirmed"],
