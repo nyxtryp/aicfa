@@ -840,10 +840,12 @@ def analyze_setups(
             if preliminary_direction is not None:
                 supporting = tuple(
                     concept for concept in supporting
-                    if not any(
+                    if any(
                         item.concept_id == concept
-                        and item.direction in {"long", "short"}
-                        and item.direction != preliminary_direction
+                        and (
+                            item.direction not in {"long", "short"}
+                            or item.direction == preliminary_direction
+                        )
                         for item in observed_items
                     )
                 )
