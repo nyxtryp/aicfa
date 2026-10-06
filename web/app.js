@@ -149,7 +149,7 @@ function render(rows){
  syncHistory(as);
  $("#universe").textContent=u||"—";$("#scanned").textContent=u?pos+"/"+u:"—";$("#rotation").textContent=p.rotation_id?"#"+p.rotation_id:"—";$("#currentMarket").textContent=p.markets?.[0]?.asset||"—";
  const m=p.markets?.[0];$("#currentStatus").textContent=String(m?.diagnostics?.status||"—").toUpperCase()+" · "+(m?.setups||[]).length+" SETUPS";$("#lastScan").textContent=p.scan_number?"#"+p.scan_number:"—";$("#progress").style.width=pct+"%";$("#rotationMeta").textContent=u?pos+" of "+u+" markets · "+Math.round(pct)+"%":"waiting";
- $("#active").textContent=ui.history.length;renderRails(ms,rows);renderHistory();renderCenter();
+ $("#active").textContent=as.length;renderRails(ms,rows);renderHistory();renderCenter();
 }
 let refreshInFlight=false,lastEventSignature="";
 async function refresh(){
