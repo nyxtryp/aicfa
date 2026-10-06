@@ -10,6 +10,9 @@
       },
       "run": {
         "command": ".venv/bin/python web/server.py",
+        "env": {
+          "AICFA_DATA_DIR": "/srv/frostdeploy/aicfa/shared/data"
+        },
         "healthcheckPath": "/"
       },
       "domain": "aicfa.aicfa.ru",
