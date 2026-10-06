@@ -134,3 +134,62 @@ def test_mtf_resolved_direction_ignores_opposite_lower_timeframe_evidence():
 
     assert result.action is DecisionAction.LONG
     assert result.candidates
+
+def test_long_decision_waits_when_price_left_entry_zone():
+    from aicfa.setup_analysis import SetupCandidate, SetupLevel, SetupAssessment
+
+    candidate = SetupCandidate(
+        scenario="continuation",
+        supporting_concepts=("market_structure.bos", "displacement"),
+        zone_concepts=("order_block.bullish",),
+        zone_locations=(),
+        entry_condition=(),
+        invalidation=(),
+        targets=(),
+        rationale=(),
+        direction="long",
+        entry_zone=(SetupLevel(81000.0, "15m", "OB low"), SetupLevel(82000.0, "15m", "OB high")),
+        target_levels=(SetupLevel(87000.0, "4h", "previous high"),),
+    )
+    setup = SetupAssessment(SetupDecision.READY, (candidate,), (), (), ())
+    result = decide(
+        setup,
+        observations=(
+            _obs("market_structure.bos", direction="long"),
+            _obs("price_action.rejection", direction="long"),
+            _obs("volume.evidence", direction="long"),
+        ),
+        current_price=86000.0,
+    )
+    assert result.action is DecisionAction.WAIT
+    assert "left the long entry zone" in result.reasons[0]
+
+
+def test_long_decision_waits_when_target_already_reached():
+    from aicfa.setup_analysis import SetupCandidate, SetupLevel, SetupAssessment
+
+    candidate = SetupCandidate(
+        scenario="continuation",
+        supporting_concepts=("market_structure.bos", "displacement"),
+        zone_concepts=("order_block.bullish",),
+        zone_locations=(),
+        entry_condition=(),
+        invalidation=(),
+        targets=(),
+        rationale=(),
+        direction="long",
+        entry_zone=(SetupLevel(81000.0, "15m", "OB low"), SetupLevel(82000.0, "15m", "OB high")),
+        target_levels=(SetupLevel(85000.0, "4h", "previous high"),),
+    )
+    setup = SetupAssessment(SetupDecision.READY, (candidate,), (), (), ())
+    result = decide(
+        setup,
+        observations=(
+            _obs("market_structure.bos", direction="long"),
+            _obs("price_action.rejection", direction="long"),
+            _obs("volume.evidence", direction="long"),
+        ),
+        current_price=86000.0,
+    )
+    assert result.action is DecisionAction.WAIT
+    assert "target already reached" in result.reasons[0]
