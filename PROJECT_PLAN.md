@@ -1128,3 +1128,18 @@ Commits:
 - `195ffeb` — `redesign(web): create distinct AICFA terminal dashboard visual`
 
 STEP 12 remains open pending live deployment/visual verification.
+
+
+### 2026-10-06 — STEP 12 — WORKING MVP RESET
+
+The second visual redesign was rejected because it prioritized decorative dashboard blocks and a historical journal over the actual AICFA working state.
+
+Decision:
+- Rebuild the application as a compact operational MVP.
+- Remove hero/marketing copy, sound control, oversized statistic blocks and decorative journal presentation.
+- Center the working screen on current market, rotation progress, configured universe size, active setups, and a short recent-scan list.
+- Scan events now carry explicit rotation id, queue position and universe size.
+- The configured production universe currently contains 109 markets (86 crypto + 23 TradFi); the UI must not infer universe size from journal history.
+- Historical scan rows are explicitly scans/findings, not current active setups.
+- Analytical/scanner signal logic is unchanged.
+- Live deployment and browser verification remain required before marking STEP 12 complete.
