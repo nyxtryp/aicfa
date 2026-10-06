@@ -1143,3 +1143,36 @@ Decision:
 - Historical scan rows are explicitly scans/findings, not current active setups.
 - Analytical/scanner signal logic is unchanged.
 - Live deployment and browser verification remain required before marking STEP 12 complete.
+
+
+### 2026-10-06 — STEP 12 — USER-FACING EVIDENCE ANALYSIS IMPLEMENTED
+
+**Status: 🟡 IN PROGRESS — code implemented; live deployment/browser verification pending**
+
+The deterministic analytical core was already GREEN. The missing product layer was exposing its evidence to the user. This pass addresses that gap without changing scanner/signal logic.
+
+Implemented:
+- `src/aicfa/persistent_journal.py` now persists per-horizon evidence/decision summaries.
+- `web/index.html` adds dedicated AICFA ANALYSIS and WAIT sections.
+- `web/app.js` renders:
+  - Market Structure
+  - Liquidity
+  - BOS
+  - CHoCH / MSS
+  - Order Block
+  - FVG
+  - Zone Reaction
+  - Volume
+  - Entry / invalidation / targets
+  - Scenario / causal rationale
+  - WAIT state with observed vs missing evidence.
+- `web/styles.css` adds compact evidence-chain and WAIT presentation.
+- The UI continues to use the existing read-only journal feed; no second scanner or analytical logic was introduced.
+
+Next:
+1. Deploy through FrostDeploy.
+2. Verify `aicfa.aicfa.ru` on real scanner data.
+3. Confirm active setups show the full evidence chain.
+4. Confirm non-actionable horizons show deterministic WAIT/missing evidence.
+5. Only then mark this STEP 12 product work GREEN.
+
