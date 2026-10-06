@@ -138,6 +138,58 @@ def _structure_direction(row: pd.Series) -> int:
     return 0
 
 
+def _structure_states(context: MultiTimeframeContext) -> tuple[str, ...]:
+    states: list[str] = []
+    seen: set[str] = set()
+    for timeframe in (
+        context.context_timeframe,
+        context.structure_timeframe,
+        context.refinement_timeframe,
+        context.execution_timeframe,
+    ):
+        if not timeframe or timeframe in seen:
+            continue
+        seen.add(timeframe)
+        row = context.latest_rows.get(timeframe)
+        if row is None:
+            continue
+        value = _structure_direction(row)
+        if value:
+            states.append(f"{timeframe} structure={'long' if value > 0 else 'short'}")
+    return tuple(states)
+
+
+def _event_direction_conflict(
+    context: MultiTimeframeContext,
+    *,
+    scenario: str,
+    direction: str,
+    observations: tuple[MarketObservation, ...],
+) -> str | None:
+    """Reject continuation when causal structural events contradict the resolved leg."""
+    relevant = {
+        context.context_timeframe,
+        context.structure_timeframe,
+        context.refinement_timeframe,
+    }
+    for item in _observed(observations):
+        if item.timeframe not in relevant:
+            continue
+        if item.concept_id in {"market_structure.bos", "market_structure.mss"}:
+            if item.direction in {"long", "short"} and item.direction != direction:
+                return (
+                    f"{item.timeframe} {item.concept_id}={item.direction} "
+                    f"conflicts with {direction} {scenario}"
+                )
+        if scenario == "continuation" and item.concept_id == "market_structure.choch":
+            if item.direction in {"long", "short"} and item.direction != direction:
+                return (
+                    f"{item.timeframe} CHoCH={item.direction} "
+                    f"conflicts with {direction} continuation"
+                )
+    return None
+
+
 def build_multi_timeframe_context(
     observations: tuple[MarketObservation, ...],
     analyses: Mapping[str, pd.DataFrame],
@@ -729,6 +781,17 @@ def analyze_setups(
             missing.append(f"{hypothesis.scenario}: setup direction is not structurally established")
             continue
 
+        if not legacy_mode:
+            event_conflict = _event_direction_conflict(
+                context,
+                scenario=hypothesis.scenario,
+                direction=direction,
+                observations=evidence_observations,
+            )
+            if event_conflict:
+                direction_conflicts.append(event_conflict)
+                continue
+
         # Keep directional rationale/evidence coherent: an opposite-side
         # order block must not be presented as support for the resolved trade.
         if direction == "long":
@@ -786,20 +849,10 @@ def analyze_setups(
                 + [f"higher-timeframe structure: {context.structure_timeframe}={direction}"]
                 + [f"setup zone observed on {tf}" for tf in source_tfs]
             )
-            if directional_observations:
-                rationale = _unique(
-                    list(rationale)
-                    + [
-                        f"{tf} structure={side}"
-                        for tf, side in directional_observations.items()
-                        if tf in {
-                            context.context_timeframe,
-                            context.structure_timeframe,
-                            context.refinement_timeframe,
-                            context.execution_timeframe,
-                        }
-                    ]
-                )
+            rationale = _unique(
+                list(rationale)
+                + [f"MTF hierarchy: {item}" for item in _structure_states(context)]
+            )
 
             if not entry_levels:
                 missing.append(f"{hypothesis.scenario}: no directionally valid entry zone is available")
@@ -845,7 +898,7 @@ def analyze_setups(
                 candidates=(),
                 missing_context=_unique(missing),
                 conflicts=conflicts,
-                reasons=("higher-timeframe structure conflicts with confirmation",),
+                reasons=("higher-timeframe structure or causal structural event conflicts with setup direction",),
             )
         return SetupAssessment(
             decision=SetupDecision.NEED_MORE_EVIDENCE,
