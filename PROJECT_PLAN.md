@@ -661,6 +661,21 @@ Journal / Feed service
 
 После завершения production-grade сайта перейти к **STEP 13 — СТАБИЛЬНАЯ МОДЕЛЬ СОБЫТИЙ**.
 
+
+
+### 2026-10-06 — STEP 12 — PUBLIC WEBSITE / AICFA APPLICATION ARCHITECTURE уточнена
+
+Зафиксирована окончательная схема пользовательских адресов:
+
+- **`aicfa-web.aicfa.ru`** — публичный презентационный сайт AICFA: описание проекта и возможностей, информация о системе, регистрация/вход пользователя, кнопка **Open AICFA**.
+- **`aicfa.aicfa.ru`** — само рабочее приложение AICFA: monitoring UI, live setup feed, Intraday / Swing / Position, lifecycle/evidence/status и будущий AI-интерфейс.
+- Пользовательский переход: `aicfa-web.aicfa.ru → Open AICFA → aicfa.aicfa.ru`.
+- **`aicfa.ru` не является рабочим URL приложения**; это базовый Platform Domain FrostDeploy.
+- В FrostDeploy уже существует проект **`aicfa`** с platform URL **`aicfa.aicfa.ru`**, Project ID **`b328b84e6d5940a2`**. Новый проект создавать не требуется.
+- Следующая инфраструктурная задача STEP 12: настроить существующий FrostDeploy project `aicfa` на production entry point `web/server.py`, затем проверить деплой и работу `https://aicfa.aicfa.ru`.
+- Презентационный сайт `aicfa-web.aicfa.ru` и рабочее приложение `aicfa.aicfa.ru` — разные пользовательские поверхности и не должны смешиваться.
+- Существующие AICFA Scanner и Journal Feed при настройке Web-приложения не изменять.
+
 ### STEP 13 — Stable event model
 Add explicit:
 - setup created;
