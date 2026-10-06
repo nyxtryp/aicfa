@@ -146,20 +146,19 @@ function renderRails(ms,rows){
  const recent=rows.slice(0,80);$("#count").textContent=recent.length+" SCANS";
  $("#activity").innerHTML=recent.map(e=>{const p=e.payload||{},m=p.markets?.[0],d=m?.diagnostics||{};return '<div class="row"><time>'+tm(e.timestamp_ms)+'</time><b>'+esc(m?.asset)+'</b><span class="'+String(d.status||"").toLowerCase()+'">'+esc(String(d.status||"—").toUpperCase())+'</span><small>'+(m?.setups||[]).length+' setups</small><em>r'+esc(p.rotation_id||"—")+' · '+esc(p.queue_position||"—")+'/'+esc(p.universe_size||"—")+'</em></div>'}).join("");
 }
-function render(rows){
- const p=rows[0]?.payload||{},ms=latest(rows),as=active(ms),u=Number(p.universe_size||0),pos=Number(p.queue_position||0),pct=u?Math.min(100,pos/u*100):0;
- syncHistory(as);
+function render(rows,registry){
+ const p=rows[0]?.payload||{},ms=latest(rows),u=Number(p.universe_size||0),pos=Number(p.queue_position||0),pct=u?Math.min(100,pos/u*100):0;
+ syncRegistry(registry);
  $("#universe").textContent=u||"—";$("#scanned").textContent=u?pos+"/"+u:"—";$("#rotation").textContent=p.rotation_id?"#"+p.rotation_id:"—";$("#currentMarket").textContent=p.markets?.[0]?.asset||"—";
  const m=p.markets?.[0];$("#currentStatus").textContent=String(m?.diagnostics?.status||"—").toUpperCase()+" · "+(m?.setups||[]).length+" SETUPS";$("#lastScan").textContent=p.scan_number?"#"+p.scan_number:"—";$("#progress").style.width=pct+"%";$("#rotationMeta").textContent=u?pos+" of "+u+" markets · "+Math.round(pct)+"%":"waiting";
- $("#active").textContent=as.length;renderRails(ms,rows);renderHistory();renderCenter();
-}
-let refreshInFlight=false,lastEventSignature="";
+ $("#active").textContent=registryItems(registry).filter(x=>x.status==="ACTIVE").length;renderRails(ms,rows);renderHistory();renderCenter();
+}let refreshInFlight=false,lastEventSignature="";
 async function refresh(){
  if(refreshInFlight)return;refreshInFlight=true;
  try{
-  const [h,d]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json())]);
-  state.events=d.events||[];const sig=JSON.stringify(state.events);
-  if(sig!==lastEventSignature){lastEventSignature=sig;render(scans())}
+  const [h,d,r]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json())]);
+  state.events=d.events||[];const registry=r.setups||[];const sig=JSON.stringify([state.events,registry]);
+  if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}
   $("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now());
  }catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}
 }
