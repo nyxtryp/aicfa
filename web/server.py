@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 FEED = "http://127.0.0.1:8090"
+CONTROL = "http://127.0.0.1:8091"
 
 
 
@@ -117,6 +118,17 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _control_request(self, method: str, path: str, body: bytes | None = None) -> None:
+        target = CONTROL + path
+        request = Request(target, data=body, method=method)
+        if body is not None:
+            request.add_header("Content-Type", "application/json")
+        try:
+            with urlopen(request, timeout=25) as response:
+                self._json(response.status, response.read())
+        except Exception as exc:
+            self._json(503, json.dumps({"error": "scanner_unavailable", "detail": str(exc)}).encode("utf-8"))
+
     def end_headers(self) -> None:
         # The monitoring UI is live state. Never let a browser/CDN keep an old
         # HTML/JS/CSS asset around after a deployment.
@@ -138,6 +150,9 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception:
                 self._json(500, b'{"error":"chart_data_unavailable"}')
             return
+        if self.path == "/api/markets":
+            self._control_request("GET", "/markets")
+            return
         if self.path == "/api" or self.path.startswith("/api/"):
             target = FEED + self.path
             try:
@@ -150,6 +165,11 @@ class Handler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:
+        if self.path == "/api/market-scan":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            self._control_request("POST", "/scan/market", body)
+            return
         if self.path.startswith("/api/"):
             self._json(405, b'{"error":"method_not_allowed"}')
             return
