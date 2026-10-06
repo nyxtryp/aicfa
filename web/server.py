@@ -24,6 +24,8 @@ RAW_DIR = DATA_DIR / "raw"
 
 def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
     normalized = symbol.strip().upper().replace("/", "_")
+    if "_" not in normalized and normalized.endswith("USDT"):
+        normalized = normalized[:-4] + "_USDT"
     if not normalized or any(part in normalized for part in ("..", "/", "\\")):
         raise ValueError("invalid symbol")
     if timeframe not in {"1m", "5m", "15m", "1h", "4h", "1d", "1w"}:
