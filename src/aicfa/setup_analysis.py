@@ -825,10 +825,29 @@ def analyze_setups(
     }
 
     for hypothesis in scenario_assessment.hypotheses:
+        observed_items = _observed(evidence_observations)
+        observed_concepts = {item.concept_id for item in observed_items}
         supporting = tuple(
             concept for concept in hypothesis.supporting_concepts
-            if concept in {item.concept_id for item in _observed(evidence_observations)}
+            if concept in observed_concepts
         )
+
+        # Directional evidence must support the resolved side. An opposite OB,
+        # BOS, CHoCH or MSS cannot be counted merely to satisfy the minimum
+        # evidence threshold.
+        if not legacy_mode:
+            preliminary_direction = context.structure_direction if context is not None else None
+            if preliminary_direction is not None:
+                supporting = tuple(
+                    concept for concept in supporting
+                    if not any(
+                        item.concept_id == concept
+                        and item.direction in {"long", "short"}
+                        and item.direction != preliminary_direction
+                        for item in observed_items
+                    )
+                )
+
         if len(supporting) < 2:
             missing.append(f"{hypothesis.scenario}: at least two independent supporting concepts are required")
             continue
