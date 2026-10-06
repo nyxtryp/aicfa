@@ -243,15 +243,12 @@ class AutonomousScanEngine:
         queue_position: int = 0,
         journal: bool = True,
     ) -> AutonomousScanState:
-        """Run exactly one configured market through the canonical scanner pipeline.
-
-        The engine is shared by autonomous and on-demand scans. The lock keeps
-        lifecycle/provider state serialized when the UI requests a market while
-        the autonomous queue is between markets. On-demand scans still update
-        the persistent setup registry, but can skip the append-only scan log.
-        """
+        """Run exactly one configured market through the canonical scanner pipeline."""
         if market_index < 0 or market_index >= len(self.universe.markets):
-            raise ValueError(f"market_index must be between 0 and {len(self.universe.markets) - 1}")
+            raise ValueError(
+                f"market_index must be between 0 and {len(self.universe.markets) - 1}"
+            )
+
         with self._scan_lock:
             timestamp = self._clock_ms() if now_ms is None else now_ms
             market = MarketUniverse((self.universe.markets[market_index],))
@@ -267,34 +264,35 @@ class AutonomousScanEngine:
                     )
             except MarketExecutionTimeout as exc:
                 market_asset = self.universe.markets[market_index].asset
-                from .market_orchestrator import MarketScanDiagnostics
-                from .market_orchestrator import MarketHorizonScan
+                from .market_orchestrator import MarketHorizonScan, MarketScanDiagnostics
+
                 timed_out = MarketHorizonScan(
-                asset=market_asset,
-                results=(),
-                setups=(),
-                lifecycle_results=(),
-                diagnostics=MarketScanDiagnostics(
-                    total_duration_ms=self.market_timeout_seconds * 1000.0,
-                    resolution_duration_ms=0.0,
-                    snapshot_duration_ms=0.0,
-                    snapshot_metrics=(),
-                    horizon_timings=(),
-                    refetched_between_horizons=False,
-                    status="timeout",
-                    error=str(exc),
-                ),
-            )
+                    asset=market_asset,
+                    results=(),
+                    setups=(),
+                    lifecycle_results=(),
+                    diagnostics=MarketScanDiagnostics(
+                        total_duration_ms=self.market_timeout_seconds * 1000.0,
+                        resolution_duration_ms=0.0,
+                        snapshot_duration_ms=0.0,
+                        snapshot_metrics=(),
+                        horizon_timings=(),
+                        refetched_between_horizons=False,
+                        status="timeout",
+                        error=str(exc),
+                    ),
+                )
                 result = MultiMarketScan(markets=(timed_out,))
+
             self._scan_number += 1
             state = AutonomousScanState(
                 scan_number=self._scan_number,
-            scanned_at_ms=timestamp,
-            result=result,
-            rotation_id=rotation_id,
-            queue_position=queue_position,
-            universe_size=len(self.universe.markets),
-        )
+                scanned_at_ms=timestamp,
+                result=result,
+                rotation_id=rotation_id,
+                queue_position=queue_position,
+                universe_size=len(self.universe.markets),
+            )
             self._last_state = state
             if journal:
                 if self.journal is not None:
