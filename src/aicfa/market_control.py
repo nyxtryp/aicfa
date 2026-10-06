@@ -11,7 +11,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from .persistent_journal import _jsonable
-from .setup_registry import SetupRegistry
 
 
 def _market_payload(engine: Any) -> list[dict[str, Any]]:
