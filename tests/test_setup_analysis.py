@@ -304,3 +304,65 @@ def test_setup_rationale_uses_structural_state_not_event_direction():
     assert "4h structure=long" in rationale
     assert "1h structure=long" in rationale
     assert "1h structure=short" not in rationale
+
+
+def test_primary_mode_hierarchies_are_independent():
+    from aicfa.data_requirements import mode_timeframe_profile
+
+    assert mode_timeframe_profile("intraday").timeframes == ("4h", "1h", "15m", "5m")
+    assert mode_timeframe_profile("swing").timeframes == ("1d", "4h", "1h")
+    assert mode_timeframe_profile("position").timeframes == ("1w", "1d", "4h")
+
+
+def test_reversal_accepts_mss_as_structural_transition():
+    from aicfa.setup_analysis import build_multi_timeframe_context, _resolve_direction
+
+    def frame(direction):
+        return pd.DataFrame({"timestamp": [1], "smc_structure_direction": [direction]})
+
+    analyses = {
+        "1w": frame(-1),
+        "1d": frame(1),
+        "4h": frame(1),
+    }
+    context = build_multi_timeframe_context(
+        (),
+        analyses,
+        timeframes=("1w", "1d", "4h"),
+        mode="position",
+    )
+    direction, conflict = _resolve_direction(
+        context,
+        scenario="reversal",
+        supporting=("market_structure.mss", "liquidity.sweep"),
+    )
+    assert direction == "long"
+    assert conflict is None
+
+
+def test_continuation_blocks_counter_direction_bos_but_reversal_does_not():
+    from aicfa.market_evidence import MarketObservation
+    from aicfa.setup_analysis import build_multi_timeframe_context, _event_direction_conflict
+
+    def frame(direction):
+        return pd.DataFrame({"timestamp": [1], "smc_structure_direction": [direction]})
+
+    analyses = {
+        "1d": frame(-1),
+        "4h": frame(-1),
+        "1h": frame(-1),
+    }
+    observations = (
+        MarketObservation("market_structure.bos", "4h", "observed", 1.0, ("bos_up=1",), direction="long"),
+        MarketObservation("market_structure.choch", "4h", "observed", 1.0, ("choch_up=1",), direction="long"),
+        MarketObservation("liquidity.sweep", "4h", "observed", 1.0, ("sweep_low=1",), direction="long"),
+    )
+    context = build_multi_timeframe_context(
+        observations, analyses, timeframes=("1d", "4h", "1h"), mode="swing"
+    )
+    assert _event_direction_conflict(
+        context, scenario="continuation", direction="short", observations=observations
+    ) is not None
+    assert _event_direction_conflict(
+        context, scenario="reversal", direction="long", observations=observations
+    ) is None
