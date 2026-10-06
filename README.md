@@ -99,6 +99,42 @@ AICFA не обязан использовать все таймфреймы в 
 
 AICFA должен поддерживать несколько самостоятельных торговых режимов.
 
+Основные торговые горизонты AICFA — **Intraday, Swing и Position**. Это не три сценария внутри одного анализа: каждый горизонт запускает собственную MTF-цепочку и получает собственный набор evidence, setup и decision.
+
+```text
+INTRADAY   4H → 1H → 15M → 5M
+SWING      1D → 4H → 1H
+POSITION   1W → 1D → 4H
+```
+
+Внутри каждого горизонта причинный сценарий выбирается отдельно:
+
+```text
+Continuation
+Reversal
+Breakout Failure
+```
+
+Итого ядро проверяет **9 независимых путей**:
+
+```text
+3 horizons × 3 causal scenarios
+
+Intraday  × {Continuation, Reversal, Breakout Failure}
+Swing     × {Continuation, Reversal, Breakout Failure}
+Position  × {Continuation, Reversal, Breakout Failure}
+```
+
+**Scalping** — отдельный изолированный режим `15M → 5M → 1M`; он не должен незаметно смешиваться с основным сканером Intraday/Swing/Position.
+
+Каждый путь обязан сохранять причинную последовательность:
+
+```text
+Structure → Liquidity → Causal Event → Zone → Reaction → Volume → Entry/SL/TP → Decision
+```
+
+
+
 ## Scalping
 
 Краткосрочный анализ и торговые сценарии.
