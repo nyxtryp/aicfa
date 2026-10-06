@@ -420,23 +420,93 @@ Completed:
 - After modification, validate Caddy configuration before reload, reload Caddy, then test both local and external API access.
 - Do not expose write methods; the journal feed remains read-only.
 
-### 2026-10-05 — STEP 11.2 — ВЫБРАН ПУБЛИЧНЫЙ HOSTNAME: aicfa.nyxtryp.ru
+### 2026-10-06 — STEP 11.2 — НОВАЯ ПЛАТФОРМЕННАЯ АРХИТЕКТУРА: aicfa.ru КАК ДОМЕН FROSTDEPLOY
 
-- Текущий production/public hostname для AICFA Feed: **aicfa.nyxtryp.ru**.
-- Корневой домен **aicfa.ru** остаётся основным публичным брендовым доменом AICFA и должен оставаться видимым пользователю в адресной строке.
-- **aicfa.ru уже привязан к HTML-сайту AICFA Web**, который развёрнут через проект AICFA Web и технически представлен hostname **aicfa-web.nyxtryp.ru**.
-- **aicfa-web.nyxtryp.ru — технический/platform hostname, а не пользовательский адрес.** Пользователь не должен на него перенаправляться и не должен его видеть.
-- Публичная схема AICFA:
-  - **aicfa.ru** — публичный адрес и бренд, который видит пользователь;
-  - **aicfa.nyxtryp.ru** — production Feed / application backend;
-  - **aicfa-web.nyxtryp.ru** — технический hostname деплоя AICFA Web, не показываемый пользователю.
-- Публичный сайт должен использовать Feed/application через **aicfa.nyxtryp.ru**, но браузер пользователя должен продолжать показывать **aicfa.ru**.
-- DNS управляется через REG.RU.
-- Текущие записи REG.RU для корневого домена:
-  - A @ → 95.163.244.138
-  - A www → 95.163.244.138
-- Реализация DNS/reverse-proxy должна сохранять **aicfa.ru как видимый публичный hostname**.
-- Пользовательский redirect с **aicfa.ru** на **aicfa.nyxtryp.ru** или **aicfa-web.nyxtryp.ru** запрещён.
+Архитектура публичных адресов AICFA изменена и зафиксирована. Предыдущая схема с `aicfa.nyxtryp.ru` как production Feed hostname **отменена**.
+
+#### Новая основа
+
+- Базовый домен установки FrostDeploy должен быть изменён с **nyxtryp.ru** на **aicfa.ru**.
+- `aicfa.ru` становится **доменом самой AICFA/FrostDeploy-платформы**, а не отдельным custom domain только для AICFA Web.
+- DNS платформы должен использовать:
+  - **A @ → IP AICFA VDS**;
+  - **A * → IP AICFA VDS** (wildcard для поддоменов проектов).
+- FrostDeploy должен самостоятельно обслуживать HTTPS и сертификаты для проектных hostname в рамках платформенной схемы.
+- Домен каждому проекту задаётся отдельно через его настройки «Домен» и может быть не только поддоменом платформы.
+- Сам корневой **aicfa.ru** также может быть назначен конкретному проекту, поэтому после перевода платформы на `aicfa.ru` его можно назначить AICFA Web или другому выбранному проекту.
+- Не создаём отдельный внешний `feed.aicfa.ru` reverse-proxy как обходной путь. Feed/API должен быть подключён через штатную платформенную архитектуру FrostDeploy.
+- `aicfa.nyxtryp.ru` больше не является целевым публичным Feed URL.
+
+#### Целевая схема
+
+```
+aicfa.ru
+↓
+FrostDeploy / AICFA platform
+↓
+проекты и сервисы AICFA
+```
+
+Пример:
+
+```
+aicfa.ru          → AICFA Web / основной сайт
+app.aicfa.ru      → AICFA application
+feed.aicfa.ru     → AICFA Feed/API, если Feed оформлен отдельным FrostDeploy-сервисом
+*.aicfa.ru        → другие проекты/сервисы
+```
+
+Конкретные имена поддоменов назначаются после проверки соответствующего проекта/сервиса.
+
+#### Текущий DNS и миграция
+
+Сейчас платформа FrostDeploy использует:
+
+```
+nyxtryp.ru
+A @ → 195.209.221.72
+A * → 195.209.221.72
+```
+
+Цель:
+
+```
+aicfa.ru
+A @ → IP AICFA VDS
+A * → IP AICFA VDS
+```
+
+Перед переключением `aicfa.ru` необходимо отвязать текущий AICFA Web custom-domain от старой схемы.
+
+Порядок:
+
+1. Сохранить текущую рабочую конфигурацию AICFA Web.
+2. Отвязать `aicfa.ru` от текущего AICFA Web custom-domain.
+3. Изменить Platform Domain FrostDeploy с `nyxtryp.ru` на `aicfa.ru`.
+4. Настроить DNS `A @` и `A *` на IP AICFA VDS.
+5. Проверить панель FrostDeploy и автоматическую выдачу HTTPS.
+6. Назначить `aicfa.ru` обратно проекту AICFA Web (или создать/назначить другой нужный проект).
+7. Назначить отдельные поддомены остальным AICFA-сервисам.
+8. После этого подключить production Feed к сайту.
+9. Проверить, что пользовательский браузер остаётся на `aicfa.ru`.
+
+#### Что делать с текущим aicfa.nyxtryp.ru
+
+- Сейчас это платформенный адрес FrostDeploy Worker-сервиса `app` без HTTP-порта.
+- Он **не является корректным публичным Journal Feed endpoint**.
+- Не использовать его как Feed URL.
+- Не удалять и не менять его до завершения миграции.
+- После перехода Platform Domain на `aicfa.ru` его дальнейшая судьба определяется отдельно.
+
+#### Что остаётся обязательным
+
+- `aicfa.ru` — основной пользовательский адрес.
+- FrostDeploy/Caddy остаётся штатным владельцем TLS и маршрутизации.
+- Journal Feed остаётся read-only.
+- Scanner не запускается сайтом.
+- Архитектура остаётся:
+  `AICFA Scanner → Journal / Feed → AICFA Website → Users`.
+- Все инфраструктурные изменения фиксируются в этом плане до перехода к следующему этапу.
 
 ### STEP 12 — ПЕРВЫЙ НАСТОЯЩИЙ САЙТ МОНИТОРИНГА AICFA
 
