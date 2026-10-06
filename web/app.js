@@ -186,7 +186,7 @@ async function refresh(){
  }catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}
 }
 function renderMarkets(){
- const root=$("#marketWatch"),visible=(state.markets&&state.markets.length?state.markets:latest(scans()).map((m,index)=>({index,asset:m.asset,market_type:m.market_type||"spot"})));
+ const root=$("#marketWatch"),visible=state.markets||[];
  $("#marketCount").textContent=visible.length;
  root.innerHTML=visible.length?visible.map(m=>'<button class="market-item '+(Number(m.index)===Number(ui.marketIndex)?"selected":"")+'" data-market-index="'+esc(m.index)+'"><span class="market-number">'+String(Number(m.index)+1).padStart(3,"0")+'</span><span class="market-symbol">'+esc(m.asset)+'</span><span class="market-type">'+esc(m.market_type==="futures"?"FUT":"SPOT")+'</span></button>').join(""):'<div class="rail-empty">NO MARKETS</div>';
 }
