@@ -15,7 +15,7 @@ function evidence(s){const c=conceptSet(s);const rows=[
 ["Market Structure",c.has("market_structure.bos")||c.has("market_structure.choch"),c.has("market_structure.bos")?"BOS confirmed":c.has("market_structure.choch")?"CHoCH observed":"Not confirmed"],
 ["Liquidity",c.has("liquidity.sweep"),c.has("liquidity.sweep")?"Sweep observed":"No confirmed sweep"],
 ["BOS",c.has("market_structure.bos"),c.has("market_structure.bos")?"Confirmed":"Not confirmed"],
-["CHoCH / MSS",c.has("market_structure.choch"),c.has("market_structure.choch")?"Confirmed":"Not confirmed"],
+["CHoCH / MSS",c.has("market_structure.choch")||c.has("market_structure.mss"),c.has("market_structure.mss")?"MSS confirmed":c.has("market_structure.choch")?"CHoCH confirmed":"Not confirmed"],
 ["Order Block",c.has("order_block.bullish")||c.has("order_block.bearish"),c.has("order_block.bullish")?"Bullish OB":c.has("order_block.bearish")?"Bearish OB":"Not present"],
 ["FVG",c.has("imbalance.fvg"),c.has("imbalance.fvg")?"Active evidence":"Not present"],
 ["Zone Reaction",c.has("price_action.rejection"),c.has("price_action.rejection")?"Confirmed":"Not confirmed"],
