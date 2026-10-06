@@ -32,7 +32,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/api" or self.path.startswith("/api/"):
-            target = FEED + self.path[4:]
+            target = FEED + self.path
             try:
                 with urlopen(Request(target, method="GET"), timeout=8) as response:
                     body = response.read()
