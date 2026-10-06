@@ -1,8 +1,4 @@
-"""Read-only HTTP feed for the persistent AICFA journal.
-
-This layer only reads already persisted JSONL events. It does not run market
-analysis, mutate lifecycle state, or expose a write endpoint.
-"""
+"""Read-only HTTP feed for the persistent AICFA journal."""
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11,6 +7,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from .persistent_journal import PersistentJournal
+from .setup_registry import SetupRegistry
 
 
 def _response_payload(journal: PersistentJournal, path: str, query: dict[str, list[str]]) -> Any:
@@ -20,15 +17,13 @@ def _response_payload(journal: PersistentJournal, path: str, query: dict[str, li
 
     if path == "/api/health":
         return {"ok": True, "journal": str(journal.path)}
-
     if path == "/api/journal/events":
         return {"events": list(events)}
-
     if path == "/api/journal/scans":
-        return {
-            "events": [event for event in events if event.get("event_type") == "scan"]
-        }
-
+        return {"events": [event for event in events if event.get("event_type") == "scan"]}
+    if path == "/api/journal/registry":
+        registry = SetupRegistry.from_env()
+        return {"setups": list(registry.current()) if registry is not None else []}
     if path == "/api/journal/setups":
         setups: list[dict[str, Any]] = []
         for event in events:
@@ -43,7 +38,6 @@ def _response_payload(journal: PersistentJournal, path: str, query: dict[str, li
                         "setup": setup,
                     })
         return {"setups": setups}
-
     raise KeyError(path)
 
 
@@ -52,11 +46,7 @@ def create_handler(journal: PersistentJournal):
         server_version = "AICFA-Journal/1.0"
 
         def _send(self, status: int, payload: Any) -> None:
-            body = json.dumps(
-                payload,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ).encode("utf-8")
+            body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -68,11 +58,7 @@ def create_handler(journal: PersistentJournal):
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
             try:
-                payload = _response_payload(
-                    journal,
-                    parsed.path,
-                    parse_qs(parsed.query),
-                )
+                payload = _response_payload(journal, parsed.path, parse_qs(parsed.query))
             except (KeyError, ValueError):
                 self._send(404, {"error": "not_found"})
                 return
