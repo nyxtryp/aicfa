@@ -774,7 +774,15 @@ def analyze_setups(
                 evidence_observations,
             )
             rationale = _unique(
-                list(hypothesis.rationale)
+                [
+                    item for item in hypothesis.rationale
+                    if not (
+                        direction == "long" and "order_block.bearish" in item
+                    )
+                    and not (
+                        direction == "short" and "order_block.bullish" in item
+                    )
+                ]
                 + [f"higher-timeframe structure: {context.structure_timeframe}={direction}"]
                 + [f"setup zone observed on {tf}" for tf in source_tfs]
             )
