@@ -30,6 +30,14 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def end_headers(self) -> None:
+        # The monitoring UI is live state. Never let a browser/CDN keep an old
+        # HTML/JS/CSS asset around after a deployment.
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
     def do_GET(self) -> None:
         if self.path == "/api" or self.path.startswith("/api/"):
             target = FEED + self.path
