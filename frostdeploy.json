@@ -1,0 +1,35 @@
+{
+  "services": [
+    {
+      "name": "web",
+      "runtime": "python",
+      "role": "web",
+      "build": {
+        "command": null,
+        "install": "auto"
+      },
+      "run": {
+        "command": ".venv/bin/python web/server.py",
+        "healthcheckPath": "/"
+      },
+      "domain": "aicfa.aicfa.ru",
+      "pythonVersion": "3.13"
+    },
+    {
+      "name": "scanner",
+      "runtime": "python",
+      "role": "worker",
+      "build": {
+        "command": null,
+        "install": "auto"
+      },
+      "run": {
+        "command": ".venv/bin/python main.py",
+        "env": {
+          "AICFA_DATA_DIR": "/srv/frostdeploy/aicfa/shared/data"
+        }
+      },
+      "pythonVersion": "3.13"
+    }
+  ]
+}
