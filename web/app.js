@@ -52,6 +52,47 @@ function setupMap(s){
  return html;
 }
 function xmode(s){return s.mode||""}
+function chartTf(mode){
+ const m=String(mode||"").toUpperCase();
+ return m==="POSITION"?"4h":m==="SWING"?"1h":"5m";
+}
+function renderCandleChart(node,candles,s){
+ if(!candles?.length){node.innerHTML='<div class="chart-empty">NO OHLCV DATA</div>';return}
+ const w=700,h=230,p=18;
+ const lo=Math.min(...candles.map(x=>Number(x.low))),hi=Math.max(...candles.map(x=>Number(x.high)));
+ const span=Math.max(hi-lo,1e-9);
+ const y=v=>h-p-((Number(v)-lo)/span)*(h-p*2);
+ const step=(w-p*2)/candles.length,body=Math.max(2,step*.52);
+ let svg='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" aria-label="AICFA market chart">';
+ candles.forEach((k,i)=>{
+  const x=p+i*step+step/2,yo=y(k.open),yc=y(k.close),yh=y(k.high),yl=y(k.low),up=Number(k.close)>=Number(k.open);
+  const top=Math.min(yo,yc),height=Math.max(1,Math.abs(yc-yo));
+  svg+='<line class="wick '+(up?"up":"down")+'" x1="'+x+'" y1="'+yh+'" x2="'+x+'" y2="'+yl+'"/><rect class="candle '+(up?"up":"down")+'" x="'+(x-body/2)+'" y="'+top+'" width="'+body+'" height="'+height+'"/>';
+ });
+ const add=(v,label,cls)=>{
+  if(v==null||!Number.isFinite(Number(v)))return;
+  const yy=y(v);if(yy<0||yy>h)return;
+  svg+='<line class="level '+cls+'" x1="'+p+'" x2="'+(w-p)+'" y1="'+yy+'" y2="'+yy+'"/><text class="level-label '+cls+'" x="'+(w-p-2)+'" y="'+Math.max(10,yy-3)+'" text-anchor="end">'+esc(label)+" "+esc(v)+'</text>';
+ };
+ const entry=s.entry_zone||[];
+ if(entry.length){add(entry[0].value,"ENTRY","entry");if(entry.length>1)add(entry[entry.length-1].value,"ENTRY","entry")}
+ if(s.invalidation_level)add(s.invalidation_level.value,"INVALID","sl");
+ const targets=s.target_levels||[];
+ if(targets[0])add(targets[0].value,"TP1","tp");
+ if(targets[1])add(targets[1].value,"TP2","tp");
+ svg+='</svg>';node.innerHTML=svg;
+}
+async function hydrateCharts(){
+ const nodes=[...document.querySelectorAll(".market-chart[data-symbol]")];
+ await Promise.all(nodes.map(async node=>{
+  try{
+   const q=new URLSearchParams({symbol:node.dataset.symbol,timeframe:node.dataset.timeframe||"5m",limit:"100"});
+   const data=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null);
+   renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"));
+  }catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}
+ }));
+}
+
 function setupCard(x){
  const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[];
  const ev=entry.length?entry.map(v=>v.value).join(" — "):"—";
@@ -59,10 +100,10 @@ function setupCard(x){
  const tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
  const why=(s.rationale||[]).join(" ");
  const hierarchy=(s.rationale||[]).filter(v=>v.startsWith("MTF hierarchy:")).join(" · ");
- return '<article class="setup '+dir(s).toLowerCase()+'"><div class="setup-top"><div><b>'+esc(x.asset)+'</b><span class="muted">'+esc(hor(x.mode))+' · '+esc(s.scenario||"SETUP")+'</span></div><strong>'+esc(dir(s))+'</strong></div><div class="scenario-desc">'+esc(scenarioText(s))+'</div>'+setupMap({...s,mode:x.mode})+'<div class="analysis"><div class="analysis-title">EVIDENCE</div>'+evidence(s,x)+'</div><div class="levels"><div><small>ENTRY</small><b>'+esc(ev)+'</b></div><div><small>INVALID</small><b>'+esc(sl)+'</b></div><div><small>TP</small><b>'+esc(tp)+'</b></div><div><small>MODE</small><b>'+esc(hor(x.mode))+'</b></div></div><div class="why"><span>WHY '+esc(dir(s))+'</span><p>'+esc(why||"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></article>'
+ return '<article class="setup '+dir(s).toLowerCase()+'"><div class="setup-top"><div><b>'+esc(x.asset)+'</b><span class="muted">'+esc(hor(x.mode))+' · '+esc(s.scenario||"SETUP")+'</span></div><strong>'+esc(dir(s))+'</strong></div><div class="scenario-desc">'+esc(scenarioText(s))+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-timeframe="'+chartTf(x.mode)+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets}))+'"></div>'+setupMap({...s,mode:x.mode})+'<div class="analysis"><div class="analysis-title">EVIDENCE</div>'+evidence(s,x)+'</div><div class="levels"><div><small>ENTRY</small><b>'+esc(ev)+'</b></div><div><small>INVALID</small><b>'+esc(sl)+'</b></div><div><small>TP</small><b>'+esc(tp)+'</b></div><div><small>MODE</small><b>'+esc(hor(x.mode))+'</b></div></div><div class="why"><span>WHY '+esc(dir(s))+'</span><p>'+esc(why||"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></article>'
 }
 function waitCards(ms){const out=[];for(const m of ms)for(const h of m.horizons||[]){const action=String(h.decision_action||h.decision||"").toUpperCase();if(action==="LONG"||action==="SHORT"||action==="READY")continue;const c=new Set(h.supported_concepts||[]);const checks=[["Liquidity",c.has("liquidity.sweep")],["Market Structure",c.has("market_structure.bos")||c.has("market_structure.choch")],["OB",c.has("order_block.bullish")||c.has("order_block.bearish")],["FVG",c.has("imbalance.fvg")],["Zone Reaction",c.has("price_action.rejection")],["Volume",c.has("volume.evidence")||c.has("volume.confirmation")]];out.push({asset:m.asset,mode:h.mode,action:action||"WAIT",checks:checks,why:(h.setup_reasons||h.decision_reasons||["structural setup is incomplete"])[0]})}return out}
-function render(rows){const e=rows[0],p=e?.payload||{},ms=latest(rows),as=active(ms),u=Number(p.universe_size||0),pos=Number(p.queue_position||0),pct=u?Math.min(100,pos/u*100):0;$("#universe").textContent=u||"—";$("#scanned").textContent=u?pos+"/"+u:"—";$("#rotation").textContent=p.rotation_id?"#"+p.rotation_id:"—";$("#currentMarket").textContent=p.markets?.[0]?.asset||"—";const m=p.markets?.[0];$("#currentStatus").textContent=String(m?.diagnostics?.status||"—").toUpperCase()+" · "+(m?.setups||[]).length+" SETUPS";$("#lastScan").textContent=p.scan_number?"#"+p.scan_number:"—";$("#progress").style.width=pct+"%";$("#rotationMeta").textContent=u?pos+" of "+u+" markets · "+Math.round(pct)+"%":"waiting";$("#active").textContent=as.length;const filtered=as.filter(s=>state.filter==="ALL"||hor(s.mode)===state.filter);$("#setups").innerHTML=filtered.length?filtered.map(setupCard).join(""):'<div class="empty">NO ACTIVE SETUPS</div>';const waits=waitCards(ms).filter(s=>state.filter==="ALL"||String(s.mode).toUpperCase()===state.filter);$("#waits").innerHTML=waits.length?waits.slice(0,6).map(w=>'<article class="wait"><div><b>'+esc(w.asset)+'</b><span>'+esc(w.mode)+'</span></div><strong>'+esc(w.action)+'</strong><div class="checks">'+w.checks.map(c=>'<span class="'+(c[1]?"ok":"missing")+'">'+(c[1]?"✓":"—")+' '+esc(c[0])+'</span>').join("")+'</div><p>'+esc(w.why)+'</p></article>').join(""):'<div class="empty">NO WAIT ANALYSIS</div>';const recent=rows.slice(0,8);$("#count").textContent=recent.length+" SCANS";$("#activity").innerHTML=recent.map(e=>{const p=e.payload||{},m=p.markets?.[0],d=m?.diagnostics||{};return '<div class="row"><time>'+tm(e.timestamp_ms)+'</time><b>'+esc(m?.asset)+'</b><span class="'+String(d.status||"").toLowerCase()+'">'+esc(String(d.status||"—").toUpperCase())+'</span><span>'+(m?.setups||[]).length+' setups</span><small>rotation '+esc(p.rotation_id||"—")+' · '+esc(p.queue_position||"—")+'/'+esc(p.universe_size||"—")+'</small></div>'}).join("")}
+function render(rows){const e=rows[0],p=e?.payload||{},ms=latest(rows),as=active(ms),u=Number(p.universe_size||0),pos=Number(p.queue_position||0),pct=u?Math.min(100,pos/u*100):0;$("#universe").textContent=u||"—";$("#scanned").textContent=u?pos+"/"+u:"—";$("#rotation").textContent=p.rotation_id?"#"+p.rotation_id:"—";$("#currentMarket").textContent=p.markets?.[0]?.asset||"—";const m=p.markets?.[0];$("#currentStatus").textContent=String(m?.diagnostics?.status||"—").toUpperCase()+" · "+(m?.setups||[]).length+" SETUPS";$("#lastScan").textContent=p.scan_number?"#"+p.scan_number:"—";$("#progress").style.width=pct+"%";$("#rotationMeta").textContent=u?pos+" of "+u+" markets · "+Math.round(pct)+"%":"waiting";$("#active").textContent=as.length;const filtered=as.filter(s=>state.filter==="ALL"||hor(s.mode)===state.filter);$("#setups").innerHTML=filtered.length?filtered.map(setupCard).join(""):'<div class="empty">NO ACTIVE SETUPS</div>';if(filtered.length)hydrateCharts();const waits=waitCards(ms).filter(s=>state.filter==="ALL"||String(s.mode).toUpperCase()===state.filter);$("#waits").innerHTML=waits.length?waits.slice(0,6).map(w=>'<article class="wait"><div><b>'+esc(w.asset)+'</b><span>'+esc(w.mode)+'</span></div><strong>'+esc(w.action)+'</strong><div class="checks">'+w.checks.map(c=>'<span class="'+(c[1]?"ok":"missing")+'">'+(c[1]?"✓":"—")+' '+esc(c[0])+'</span>').join("")+'</div><p>'+esc(w.why)+'</p></article>').join(""):'<div class="empty">NO WAIT ANALYSIS</div>';const recent=rows.slice(0,8);$("#count").textContent=recent.length+" SCANS";$("#activity").innerHTML=recent.map(e=>{const p=e.payload||{},m=p.markets?.[0],d=m?.diagnostics||{};return '<div class="row"><time>'+tm(e.timestamp_ms)+'</time><b>'+esc(m?.asset)+'</b><span class="'+String(d.status||"").toLowerCase()+'">'+esc(String(d.status||"—").toUpperCase())+'</span><span>'+(m?.setups||[]).length+' setups</span><small>rotation '+esc(p.rotation_id||"—")+' · '+esc(p.queue_position||"—")+'/'+esc(p.universe_size||"—")+'</small></div>'}).join("")}
 let refreshInFlight=false;
 async function refresh(){
  if(refreshInFlight)return;
