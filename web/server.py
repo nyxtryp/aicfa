@@ -6,6 +6,8 @@ market scanner.
 """
 from __future__ import annotations
 
+import csv
+import json
 import os
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -15,6 +17,33 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parent
 FEED = "http://127.0.0.1:8090"
 
+
+
+DATA_DIR = Path(os.getenv("AICFA_DATA_DIR", str(ROOT.parent / "data")))
+RAW_DIR = DATA_DIR / "raw"
+
+def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
+    normalized = symbol.strip().upper().replace("/", "_")
+    if not normalized or any(part in normalized for part in ("..", "/", "\\")):
+        raise ValueError("invalid symbol")
+    if timeframe not in {"1m", "5m", "15m", "1h", "4h", "1d", "1w"}:
+        raise ValueError("invalid timeframe")
+    try:
+        limit = max(20, min(int(limit), 300))
+    except (TypeError, ValueError):
+        limit = 160
+    path = RAW_DIR / normalized / f"{timeframe}.csv"
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    rows = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            try:
+                rows.append({"timestamp": int(row["timestamp"]), "open": float(row["open"]), "high": float(row["high"]), "low": float(row["low"]), "close": float(row["close"]), "volume": float(row["volume"])})
+            except (KeyError, TypeError, ValueError):
+                continue
+    return json.dumps({"symbol": symbol, "timeframe": timeframe, "candles": rows[-limit:]}, separators=(",", ":")).encode("utf-8")
 
 class Handler(SimpleHTTPRequestHandler):
     server_version = "AICFA-Web/1.0"
@@ -39,6 +68,18 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self) -> None:
+        if self.path.startswith("/api/chart"):
+            from urllib.parse import parse_qs
+            query = parse_qs(urlsplit(self.path).query)
+            try:
+                self._json(200, _chart_data(query.get("symbol", [""])[0], query.get("timeframe", ["15m"])[0], query.get("limit", ["160"])[0]))
+            except FileNotFoundError:
+                self._json(404, b'{"error":"chart_data_not_found"}')
+            except ValueError as exc:
+                self._json(400, json.dumps({"error": str(exc)}).encode("utf-8"))
+            except Exception:
+                self._json(500, b'{"error":"chart_data_unavailable"}')
+            return
         if self.path == "/api" or self.path.startswith("/api/"):
             target = FEED + self.path
             try:
