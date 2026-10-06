@@ -989,3 +989,49 @@ This closure does not claim that the underlying generic TP-generation/data-valid
 - Execution remains separate from analysis.
 - Production data stays in persistent storage.
 - Infrastructure changes must be recorded in this plan before moving to the next stage.
+
+
+### 2026-10-06 — STEP 12 — TECHNICAL WEB CARCASS DEPLOYED / FINAL DESIGN DEFERRED
+
+- The AICFA Web application has now been deployed successfully in FrostDeploy as a **Web** application using `web/server.py`.
+- Production deployment verified on commit `60c073e`.
+- The application is publicly available at **`aicfa.aicfa.ru`**.
+- FrostDeploy allocated the application port dynamically; healthcheck passed and deployment completed successfully.
+- Current UI is intentionally treated as a **technical/functional carcass**, not the final product design.
+- Current carcass already contains the main future surfaces: AICFA status, AI query placeholder, autonomous horizons, Live Feed, Current Setups, and Immutable Journal.
+- The visible `DATA UNAVAILABLE` / empty feed state is expected at this stage and is not treated as the final user experience.
+- **Final visual redesign is deliberately deferred** until the real Journal/Feed data is connected and the actual information architecture, states and user flows are verified.
+- Do not spend the next implementation step on cosmetic redesign. First connect and verify the real central Feed data in the existing UI.
+
+### Current stopping point — 2026-10-06
+
+**We are here:**
+```
+STEP 12
+  ├─ Web application: DEPLOYED / GREEN
+  ├─ Technical UI carcass: PRESENT
+  ├─ Final visual design: DEFERRED
+  └─ Real Journal/Feed data in UI: NEXT
+```
+
+### Next exact implementation action
+
+Continue **STEP 12** by connecting the deployed AICFA Web UI to the existing read-only Journal Feed and verifying real production data end-to-end:
+
+```
+AICFA Scanner
+    ↓
+Persistent Journal
+    ↓
+Journal Feed :8090
+    ↓
+web/server.py /api proxy
+    ↓
+aicfa.aicfa.ru
+    ↓
+Live Feed / Current Setups / Events
+```
+
+Verify actual setup/event rendering, lifecycle states, timestamps/freshness, horizon filtering and empty/degraded-data states. Only after this functional layer is stable should the final production-grade visual redesign be performed.
+
+**Do not mark STEP 12 complete yet.**
