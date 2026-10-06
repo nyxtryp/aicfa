@@ -179,14 +179,14 @@ function render(rows,registry){
 async function refresh(){
  if(refreshInFlight)return;refreshInFlight=true;
  try{
-  const [h,d,r,mk]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/markets?t="+Date.now(),{cache:"no-store"}).then(x=>x.json())]);
+  const [h,d,r,mk]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/markets?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({markets:[]}))]);
   state.events=d.events||[];const registry=r.setups||[];state.registry=registry;state.markets=mk.markets||[];const sig=JSON.stringify([state.events,registry,state.markets]);
   if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}
   $("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now());
  }catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}
 }
 function renderMarkets(){
- const root=$("#marketWatch"),visible=state.markets||[];
+ const root=$("#marketWatch"),visible=(state.markets&&state.markets.length?state.markets:latest(scans()).map((m,index)=>({index,asset:m.asset,market_type:m.market_type||"spot"})));
  $("#marketCount").textContent=visible.length;
  root.innerHTML=visible.length?visible.map(m=>'<button class="market-item '+(Number(m.index)===Number(ui.marketIndex)?"selected":"")+'" data-market-index="'+esc(m.index)+'"><span class="market-number">'+String(Number(m.index)+1).padStart(3,"0")+'</span><span class="market-symbol">'+esc(m.asset)+'</span><span class="market-type">'+esc(m.market_type==="futures"?"FUT":"SPOT")+'</span></button>').join(""):'<div class="rail-empty">NO MARKETS</div>';
 }
