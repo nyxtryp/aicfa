@@ -36,7 +36,7 @@ function registryItems(records){
  for(const r of records||[]){
   const status=String(r.status||"").toUpperCase();
   if(status!=="ACTIVE"&&status!=="STALE")continue;
-  const wrapper=r.setup||{},candidate=wrapper.candidate||wrapper;
+  const wrapper=r.setup||{},base=wrapper.candidate||wrapper,candidate={...base,chart:wrapper.chart||base.chart};
   out.push({asset:r.asset,mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||status.toLowerCase(),status,key:r.setup_id,seenAt:Number(r.last_seen_at_ms||r.created_at_ms||0),lastConfirmedAt:Number(r.last_confirmed_at_ms||0),setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
  }
  return out.sort((a,b)=>(a.status==="ACTIVE"?0:1)-(b.status==="ACTIVE"?0:1)||Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
