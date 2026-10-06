@@ -133,6 +133,38 @@ def decide(
             reasons=("resolved MTF setup direction lacks matching explicit evidence",),
         )
 
+    # A structural candidate is not a trade decision. Final LONG/SHORT is
+    # blocked until the selected zone has actually reacted and volume provides
+    # confirming evidence. This prevents BOS/OB/FVG alone from becoming a live
+    # trade signal.
+    observed_concepts = {
+        item.concept_id
+        for item in observations
+        if item.state == "observed" and item.confidence >= 0.5
+    }
+    required_confirmation = ("price_action.rejection", "volume.evidence")
+    missing_confirmation = tuple(
+        concept for concept in required_confirmation
+        if concept not in observed_concepts
+    )
+    if missing_confirmation:
+        labels = {
+            "price_action.rejection": "confirmed zone reaction",
+            "volume.evidence": "confirming volume evidence",
+        }
+        return DecisionAssessment(
+            action=DecisionAction.WAIT,
+            candidates=(),
+            missing_context=setup_assessment.missing_context + tuple(
+                labels[concept] for concept in missing_confirmation
+            ),
+            conflicts=setup_assessment.conflicts,
+            reasons=(
+                "structural setup exists, but final entry confirmation is incomplete: "
+                + ", ".join(labels[concept] for concept in missing_confirmation),
+            ),
+        )
+
     action = DecisionAction.LONG if side == "long" else DecisionAction.SHORT
     candidates = tuple(
         DecisionCandidate(
