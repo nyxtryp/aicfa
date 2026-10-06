@@ -729,6 +729,13 @@ def analyze_setups(
             missing.append(f"{hypothesis.scenario}: setup direction is not structurally established")
             continue
 
+        # Keep directional rationale/evidence coherent: an opposite-side
+        # order block must not be presented as support for the resolved trade.
+        if direction == "long":
+            supporting = tuple(concept for concept in supporting if concept != "order_block.bearish")
+        elif direction == "short":
+            supporting = tuple(concept for concept in supporting if concept != "order_block.bullish")
+
         confirmations, invalidations = _knowledge_requirements(supporting)
         source_tfs = _unique([
             item.timeframe
