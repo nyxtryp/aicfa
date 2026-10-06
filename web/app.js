@@ -28,5 +28,5 @@ let refreshInFlight=false;
 async function refresh(){
  if(refreshInFlight)return;
  refreshInFlight=true;
- try{const[h,d]=await Promise.all([fetch(API_BASE+"/health",{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500",{cache:"no-store"}).then(x=>x.json())]);state.events=d.events||[];render(scans());$("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now())}catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}}
+ try{const[h,d]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json())]);state.events=d.events||[];render(scans());$("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now())}catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}}
 $("#filters").addEventListener("click",e=>{const f=e.target.dataset.filter;if(!f)return;document.querySelectorAll("#filters button").forEach(b=>b.classList.remove("active"));e.target.classList.add("active");state.filter=f;render(scans())});refresh();setInterval(refresh,3000);
