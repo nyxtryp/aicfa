@@ -24,6 +24,7 @@ class SetupIdentity:
     symbol: str
     market_type: str
     horizon: TradingMode
+    scenario: str
     direction: str
     entry_zone: tuple[tuple[float, str, str], ...]
     invalidation: tuple[float, str, str] | None
@@ -77,6 +78,7 @@ class SetupLifecycle:
             symbol=symbol,
             market_type=market_type,
             horizon=normalized,
+            scenario=candidate.scenario,
             direction=candidate.direction,
             entry_zone=tuple(
                 (level.value, level.timeframe, level.source)
