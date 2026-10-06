@@ -19,10 +19,7 @@ function latest(rows){
  }
  return [...m.values()];
 }
-function setupKey(x){
- const s=x.setup||{},geometry=JSON.stringify({scenario:s.scenario||"",entry:s.entry_zone||[],invalid:s.invalidation_level||null,targets:s.target_levels||[]});
- return [x.asset,hor(x.mode),dir(s),geometry].join("|");
-}
+function setupKey(x){return String(x.key||[x.asset,hor(x.mode),(x.setup?.scenario||""),dir(x.setup||""),x.setupTimeframe||""].join("|"))}
 function active(ms){
  const out=[],seen=new Set();
  for(const m of ms)for(const s of m.setups||[]){
