@@ -667,6 +667,35 @@ Journal / Feed service
 
 
 
+### STEP 11.3 — PRODUCTION AUTONOMOUS SCANNER WORKER — ACTIVE
+
+The analytical AutonomousScanEngine already exists and is tested, but the deployed fd-aicfa production entry point was still a placeholder that only printed AICFA worker started. and slept. This disconnected the real scanner from production and therefore prevented persistent scan events from reaching the Journal Feed.
+
+#### Required implementation
+
+1. Replace the placeholder main.py worker with a real production entry point.
+2. Load the durable production market universe from config/market_universe.json (overrideable with AICFA_MARKET_UNIVERSE).
+3. Instantiate the existing AutonomousScanEngine; do not create a second scanner.
+4. Preserve the existing three primary horizons: Intraday, Swing, Position.
+5. Preserve AICFA_DATA_DIR / PersistentJournal behavior so production writes to /srv/frostdeploy/aicfa/shared/data/journal/events.jsonl.
+6. Run the existing sequential autonomous market rotation continuously.
+7. A failure on one market must not terminate the whole worker; log the error and advance to the next configured market.
+8. Handle SIGTERM/SIGINT cleanly for FrostDeploy/systemd restarts and deployments.
+9. Keep the existing FrostDeploy start command .venv/bin/python main.py.
+10. Add focused orchestration coverage for the worker loop/error isolation.
+11. Deploy and verify end-to-end: fd-aicfa → AutonomousScanEngine → PersistentJournal → Journal Feed → Web.
+12. Only after this production worker is green should STEP 12 real-data Web verification continue.
+
+#### Implementation record — 2026-10-06
+
+- Replaced placeholder production worker in commit 72e7d68514ac002a5aa0fd5cb3c2a6cdc8d3b0c7.
+- Production worker now loads the configured universe, instantiates AutonomousScanEngine, handles SIGTERM/SIGINT, and runs the existing sequential scanner.
+- Added market-error isolation to AutonomousScanEngine.run_forever_batches() in commit 023fb607a62cab21f68d02748ab325b101f8c8b9.
+- Added focused regression coverage in commit e92431d0560ff0ae3286c1d1ce5228ec828048f6.
+- Code implementation: GREEN.
+- Production VDS deployment/verification: PENDING.
+- Do not mark STEP 11.3 complete until the real VDS worker writes a new journal event and the Feed/Web chain reads it.
+
 ### 2026-10-06 — STEP 12 — PUBLIC WEBSITE / AICFA APPLICATION ARCHITECTURE — FINAL / FIXED
 
 Зафиксирована окончательная и обязательная архитектура пользовательских адресов AICFA. **Это правило проекта и не должно трактоваться иначе.**
@@ -897,6 +926,8 @@ NOW
  ↓
 11  Persistent feed + Caddy
  ↓
+11.3  Production autonomous scanner worker
+ ↓
 12  Live AICFA website
  ↓
 13  Stable event/setup IDs
@@ -948,7 +979,8 @@ NOW
 - Read-only feed code/tests: GREEN.
 - Feed systemd productionization: **GREEN / DONE**.
 - Caddy/FrostDeploy platform routing: **GREEN / DONE**.
-- User-facing website: **NEXT — STEP 12 implementation**.
+- Production autonomous scanner worker: **STEP 11.3 — CODE GREEN / VDS VERIFICATION PENDING**.
+- User-facing website: **STEP 12 implementation in progress; blocked on production scanner data until 11.3 is green**.
 - Experience loop: ARCHITECTURE DEFINED; needs live outcome accumulation.
 - Own ML model: NOT YET PRODUCTION.
 - Vision: PLANNED.
@@ -1007,16 +1039,23 @@ This closure does not claim that the underlying generic TP-generation/data-valid
 
 **We are here:**
 ```
+STEP 11.3
+  ├─ Production worker code: GREEN
+  ├─ AutonomousScanEngine wired into main.py: DONE
+  ├─ Per-market error isolation: DONE
+  ├─ Graceful shutdown: DONE
+  └─ Real VDS journal production: PENDING
+        ↓
 STEP 12
   ├─ Web application: DEPLOYED / GREEN
   ├─ Technical UI carcass: PRESENT
   ├─ Final visual design: DEFERRED
-  └─ Real Journal/Feed data in UI: NEXT
+  └─ Real Journal/Feed data in UI: WAITING FOR 11.3
 ```
 
 ### Next exact implementation action
 
-Continue **STEP 12** by connecting the deployed AICFA Web UI to the existing read-only Journal Feed and verifying real production data end-to-end:
+Complete **STEP 11.3** on the VDS first, then continue **STEP 12** by connecting the deployed AICFA Web UI to the real Journal Feed and verifying production data end-to-end:
 
 ```
 AICFA Scanner
