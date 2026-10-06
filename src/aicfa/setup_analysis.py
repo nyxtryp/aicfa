@@ -724,10 +724,18 @@ def _resolve_direction(
             if broader_direction != direction:
                 reversal_confirmed = (
                     scenario == "reversal"
-                    and "market_structure.choch" in supporting
+                    and (
+                        "market_structure.choch" in supporting
+                        or "market_structure.mss" in supporting
+                    )
                     and "liquidity.sweep" in supporting
                 )
-                if not reversal_confirmed:
+                failure_confirmed = (
+                    scenario == "breakout_failure"
+                    and "liquidity.sweep" in supporting
+                    and "price_action.rejection" in supporting
+                )
+                if not reversal_confirmed and not failure_confirmed:
                     return None, "broader higher-timeframe structure conflicts with setup direction"
     return direction, None
 
