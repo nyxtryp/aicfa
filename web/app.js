@@ -82,8 +82,8 @@ function renderCandleChart(node,candles,s){
  const price=v=>Number(v?.price??v?.value??v);
  const time=v=>Number(v?.timestamp??v?.time??v);
  const entry=s.entry||s.entry_zone||[],targets=s.take_profits||s.target_levels||[];
- const zones=s.zones||{},obs=[...(zones.order_blocks||s.order_blocks||[]),...(zones.ob||[])],fvgs=[...(zones.fvgs||s.fvgs||[]),...(zones.fvg||[])];
- const events={BOS:[...(s.bos||s.BOS||[])],CHoCH:[...(s.choch||s.CHoCH||[])],MSS:[...(s.mss||s.MSS||[])]};
+ const chartData=s.chart||{},zones=s.zones||{},chartZones=chartData.zones||[],obs=[...chartZones.filter(z=>String(z.type).toLowerCase()==="ob"),...(zones.order_blocks||s.order_blocks||[]),...(zones.ob||[])],fvgs=[...chartZones.filter(z=>String(z.type).toLowerCase()==="fvg"),...(zones.fvgs||s.fvgs||[]),...(zones.fvg||[])];
+ const chartEvents=chartData.events||[],events={BOS:[...chartEvents.filter(e=>e.type==="BOS"),...(s.bos||s.BOS||[])],CHoCH:[...chartEvents.filter(e=>e.type==="CHoCH"),...(s.choch||s.CHoCH||[])],MSS:[...chartEvents.filter(e=>e.type==="MSS"),...(s.mss||s.MSS||[])]};
  function rangePrice(x){const a=price(x?.priceLow??x?.low??x?.low_price),b=price(x?.priceHigh??x?.high??x?.high_price);return [Math.min(a,b),Math.max(a,b)]}
  function xCoord(t){if(!Number.isFinite(t))return null;return chart.timeScale().timeToCoordinate(Math.floor(t>1e12?t/1000:t))}
  function drawOverlay(){
