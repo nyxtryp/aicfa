@@ -526,10 +526,10 @@ A * → IP AICFA VDS
 
 ### Публичный адрес
 
-- Пользователь открывает **aicfa.ru** и остаётся на **aicfa.ru**.
-- Technical Feed/application hostnames are internal platform details and must not become the user-facing browser URL.
-- The user-facing product URL is **aicfa.ru**.
-- При переходах внутри продукта браузер продолжает показывать **aicfa.ru**.
+- Пользователь открывает **aicfa.aicfa.ru** после успешной регистрации/авторизации и работает в самом AICFA.
+- `aicfa-web.aicfa.ru` — презентационная поверхность.
+- `aicfa.aicfa.ru` — пользовательский URL самого рабочего AICFA.
+- Технические Feed/Scanner hostname не должны становиться пользовательскими адресами.
 
 ### Основные элементы сайта
 
@@ -641,12 +641,16 @@ AICFA Website
 
 ### Требование к публичному URL
 
-Публичный UI должен быть отделён от технических hostname:
+Публичные пользовательские поверхности разделены:
 
 ```
-Пользователь
+aicfa-web.aicfa.ru
    ↓
-aicfa.ru
+Open AICFA
+   ↓
+регистрация / авторизация
+   ↓
+aicfa.aicfa.ru
    ↓
 AICFA Web UI
    ↓
@@ -655,7 +659,7 @@ AICFA Web UI
 Journal / Feed service
 ```
 
-При этом **aicfa.nyxtryp.ru не должен становиться адресом страницы в браузере**. Предпочтительный принцип — same-origin/proxy/API integration через публичный **aicfa.ru**, а не пользовательский redirect.
+При этом технические hostname Feed/Scanner не должны становиться адресом страницы в браузере. Рабочая пользовательская поверхность — **aicfa.aicfa.ru**.
 
 ### Следующий этап
 
