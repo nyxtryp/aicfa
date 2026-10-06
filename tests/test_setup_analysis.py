@@ -196,3 +196,111 @@ def test_reversal_can_change_direction_only_after_choch_and_sweep():
     )
     assert direction == "long"
     assert conflict is None
+
+
+def test_continuation_rejects_opposite_bos_event_on_higher_structure():
+    from aicfa.market_evidence import MarketObservation
+    from aicfa.setup_analysis import build_multi_timeframe_context, _resolve_direction, _event_direction_conflict
+
+    def frame(direction):
+        return pd.DataFrame({"timestamp": [1], "smc_structure_direction": [direction]})
+
+    analyses = {
+        "4h": frame(1),
+        "1h": frame(1),
+        "15m": frame(1),
+        "5m": frame(1),
+    }
+    observations = (
+        MarketObservation(
+            concept_id="market_structure.bos",
+            timeframe="4h",
+            state="observed",
+            confidence=1.0,
+            evidence=("bos_down=1",),
+            direction="short",
+        ),
+    )
+    context = build_multi_timeframe_context(
+        observations,
+        analyses,
+        timeframes=("4h", "1h", "15m", "5m"),
+        mode="intraday",
+    )
+    direction, conflict = _resolve_direction(
+        context,
+        scenario="continuation",
+        supporting=("market_structure.bos", "displacement"),
+    )
+    assert direction == "long"
+    assert conflict is None
+    assert _event_direction_conflict(
+        context,
+        scenario="continuation",
+        direction="long",
+        observations=observations,
+    ) is not None
+
+
+def test_setup_rationale_uses_structural_state_not_event_direction():
+    from aicfa.market_evidence import MarketObservation
+    from aicfa.evidence_reasoning import EvidenceAssessment, EvidenceDecision
+    from aicfa.scenario_reasoning import ScenarioAssessment, ScenarioHypothesis
+    from aicfa.setup_analysis import analyze_setups
+
+    def frame(direction):
+        return pd.DataFrame({
+            "timestamp": [1],
+            "smc_structure_direction": [direction],
+            "order_block_bullish_low": [90.0],
+            "order_block_bullish_high": [95.0],
+            "previous_low": [89.0],
+            "previous_high": [110.0],
+            "active_buy_liquidity_price": [115.0],
+        })
+
+    observations = (
+        MarketObservation("market_structure.bos", "1h", "observed", 1.0, ("bos_up=1",), direction="long"),
+        MarketObservation("displacement", "1h", "observed", 1.0, ("displacement_up=1",), direction="long"),
+        MarketObservation("order_block.bullish", "1h", "observed", 1.0, ("order_block_bullish=1",), direction="long"),
+    )
+    evidence = EvidenceAssessment(
+        decision=EvidenceDecision.PROCEED,
+        observations=observations,
+        missing_context=(),
+        conflicts=(),
+        reasons=(),
+        supported_concepts=tuple(item.concept_id for item in observations),
+        possible_concepts=(),
+    )
+    scenario = ScenarioAssessment(
+        decision=EvidenceDecision.PROCEED,
+        hypotheses=(ScenarioHypothesis(
+            scenario="continuation",
+            supporting_concepts=("market_structure.bos", "displacement"),
+            confirmations=(),
+            invalidations=(),
+            rationale=("market_structure.bos is supported by the current evidence",),
+        ),),
+        unsupported_scenarios=(),
+        reasons=(),
+    )
+    analyses = {
+        "4h": frame(1),
+        "1h": frame(1),
+        "15m": frame(1),
+        "5m": frame(1),
+    }
+    result = analyze_setups(
+        evidence,
+        scenario,
+        observations=observations,
+        analyses=analyses,
+        timeframes=("4h", "1h", "15m", "5m"),
+        mode="intraday",
+    )
+    assert result.decision is SetupDecision.READY
+    rationale = " ".join(result.candidates[0].rationale)
+    assert "4h structure=long" in rationale
+    assert "1h structure=long" in rationale
+    assert "1h structure=short" not in rationale
