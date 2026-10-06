@@ -1,8 +1,8 @@
 """AICFA public web server.
 
-Serves the static monitoring UI and exposes a same-origin read-only /api proxy
-to the local journal feed at 127.0.0.1:8090. The web process never runs the
-market scanner.
+Serves the static monitoring UI, proxies read-only journal data, and forwards
+market-watch scan requests to the loopback control endpoint owned by the
+already-running scanner worker. The web process never runs market analysis.
 """
 from __future__ import annotations
 
