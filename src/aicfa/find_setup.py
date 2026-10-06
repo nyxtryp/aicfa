@@ -688,6 +688,7 @@ def find_setup(
     decision_assessment = decide(
         setup_assessment,
         observations=evidence_assessment.observations,
+        current_price=float(base_analysis["close"].iloc[-1]) if "close" in base_analysis.columns else None,
     )
     decision_duration_ms = (time.perf_counter() - decision_started) * 1000.0
 
