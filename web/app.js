@@ -42,9 +42,11 @@ function registryItems(records){
  return out.sort((a,b)=>(a.status==="ACTIVE"?0:1)-(b.status==="ACTIVE"?0:1)||Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
 }
 function syncRegistry(records){
- const items=registryItems(records),previous=ui.selected;
+ const items=registryItems(records),previous=ui.selected,oldKeys=new Set(ui.history.map(x=>x.key));
+ const newlyAdded=items.find(x=>!oldKeys.has(x.key));
  ui.history=items;
- if(previous&&items.some(x=>x.key===previous))ui.selected=previous;
+ if(newlyAdded)ui.selected=newlyAdded.key;
+ else if(previous&&items.some(x=>x.key===previous))ui.selected=previous;
  else if(items.length)ui.selected=items[0].key;
 }function conceptSet(s,x){return new Set([...(s.supporting_concepts||[]),...(s.zone_concepts||[]),...(x?.evidence_concepts||[])])}
 function evidence(s,x){
