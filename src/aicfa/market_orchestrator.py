@@ -248,7 +248,7 @@ def analyze_market_horizons(
         candidates = getattr(result.setup_assessment, "candidates", ())
 
         mode_lifecycle: tuple[SetupLifecycleResult, ...] = ()
-        if lifecycle is not None and str(result.decision_assessment.action.value) in {"long", "short"}:
+        if lifecycle is not None:
             mode_lifecycle = lifecycle.evaluate_all(
                 symbol=result.symbol,
                 market_type=market_type,
