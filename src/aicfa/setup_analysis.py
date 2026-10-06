@@ -549,6 +549,19 @@ def _scenario_requirements_met(
                 or "market_structure.mss" in concepts
             )
         )
+    if scenario == "breakout_failure":
+        return (
+            "liquidity.sweep" in concepts
+            and "price_action.rejection" in concepts
+            and bool(
+                concepts
+                & {
+                    "market_structure.bos",
+                    "market_structure.choch",
+                    "market_structure.mss",
+                }
+            )
+        )
     return _scenario_has_required_evidence(scenario, supporting)
 
 
