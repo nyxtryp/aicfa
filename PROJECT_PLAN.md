@@ -1176,3 +1176,187 @@ Next:
 4. Confirm non-actionable horizons show deterministic WAIT/missing evidence.
 5. Only then mark this STEP 12 product work GREEN.
 
+
+
+### 2026-10-07 — CONSOLIDATED DAILY WORK — LIVE SETUP TERMINAL, PERSISTENT SETUP LIFECYCLE AND MARKET WATCH
+
+This section records the implementation completed in the current work session. Commit timestamps are in UTC (the Git history is dated 2026-10-06 UTC).
+
+#### A. Chart and setup-terminal foundation
+
+The Web application was moved from a generic dashboard toward the actual AICFA operational terminal:
+
+- Lightweight Charts became the setup chart foundation.
+- Setup Entry / SL / TP levels are rendered from AICFA setup data.
+- Causal setup geometry was exposed from the analytical result instead of being recreated in the frontend.
+- Exact setup timeframe is used for the chart; there is no silent 5m fallback.
+- Empty chart/setup states are centered correctly.
+- Feature analyses are carried into setup results so the UI can use the exact backend analysis.
+- SHIB perpetual symbol alias handling was added for chart data.
+- Setup redraws were optimized so unchanged setup state does not rebuild charts repeatedly.
+- The terminal was rebuilt around a central active-analysis workspace, scanner activity/WAIT rails and a right-side setup queue.
+
+Relevant commits:
+- `c5f1c0ca10e38d53986e9ed0af8ef617ace7c85f` — Use Lightweight Charts for setup charts.
+- `96c9a7468a4c7dca9bcf41b8343be159e4433d1f` — Overlay setup levels on Lightweight Charts.
+- `5db31375d9f81b96df9dbcd2b25c0aebe6008b57` — Add full AICFA chart overlay for levels, zones and structure.
+- `9cc4dde1b9094887fc72c8976a8ffa9914579dd` — Stop rebuilding unchanged setup charts on every scan.
+- `d1610c02a7b122f4e4785fb4fbab13ad1c224b23` — Only redraw setup view when setup state changes.
+- `dd69aa2e9b42064056f19a5f93d920e4063ca378` — Resolve Binance perpetual alias for SHIB charts.
+- `aa080b2964b3abf0a4402d29e9b27e36dd33d8bc` — Refine setup information architecture for trading terminal.
+- `31c117c5c1e7e12cc41969e952ac84b6a8a10452` — Rebuild AICFA terminal information architecture.
+- `32c635ccc57c65b672e97cee7699863dcdbe8fdb` — Rework terminal layout into center workspace with left activity rails and setup watchlist.
+- `5c8c64f1cf00d326253ceb84fcf724411492c005` — Add persistent setup queue and center focus workflow.
+- `20a0e62cdfb53ea78eee805661291c72e8ee4471` — Style terminal as three-column workspace with independent scrolling rails.
+- `ef6cb7b75c9732957d01e4d54f571b664567d71b` — Keep active KPI scoped to current scan while retaining setup history.
+- `13dfa3da9c5547e9c5382e25b92fc9a26d83c45e` — Populate feature analyses in setup result.
+- `24d34dde35e2bf018a64f0dce99e7631812be95d` — Expose full feature analyses for chart geometry.
+- `4096b542726e24977fdbb81959b79400dd8be6d2` — Add causal setup geometry to chart journal payload.
+- `39db64a71f8f4aaef7463b705c4623262064dba3` — Fix setup chart geometry and rationale rendering.
+- `bdf8167904ae841d0f65a143aa9b7a541af0f080` — Use setup timeframe directly for chart.
+- `7b91a0e2ed9361a1921f4cad018141317fab9aff` — Keep chart empty states centered.
+- `ccaf60a0900995b33c91cf0c9fe0ccbf37219313` — Fix empty setup message centering.
+- `18a6010c6130d58d8fe7bd99b78fa18bf186ca56` — Swap WAIT and scanner log panels.
+
+#### B. Persistent setup registry / real setup lifetime
+
+The previous browser-only setup queue was replaced by a persistent backend-controlled registry.
+
+Implemented:
+- Durable setup registry at `AICFA_DATA_DIR/journal/setup_registry.json`.
+- Stable setup identity based on market + mode + scenario + direction + structural timeframe rather than changing price/chart geometry.
+- Same setup found again refreshes the existing record instead of creating a duplicate.
+- Setup freshness is persisted across browser reloads, worker restarts and deployments.
+- Registry keeps lifecycle state independently from the current analytical decision.
+- A temporary analytical WAIT no longer destroys a still-valid lifecycle-active setup.
+- Lifecycle is evaluated on every scan rather than only when the current decision action is LONG/SHORT.
+- Setup states include ACTIVE / STALE / INVALIDATED / COMPLETED / EXPIRED.
+- Freshness transitions are based on the structural timeframe rather than an arbitrary global timer.
+- Exact chart geometry is persisted with the setup registry and restored with the setup.
+- The right-side queue is now derived from the persistent registry, not browser memory.
+- Newly discovered setups automatically receive center focus.
+- UI filters no longer destroy the persistent setup queue.
+
+Relevant commits:
+- `726ffba703e867735803d20f7adfbf3372c8bd9c` — Add persistent setup registry for durable setup queue.
+- `f4be44cd75e3d0340fc8bd39171782b3905d6025` — Evaluate active setup lifecycle on every market scan.
+- `efa3e1d415eb264eda4ff8945fd260471e6af327` — Persist setup registry alongside scan journal.
+- `8699a24b83695ef84ba261f679219e8e16f875cf` — Expose persistent setup registry feed.
+- `f1bbb6a93533e7c5db0d10d35463b1dc3f8c839d` — Expose persistent setup registry feed.
+- `abc2f8162c0f32f5fae8b85d7e8a8268f2c3a7d3` — Expose persistent setup registry feed.
+- `738dd5c86c75c459d30014924976744135145616` — Use stable server setup identity in queue.
+- `2db64f22b6c442ae418754af8a0c5e73335b735b` — Rebuild setup queue from persistent registry.
+- `1a13b4bb4a97114f7d3cd4f7e9838b89e809a7bf` — Load setup queue from persistent registry endpoint.
+- `1ef01e5fc0fde6fc4414f2ce499c57ff2c3b4cc2` — Use setup timeframe without silent 5m fallback.
+- `5bdd26b0291c436a43f3a9821d03848975f5c63e` — Render persisted SMC chart geometry.
+- `71234d7ee42517ca2b5c83a05b503f77cc3983bc` — Auto-focus newly discovered setup only.
+- `1e944974960f1aee0a903065bbd0b54cf40b1c37` — Show setup freshness status in queue.
+- `766538b33fd94024c61988f5b03319255ff0ed0a` — Test persistent setup registry refresh and expiry.
+- `3fb79ab994726b44e1b7a4ca7e2c4663635f8c51` — Correct registry lifecycle timing test.
+- `004c9ff9ce0889a0aeb592ee28396662f386c5d9` — Fix persistent setup registry endpoint.
+- `edf3f170b1a4daca370fdc401461cb2e81513476` — Add persistent setup registry API.
+- `783b873c022fcba7d089d3675f19cb3b8f6fe1f7` — Add scenario to stable setup identity.
+- `47719d65402db667c96bffb803291165c2343be1` — Evaluate setup lifecycle on every scan.
+- `8f4de6c49fb47a09b1e7d0d166b3f8554a4bc677` — Persist setup registry with scanner state.
+- `a6c323dd499418e130fb9f856e5b3fdf1291773e` — Keep persistent setup queue across UI filters.
+- `23281375422a092c0b28a439990bf73d24ac2a47` — Persist exact setup chart geometry in registry.
+- `313b0bfe72dc5691d23a239ba3a7d961c10f899d` — Carry persisted chart geometry into setup view.
+- `04b1b2cb974c639e65d78834a7b92aa81b4c0462` — Keep lifecycle-active setups fresh during temporary analytical WAIT.
+
+#### C. MARKET WATCH — same scanner, on-demand market selection
+
+A new `MARKET WATCH` column was implemented exactly as defined in the product discussion.
+
+**There is no separate manual analysis mode.** A market clicked in MARKET WATCH is sent through the same live `AutonomousScanEngine` / `scan_universe()` / `analyze_market_horizons()` pipeline used by the autonomous scanner.
+
+Behavior:
+- MARKET WATCH displays the complete configured market universe with numbering and scrolling.
+- Clicking a market requests a scan of that exact configured market.
+- The autonomous queue remains the same scanner; MARKET WATCH does not replace or reset it.
+- If the clicked market produces no actionable setup, the center shows `NO ACTIVE SETUP` and nothing is added to the setup queue.
+- If the clicked market produces a setup, the exact setup is shown in the center and enters the same persistent setup registry/right-side queue.
+- A setup found by MARKET WATCH and later found again by the autonomous scanner uses the same stable identity and is refreshed rather than duplicated.
+- A genuinely new setup is added to the common registry and immediately receives center focus.
+- Lifecycle/freshness rules are identical for automatic and MARKET WATCH discoveries.
+- MARKET WATCH scans do not append a duplicate historical heartbeat into the append-only scanner journal.
+- The right queue remains the system-controlled relevance queue; the left scanner log remains historical scan activity.
+
+Implementation:
+- Added loopback scanner control endpoint on `127.0.0.1:8091`.
+- The web server only proxies requests; it never performs market analysis itself.
+- Added serialized access to the shared scanner engine so an on-demand scan cannot race the autonomous engine's mutable provider/lifecycle state.
+- Added `GET /api/markets`.
+- Added `POST /api/market-scan`.
+- Added the MARKET WATCH UI with numbered scrollable markets.
+- Manual/on-demand result immediately focuses the center when a setup is found.
+- No-setup result produces the center empty state and no queue insertion.
+
+Relevant commits:
+- `53b099b884f584c3ac02f7132a8a193434f5de66` — Add serialized shared scan access for market watch.
+- `8fc110691d1de45828086630a8ca5b5d4df00806` — Fix shared market scan locking.
+- `49182ec05461df55562072fd40f242147b44d86c` — Add loopback market watch control endpoint.
+- `530411a21f1b9d3b789c9966aa944fadec45f6e4` — Expose shared scanner for market watch.
+- `6ff10c131f8d57733750c5e11620bf56421b437f` — Proxy market watch controls to scanner worker.
+- `d42fdb21d49d87ecc559ff1d909ff559c7c86e05` — Add Market Watch shared scanner flow.
+- `642271c70181ceb61c5c8b4a06dcf388a7e41890` — Add Market Watch panel.
+- `e7c6d11161d8f7a58cfcb17199ae1d366cc5d67c` — Style Market Watch column.
+- `0e0046d7679d5536c5f4f461f47e09402dc881e3` — Clarify Market Watch proxy role.
+- `61c19de61cf5fc270fa18230db160ef3a109b032` — Focus manual setup immediately.
+- `06aaf9f5d8431a184bc2ad21d80a5a70a0d28747` — Clean Market Watch control module.
+
+#### D. Important correctness decision preserved
+
+The system must not confuse analytical WAIT with setup disappearance.
+
+A setup is not deleted merely because one later scan temporarily produces WAIT. Its persistent lifecycle state is evaluated separately. The scanner may strengthen, refresh, stale, invalidate, complete or expire the setup according to actual evidence/lifecycle state.
+
+The right queue is therefore **not an infinite history** and **not a browser cache**. It is a persistent, system-controlled relevance queue.
+
+#### E. Verification status for this work block
+
+- Git history was reviewed from the current main branch.
+- MARKET WATCH implementation is committed and present on `main`.
+- The same scanner engine is used by automatic and on-demand paths.
+- Persistent setup registry remains the common state layer.
+- GitHub CI was triggered after the implementation.
+- CI currently fails during pytest collection because the GitHub runner cannot import the `aicfa` package (`ModuleNotFoundError`) under the repository's `src` layout. The failure occurs before the later compile/node checks; it is a CI environment/path issue, not evidence that the MARKET WATCH logic itself produced a test failure.
+- The implementation is therefore recorded as **CODE IMPLEMENTED / CI ENVIRONMENT VERIFICATION PENDING**, not falsely marked fully GREEN.
+
+#### Current state after today's work
+
+```
+AICFA analytical core                    GREEN
+SMC / zones / causal setup engine        GREEN
+Autonomous scanner                       GREEN (code)
+Persistent scan journal                  GREEN
+Persistent setup registry                GREEN
+Setup lifecycle / relevance              GREEN (code)
+Setup queue survives reload/deploy       GREEN (code)
+Chart geometry persistence               GREEN (code)
+MARKET WATCH shared scanner              IMPLEMENTED
+Automatic + MARKET WATCH same pipeline  IMPLEMENTED
+New setup → center focus                 IMPLEMENTED
+No setup → center NO ACTIVE SETUP        IMPLEMENTED
+CI full verification                     BLOCKED by runner import-path failure
+VDS end-to-end MARKET WATCH              PENDING
+Final browser verification               PENDING
+```
+
+#### Next exact action
+
+Do not redesign the analytical engine. First verify the implemented path end-to-end on the production VDS:
+
+```
+MARKET WATCH
+→ POST /api/market-scan
+→ shared AutonomousScanEngine
+→ same setup/lifecycle logic
+→ no setup: center NO ACTIVE SETUP
+→ setup: center + persistent registry/right queue
+→ autonomous scanner later revisits market
+→ same setup refreshes, no duplicate
+→ new setup gets center focus
+→ lifecycle eventually removes/stales it when genuinely no longer relevant
+```
+
+Only after this behavioral verification should the MARKET WATCH task be considered fully GREEN.
