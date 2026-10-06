@@ -518,7 +518,7 @@ A * → IP AICFA VDS
 - The next infrastructure action is to create/deploy the dedicated AICFA Web project in FrostDeploy using the `web/server.py` entry point, then bind the public project domain to `aicfa.ru`.
 - Do not change the existing AICFA worker or Journal Feed service for this web deployment.
 
-### STEP 12 — ПЕРВЫЙ НАСТОЯЩИЙ САЙТ МОНИТОРИНГА AICFA
+### STEP 12 — ПЕРВЫЙ НАСТОЯЩИЙ САЙТ МОНИТОРИНГА AICFA — РАБОЧЕЕ ПРИЛОЖЕНИЕ `aicfa.aicfa.ru`
 
 Создать полноценный, качественно оформленный пользовательский интерфейс AICFA поверх централизованного Scanner/Feed.
 
@@ -663,17 +663,38 @@ Journal / Feed service
 
 
 
-### 2026-10-06 — STEP 12 — PUBLIC WEBSITE / AICFA APPLICATION ARCHITECTURE уточнена
+### 2026-10-06 — STEP 12 — PUBLIC WEBSITE / AICFA APPLICATION ARCHITECTURE — FINAL / FIXED
 
-Зафиксирована окончательная схема пользовательских адресов:
+Зафиксирована окончательная и обязательная архитектура пользовательских адресов AICFA. **Это правило проекта и не должно трактоваться иначе.**
 
-- **`aicfa-web.aicfa.ru`** — публичный презентационный сайт AICFA: описание проекта и возможностей, информация о системе, регистрация/вход пользователя, кнопка **Open AICFA**.
-- **`aicfa.aicfa.ru`** — само рабочее приложение AICFA: monitoring UI, live setup feed, Intraday / Swing / Position, lifecycle/evidence/status и будущий AI-интерфейс.
-- Пользовательский переход: `aicfa-web.aicfa.ru → Open AICFA → aicfa.aicfa.ru`.
-- **`aicfa.ru` не является рабочим URL приложения**; это базовый Platform Domain FrostDeploy.
-- В FrostDeploy уже существует проект **`aicfa`** с platform URL **`aicfa.aicfa.ru`**, Project ID **`b328b84e6d5940a2`**. Новый проект создавать не требуется.
-- Следующая инфраструктурная задача STEP 12: настроить существующий FrostDeploy project `aicfa` на production entry point `web/server.py`, затем проверить деплой и работу `https://aicfa.aicfa.ru`.
-- Презентационный сайт `aicfa-web.aicfa.ru` и рабочее приложение `aicfa.aicfa.ru` — разные пользовательские поверхности и не должны смешиваться.
+- **`aicfa-web.aicfa.ru` = ПРЕЗЕНТАЦИОННЫЙ САЙТ AICFA.**
+  - описание AICFA и его возможностей;
+  - информация о системе;
+  - регистрация / вход;
+  - кнопка **Open AICFA**.
+  - Это НЕ рабочее приложение AICFA.
+
+- **`aicfa.aicfa.ru` = САМ AICFA, рабочее приложение.**
+  - monitoring UI;
+  - live setup feed;
+  - Intraday / Swing / Position;
+  - lifecycle / evidence / status;
+  - будущий AI-интерфейс;
+  - все дальнейшие рабочие функции продукта.
+
+- Пользовательский путь строго:
+  **`aicfa-web.aicfa.ru` → Open AICFA → `aicfa.aicfa.ru`**
+
+- **`aicfa.ru` НЕ является ни презентационным сайтом, ни рабочим URL AICFA.** Это базовый Platform Domain FrostDeploy.
+
+- В FrostDeploy уже существует проект **`aicfa`** с platform URL **`aicfa.aicfa.ru`**, Project ID **`b328b84e6d5940a2`**. Новый проект для рабочего AICFA создавать не требуется.
+
+- Рабочее приложение `aicfa.aicfa.ru` должно развиваться внутри существующего проекта AICFA и использовать production entry point `web/server.py` с сохранением существующих Scanner и Journal Feed.
+
+- **Никогда не смешивать роли адресов:**
+  `aicfa-web.aicfa.ru` = presentation/marketing surface;
+  `aicfa.aicfa.ru` = actual AICFA application.
+
 - Существующие AICFA Scanner и Journal Feed при настройке Web-приложения не изменять.
 
 ### STEP 13 — Stable event model
