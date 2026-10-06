@@ -66,7 +66,7 @@ function scenarioText(s){
  };
  return map[String(s.scenario||"").toLowerCase()]||"Scenario is supported by the currently observed market evidence.";
 }
-function chartTf(mode,setup){const entry=Array.isArray(setup?.entry_zone)?setup.entry_zone[0]:null;if(entry?.timeframe)return String(entry.timeframe);const m=String(mode||"").toUpperCase();return m==="POSITION"?"4h":m==="SWING"?"1h":"5m"}
+function chartTf(mode,setup){const entry=Array.isArray(setup?.entry_zone)?setup.entry_zone[0]:null;return String(entry?.timeframe||setup?.timeframe||mode||"5m").toLowerCase()}
 function renderCandleChart(node,candles,s){
  if(!candles?.length){node.innerHTML='<div class="chart-empty">NO OHLCV DATA</div>';return}
  if(!window.LightweightCharts){node.innerHTML='<div class="chart-empty">CHART LIBRARY UNAVAILABLE</div>';return}
