@@ -699,6 +699,7 @@ def find_setup(
         symbol=symbol,
         timeframes=timeframes,
         frames=frames,
+        **{"analyses": analyses},
         analysis=analysis,
         evidence=market_evidence,
         evidence_assessment=evidence_assessment,
