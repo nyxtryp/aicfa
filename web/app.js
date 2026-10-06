@@ -122,11 +122,10 @@ function waitCards(ms){
  }
  return out;
 }
-function historyCard(x,i){
+function historyCard(x){
  const s=x.setup||{},side=dir(s),selected=x.key===ui.selected;
- return '<button class="history-item '+side.toLowerCase()+(selected?" selected":"")+'" data-setup-key="'+esc(x.key)+'"><span class="history-dot"></span><span class="history-main"><b>'+esc(x.asset)+'</b><small>'+esc(hor(x.mode))+' · '+esc(s.scenario||"SETUP")+'</small></span><strong>'+esc(side)+'</strong><time>'+esc(i===0?"NEW":tm(x.seenAt))+'</time></button>';
-}
-function renderHistory(){
+ return '<button class="history-item '+side.toLowerCase()+(selected?" selected":"")+'" data-setup-key="'+esc(x.key)+'"><span class="history-dot"></span><span class="history-main"><b>'+esc(x.asset)+'</b><small>'+esc(hor(x.mode))+' · '+esc(s.scenario||"SETUP")+'</small></span><strong>'+esc(side)+'</strong><em>'+esc(x.status||"ACTIVE")+'</em><time>'+esc(tm(x.seenAt))+'</time></button>';
+}function renderHistory(){
  const visible=ui.history.filter(x=>state.filter==="ALL"||hor(x.mode)===state.filter);
  if(visible.length&&!visible.some(x=>x.key===ui.selected))ui.selected=visible[0].key;
  $("#historyCount").textContent=visible.length;
