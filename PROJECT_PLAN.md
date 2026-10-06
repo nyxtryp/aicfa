@@ -1085,3 +1085,26 @@ Verify actual setup/event rendering, lifecycle states, timestamps/freshness, hor
 - Commit: `abb2395` — `fix: preserve journal feed api path in web proxy`.
 - FrostDeploy autodeploy should publish this fix from `main`.
 - **Next verification:** confirm `aicfa.aicfa.ru` changes from OFFLINE/DATA UNAVAILABLE to LIVE/HEALTHY and that real journal setups/events render.
+
+
+### 2026-10-06 — STEP 12 — WEB MVP REDESIGN: ACTIVE SETUPS ONLY
+
+The first real production-data pass exposed a presentation bug: the Web UI was rendering `WAIT` scan states as if they were trade setups, producing cards such as `DOTUSDT / WAIT / ENTRY — / SL — / TP —`. This is not an AICFA setup and must never be presented as one.
+
+Actions completed:
+- `web/app.js` now derives the current state from the latest scan per market, rather than treating every historical setup-like payload as a current setup.
+- Only `LONG` / `SHORT` setups with lifecycle `ACTIVE` are rendered in **Active setups**.
+- `WAIT` / `NO TRADE` is represented only as aggregated market state.
+- Repeated scanner heartbeat events are hidden from the public Journal view; meaningful journal events remain visible.
+- Removed the old first-three-card refresh animation that caused BTC/SOL/etc. to blink every 15 seconds.
+- Replaced the technical carcass with a cleaner MVP information architecture: scanner status, market totals, active setups, horizon filters, and meaningful journal events.
+- Analytical/scanner core was not changed.
+
+Commits:
+- `c4297ea` — `fix(web): show only current active trade setups`
+- `604e3ab` — `redesign(web): replace technical carcass with real MVP layout`
+- `3a7cfef` — `redesign(web): improve AICFA public app presentation`
+
+**Current rule:** a card with `WAIT` is never a trade setup. If there is no current active LONG/SHORT setup, the UI must explicitly show **NO ACTIVE SETUPS**.
+
+**STEP 12 remains in progress** until the redesigned production page is visually/end-to-end verified after deployment.
