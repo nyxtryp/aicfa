@@ -38,10 +38,14 @@ def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
     except (TypeError, ValueError):
         limit = 160
 
-    candidates = [
-        RAW_DIR / normalized / f"{timeframe}.csv",
-        RAW_DIR / normalized.replace("_USDT", "_USDT_USDT") / f"{timeframe}.csv",
-    ]
+    aliases = {"SHIB_USDT": "1000SHIB_USDT"}
+    storage_symbols = [normalized]
+    if normalized in aliases:
+        storage_symbols.append(aliases[normalized])
+    candidates = [p for symbol_name in storage_symbols for p in (
+        RAW_DIR / symbol_name / f"{timeframe}.csv",
+        RAW_DIR / symbol_name.replace("_USDT", "_USDT_USDT") / f"{timeframe}.csv",
+    )]
     if raw.endswith(":USDT"):
         candidates.append(RAW_DIR / raw.replace("/", "_").replace(":", "_") / f"{timeframe}.csv")
 
@@ -69,7 +73,7 @@ def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
     # exists. This is read-only and keeps the scanner/journal untouched.
     if not rows:
         from urllib.parse import urlencode
-        quote = normalized.replace("_", "")
+        quote = aliases.get(normalized, normalized).replace("_", "")
         if raw.endswith(":USDT"):
             endpoint = "https://fapi.binance.com/fapi/v1/klines"
         else:
