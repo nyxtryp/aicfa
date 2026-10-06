@@ -150,7 +150,7 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception:
                 self._json(500, b'{"error":"chart_data_unavailable"}')
             return
-        if self.path == "/api/markets":
+        if urlsplit(self.path).path == "/api/markets":
             try:
                 universe_path = ROOT.parent / "config" / "market_universe.json"
                 payload = json.loads(universe_path.read_text(encoding="utf-8"))
