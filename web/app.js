@@ -31,17 +31,22 @@ function active(ms){
  }
  return out;
 }
-function syncHistory(as){
- let newest=null;
- for(const x of as){
-  const i=ui.history.findIndex(h=>h.key===x.key);
-  if(i>=0)ui.history[i]={...ui.history[i],...x};
-  else{ui.history.unshift({...x,seenAt:Date.now()});if(!newest)newest=x.key}
+function registryItems(records){
+ const out=[];
+ for(const r of records||[]){
+  const status=String(r.status||"").toUpperCase();
+  if(status!=="ACTIVE"&&status!=="STALE")continue;
+  const wrapper=r.setup||{},candidate=wrapper.candidate||wrapper;
+  out.push({asset:r.asset,mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||status.toLowerCase(),status,key:r.setup_id,seenAt:Number(r.last_seen_at_ms||r.created_at_ms||0),lastConfirmedAt:Number(r.last_confirmed_at_ms||0),setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
  }
- if(ui.history.length>40)ui.history.length=40;
- if(newest)ui.selected=newest;
+ return out.sort((a,b)=>(a.status==="ACTIVE"?0:1)-(b.status==="ACTIVE"?0:1)||Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
 }
-function conceptSet(s,x){return new Set([...(s.supporting_concepts||[]),...(s.zone_concepts||[]),...(x?.evidence_concepts||[])])}
+function syncRegistry(records){
+ const items=registryItems(records),previous=ui.selected;
+ ui.history=items;
+ if(previous&&items.some(x=>x.key===previous))ui.selected=previous;
+ else if(items.length)ui.selected=items[0].key;
+}function conceptSet(s,x){return new Set([...(s.supporting_concepts||[]),...(s.zone_concepts||[]),...(x?.evidence_concepts||[])])}
 function evidence(s,x){
  const c=conceptSet(s,x),rows=[
   ["Market Structure",c.has("market_structure.bos")||c.has("market_structure.choch"),c.has("market_structure.bos")?"BOS confirmed":c.has("market_structure.choch")?"CHoCH observed":"Not confirmed"],
