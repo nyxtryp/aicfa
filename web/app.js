@@ -208,11 +208,14 @@ async function scanMarket(index){
   if(!response.ok)throw new Error(data.error||"scan_failed");
   const items=registryItems(data.setups||[]);
   if(items.length){
+   const keys=new Set(items.map(x=>x.key));
+   ui.history=[...ui.history.filter(x=>!keys.has(x.key)),...items].sort((a,b)=>(a.status==="ACTIVE"?0:1)-(b.status==="ACTIVE"?0:1)||Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
    const item=items[0];
    ui.centerKey=item.key;
    ui.selected=item.key;
    ui.centerEmpty=false;
    ui.centerEmptyMarket="";
+   renderHistory();
    renderCenter();
   }else{
    ui.centerKey=null;
