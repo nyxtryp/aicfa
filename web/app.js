@@ -66,23 +66,36 @@ function renderCandleChart(node,candles,s){
  series.setData(data);
  const overlay=document.createElement("canvas");overlay.className="chart-overlay";node.appendChild(overlay);
  const ctx=overlay.getContext("2d"),dpr=window.devicePixelRatio||1;
- const levels=[],entry=s.entry_zone||[],targets=s.target_levels||[];
- if(entry[0])levels.push({price:Number(entry[0].value),label:"ENTRY",cls:"entry"});
- if(entry[1])levels.push({price:Number(entry[1].value),label:"ENTRY",cls:"entry"});
- if(s.invalidation_level)levels.push({price:Number(s.invalidation_level.value),label:"SL",cls:"sl"});
- if(targets[0])levels.push({price:Number(targets[0].value),label:"TP1",cls:"tp"});
- if(targets[1])levels.push({price:Number(targets[1].value),label:"TP2",cls:"tp"});
- function draw(){
+ const price=v=>Number(v?.price??v?.value??v);
+ const time=v=>Number(v?.timestamp??v?.time??v);
+ const entry=s.entry||s.entry_zone||[], targets=s.take_profits||s.target_levels||[];
+ const zones=s.zones||{};
+ const obs=[...(zones.order_blocks||s.order_blocks||[]),...(zones.ob||[])];
+ const fvgs=[...(zones.fvgs||s.fvgs||[]),...(zones.fvg||[])];
+ const events={
+  BOS:[...(s.bos||s.BOS||[])],
+  CHoCH:[...(s.choch||s.CHoCH||[])],
+  MSS:[...(s.mss||s.MSS||[])]
+ };
+ function rangePrice(x,lo,hi){const a=price(x?.[lo]??x?.priceLow??x?.low),b=price(x?.[hi]??x?.priceHigh??x?.high);return [Math.min(a,b),Math.max(a,b)]}
+ function xCoord(t){if(!Number.isFinite(t))return null;return chart.timeScale().timeToCoordinate(Math.floor(t>1e12?t/1000:t))}
+ function drawOverlay(){
   const w=node.clientWidth,h=node.clientHeight;ctx.clearRect(0,0,w,h);
-  for(const l of levels){if(!Number.isFinite(l.price))continue;const y=series.priceToCoordinate(l.price);if(y==null||y<0||y>h)continue;ctx.beginPath();ctx.moveTo(0,y+.5);ctx.lineTo(w,y+.5);ctx.lineWidth=1;ctx.setLineDash([7,5]);ctx.strokeStyle=l.cls==="entry"?"#d7ff58":l.cls==="sl"?"#ff687b":"#61df9a";ctx.stroke();ctx.setLineDash([]);const text=l.label+"  "+l.price;ctx.font="700 10px system-ui,-apple-system,Segoe UI,sans-serif";const tw=ctx.measureText(text).width;ctx.fillStyle=l.cls==="entry"?"#d7ff58":l.cls==="sl"?"#ff687b":"#61df9a";ctx.fillText(text,Math.max(6,w-tw-10),Math.max(12,y-5))}
- }
- function resize(){const w=Math.max(1,node.clientWidth),h=Math.max(1,node.clientHeight);chart.resize(w,h);overlay.width=Math.floor(w*dpr);overlay.height=Math.floor(h*dpr);overlay.style.width=w+"px";overlay.style.height=h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
- chart.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(draw);if(chart.timeScale().subscribeVisibleTimeRangeChange)chart.timeScale().subscribeVisibleTimeRangeChange(draw);
+  const line=(p,label,kind,dash=[7,5])=>{if(!Number.isFinite(p))return;const y=series.priceToCoordinate(p);if(y==null)return;ctx.beginPath();ctx.moveTo(0,y+.5);ctx.lineTo(w,y+.5);ctx.setLineDash(dash);ctx.lineWidth=1;ctx.strokeStyle=kind==="sl"?"#ff687b":kind==="tp"?"#61df9a":"#d7ff58";ctx.stroke();ctx.setLineDash([]);ctx.font="700 10px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;const text=label+"  "+p;ctx.fillText(text,Math.max(6,w-ctx.measureText(text).width-10),Math.max(12,y-5))};
+  if(Array.isArray(entry)){for(const e of entry)line(price(e),"ENTRY","entry")}else if(entry)line(price(entry),"ENTRY","entry");
+  if(s.stop_loss)line(price(s.stop_loss),"SL","sl",[6,5]); else if(s.invalidation_level)line(price(s.invalidation_level),"SL","sl",[6,5]);
+  for(const t of Array.isArray(targets)?targets:[])line(price(t),targets.indexOf(t)===0?"TP1":"TP"+(targets.indexOf(t)+1),"tp",[7,5]);
+  const rect=(z,fill,stroke)=>{const [lo,hi]=rangePrice(z);if(!Number.isFinite(lo)||!Number.isFinite(hi))return;const y1=series.priceToCoordinate(hi),y2=series.priceToCoordinate(lo);if(y1==null||y2==null)return;const ts=time(z.timeStart??z.startTime??z.time_start),te=time(z.timeEnd??z.endTime??z.time_end);let x1=xCoord(ts),x2=xCoord(te);if(x1==null)x1=0;if(x2==null)x2=w;if(x2<x1)[x1,x2]=[x2,x1];ctx.fillStyle=fill;ctx.fillRect(x1,Math.min(y1,y2),Math.max(2,x2-x1),Math.abs(y2-y1));ctx.strokeStyle=stroke;ctx.strokeRect(x1,Math.min(y1,y2),Math.max(2,x2-x1),Math.abs(y2-y1))};
+  obs.forEach(z=>rect(z,"rgba(255,184,77,.12)","rgba(255,184,77,.55)"));
+  fvgs.forEach(z=>rect(z,"rgba(174,108,255,.13)","rgba(174,108,255,.6)"));
+  Object.entries(events).forEach(([name,list])=>{for(const e of list){const p=price(e);if(!Number.isFinite(p))continue;const y=series.priceToCoordinate(p);if(y==null)continue;let x1=xCoord(time(e.timeStart??e.startTime??e.time_start));let x2=xCoord(time(e.timeEnd??e.endTime??e.time_end));if(x1==null)x1=0;if(x2==null)x2=w;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([5,5]);ctx.strokeStyle=name==="BOS"?"#f3c74f":name==="CHoCH"?"#67b7ff":"#ff9d66";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(name,Math.min(w-35,Math.max(4,x1+4)),Math.max(11,y-4))}})}
+ function resize(){const w=Math.max(1,node.clientWidth),h=Math.max(1,node.clientHeight);chart.resize(w,h);overlay.width=Math.floor(w*dpr);overlay.height=Math.floor(h*dpr);overlay.style.width=w+"px";overlay.style.height=h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);drawOverlay()}
+ chart.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(drawOverlay);if(chart.timeScale().subscribeVisibleTimeRangeChange)chart.timeScale().subscribeVisibleTimeRangeChange(drawOverlay);
  const ro=new ResizeObserver(resize);ro.observe(node);resize();node._aicfaChartCleanup=()=>{ro.disconnect();chart.remove()};
 }
 async function hydrateCharts(){
  const nodes=[...document.querySelectorAll(".market-chart[data-symbol]")];
- await Promise.all(nodes.map(async node=>{try{const q=new URLSearchParams({symbol:node.dataset.symbol,timeframe:node.dataset.timeframe||"5m",limit:"160"});const response=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"});const data=response.ok?await response.json():null;renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"))}catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}}))
+ await Promise.all(nodes.map(async node=>{try{const q=new URLSearchParams({symbol:node.dataset.symbol,timeframe:node.dataset.timeframe||"5m",limit:"200"});const response=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"});const data=response.ok?await response.json():null;renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"))}catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}}))
 }
 
 function setupCard(x){
