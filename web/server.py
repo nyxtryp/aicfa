@@ -151,7 +151,22 @@ class Handler(SimpleHTTPRequestHandler):
                 self._json(500, b'{"error":"chart_data_unavailable"}')
             return
         if self.path == "/api/markets":
-            self._control_request("GET", "/markets")
+            try:
+                universe_path = ROOT.parent / "config" / "market_universe.json"
+                payload = json.loads(universe_path.read_text(encoding="utf-8"))
+                markets = [
+                    {
+                        "index": index,
+                        "asset": item["asset"],
+                        "market_type": item.get("market_type", "futures"),
+                        "asset_class": item.get("asset_class", ""),
+                        "category": item.get("category", ""),
+                    }
+                    for index, item in enumerate(payload.get("markets", []))
+                ]
+                self._json(200, json.dumps({"markets": markets}, ensure_ascii=False).encode("utf-8"))
+            except Exception as exc:
+                self._json(500, json.dumps({"error": "market_universe_unavailable", "detail": str(exc)}).encode("utf-8"))
             return
         if self.path == "/api" or self.path.startswith("/api/"):
             target = FEED + self.path
