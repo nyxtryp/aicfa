@@ -166,27 +166,76 @@ def _event_direction_conflict(
     direction: str,
     observations: tuple[MarketObservation, ...],
 ) -> str | None:
-    """Reject continuation when causal structural events contradict the resolved leg."""
+    """Validate causal event direction without breaking valid reversal/failure paths.
+
+    Event direction is scenario-specific:
+    - continuation: BOS/displacement must support the active structural leg;
+    - reversal: CHoCH/MSS must support the new leg and the sweep must be aligned;
+    - breakout failure: the post-sweep structural break/rejection must support
+      the failure direction.
+    A counter-direction event is not automatically a contradiction: for a
+    reversal it can be the very event that creates the new direction.
+    """
     relevant = {
-        context.context_timeframe,
-        context.structure_timeframe,
-        context.refinement_timeframe,
+        tf for tf in (
+            context.context_timeframe,
+            context.structure_timeframe,
+            context.refinement_timeframe,
+        ) if tf
     }
-    for item in _observed(observations):
-        if item.timeframe not in relevant:
-            continue
-        if item.concept_id in {"market_structure.bos", "market_structure.mss"}:
-            if item.direction in {"long", "short"} and item.direction != direction:
-                return (
-                    f"{item.timeframe} {item.concept_id}={item.direction} "
-                    f"conflicts with {direction} {scenario}"
-                )
-        if scenario == "continuation" and item.concept_id == "market_structure.choch":
-            if item.direction in {"long", "short"} and item.direction != direction:
-                return (
-                    f"{item.timeframe} CHoCH={item.direction} "
-                    f"conflicts with {direction} continuation"
-                )
+    items = [item for item in _observed(observations) if item.timeframe in relevant]
+
+    def wrong(item: MarketObservation) -> str | None:
+        if item.direction not in {"long", "short"} or item.direction == direction:
+            return None
+        return (
+            f"{item.timeframe} {item.concept_id}={item.direction} "
+            f"conflicts with {direction} {scenario}"
+        )
+
+    if scenario == "continuation":
+        for item in items:
+            if item.concept_id in {"market_structure.bos", "market_structure.mss", "market_structure.choch"}:
+                conflict = wrong(item)
+                if conflict:
+                    return conflict
+        return None
+
+    if scenario == "reversal":
+        transition = [
+            item for item in items
+            if item.concept_id in {"market_structure.choch", "market_structure.mss"}
+        ]
+        if not any(item.direction == direction for item in transition):
+            return f"{direction} reversal lacks a same-direction CHoCH/MSS"
+        for item in transition:
+            conflict = wrong(item)
+            if conflict:
+                return conflict
+        sweeps = [item for item in items if item.concept_id == "liquidity.sweep"]
+        if not any(item.direction == direction for item in sweeps):
+            return f"{direction} reversal lacks a same-direction liquidity sweep"
+        return None
+
+    if scenario == "breakout_failure":
+        sweeps = [item for item in items if item.concept_id == "liquidity.sweep"]
+        if not any(item.direction == direction for item in sweeps):
+            return f"{direction} breakout failure lacks a same-direction liquidity sweep"
+        structural = [
+            item for item in items
+            if item.concept_id in {"market_structure.bos", "market_structure.choch", "market_structure.mss"}
+        ]
+        if structural and not any(item.direction == direction for item in structural):
+            return f"{direction} breakout failure lacks same-direction structural confirmation"
+        for item in structural:
+            if item.direction == direction:
+                continue
+            # A prior opposite BOS can describe the failed breakout itself; it
+            # is not a contradiction. Only an opposite final transition blocks.
+            if item.concept_id in {"market_structure.choch", "market_structure.mss"}:
+                return wrong(item)
+        return None
+
     return None
 
 
@@ -477,13 +526,30 @@ def _invalidation_level(
 def _scenario_requirements(scenario: str) -> tuple[str, ...]:
     return {
         "continuation": ("market_structure.bos", "displacement"),
-        "reversal": ("market_structure.choch", "liquidity.sweep"),
+        # Reversal accepts either CHoCH or MSS as the structural transition.
+        # The actual direction/sweep relationship is validated separately.
+        "reversal": ("liquidity.sweep",),
         "breakout_failure": (
-            "market_structure.bos",
             "liquidity.sweep",
             "price_action.rejection",
         ),
     }.get(scenario, ())
+
+
+def _scenario_requirements_met(
+    scenario: str,
+    supporting: tuple[str, ...],
+) -> bool:
+    concepts = set(supporting)
+    if scenario == "reversal":
+        return (
+            "liquidity.sweep" in concepts
+            and (
+                "market_structure.choch" in concepts
+                or "market_structure.mss" in concepts
+            )
+        )
+    return _scenario_has_required_evidence(scenario, supporting)
 
 
 def _scenario_has_required_evidence(
@@ -758,7 +824,7 @@ def analyze_setups(
         if len(supporting) < 2:
             missing.append(f"{hypothesis.scenario}: at least two independent supporting concepts are required")
             continue
-        if not legacy_mode and not _scenario_has_required_evidence(hypothesis.scenario, supporting):
+        if not legacy_mode and not _scenario_requirements_met(hypothesis.scenario, supporting):
             missing.append(f"{hypothesis.scenario}: required scenario evidence is incomplete")
             continue
         if not zones:
