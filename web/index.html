@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#07090d">
+  <meta name="description" content="AICFA — autonomous market intelligence for digital financial assets.">
+  <title>AICFA — Market Intelligence</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="AICFA home"><span class="mark">A</span><span>AICFA</span></a>
+    <div class="status"><i id="statusDot"></i><span id="statusText">CONNECTING</span><span class="sep">·</span><span id="updated">—</span></div>
+    <button id="soundBtn" class="sound" type="button" aria-pressed="false">SOUND OFF</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">AI FOR DIGITAL FINANCIAL ASSETS</p>
+        <h1>See the market.<br><em>Before the noise.</em></h1>
+        <p class="lede">AICFA continuously maps market structure, liquidity, zones and evidence into explainable market states and setups.</p>
+      </div>
+      <div class="query">
+        <span>⌕</span>
+        <input id="query" placeholder="Ask AICFA anything — coming soon" disabled>
+        <kbd>AI</kbd>
+      </div>
+    </section>
+
+    <section class="strip" aria-label="System state">
+      <div><span>ENGINE</span><strong id="engine">AUTONOMOUS</strong></div>
+      <div><span>HORIZONS</span><strong>INTRADAY · SWING · POSITION</strong></div>
+      <div><span>MODE</span><strong id="mode">LIVE FEED</strong></div>
+      <div><span>DATA</span><strong id="dataState">—</strong></div>
+    </section>
+
+    <section class="section-head">
+      <div><div class="eyebrow">LIVE MARKET STATE</div><h2>Current setups</h2></div>
+      <div class="filters" id="filters">
+        <button class="active" data-filter="ALL">ALL</button>
+        <button data-filter="INTRADAY">INTRADAY</button>
+        <button data-filter="SWING">SWING</button>
+        <button data-filter="POSITION">POSITION</button>
+      </div>
+    </section>
+
+    <section id="setups" class="grid">
+      <div class="empty"><span class="spinner"></span><p>Reading the central feed…</p></div>
+    </section>
+
+    <section class="section-head history-head">
+      <div><div class="eyebrow">IMMUTABLE JOURNAL</div><h2>Recent events</h2></div>
+      <span class="count" id="eventCount">0 EVENTS</span>
+    </section>
+    <section id="events" class="events"></section>
+  </main>
+
+  <footer><span>AICFA</span><span>Autonomous market intelligence</span><span>READ-ONLY PUBLIC FEED</span></footer>
+  <script src="/app.js"></script>
+</body>
+</html>
