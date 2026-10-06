@@ -95,6 +95,7 @@ class FindSetupResult:
     symbol: str
     timeframes: tuple[str, ...]
     frames: dict[str, pd.DataFrame]
+    analyses: dict[str, pd.DataFrame]
     analysis: pd.DataFrame
     evidence: object
     evidence_assessment: object
