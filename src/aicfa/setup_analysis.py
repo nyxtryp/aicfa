@@ -787,9 +787,16 @@ def analyze_setups(
                 + [f"setup zone observed on {tf}" for tf in source_tfs]
             )
             if directional_observations:
-                rationale = _unique(
-                    list(rationale)
-                    + [f"{tf} directional evidence={side}" for tf, side in directional_observations.items()]
+                    + [
+                        f"{tf} structure={side}"
+                        for tf, side in directional_observations.items()
+                        if tf in {
+                            context.context_timeframe,
+                            context.structure_timeframe,
+                            context.refinement_timeframe,
+                            context.execution_timeframe,
+                        }
+                    ]
                 )
 
             if not entry_levels:
