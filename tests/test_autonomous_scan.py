@@ -227,3 +227,46 @@ def test_run_forever_batches_scans_one_market_sequentially(monkeypatch):
         "COIN001/USDT",
     ]
     assert sleeps == [60, 60, 60, 60]
+
+def test_run_forever_batches_continues_after_market_error(monkeypatch):
+    monkeypatch.setattr(
+        "aicfa.autonomous_scan.build_public_market_data_provider",
+        lambda **kwargs: SnapshotProvider(),
+    )
+
+    assets = tuple(f"COIN{i:03d}/USDT" for i in range(2))
+    engine = AutonomousScanEngine(
+        MarketUniverse(tuple(MonitoredMarket(asset) for asset in assets))
+    )
+
+    calls = []
+    errors = []
+
+    def fake_scan_market(index, *, now_ms=None):
+        asset = engine.universe.markets[index].asset
+        calls.append(asset)
+        if asset == "COIN000/USDT" and calls.count(asset) == 1:
+            raise RuntimeError("temporary provider failure")
+        return SimpleNamespace(
+            scan_number=len(calls),
+            result=SimpleNamespace(
+                markets=(SimpleNamespace(asset=asset, diagnostics=None, setups=()),)
+            ),
+        )
+
+    monkeypatch.setattr(engine, "scan_market", fake_scan_market)
+
+    engine.run_forever_batches(
+        interval_seconds=0,
+        batch_size=1,
+        on_error=lambda asset, exc: errors.append((asset, str(exc))),
+        should_stop=lambda: len(calls) >= 3,
+    )
+
+    assert calls == [
+        "COIN000/USDT",
+        "COIN001/USDT",
+        "COIN000/USDT",
+    ]
+    assert errors == [("COIN000/USDT", "temporary provider failure")]
+
