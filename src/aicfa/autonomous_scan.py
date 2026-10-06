@@ -336,6 +336,7 @@ class AutonomousScanEngine:
         self, *, interval_seconds: float = BATCH_SCAN_INTERVAL_SECONDS,
         batch_size: int = DEFAULT_MARKETS_PER_BATCH,
         on_scan: Callable[[AutonomousScanState], None] | None = None,
+        on_error: Callable[[str, Exception], None] | None = None,
         should_stop: Callable[[], bool] | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -350,7 +351,16 @@ class AutonomousScanEngine:
         while True:
             if should_stop is not None and should_stop():
                 return
-            state = self.scan_market(market_index)
+            asset = self.universe.markets[market_index].asset
+            try:
+                state = self.scan_market(market_index)
+            except Exception as exc:
+                if on_error is not None:
+                    on_error(asset, exc)
+                market_index = (market_index + 1) % len(self.universe.markets)
+                if interval_seconds:
+                    sleep(interval_seconds)
+                continue
             if on_scan is not None:
                 on_scan(state)
             if should_stop is not None and should_stop():
