@@ -68,7 +68,7 @@ function scenarioText(s){
  };
  return map[String(s.scenario||"").toLowerCase()]||"Scenario is supported by the currently observed market evidence.";
 }
-function chartTf(mode,setup){const entry=Array.isArray(setup?.entry_zone)?setup.entry_zone[0]:null;return String(entry?.timeframe||setup?.timeframe||mode||"5m").toLowerCase()}
+function chartTf(_mode,setup){const entry=Array.isArray(setup?.entry_zone)?setup.entry_zone[0]:null;return String(entry?.timeframe||setup?.timeframe||"").toLowerCase()}
 function renderCandleChart(node,candles,s){
  if(!candles?.length){node.innerHTML='<div class="chart-empty">NO OHLCV DATA</div>';return}
  if(!window.LightweightCharts){node.innerHTML='<div class="chart-empty">CHART LIBRARY UNAVAILABLE</div>';return}
@@ -101,7 +101,7 @@ function renderCandleChart(node,candles,s){
 }
 async function hydrateCharts(){
  const nodes=[...document.querySelectorAll(".market-chart[data-symbol]")];
- await Promise.all(nodes.map(async node=>{try{const q=new URLSearchParams({symbol:node.dataset.symbol,timeframe:node.dataset.timeframe||"5m",limit:"200"});const response=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"});const data=response.ok?await response.json():null;renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"))}catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}}));
+ await Promise.all(nodes.map(async node=>{try{const q=new URLSearchParams({symbol:node.dataset.symbol,timeframe:node.dataset.timeframe,limit:"200"});const response=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"});const data=response.ok?await response.json():null;renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"))}catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}}));
 }
 function setupCard(x){
  const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
