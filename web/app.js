@@ -1,5 +1,5 @@
 const API_BASE="/api";
-const state={events:[],filter:"ALL"};
+const state={events:[],registry:[],filter:"ALL"};
 const ui={history:[],selected:null,lastSelectedSignature:""};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?"—":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -158,11 +158,11 @@ async function refresh(){
  if(refreshInFlight)return;refreshInFlight=true;
  try{
   const [h,d,r]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json())]);
-  state.events=d.events||[];const registry=r.setups||[];const sig=JSON.stringify([state.events,registry]);
+  state.events=d.events||[];const registry=r.setups||[];state.registry=registry;const sig=JSON.stringify([state.events,registry]);
   if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}
   $("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now());
  }catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}
 }
-$("#filters").addEventListener("click",e=>{const f=e.target.dataset.filter;if(!f)return;document.querySelectorAll("#filters button").forEach(b=>b.classList.remove("active"));e.target.classList.add("active");state.filter=f;render(scans())});
+$("#filters").addEventListener("click",e=>{const f=e.target.dataset.filter;if(!f)return;document.querySelectorAll("#filters button").forEach(b=>b.classList.remove("active"));e.target.classList.add("active");state.filter=f;render(scans(),state.registry)});
 $("#setupHistory").addEventListener("click",e=>{const b=e.target.closest("[data-setup-key]");if(!b)return;ui.selected=b.dataset.setupKey;renderHistory();renderCenter()});
 refresh();setInterval(refresh,3000);
