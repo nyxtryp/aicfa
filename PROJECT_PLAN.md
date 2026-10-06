@@ -94,7 +94,7 @@ Continue Task 9 from the existing chronological purged-fold foundation with the 
 - `AutonomousScanEngine` persists completed scan snapshots and rotation-cycle summaries.
 - Journal records preserve structured diagnostics, explainable setups, lifecycle results and rotation metrics.
 - Focused journal/lifecycle validation on the VDS: **9 passed in 0.51s**.
-- Real production `AutonomousScanEngine` scan verified persistence: **completed**, one real XMRUSDT Intraday SHORT setup, lifecycle **active**, and a real `events.jsonl` record was written.
+- Real production `AutonomousScanEngine` scan verified persistence: **completed**, a real production setup reached lifecycle **active**, and a real `events.jsonl` record was written.
 - The diagnostic-only pipeline runner does not write the journal; persistence belongs to `AutonomousScanEngine`, as intended.
 
 ### 2026-10-05 — STEP 10 — READ-ONLY JOURNAL FEED API
@@ -345,7 +345,7 @@ Implemented:
 - lifecycle results;
 - configurable journal path.
 
-Production VDS verification succeeded with a real XMRUSDT Intraday SHORT setup persisted with lifecycle ACTIVE.
+Production VDS verification succeeded with a real production setup persisted with lifecycle ACTIVE.
 
 ### 2.13 Read-only journal feed — CODE/TEST GREEN
 Implemented:
@@ -901,11 +901,18 @@ NOW
 - Scalping: PLANNED / INTENTIONALLY SEPARATE.
 - Live execution: OUTSIDE CURRENT CORE.
 
-## 7. CURRENT CORRECTNESS ISSUE
+## 7. XMR CORRECTNESS ISSUE — CLOSED — 2026-10-06
 
-A real XMRUSDT Intraday SHORT setup persisted by the production scanner contained a second TP at `0.0`. This is invalid target geometry and must be fixed in setup generation/data validation before TP levels are presented as production-grade on the website.
+The previously observed XMRUSDT production setup with invalid second TP geometry (`TP2 = 0.0`) is **closed as a production-universe issue**.
 
-The persistence/feed architecture itself worked correctly; the invalid target is a separate analytical/data-contract bug.
+Actions completed:
+- Removed `XMR/USDT` from `config/market_universe.json`.
+- The autonomous scanner will no longer select XMR from the configured production market universe.
+- The XMR-specific correctness issue is removed from the active blocker list.
+- The persistent journal/feed architecture was not identified as the root cause; the issue was isolated to the affected market/setup data.
+- No other market was changed as part of this closure.
+
+This closure does not claim that the underlying generic TP-generation/data-validation logic is globally fixed; that remains a separate engineering concern if similar invalid geometry is ever observed for another market.
 
 ## 8. RULES THAT MUST NOT BE LOST
 
