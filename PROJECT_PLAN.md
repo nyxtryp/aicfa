@@ -1108,3 +1108,23 @@ Commits:
 **Current rule:** a card with `WAIT` is never a trade setup. If there is no current active LONG/SHORT setup, the UI must explicitly show **NO ACTIVE SETUPS**.
 
 **STEP 12 remains in progress** until the redesigned production page is visually/end-to-end verified after deployment.
+
+
+### 2026-10-06 — STEP 12 — SECOND WEB REDESIGN PASS
+
+The first redesign was rejected in live review. The main issues were visual presentation, accidental removal of the Sound control, and insufficient useful scanner activity on the public page.
+
+Second pass completed:
+- Rebuilt the page layout rather than iterating on the previous dashboard composition.
+- Restored **SOUND OFF / SOUND ON** control.
+- Added **Latest scans / Scanner Activity** using persisted scan data.
+- Kept only active LONG/SHORT setups in the trade area.
+- Kept WAIT/NO TRADE as state, never as a setup.
+- No analytical/scanner-core changes.
+
+Commits:
+- `8499360` — `fix(web): restore sound and make scanner activity visible`
+- `9c72821` — `redesign(web): rebuild dashboard layout and restore controls`
+- `195ffeb` — `redesign(web): create distinct AICFA terminal dashboard visual`
+
+STEP 12 remains open pending live deployment/visual verification.
