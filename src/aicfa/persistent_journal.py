@@ -72,10 +72,31 @@ class PersistentJournal:
         markets = []
         for market in state.result.markets:
             diagnostics = market.diagnostics
+            horizons = []
+            for result in getattr(market, "results", ()):
+                evidence = getattr(result, "evidence_assessment", None)
+                setup = getattr(result, "setup_assessment", None)
+                decision = getattr(result, "decision_assessment", None)
+                horizons.append({
+                    "mode": result.mode,
+                    "decision": result.decision,
+                    "reason": result.reason,
+                    "supported_concepts": getattr(evidence, "supported_concepts", ()),
+                    "possible_concepts": getattr(evidence, "possible_concepts", ()),
+                    "missing_context": getattr(evidence, "missing_context", ()),
+                    "conflicts": getattr(evidence, "conflicts", ()),
+                    "setup_decision": getattr(setup, "decision", None),
+                    "setup_reasons": getattr(setup, "reasons", ()),
+                    "setup_missing_context": getattr(setup, "missing_context", ()),
+                    "setup_conflicts": getattr(setup, "conflicts", ()),
+                    "decision_action": getattr(decision, "action", None),
+                    "decision_reasons": getattr(decision, "reasons", ()),
+                })
             markets.append({
                 "asset": market.asset,
                 "diagnostics": diagnostics,
                 "setups": market.setups,
+                "horizons": horizons,
                 "lifecycle_results": market.lifecycle_results,
             })
         self.append(
