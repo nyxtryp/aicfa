@@ -1,6 +1,6 @@
 const API_BASE="/api";
-const state={events:[],registry:[],filter:"ALL"};
-const ui={history:[],selected:null,lastSelectedSignature:""};
+const state={events:[],registry:[],markets:[],filter:"ALL"};
+const ui={history:[],selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?"—":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const pick=(o,...k)=>{for(const x of k)if(o&&o[x]!=null)return o[x]};
@@ -45,9 +45,19 @@ function syncRegistry(records){
  const items=registryItems(records),previous=ui.selected,oldKeys=new Set(ui.history.map(x=>x.key));
  const newlyAdded=items.find(x=>!oldKeys.has(x.key));
  ui.history=items;
- if(newlyAdded)ui.selected=newlyAdded.key;
- else if(previous&&items.some(x=>x.key===previous))ui.selected=previous;
- else if(items.length)ui.selected=items[0].key;
+ if(newlyAdded){
+  ui.selected=newlyAdded.key;
+  ui.centerKey=newlyAdded.key;
+  ui.centerEmpty=false;
+  ui.centerEmptyMarket="";
+ }else if(previous&&items.some(x=>x.key===previous)){
+  ui.selected=previous;
+ }else if(!ui.centerEmpty&&ui.centerKey&&items.some(x=>x.key===ui.centerKey)){
+  ui.selected=ui.centerKey;
+ }else if(!ui.centerEmpty&&ui.centerKey===null&&items.length){
+  ui.selected=items[0].key;
+  ui.centerKey=items[0].key;
+ }
 }function conceptSet(s,x){return new Set([...(s.supporting_concepts||[]),...(s.zone_concepts||[]),...(x?.evidence_concepts||[])])}
 function evidence(s,x){
  const c=conceptSet(s,x),rows=[
@@ -132,9 +142,20 @@ function historyCard(x){
  $("#setupHistory").innerHTML=visible.length?visible.map(historyCard).join(""):'<div class="rail-empty">NO SETUPS YET</div>';
 }
 function renderCenter(){
- const x=ui.history.find(h=>h.key===ui.selected);
  const root=$("#setups");
- if(!x){$("#workspaceTitle").textContent="Waiting for setup";root.innerHTML='<div class="workspace-empty"><b>NO ACTIVE SETUP</b><span>The scanner is working. A new actionable setup will open here automatically.</span></div>';return}
+ if(ui.centerEmpty){
+  root.dataset.signature="";
+  $("#workspaceTitle").textContent=(ui.centerEmptyMarket||"MARKET")+" · NO SETUP";
+  root.innerHTML='<div class="workspace-empty"><b>NO ACTIVE SETUP</b><span>This market was analyzed by the same AICFA scanner pipeline. No actionable setup was found.</span></div>';
+  return;
+ }
+ const x=ui.history.find(h=>h.key===ui.centerKey);
+ if(!x){
+  root.dataset.signature="";
+  $("#workspaceTitle").textContent="Waiting for setup";
+  root.innerHTML='<div class="workspace-empty"><b>NO ACTIVE SETUP</b><span>The scanner is working. A new actionable setup will open here automatically.</span></div>';
+  return;
+ }
  const sig=x.key+JSON.stringify(x.setup);
  if(root.dataset.signature===sig)return;
  root.dataset.signature=sig;$("#workspaceTitle").textContent=x.asset+" · "+hor(x.mode);
@@ -150,6 +171,7 @@ function renderRails(ms,rows){
 function render(rows,registry){
  const p=rows[0]?.payload||{},ms=latest(rows),u=Number(p.universe_size||0),pos=Number(p.queue_position||0),pct=u?Math.min(100,pos/u*100):0;
  syncRegistry(registry);
+ renderMarkets();
  $("#universe").textContent=u||"—";$("#scanned").textContent=u?pos+"/"+u:"—";$("#rotation").textContent=p.rotation_id?"#"+p.rotation_id:"—";$("#currentMarket").textContent=p.markets?.[0]?.asset||"—";
  const m=p.markets?.[0];$("#currentStatus").textContent=String(m?.diagnostics?.status||"—").toUpperCase()+" · "+(m?.setups||[]).length+" SETUPS";$("#lastScan").textContent=p.scan_number?"#"+p.scan_number:"—";$("#progress").style.width=pct+"%";$("#rotationMeta").textContent=u?pos+" of "+u+" markets · "+Math.round(pct)+"%":"waiting";
  $("#active").textContent=registryItems(registry).filter(x=>x.status==="ACTIVE").length;renderRails(ms,rows);renderHistory();renderCenter();
@@ -157,12 +179,61 @@ function render(rows,registry){
 async function refresh(){
  if(refreshInFlight)return;refreshInFlight=true;
  try{
-  const [h,d,r]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json())]);
-  state.events=d.events||[];const registry=r.setups||[];state.registry=registry;const sig=JSON.stringify([state.events,registry]);
+  const [h,d,r,mk]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/markets?t="+Date.now(),{cache:"no-store"}).then(x=>x.json())]);
+  state.events=d.events||[];const registry=r.setups||[];state.registry=registry;state.markets=mk.markets||[];const sig=JSON.stringify([state.events,registry,state.markets]);
   if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}
   $("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now());
  }catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}
 }
+function renderMarkets(){
+ const root=$("#marketWatch"),visible=state.markets||[];
+ $("#marketCount").textContent=visible.length;
+ root.innerHTML=visible.length?visible.map(m=>'<button class="market-item '+(Number(m.index)===Number(ui.marketIndex)?"selected":"")+'" data-market-index="'+esc(m.index)+'"><span class="market-number">'+String(Number(m.index)+1).padStart(3,"0")+'</span><span class="market-symbol">'+esc(m.asset)+'</span><span class="market-type">'+esc(m.market_type==="futures"?"FUT":"SPOT")+'</span></button>').join(""):'<div class="rail-empty">NO MARKETS</div>';
+}
+async function scanMarket(index){
+ const market=state.markets.find(x=>Number(x.index)===Number(index));
+ if(!market)return;
+ ui.marketIndex=Number(index);
+ ui.marketBusy=true;
+ ui.centerEmpty=false;
+ ui.centerKey=null;
+ ui.centerEmptyMarket=market.asset;
+ $("#workspaceTitle").textContent=market.asset+" · ANALYZING";
+ $("#setups").dataset.signature="";
+ $("#setups").innerHTML='<div class="workspace-empty"><b>ANALYZING MARKET</b><span>Running the same AICFA scanner pipeline used by the autonomous queue.</span></div>';
+ renderMarkets();
+ try{
+  const response=await fetch(API_BASE+"/market-scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({market_index:Number(index)})});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||"scan_failed");
+  const items=registryItems(data.setups||[]);
+  if(items.length){
+   const item=items[0];
+   ui.centerKey=item.key;
+   ui.selected=item.key;
+   ui.centerEmpty=false;
+   ui.centerEmptyMarket="";
+   renderCenter();
+  }else{
+   ui.centerKey=null;
+   ui.selected=null;
+   ui.centerEmpty=true;
+   ui.centerEmptyMarket=market.asset;
+   renderCenter();
+  }
+ }catch(error){
+  ui.centerKey=null;
+  ui.selected=null;
+  ui.centerEmpty=true;
+  ui.centerEmptyMarket=market.asset;
+  $("#workspaceTitle").textContent=market.asset+" · SCAN ERROR";
+  $("#setups").innerHTML='<div class="workspace-empty"><b>MARKET SCAN UNAVAILABLE</b><span>The shared scanner could not return a result.</span></div>';
+ }finally{
+  ui.marketBusy=false;
+  renderMarkets();
+ }
+}
 $("#filters").addEventListener("click",e=>{const f=e.target.dataset.filter;if(!f)return;document.querySelectorAll("#filters button").forEach(b=>b.classList.remove("active"));e.target.classList.add("active");state.filter=f;render(scans(),state.registry)});
-$("#setupHistory").addEventListener("click",e=>{const b=e.target.closest("[data-setup-key]");if(!b)return;ui.selected=b.dataset.setupKey;renderHistory();renderCenter()});
+$("#marketWatch").addEventListener("click",e=>{const b=e.target.closest("[data-market-index]");if(!b)return;scanMarket(Number(b.dataset.marketIndex))});
+$("#setupHistory").addEventListener("click",e=>{const b=e.target.closest("[data-setup-key]");if(!b)return;ui.selected=b.dataset.setupKey;ui.centerKey=b.dataset.setupKey;ui.centerEmpty=false;ui.centerEmptyMarket="";renderHistory();renderCenter()});
 refresh();setInterval(refresh,3000);
