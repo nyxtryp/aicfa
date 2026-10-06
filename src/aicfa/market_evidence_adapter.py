@@ -233,7 +233,15 @@ def build_market_evidence(
                 observations.append(item)
                 emitted = True
 
-        volume_column = next((column for column in _VOLUME_COLUMNS if column in analysis.columns), None)
+        volume_candidates = tuple(
+            column
+            for column in (
+                *(_VOLUME_COLUMNS if timeframe == base_timeframe else tuple(f"mtf_{timeframe}_{name}" for name in _VOLUME_COLUMNS)),
+                *_VOLUME_COLUMNS,
+            )
+            if column in analysis.columns
+        )
+        volume_column = volume_candidates[0] if volume_candidates else None
         if volume_column is not None:
             volume_mask = analysis[volume_column].fillna(0).astype(float).gt(0)
             if volume_mask.any():
