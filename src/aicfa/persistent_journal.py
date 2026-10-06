@@ -83,6 +83,9 @@ class PersistentJournal:
             state.scanned_at_ms,
             {
                 "scan_number": state.scan_number,
+                "rotation_id": state.rotation_id,
+                "queue_position": state.queue_position,
+                "universe_size": state.universe_size,
                 "markets": markets,
             },
         )
