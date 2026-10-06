@@ -1035,3 +1035,14 @@ Live Feed / Current Setups / Events
 Verify actual setup/event rendering, lifecycle states, timestamps/freshness, horizon filtering and empty/degraded-data states. Only after this functional layer is stable should the final production-grade visual redesign be performed.
 
 **Do not mark STEP 12 complete yet.**
+
+
+### 2026-10-06 — STEP 12 — JOURNAL FEED CONNECTION BUG FIXED
+
+- During live integration verification, identified the exact cause of the Web UI showing `OFFLINE / DATA UNAVAILABLE`.
+- `web/server.py` was incorrectly stripping the `/api` prefix before proxying requests to the Journal Feed.
+- The Journal Feed itself expects the full paths `/api/health`, `/api/journal/events`, `/api/journal/scans`, and `/api/journal/setups`.
+- Fixed the Web proxy to preserve the complete API path when forwarding to `127.0.0.1:8090`.
+- Commit: `abb2395` — `fix: preserve journal feed api path in web proxy`.
+- FrostDeploy autodeploy should publish this fix from `main`.
+- **Next verification:** confirm `aicfa.aicfa.ru` changes from OFFLINE/DATA UNAVAILABLE to LIVE/HEALTHY and that real journal setups/events render.
