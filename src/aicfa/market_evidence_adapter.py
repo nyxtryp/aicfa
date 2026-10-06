@@ -9,12 +9,17 @@ from .market_evidence import MarketEvidence, MarketObservation
 _DIRECTION_COLUMNS = {
     "market_structure.bos": ("bos_up", "bos_down"),
     "market_structure.choch": ("choch_up", "choch_down"),
+    "market_structure.mss": ("mss_up", "mss_down"),
+    "price_action.rejection": ("zone_reaction_support", "zone_reaction_resistance"),
     "displacement": ("displacement_up", "displacement_down"),
     "imbalance.fvg": ("fvg_bullish", "fvg_bearish"),
     "order_block.bullish": ("order_block_bullish", None),
     "order_block.bearish": (None, "order_block_bearish"),
     "liquidity.sweep": ("sweep_low", "sweep_high"),
 }
+
+_VOLUME_COLUMNS = ("smc_volume_evidence_expansion", "volume_evidence_expansion", "volume_expansion")
+
 
 
 def _active(value: object) -> bool:
@@ -226,6 +231,21 @@ def build_market_evidence(
             item = _latest_event(analysis, concept_id, timeframe, base_timeframe=base_timeframe)
             if item is not None:
                 observations.append(item)
+                emitted = True
+
+        volume_column = next((column for column in _VOLUME_COLUMNS if column in analysis.columns), None)
+        if volume_column is not None:
+            volume_mask = analysis[volume_column].fillna(0).astype(float).gt(0)
+            if volume_mask.any():
+                row = analysis.loc[volume_mask].iloc[-1]
+                observations.append(MarketObservation(
+                    concept_id="volume.evidence",
+                    timeframe=timeframe,
+                    state="observed",
+                    confidence=1.0,
+                    evidence=(f"{volume_column}={row[volume_column]!r}",),
+                    notes="causal volume expansion evidence",
+                ))
                 emitted = True
 
         if not emitted:
