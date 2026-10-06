@@ -58,39 +58,31 @@ function chartTf(mode){
 }
 function renderCandleChart(node,candles,s){
  if(!candles?.length){node.innerHTML='<div class="chart-empty">NO OHLCV DATA</div>';return}
- const w=700,h=230,p=18;
- const lo=Math.min(...candles.map(x=>Number(x.low))),hi=Math.max(...candles.map(x=>Number(x.high)));
- const span=Math.max(hi-lo,1e-9);
- const y=v=>h-p-((Number(v)-lo)/span)*(h-p*2);
- const step=(w-p*2)/candles.length,body=Math.max(2,step*.52);
- let svg='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" aria-label="AICFA market chart">';
- candles.forEach((k,i)=>{
-  const x=p+i*step+step/2,yo=y(k.open),yc=y(k.close),yh=y(k.high),yl=y(k.low),up=Number(k.close)>=Number(k.open);
-  const top=Math.min(yo,yc),height=Math.max(1,Math.abs(yc-yo));
-  svg+='<line class="wick '+(up?"up":"down")+'" x1="'+x+'" y1="'+yh+'" x2="'+x+'" y2="'+yl+'"/><rect class="candle '+(up?"up":"down")+'" x="'+(x-body/2)+'" y="'+top+'" width="'+body+'" height="'+height+'"/>';
- });
- const add=(v,label,cls)=>{
-  if(v==null||!Number.isFinite(Number(v)))return;
-  const yy=y(v);if(yy<0||yy>h)return;
-  svg+='<line class="level '+cls+'" x1="'+p+'" x2="'+(w-p)+'" y1="'+yy+'" y2="'+yy+'"/><text class="level-label '+cls+'" x="'+(w-p-2)+'" y="'+Math.max(10,yy-3)+'" text-anchor="end">'+esc(label)+" "+esc(v)+'</text>';
- };
- const entry=s.entry_zone||[];
- if(entry.length){add(entry[0].value,"ENTRY","entry");if(entry.length>1)add(entry[entry.length-1].value,"ENTRY","entry")}
- if(s.invalidation_level)add(s.invalidation_level.value,"INVALID","sl");
- const targets=s.target_levels||[];
- if(targets[0])add(targets[0].value,"TP1","tp");
- if(targets[1])add(targets[1].value,"TP2","tp");
- svg+='</svg>';node.innerHTML=svg;
+ if(!window.LightweightCharts){node.innerHTML='<div class="chart-empty">CHART LIBRARY UNAVAILABLE</div>';return}
+ node.innerHTML="";
+ const chart=LightweightCharts.createChart(node,{width:node.clientWidth,height:360,layout:{background:{type:"solid",color:"#0b0e13"},textColor:"#7e8795"},grid:{vertLines:{color:"#171c23"},horzLines:{color:"#171c23"}},crosshair:{mode:LightweightCharts.CrosshairMode.Normal},rightPriceScale:{borderColor:"#252b34"},timeScale:{borderColor:"#252b34",timeVisible:true,secondsVisible:false},handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true},handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true}});
+ const series=chart.addCandlestickSeries({upColor:"#61df9a",downColor:"#ff687b",borderUpColor:"#61df9a",borderDownColor:"#ff687b",wickUpColor:"#61df9a",wickDownColor:"#ff687b"});
+ const data=candles.map(k=>({time:Math.floor(Number(k.timestamp)/1000),open:Number(k.open),high:Number(k.high),low:Number(k.low),close:Number(k.close)})).filter(k=>Number.isFinite(k.time)&&Number.isFinite(k.open)&&Number.isFinite(k.high)&&Number.isFinite(k.low)&&Number.isFinite(k.close));
+ series.setData(data);
+ const overlay=document.createElement("canvas");overlay.className="chart-overlay";node.appendChild(overlay);
+ const ctx=overlay.getContext("2d"),dpr=window.devicePixelRatio||1;
+ const levels=[],entry=s.entry_zone||[],targets=s.target_levels||[];
+ if(entry[0])levels.push({price:Number(entry[0].value),label:"ENTRY",cls:"entry"});
+ if(entry[1])levels.push({price:Number(entry[1].value),label:"ENTRY",cls:"entry"});
+ if(s.invalidation_level)levels.push({price:Number(s.invalidation_level.value),label:"SL",cls:"sl"});
+ if(targets[0])levels.push({price:Number(targets[0].value),label:"TP1",cls:"tp"});
+ if(targets[1])levels.push({price:Number(targets[1].value),label:"TP2",cls:"tp"});
+ function draw(){
+  const w=node.clientWidth,h=node.clientHeight;ctx.clearRect(0,0,w,h);
+  for(const l of levels){if(!Number.isFinite(l.price))continue;const y=series.priceToCoordinate(l.price);if(y==null||y<0||y>h)continue;ctx.beginPath();ctx.moveTo(0,y+.5);ctx.lineTo(w,y+.5);ctx.lineWidth=1;ctx.setLineDash([7,5]);ctx.strokeStyle=l.cls==="entry"?"#d7ff58":l.cls==="sl"?"#ff687b":"#61df9a";ctx.stroke();ctx.setLineDash([]);const text=l.label+"  "+l.price;ctx.font="700 10px system-ui,-apple-system,Segoe UI,sans-serif";const tw=ctx.measureText(text).width;ctx.fillStyle=l.cls==="entry"?"#d7ff58":l.cls==="sl"?"#ff687b":"#61df9a";ctx.fillText(text,Math.max(6,w-tw-10),Math.max(12,y-5))}
+ }
+ function resize(){const w=Math.max(1,node.clientWidth),h=Math.max(1,node.clientHeight);chart.resize(w,h);overlay.width=Math.floor(w*dpr);overlay.height=Math.floor(h*dpr);overlay.style.width=w+"px";overlay.style.height=h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);draw()}
+ chart.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(draw);if(chart.timeScale().subscribeVisibleTimeRangeChange)chart.timeScale().subscribeVisibleTimeRangeChange(draw);
+ const ro=new ResizeObserver(resize);ro.observe(node);resize();node._aicfaChartCleanup=()=>{ro.disconnect();chart.remove()};
 }
 async function hydrateCharts(){
  const nodes=[...document.querySelectorAll(".market-chart[data-symbol]")];
- await Promise.all(nodes.map(async node=>{
-  try{
-   const q=new URLSearchParams({symbol:node.dataset.symbol,timeframe:node.dataset.timeframe||"5m",limit:"100"});
-   const data=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.json():null);
-   renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"));
-  }catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}
- }));
+ await Promise.all(nodes.map(async node=>{try{const q=new URLSearchParams({symbol:node.dataset.symbol,timeframe:node.dataset.timeframe||"5m",limit:"160"});const response=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"});const data=response.ok?await response.json():null;renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"))}catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}}))
 }
 
 function setupCard(x){
@@ -100,7 +92,7 @@ function setupCard(x){
  const tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
  const why=(s.rationale||[]).join(" ");
  const hierarchy=(s.rationale||[]).filter(v=>v.startsWith("MTF hierarchy:")).join(" · ");
- return '<article class="setup '+dir(s).toLowerCase()+'"><div class="setup-top"><div><b>'+esc(x.asset)+'</b><span class="muted">'+esc(hor(x.mode))+' · '+esc(s.scenario||"SETUP")+'</span></div><strong>'+esc(dir(s))+'</strong></div><div class="scenario-desc">'+esc(scenarioText(s))+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-timeframe="'+chartTf(x.mode)+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets}))+'"></div>'+setupMap({...s,mode:x.mode})+'<div class="analysis"><div class="analysis-title">EVIDENCE</div>'+evidence(s,x)+'</div><div class="levels"><div><small>ENTRY</small><b>'+esc(ev)+'</b></div><div><small>INVALID</small><b>'+esc(sl)+'</b></div><div><small>TP</small><b>'+esc(tp)+'</b></div><div><small>MODE</small><b>'+esc(hor(x.mode))+'</b></div></div><div class="why"><span>WHY '+esc(dir(s))+'</span><p>'+esc(why||"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></article>'
+ return '<article class="setup '+dir(s).toLowerCase()+'"><div class="setup-top"><div><b>'+esc(x.asset)+'</b><span class="muted">'+esc(hor(x.mode))+' · '+esc(s.scenario||"SETUP")+'</span></div><strong>'+esc(dir(s))+'</strong></div><div class="scenario-desc">'+esc(scenarioText(s))+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-timeframe="'+chartTf(x.mode)+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets}))+'"></div>'+setupMap({...s,mode:x.mode})+'<div class="analysis"><div class="analysis-title">EVIDENCE</div>'+evidence(s,x)+'</div><div class="chart-meta"><span>'+esc(hor(x.mode))+'</span><span>'+esc(ev?"ENTRY "+ev:"ENTRY —")+'</span><span>'+esc(sl?"SL "+sl:"SL —")+'</span><span>'+esc(tp?"TP "+tp:"TP —")+'</span></div><div class="why"><span>WHY '+esc(dir(s))+'</span><p>'+esc(why||"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></article>'
 }
 function waitCards(ms){const out=[];for(const m of ms)for(const h of m.horizons||[]){const action=String(h.decision_action||h.decision||"").toUpperCase();if(action==="LONG"||action==="SHORT"||action==="READY")continue;const c=new Set(h.supported_concepts||[]);const checks=[["Liquidity",c.has("liquidity.sweep")],["Market Structure",c.has("market_structure.bos")||c.has("market_structure.choch")],["OB",c.has("order_block.bullish")||c.has("order_block.bearish")],["FVG",c.has("imbalance.fvg")],["Zone Reaction",c.has("price_action.rejection")],["Volume",c.has("volume.evidence")||c.has("volume.confirmation")]];out.push({asset:m.asset,mode:h.mode,action:action||"WAIT",checks:checks,why:(h.setup_reasons||h.decision_reasons||["structural setup is incomplete"])[0]})}return out}
 function render(rows){const e=rows[0],p=e?.payload||{},ms=latest(rows),as=active(ms),u=Number(p.universe_size||0),pos=Number(p.queue_position||0),pct=u?Math.min(100,pos/u*100):0;$("#universe").textContent=u||"—";$("#scanned").textContent=u?pos+"/"+u:"—";$("#rotation").textContent=p.rotation_id?"#"+p.rotation_id:"—";$("#currentMarket").textContent=p.markets?.[0]?.asset||"—";const m=p.markets?.[0];$("#currentStatus").textContent=String(m?.diagnostics?.status||"—").toUpperCase()+" · "+(m?.setups||[]).length+" SETUPS";$("#lastScan").textContent=p.scan_number?"#"+p.scan_number:"—";$("#progress").style.width=pct+"%";$("#rotationMeta").textContent=u?pos+" of "+u+" markets · "+Math.round(pct)+"%":"waiting";$("#active").textContent=as.length;const filtered=as.filter(s=>state.filter==="ALL"||hor(s.mode)===state.filter);$("#setups").innerHTML=filtered.length?filtered.map(setupCard).join(""):'<div class="empty">NO ACTIVE SETUPS</div>';if(filtered.length)hydrateCharts();const waits=waitCards(ms).filter(s=>state.filter==="ALL"||String(s.mode).toUpperCase()===state.filter);$("#waits").innerHTML=waits.length?waits.slice(0,6).map(w=>'<article class="wait"><div><b>'+esc(w.asset)+'</b><span>'+esc(w.mode)+'</span></div><strong>'+esc(w.action)+'</strong><div class="checks">'+w.checks.map(c=>'<span class="'+(c[1]?"ok":"missing")+'">'+(c[1]?"✓":"—")+' '+esc(c[0])+'</span>').join("")+'</div><p>'+esc(w.why)+'</p></article>').join(""):'<div class="empty">NO WAIT ANALYSIS</div>';const recent=rows.slice(0,8);$("#count").textContent=recent.length+" SCANS";$("#activity").innerHTML=recent.map(e=>{const p=e.payload||{},m=p.markets?.[0],d=m?.diagnostics||{};return '<div class="row"><time>'+tm(e.timestamp_ms)+'</time><b>'+esc(m?.asset)+'</b><span class="'+String(d.status||"").toLowerCase()+'">'+esc(String(d.status||"—").toUpperCase())+'</span><span>'+(m?.setups||[]).length+' setups</span><small>rotation '+esc(p.rotation_id||"—")+' · '+esc(p.queue_position||"—")+'/'+esc(p.universe_size||"—")+'</small></div>'}).join("")}
