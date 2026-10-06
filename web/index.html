@@ -11,7 +11,7 @@
 </header>
 <main>
   <section class="terminal-head">
-    <div><span class="label">AUTONOMOUS MARKET SCANNER</span><h1>AICFA Terminal</h1><p>Structural setups detected from the live market scan.</p></div>
+    <div><span class="label">AUTONOMOUS MARKET SCANNER</span><h1>AICFA Terminal</h1><p>One active setup in focus. History stays in the right watchlist.</p></div>
     <div class="scanner-state"><span class="label">CURRENT MARKET</span><strong id="currentMarket">—</strong><small id="currentStatus">CONNECTING</small></div>
   </section>
 
@@ -23,17 +23,32 @@
     <div class="rotation-kpi"><span>ROTATION <b id="rotation">—</b></span><div class="bar"><i id="progress"></i></div><small id="rotationMeta">—</small></div>
   </section>
 
-  <section class="section-head">
-    <div><span class="label">SIGNAL BOARD</span><h2>Active setups</h2></div>
-    <nav id="filters"><button class="active" data-filter="ALL">ALL</button><button data-filter="INTRADAY">INTRADAY</button><button data-filter="SWING">SWING</button><button data-filter="POSITION">POSITION</button></nav>
-  </section>
-  <section id="setups" class="setups"></section>
+  <section class="terminal-grid">
+    <aside class="left-rail">
+      <section class="rail-panel">
+        <div class="rail-head"><div><span class="label">INCOMPLETE ANALYSIS</span><h2>WAIT</h2></div><span id="waitCount">—</span></div>
+        <div id="waits" class="rail-scroll"></div>
+      </section>
+      <section class="rail-panel">
+        <div class="rail-head"><div><span class="label">SCANNER LOG</span><h2>Recent scans</h2></div><span id="count">—</span></div>
+        <div id="activity" class="rail-scroll log-scroll"></div>
+      </section>
+    </aside>
 
-  <section class="lower-grid">
-    <section class="subsection"><div class="section-head compact"><div><span class="label">INCOMPLETE ANALYSIS</span><h2>WAIT</h2></div></div><div id="waits" class="waits"></div></section>
-    <section class="subsection"><div class="section-head compact"><div><span class="label">SCANNER LOG</span><h2>Recent scans</h2></div><span id="count">—</span></div><div id="activity"></div></section>
+    <section class="workspace">
+      <div class="workspace-head">
+        <div><span class="label">ACTIVE ANALYSIS</span><h2 id="workspaceTitle">Waiting for setup</h2></div>
+        <nav id="filters"><button class="active" data-filter="ALL">ALL</button><button data-filter="INTRADAY">INTRADAY</button><button data-filter="SWING">SWING</button><button data-filter="POSITION">POSITION</button></nav>
+      </div>
+      <section id="setups" class="setups"></section>
+    </section>
+
+    <aside class="setup-rail">
+      <div class="rail-head"><div><span class="label">SETUP QUEUE</span><h2>Signals</h2></div><span id="historyCount">0</span></div>
+      <div id="setupHistory" class="setup-history"></div>
+    </aside>
   </section>
 </main>
 <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
-<script src="/app.js?v=live"></script>
+<script src="/app.js?v=terminal"></script>
 </body></html>
