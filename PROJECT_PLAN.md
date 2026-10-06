@@ -506,6 +506,18 @@ A * → IP AICFA VDS
   `AICFA Scanner → Journal / Feed → AICFA Website → Users`.
 - Все инфраструктурные изменения фиксируются в этом плане до перехода к следующему этапу.
 
+### 2026-10-06 — STEP 12 STARTED — AICFA MONITORING WEB UI
+
+- Began the production web implementation in the existing `nyxtryp/aicfa` repository under `web/`.
+- Added `web/index.html`: first real monitoring UI shell with live setup feed, horizon filters, system status, journal events, future AI query surface and sound control.
+- Added `web/styles.css`: responsive production-oriented visual system for desktop/mobile.
+- Added `web/app.js`: read-only feed consumption, 15-second refresh, setup normalization, lifecycle/evidence display, filtering and browser-safe notification sound.
+- Added `web/server.py`: static web server plus same-origin read-only `/api/*` proxy to the local Journal Feed at `127.0.0.1:8090`. The web process does **not** run the scanner.
+- This establishes the intended flow:
+  `AICFA Scanner → Journal/Feed → AICFA Web UI → Users`.
+- The next infrastructure action is to create/deploy the dedicated AICFA Web project in FrostDeploy using the `web/server.py` entry point, then bind the public project domain to `aicfa.ru`.
+- Do not change the existing AICFA worker or Journal Feed service for this web deployment.
+
 ### STEP 12 — ПЕРВЫЙ НАСТОЯЩИЙ САЙТ МОНИТОРИНГА AICFA
 
 Создать полноценный, качественно оформленный пользовательский интерфейс AICFA поверх централизованного Scanner/Feed.
