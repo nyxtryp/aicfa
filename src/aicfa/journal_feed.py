@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 from .persistent_journal import PersistentJournal
 
 
-def _response_payload(journal: PersistentJournal, path: str, query: dict[str, list[str]], registry: SetupRegistry | None = None) -> Any:
+def _response_payload(journal: PersistentJournal, path: str, query: dict[str, list[str]]) -> Any:
     limit = int(query.get("limit", ["100"])[0])
     limit = max(1, min(limit, 500))
     events = journal.read(limit)
