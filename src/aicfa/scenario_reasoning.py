@@ -32,7 +32,7 @@ def _unique(values: list[str]) -> tuple[str, ...]:
 
 _SCENARIO_RULES = {
     "continuation": {
-        "support": {"market_structure.bos", "displacement", "order_block.bullish", "order_block.bearish"},
+        "support": {"market_structure.bos", "displacement"},
         "confirm": ("follow-through displacement", "structure remains intact"),
         "invalidate": ("decisive structural failure", "acceptance against the active leg"),
     },
