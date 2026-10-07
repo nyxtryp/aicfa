@@ -256,8 +256,11 @@ def build_market_evidence(
                 ))
                 emitted = True
 
-        if not emitted:
-            missing.append(f"{timeframe}:no_active_supported_observation")
+        # A quiet timeframe is not missing data. In SMC a timeframe may
+        # legitimately contain no fresh BOS/CHoCH/sweep/zone event while the
+        # higher-timeframe structure and the causal setup remain valid.
+        # Missing context is reserved for unavailable analysis, not absence
+        # of a particular event.
 
     # Opposite event directions are not enough to declare contradictory market
     # evidence. BOS/CHoCH/displacement are causal events that may occur at
