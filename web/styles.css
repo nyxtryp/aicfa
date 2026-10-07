@@ -27,7 +27,7 @@ main{max-width:1600px;margin:auto;padding:26px 22px 34px}
 .market-watch.collapsed .rail-head,.rail-panel.collapsed .rail-head{border-bottom:0}
 .rail-head h2,.workspace-head h2{margin:3px 0 0;font-size:16px;letter-spacing:-.025em}.rail-head>span{color:var(--muted);font-size:9px;font-variant-numeric:tabular-nums}
 .rail-scroll,.setup-history{overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:#303844 transparent}.market-list{overflow:auto;min-height:0;flex:1;padding:5px;scrollbar-width:thin;scrollbar-color:#303844 transparent}
-.market-item{width:100%;display:grid;grid-template-columns:28px minmax(0,1fr) 24px;gap:6px;align-items:center;text-align:left;border:0;border-bottom:1px solid var(--line);padding:9px 6px;background:transparent;color:var(--text);cursor:pointer}
+.market-item{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 24px;gap:6px;align-items:center;text-align:left;border:0;border-bottom:1px solid var(--line);padding:9px 6px;background:transparent;color:var(--text);cursor:pointer}
 .market-item:hover{background:var(--surface2)}.market-item.selected{background:#151b21;box-shadow:inset 2px 0 0 var(--accent)}
 .market-number{color:var(--dim);font-size:8px;font-variant-numeric:tabular-nums}.market-symbol{font-size:10px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.market-type{color:var(--dim);font-size:7px;text-align:right;letter-spacing:.08em}
 
