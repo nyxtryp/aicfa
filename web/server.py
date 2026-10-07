@@ -15,6 +15,9 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
+SRC = ROOT.parent / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 FEED = "http://127.0.0.1:8090"
 CONTROL = "http://127.0.0.1:8091"
 
