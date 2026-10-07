@@ -45,10 +45,21 @@ def main() -> None:
     universe_path = _universe_path()
     universe = load_market_universe(universe_path)
     engine = AutonomousScanEngine(universe)
+    control_port = int(os.environ.get("AICFA_CONTROL_PORT", "8091"))
+
+    def _serve_control() -> None:
+        try:
+            serve_control(engine, host="127.0.0.1", port=control_port)
+        except Exception as exc:
+            # Market Watch is a control plane. Its failure must be explicit,
+            # while the autonomous scanner itself remains alive.
+            print(
+                f"AICFA market control stopped: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
     control_thread = threading.Thread(
-        target=serve_control,
-        args=(engine,),
-        kwargs={"host": "127.0.0.1", "port": int(os.environ.get("AICFA_CONTROL_PORT", "8091"))},
+        target=_serve_control,
         name="aicfa-market-control",
         daemon=True,
     )
