@@ -23,7 +23,14 @@ def _response_payload(journal: PersistentJournal, path: str, query: dict[str, li
         return {"events": [event for event in events if event.get("event_type") == "scan"]}
     if path == "/api/journal/registry":
         registry = SetupRegistry.from_env()
-        return {"setups": list(registry.current()) if registry is not None else []}
+        if registry is None:
+            return {"setups": []}
+        try:
+            return {"setups": list(registry.current())}
+        except Exception:
+            # The journal feed remains readable even if the durable registry
+            # projection is temporarily unreadable/corrupt.
+            return {"setups": []}
     if path == "/api/journal/setups":
         setups: list[dict[str, Any]] = []
         for event in events:
