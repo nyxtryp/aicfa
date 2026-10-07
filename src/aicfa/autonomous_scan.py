@@ -364,9 +364,21 @@ class AutonomousScanEngine:
             self._last_state = state
             if journal:
                 if self.journal is not None:
-                    self.journal.record_scan(state)
+                    try:
+                        self.journal.record_scan(state)
+                    except Exception as exc:
+                        print(
+                            f"AICFA journal error: {type(exc).__name__}: {exc}",
+                            flush=True,
+                        )
             if self.registry is not None:
-                self.registry.record_scan(state)
+                try:
+                    self.registry.record_scan(state)
+                except Exception as exc:
+                    print(
+                        f"AICFA registry error: {type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
             return state
 
     def run_cycle(
