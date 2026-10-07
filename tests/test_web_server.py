@@ -41,3 +41,49 @@ def test_market_price_candidates_normalize_perpetual_symbols():
         "market_type": "futures",
         "venue_symbols": {"bybit": "XAU/USDT:USDT"},
     }) == ("XAUUSDT",)
+
+
+def test_web_server_entrypoint_starts_outside_pytest_import_path(tmp_path):
+    import os
+    import socket
+    import subprocess
+    import sys
+    import time
+    from urllib.request import urlopen
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+
+    env = os.environ.copy()
+    env["PORT"] = str(port)
+    env["AICFA_DATA_DIR"] = str(tmp_path / "data")
+    process = subprocess.Popen(
+        [sys.executable, "web/server.py"],
+        cwd=server.ROOT.parent,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            try:
+                with urlopen(f"http://127.0.0.1:{port}/api/markets", timeout=1) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                assert response.status == 200
+                assert len(payload["markets"]) == 109
+                break
+            except Exception:
+                time.sleep(0.05)
+        else:
+            stderr = process.stderr.read() if process.stderr else ""
+            raise AssertionError(f"web server did not start: {stderr}")
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
