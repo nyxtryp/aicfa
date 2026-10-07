@@ -27,7 +27,8 @@ def _market_payload(engine: Any) -> list[dict[str, Any]]:
 
 
 def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
-    state = engine.scan_market(market_index, journal=False)
+    pause_until_ms = engine.pause_automatic_scanning()
+    state = engine.scan_market(market_index, journal=False, enforce_timeout=False)
     market = state.result.markets[0]
     registry = engine.registry
     setups: list[dict[str, Any]] = []
@@ -45,6 +46,7 @@ def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
             "diagnostics": _jsonable(market.diagnostics),
         },
         "setups": setups,
+        "automatic_scan_paused_until_ms": pause_until_ms,
     }
 
 
