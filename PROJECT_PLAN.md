@@ -1360,3 +1360,18 @@ MARKET WATCH
 ```
 
 Only after this behavioral verification should the MARKET WATCH task be considered fully GREEN.
+
+
+### 2026-10-07 — SCANNER RELIABILITY + MANUAL MARKET WATCH PAUSE
+
+Fixed the scanner failure path that could suppress all actionable setups:
+- raised the whole-market execution budget from 20s to 90s and made the timeout compatible with the production workload;
+- manual Market Watch scans no longer invoke the main-thread-only SIGALRM timeout;
+- a Market Watch click immediately pauses the autonomous queue for 30s; every new manual selection refreshes that 30s window;
+- the automatic queue waits during the pause and resumes only after the deadline;
+- unexpected per-market exceptions are converted into observable `status=error` scan results instead of silently disappearing;
+- quiet timeframes are no longer treated as missing SMC evidence; missing context now means unavailable analysis/data, while scenario-specific SMC requirements remain the real confirmation gate;
+- added src-layout pytest configuration so CI can import `aicfa` correctly;
+- added regression tests for the manual pause, observable scanner errors, and quiet-timeframe evidence semantics.
+
+Relevant commits: `c75adfe2`, `20b0bdf2`, `5f671f1e`, `cd5da517`, `b8176edf`, `6798da86`, `ae35ac96`.
