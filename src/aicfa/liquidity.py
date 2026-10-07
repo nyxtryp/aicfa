@@ -9,6 +9,8 @@ level and invalidates the pool.
 """
 from __future__ import annotations
 
+import heapq
+
 import numpy as np
 import pandas as pd
 
@@ -110,6 +112,13 @@ def build_liquidity(
     int_low_by_row = {i: p for i, p in int_lows}
 
     pools = []
+    # Active pools are resolved by price crossing, not by scanning every
+    # historical pool on every candle.  Each pool enters one min-heap for
+    # buy-side liquidity and one max-heap for sell-side liquidity.  Stale heap
+    # entries are skipped lazily after a pool changes state.
+    buy_heap = []
+    sell_heap = []
+    active_by_side = {"buy": [], "sell": []}
     active_counts = {"buy": 0, "sell": 0, "external_buy": 0, "external_sell": 0, "internal_buy": 0, "internal_sell": 0}
     active_latest = {"buy": None, "sell": None}
     last_ext_high = last_ext_low = None
@@ -126,6 +135,11 @@ def build_liquidity(
         active_counts[side] += 1
         active_counts[("external_" if external else "internal_") + side] += 1
         active_latest[side] = pool_id
+        active_by_side[side].append(pool_id)
+        if side == "buy":
+            heapq.heappush(buy_heap, (float(level), pool_id))
+        else:
+            heapq.heappush(sell_heap, (-float(level), pool_id))
         out.at[row, "liquidity_pool_created_high" if side == "buy" else "liquidity_pool_created_low"] = 1
         out.at[row, "equal_high" if side == "buy" else "equal_low"] = 1
         out.at[row, "buy_side_liquidity" if side == "buy" else "sell_side_liquidity"] = 1
@@ -138,43 +152,64 @@ def build_liquidity(
             add_pool(row=row, side=side, level=(price + previous_price) / 2.0, external=external)
 
     for row in range(n):
-        for pool in pools:
+        # A candle can resolve every active pool crossed by its wick.  Heap
+        # processing makes the lifecycle proportional to actual pool events
+        # instead of O(rows * historical_pools).
+        unresolved_buy = []
+        while buy_heap and buy_heap[0][0] < highs[row]:
+            level, pool_id = heapq.heappop(buy_heap)
+            pool = pools[pool_id]
             if pool["state"] != "active" or pool["created"] >= row:
                 continue
-            side = pool["side"]
-            level = float(pool["level"])
-            if side == "buy" and highs[row] > level:
-                if closes[row] < level:
-                    pool["state"] = "swept"
-                    active_counts["buy"] -= 1
-                    active_counts["external_buy" if pool["external"] else "internal_buy"] -= 1
-                    out.at[row, "sweep_high"] = 1
-                    out.at[row, "sweep_high_reclaim"] = 1
-                    out.at[row, "sweep_high_level"] = level
-                    out.at[row, "liquidity_pool_swept_high"] = 1
-                elif closes[row] > level:
-                    pool["state"] = "broken"
-                    active_counts["buy"] -= 1
-                    active_counts["external_buy" if pool["external"] else "internal_buy"] -= 1
-                    out.at[row, "sweep_high_level"] = level
-                    out.at[row, "liquidity_breakout_high"] = 1
-                    out.at[row, "liquidity_pool_invalidated_high"] = 1
-            elif side == "sell" and lows[row] < level:
-                if closes[row] >= level:
-                    pool["state"] = "swept"
-                    active_counts["sell"] -= 1
-                    active_counts["external_sell" if pool["external"] else "internal_sell"] -= 1
-                    out.at[row, "sweep_low"] = 1
-                    out.at[row, "sweep_low_reclaim"] = 1
-                    out.at[row, "sweep_low_level"] = level
-                    out.at[row, "liquidity_pool_swept_low"] = 1
-                elif closes[row] < level:
-                    pool["state"] = "broken"
-                    active_counts["sell"] -= 1
-                    active_counts["external_sell" if pool["external"] else "internal_sell"] -= 1
-                    out.at[row, "sweep_low_level"] = level
-                    out.at[row, "liquidity_breakout_low"] = 1
-                    out.at[row, "liquidity_pool_invalidated_low"] = 1
+            if closes[row] < level:
+                pool["state"] = "swept"
+                active_counts["buy"] -= 1
+                active_counts["external_buy" if pool["external"] else "internal_buy"] -= 1
+                out.at[row, "sweep_high"] = 1
+                out.at[row, "sweep_high_reclaim"] = 1
+                out.at[row, "sweep_high_level"] = level
+                out.at[row, "liquidity_pool_swept_high"] = 1
+            elif closes[row] > level:
+                pool["state"] = "broken"
+                active_counts["buy"] -= 1
+                active_counts["external_buy" if pool["external"] else "internal_buy"] -= 1
+                out.at[row, "sweep_high_level"] = level
+                out.at[row, "liquidity_breakout_high"] = 1
+                out.at[row, "liquidity_pool_invalidated_high"] = 1
+            else:
+                # close == level: the original lifecycle leaves this pool
+                # active. Preserve it while allowing lower levels to resolve.
+                unresolved_buy.append((level, pool_id))
+        for entry in unresolved_buy:
+            heapq.heappush(buy_heap, entry)
+
+        unresolved_sell = []
+        while sell_heap and -sell_heap[0][0] > lows[row]:
+            neg_level, pool_id = heapq.heappop(sell_heap)
+            level = -neg_level
+            pool = pools[pool_id]
+            if pool["state"] != "active" or pool["created"] >= row:
+                continue
+            if closes[row] >= level:
+                pool["state"] = "swept"
+                active_counts["sell"] -= 1
+                active_counts["external_sell" if pool["external"] else "internal_sell"] -= 1
+                out.at[row, "sweep_low"] = 1
+                out.at[row, "sweep_low_reclaim"] = 1
+                out.at[row, "sweep_low_level"] = level
+                out.at[row, "liquidity_pool_swept_low"] = 1
+            elif closes[row] < level:
+                pool["state"] = "broken"
+                active_counts["sell"] -= 1
+                active_counts["external_sell" if pool["external"] else "internal_sell"] -= 1
+                out.at[row, "sweep_low_level"] = level
+                out.at[row, "liquidity_breakout_low"] = 1
+                out.at[row, "liquidity_pool_invalidated_low"] = 1
+            else:
+                # close == level: preserve the active pool.
+                unresolved_sell.append((neg_level, pool_id))
+        for entry in unresolved_sell:
+            heapq.heappush(sell_heap, entry)
 
         if row in ext_high_by_row:
             price = ext_high_by_row[row]
