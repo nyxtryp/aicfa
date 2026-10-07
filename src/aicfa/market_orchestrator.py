@@ -125,9 +125,14 @@ def _acquire_primary_snapshot(
     market_type: str,
     modes: Sequence[TradingMode],
     resolver: Callable[[str, str], str] | None,
+    venue_symbols: tuple[tuple[str, str], ...] = (),
 ) -> tuple[SharedSnapshotMarketDataProvider, str, dict[str, object]]:
     """Resolve once and acquire the full primary MTF OHLCV snapshot once."""
     shared = _shared_provider(provider)
+    if venue_symbols:
+        register = getattr(shared, "register_market_symbols", None)
+        if register is not None:
+            register(asset, venue_symbols, market_type=market_type)
     symbol = str(resolver(asset, market_type)) if resolver is not None else str(
         shared.resolve_symbol(asset, market_type=market_type)
     )
@@ -187,6 +192,7 @@ def analyze_market_horizons(
         market_type=market_type,
         modes=normalized_modes,
         resolver=resolver,
+        venue_symbols=venue_symbols,
     )
     acquisition_elapsed = (time.perf_counter() - acquisition_started) * 1000.0
     snapshot_metrics = tuple(getattr(shared_provider, "last_snapshot_metrics", ()))
