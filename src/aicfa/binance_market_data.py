@@ -17,7 +17,7 @@ from urllib.request import Request, urlopen
 
 import pandas as pd
 
-from .market_data import BASE_TIMEFRAMES
+from .market_data import BASE_TIMEFRAMES, timeframe_ms
 
 _BINANCE_INTERVALS = set(BASE_TIMEFRAMES)
 _SPOT_BASE_URL = "https://data-api.binance.vision/api/v3"
@@ -25,6 +25,8 @@ _FUTURES_BASE_URL = "https://fapi.binance.com/fapi/v1"
 _OHLCV_COLUMNS = ("timestamp", "open", "high", "low", "close", "volume")
 _TRADE_COLUMNS = ("timestamp", "price", "volume", "side")
 _BOOK_COLUMNS = ("timestamp", "bid_price", "bid_size", "ask_price", "ask_size")
+_MAX_KLINE_PAGE = 1000
+_MAX_KLINE_TOTAL = 5000
 
 class BinanceTransportError(RuntimeError):
     """Provider transport failure classified as retryable or terminal."""
@@ -129,8 +131,10 @@ class BinanceMarketDataProvider:
     def _validate_limit(limit: int) -> int:
         if limit <= 0:
             raise ValueError("limit must be positive")
-        if limit > 1000:
-            raise ValueError("Binance adapter currently caps limit at 1000")
+        if limit > _MAX_KLINE_TOTAL:
+            raise ValueError(
+                f"Binance kline limit must be between 1 and {_MAX_KLINE_TOTAL}"
+            )
         return int(limit)
 
     @staticmethod
@@ -147,24 +151,74 @@ class BinanceMarketDataProvider:
         if since_ms is not None and int(since_ms) < 0:
             raise ValueError("since_ms must be non-negative")
 
-        params = {"symbol": self._normalize_symbol(symbol), "interval": timeframe, "limit": self._validate_limit(limit)}
-        if since_ms is not None:
-            params["startTime"] = int(since_ms)
-        endpoint = self._endpoint(market_type).replace("/klines", "")
-        request = Request(
-            f"{endpoint}/klines?{urlencode(params)}",
-            headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"},
-            method="GET",
+        total = self._validate_limit(limit)
+        normalized_symbol = self._normalize_symbol(symbol)
+        interval = timeframe_ms(timeframe)
+        rows: list[list[object]] = []
+        remaining = total
+        next_start = int(since_ms) if since_ms is not None else None
+        next_end: int | None = None
+
+        while remaining > 0:
+            page_limit = min(_MAX_KLINE_PAGE, remaining)
+            params: dict[str, object] = {
+                "symbol": normalized_symbol,
+                "interval": timeframe,
+                "limit": page_limit,
+            }
+            if next_start is not None:
+                params["startTime"] = next_start
+            elif next_end is not None:
+                params["endTime"] = next_end
+
+            endpoint = self._endpoint(market_type).replace("/klines", "")
+            request = Request(
+                f"{endpoint}/klines?{urlencode(params)}",
+                headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"},
+                method="GET",
+            )
+            payload = self._request_json(request)
+            if not isinstance(payload, list):
+                raise ValueError("Binance klines response must be a list")
+
+            page_rows: list[list[object]] = []
+            for row in payload:
+                if not isinstance(row, list) or len(row) < 6:
+                    raise ValueError("Binance kline row must contain at least 6 fields")
+                page_rows.append(row[:6])
+            if not page_rows:
+                break
+
+            rows.extend(page_rows)
+            remaining -= len(page_rows)
+            timestamps = [int(row[0]) for row in page_rows]
+
+            if len(page_rows) < page_limit:
+                break
+
+            if next_start is not None:
+                next_value = max(timestamps) + interval
+                if next_value <= next_start:
+                    break
+                next_start = next_value
+            else:
+                oldest = min(timestamps)
+                next_value = oldest - 1
+                if next_end is not None and next_value >= next_end:
+                    break
+                next_end = next_value
+
+        if not rows:
+            return pd.DataFrame(columns=_OHLCV_COLUMNS)
+
+        frame = pd.DataFrame(rows, columns=_OHLCV_COLUMNS)
+        frame["timestamp"] = pd.to_numeric(frame["timestamp"], errors="raise")
+        frame = (
+            frame.drop_duplicates(subset=["timestamp"], keep="last")
+            .sort_values("timestamp")
+            .reset_index(drop=True)
         )
-        payload = self._request_json(request)
-        if not isinstance(payload, list):
-            raise ValueError("Binance klines response must be a list")
-        rows = []
-        for row in payload:
-            if not isinstance(row, list) or len(row) < 6:
-                raise ValueError("Binance kline row must contain at least 6 fields")
-            rows.append(row[:6])
-        return pd.DataFrame(rows, columns=_OHLCV_COLUMNS)
+        return frame.head(total) if since_ms is not None else frame.tail(total)
 
     def _request_json(self, request: Request):
         attempts = self.max_retries + 1
