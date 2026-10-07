@@ -244,6 +244,21 @@ class SharedSnapshotMarketDataProvider:
     def resolve_symbol(self, asset: str, *, market_type: str = "spot") -> str:
         return self._provider.resolve_symbol(asset, market_type=market_type)
 
+    def register_market_symbols(
+        self,
+        asset: str,
+        venue_symbols: Sequence[tuple[str, str]],
+        *,
+        market_type: str = "spot",
+    ) -> None:
+        register = getattr(self._provider, "register_market_symbols", None)
+        if register is None:
+            raise AttributeError("underlying provider does not support venue symbol registration")
+        with self._lock:
+            register(asset, venue_symbols, market_type=market_type)
+            self._snapshots.clear()
+            self._aux_cache.clear()
+
     def fetch_ohlcv_snapshot(self, *, symbol: str, market_type: str,
                              timeframes: Sequence[str], since_ms: int | None,
                              limit: int | None = None,
