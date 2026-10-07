@@ -163,10 +163,10 @@ function renderCenter(){
 }
 function renderRails(ms,rows){
  const waits=waitCards(ms).filter(s=>state.filter==="ALL"||String(s.mode).toUpperCase()===state.filter);
- $("#waitCount").textContent=waits.length;
+ 
  $("#waits").innerHTML=waits.length?waits.map(w=>'<article class="wait"><div><b>'+esc(w.asset)+'</b><span>'+esc(w.mode)+'</span></div><strong>'+esc(w.action)+'</strong><div class="checks">'+w.checks.map(c=>'<span class="'+(c[1]?"ok":"missing")+'">'+(c[1]?"✓":"—")+" "+esc(c[0])+'</span>').join("")+'</div><p>'+esc(w.why)+'</p></article>').join(""):'<div class="rail-empty">NO WAIT ANALYSIS</div>';
- const recent=rows.slice(0,80);$("#count").textContent=recent.length+" SCANS";
- $("#activity").innerHTML=recent.map(e=>{const p=e.payload||{},m=p.markets?.[0],d=m?.diagnostics||{};return '<div class="row"><time>'+tm(e.timestamp_ms)+'</time><b>'+esc(m?.asset)+'</b><span class="'+String(d.status||"").toLowerCase()+'">'+esc(String(d.status||"—").toUpperCase())+'</span><small>'+(m?.setups||[]).length+' setups</small><em>r'+esc(p.rotation_id||"—")+' · '+esc(p.queue_position||"—")+'/'+esc(p.universe_size||"—")+'</em></div>'}).join("");
+ const recent=rows.slice(0,80);
+ $("#activity").innerHTML=recent.map(e=>{const p=e.payload||{},m=p.markets?.[0],d=m?.diagnostics||{};return '<div class="row"><time>'+tm(e.timestamp_ms)+'</time><b>'+esc(m?.asset)+'</b><span class="'+String(d.status||"").toLowerCase()+'">'+esc(String(d.status||"—").toUpperCase())+'</span><small>'+(m?.setups||[]).length+' setups</small></div>'}).join("");
 }
 function render(rows,registry){
  const p=rows[0]?.payload||{},ms=latest(rows),u=Number(p.universe_size||0),pos=Number(p.queue_position||0),pct=u?Math.min(100,pos/u*100):0;
@@ -187,8 +187,8 @@ async function refresh(){
 }
 function renderMarkets(){
  const root=$("#marketWatch"),visible=state.markets||[];
- $("#marketCount").textContent=visible.length;
- root.innerHTML=visible.length?visible.map(m=>'<button class="market-item '+(Number(m.index)===Number(ui.marketIndex)?"selected":"")+'" data-market-index="'+esc(m.index)+'"><span class="market-number">'+String(Number(m.index)+1).padStart(3,"0")+'</span><span class="market-symbol">'+esc(m.asset)+'</span><span class="market-type">'+esc(m.market_type==="futures"?"FUT":"SPOT")+'</span></button>').join(""):'<div class="rail-empty">NO MARKETS</div>';
+ 
+ root.innerHTML=visible.length?visible.map(m=>'<button class="market-item '+(Number(m.index)===Number(ui.marketIndex)?"selected":"")+'" data-market-index="'+esc(m.index)+'"><span class="market-symbol">'+esc(m.asset)+'</span><span class="market-type">'+esc(m.market_type==="futures"?"FUT":"SPOT")+'</span></button>').join(""):'<div class="rail-empty">NO MARKETS</div>';
 }
 async function scanMarket(index){
  const market=state.markets.find(x=>Number(x.index)===Number(index));
