@@ -54,7 +54,7 @@ def test_binance_adapter_uses_futures_endpoint():
     assert len(out) == 1
 
 
-@pytest.mark.parametrize("limit", [0, -1, 1001])
+@pytest.mark.parametrize("limit", [0, -1, 5001])
 def test_binance_adapter_rejects_invalid_limit(limit):
     with pytest.raises(ValueError):
         BinanceMarketDataProvider().fetch_ohlcv(
@@ -261,3 +261,35 @@ def test_binance_adapter_collects_timestamped_l1_history_without_inventing_rows(
     assert out["bid_size"].tolist() == ["5.0", "6.0"]
     assert len(sleeps) == 1
     assert sleeps == [0.25]
+
+
+def test_binance_adapter_paginates_large_ohlcv_requests():
+    from urllib.parse import parse_qs, urlparse
+
+    calls = []
+
+    def opener(request, timeout):
+        query = parse_qs(urlparse(request.full_url).query)
+        calls.append(query)
+        end_time = query.get("endTime", [None])[0]
+        if end_time is None:
+            start = 1_000_000
+            rows = [[start + index * 60_000, "100", "110", "90", "105", "12"] for index in range(1000)]
+        else:
+            end = int(end_time)
+            rows = [[end - (999 - index) * 60_000, "100", "110", "90", "105", "12"] for index in range(1000)]
+        return FakeResponse(rows)
+
+    provider = BinanceMarketDataProvider(opener=opener)
+    out = provider.fetch_ohlcv(
+        symbol="BTCUSDT",
+        market_type="futures",
+        timeframe="1m",
+        since_ms=None,
+        limit=2016,
+    )
+
+    assert len(calls) == 3
+    assert all(int(call["limit"][0]) <= 1000 for call in calls)
+    assert len(out) == 2016
+    assert out["timestamp"].is_monotonic_increasing
