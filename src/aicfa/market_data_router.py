@@ -49,6 +49,19 @@ class FallbackMarketDataProvider:
     def providers(self) -> tuple[MarketDataProvider, ...]:
         return self._providers
 
+    def register_market_symbols(
+        self,
+        asset: str,
+        venue_symbols: Sequence[tuple[str, str]],
+        *,
+        market_type: str = "spot",
+    ) -> None:
+        """Forward verified native symbols to providers that support them."""
+        for provider in self._providers:
+            register = getattr(provider, "register_market_symbols", None)
+            if register is not None:
+                register(asset, venue_symbols, market_type=market_type)
+
     def resolve_symbol(self, asset: str, *, market_type: str = "spot") -> str:
         attempts: list[ProviderAttempt] = []
         for provider in self._providers:
