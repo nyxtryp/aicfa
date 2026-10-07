@@ -145,19 +145,11 @@ class BybitMarketDataProvider:
                 return normalized
             if requested in symbols:
                 return requested
-            frozen = frozenset(
-            symbol
-            for symbol in symbols
-            if isinstance(symbol, str) and symbol
-        )
-        self._symbols_cache[market_type] = (now, frozen)
-        if normalized in frozen:
-            return normalized
-        if requested in frozen:
-            return requested
-        raise ValueError(f"no Bybit {quote_asset.upper()} market found for asset: {normalized}")
+            raise ValueError(f"no Bybit {quote_asset.upper()} market found for asset: {normalized}")
+
         cursor: str | None = None
         seen_cursors: set[str] = set()
+        all_symbols: set[str] = set()
 
         while True:
             params: dict[str, object] = {"category": category, "limit": 1000}
@@ -166,16 +158,13 @@ class BybitMarketDataProvider:
             payload = self._get("instruments-info", params)
             result = payload.get("result", {})
             items = result.get("list", [])
-            symbols = {
+            page_symbols = {
                 str(item.get("symbol", "")).upper()
                 for item in items
                 if isinstance(item, dict)
                 and item.get("status") in {None, "Trading"}
             }
-            if normalized in symbols:
-                return normalized
-            if requested in symbols:
-                return requested
+            all_symbols.update(symbol for symbol in page_symbols if symbol)
 
             next_cursor = str(result.get("nextPageCursor") or "")
             if not next_cursor or next_cursor in seen_cursors:
@@ -183,6 +172,12 @@ class BybitMarketDataProvider:
             seen_cursors.add(next_cursor)
             cursor = next_cursor
 
+        frozen = frozenset(all_symbols)
+        self._symbols_cache[market_type] = (now, frozen)
+        if normalized in frozen:
+            return normalized
+        if requested in frozen:
+            return requested
         raise ValueError(f"no Bybit {quote_asset.upper()} market found for asset: {normalized}")
 
     def fetch_trades(self, *, symbol: str, market_type: str, limit: int) -> pd.DataFrame:
