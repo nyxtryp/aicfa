@@ -64,6 +64,8 @@ class BybitMarketDataProvider:
         self.retry_backoff_seconds = float(retry_backoff_seconds)
         self._opener = opener
         self._sleeper = sleeper
+        self._symbols_cache: dict[str, tuple[float, frozenset[str]]] = {}
+        self._symbols_cache_ttl_seconds = 60.0
 
     @staticmethod
     def _category(market_type: str) -> str:
@@ -135,6 +137,25 @@ class BybitMarketDataProvider:
             raise ValueError("asset must not be empty")
         category = self._category(market_type)
         requested = f"{normalized}{quote_asset.strip().upper()}"
+        now = time.monotonic()
+        cached = self._symbols_cache.get(market_type)
+        if cached is not None and now - cached[0] < self._symbols_cache_ttl_seconds:
+            symbols = cached[1]
+            if normalized in symbols:
+                return normalized
+            if requested in symbols:
+                return requested
+            frozen = frozenset(
+            symbol
+            for symbol in symbols
+            if isinstance(symbol, str) and symbol
+        )
+        self._symbols_cache[market_type] = (now, frozen)
+        if normalized in frozen:
+            return normalized
+        if requested in frozen:
+            return requested
+        raise ValueError(f"no Bybit {quote_asset.upper()} market found for asset: {normalized}")
         cursor: str | None = None
         seen_cursors: set[str] = set()
 
