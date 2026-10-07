@@ -112,11 +112,25 @@ def create_handler(engine: Any):
 
 
 def serve_control(engine: Any, *, host: str = "127.0.0.1", port: int = 8091) -> None:
-    server = ThreadingHTTPServer((host, port), create_handler(engine))
-    try:
-        server.serve_forever()
-    finally:
-        server.server_close()
+    # A deployment can briefly race an old worker while FrostDeploy replaces
+    # the process. Keep the control plane retrying its bind instead of dying
+    # permanently and leaving Market Watch broken for the whole deployment.
+    import time
+    while True:
+        try:
+            server = ThreadingHTTPServer((host, port), create_handler(engine))
+        except OSError as exc:
+            print(
+                f"AICFA market control bind failed on {host}:{port}: {exc}; retrying",
+                flush=True,
+            )
+            time.sleep(1.0)
+            continue
+        try:
+            server.serve_forever()
+        finally:
+            server.server_close()
+        return
 
 
 __all__ = ["create_handler", "serve_control"]
