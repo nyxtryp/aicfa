@@ -309,3 +309,26 @@ def test_scan_market_turns_unexpected_exception_into_observable_error(monkeypatc
     assert market.setups == ()
     assert market.diagnostics.status == "error"
     assert "provider exploded" in market.diagnostics.error
+
+
+def test_automatic_worker_thread_does_not_fail_due_to_main_thread_timeout():
+    import threading
+
+    engine = AutonomousScanEngine(
+        MarketUniverse((MonitoredMarket("BTC/USDT"),)),
+        journal=None,
+    )
+    original = engine.scan_market
+    states = []
+
+    def run():
+        states.append(original(0))
+
+    worker = threading.Thread(target=run)
+    worker.start()
+    worker.join(timeout=5)
+
+    assert not worker.is_alive()
+    assert len(states) == 1
+    market = states[0].result.markets[0]
+    assert "hard market timeout" not in market.diagnostics.error
