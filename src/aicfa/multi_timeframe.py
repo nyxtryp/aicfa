@@ -71,7 +71,7 @@ def build_multi_timeframe_structure(
         source_ts = pd.to_datetime(source_x["timestamp"], unit="ms", utc=True)
         if len(source_ts) > 1:
             deltas = source_ts.diff().dropna()
-            if (deltas < pd.Timedelta(minutes=minutes)).any():
+            if (deltas < pd.Timedelta(minutes=int(minutes))).any():
                 raise ValueError(f"{timeframe} source contains intervals shorter than its declared timeframe")
 
         structure = build_structure(
