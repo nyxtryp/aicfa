@@ -64,6 +64,26 @@ def create_handler(engine: Any):
             self.wfile.write(body)
 
         def do_GET(self) -> None:
+            if self.path == "/health":
+                last = engine.last_state
+                market = None
+                if last is not None and last.result.markets:
+                    market = last.result.markets[0]
+                diagnostics = getattr(market, "diagnostics", None) if market is not None else None
+                self._send(
+                    200,
+                    {
+                        "ok": True,
+                        "scanner": "running",
+                        "scan_number": engine.scan_number,
+                        "cycle_id": engine.cycle_id,
+                        "universe_size": len(engine.universe.markets),
+                        "automatic_scan_paused_until_ms": engine.automatic_pause_until_ms,
+                        "last_scan_status": getattr(diagnostics, "status", None),
+                        "last_scan_error": getattr(diagnostics, "error", ""),
+                    },
+                )
+                return
             if self.path == "/markets":
                 self._send(200, {"markets": _market_payload(engine)})
                 return
