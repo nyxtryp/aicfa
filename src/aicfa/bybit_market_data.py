@@ -81,7 +81,12 @@ class BybitMarketDataProvider:
 
     @staticmethod
     def _normalize_symbol(symbol: str) -> str:
-        normalized = symbol.replace("/", "").replace("-", "").replace("_", "").strip().upper()
+        # Accept AICFA/CCXT contract notation such as XAU/USDT:USDT,
+        # while sending the native Bybit instrument symbol XAUUSDT.
+        raw = symbol.strip().upper()
+        if ":" in raw:
+            raw = raw.split(":", 1)[0]
+        normalized = raw.replace("/", "").replace("-", "").replace("_", "")
         if not normalized:
             raise ValueError("symbol must not be empty")
         return normalized
