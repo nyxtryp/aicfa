@@ -29,8 +29,8 @@ RAW_DIR = DATA_DIR / "raw"
 
 def _journal_payload(path: str, query: dict[str, list[str]]) -> bytes:
     """Serve the terminal journal directly from the shared persistent data directory."""
-    from src.aicfa.persistent_journal import PersistentJournal
-    from src.aicfa.setup_registry import SetupRegistry
+    from aicfa.persistent_journal import PersistentJournal
+    from aicfa.setup_registry import SetupRegistry
 
     try:
         limit = int(query.get("limit", ["100"])[0])
