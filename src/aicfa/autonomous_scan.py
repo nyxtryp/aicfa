@@ -161,13 +161,16 @@ class AutonomousScanEngine:
         """Pause the automatic queue for a short manual Market Watch scan window."""
         if seconds <= 0:
             raise ValueError("pause duration must be greater than zero")
-        with self._scan_lock:
-            now_ms = self._clock_ms()
-            self._manual_pause_until_ms = max(
-                self._manual_pause_until_ms,
-                now_ms + int(seconds * 1000.0),
-            )
-            return self._manual_pause_until_ms
+        # Do not take the scan lock here: a manual click must pause the
+        # automatic queue immediately even if an automatic market is currently
+        # being analyzed. The running scan is allowed to finish, then the
+        # queue observes this deadline before starting another market.
+        now_ms = self._clock_ms()
+        self._manual_pause_until_ms = max(
+            self._manual_pause_until_ms,
+            now_ms + int(seconds * 1000.0),
+        )
+        return self._manual_pause_until_ms
 
     @property
     def last_state(self) -> AutonomousScanState | None:
