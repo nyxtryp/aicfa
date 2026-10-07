@@ -270,3 +270,42 @@ def test_run_forever_batches_continues_after_market_error(monkeypatch):
     ]
     assert errors == [("COIN000/USDT", "temporary provider failure")]
 
+
+
+def test_manual_market_pause_is_30_seconds_and_refreshes_on_new_click():
+    now = {"ms": 1_000_000}
+    engine = AutonomousScanEngine(
+        MarketUniverse((MonitoredMarket("BTC/USDT"),)),
+        clock_ms=lambda: now["ms"],
+    )
+
+    first = engine.pause_automatic_scanning()
+    assert first == now["ms"] + 30_000
+    assert engine.automatic_scan_paused is True
+
+    now["ms"] += 20_000
+    second = engine.pause_automatic_scanning()
+    assert second == now["ms"] + 30_000
+    assert engine.automatic_pause_until_ms == now["ms"] + 30_000
+
+    now["ms"] = second
+    assert engine.automatic_scan_paused is False
+
+
+def test_scan_market_turns_unexpected_exception_into_observable_error(monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("provider exploded")
+
+    monkeypatch.setattr("aicfa.autonomous_scan.scan_universe", fail)
+    engine = AutonomousScanEngine(
+        MarketUniverse((MonitoredMarket("BTC/USDT"),)),
+        journal=None,
+    )
+
+    state = engine.scan_market(0, enforce_timeout=False)
+
+    market = state.result.markets[0]
+    assert state.scan_number == 1
+    assert market.setups == ()
+    assert market.diagnostics.status == "error"
+    assert "provider exploded" in market.diagnostics.error
