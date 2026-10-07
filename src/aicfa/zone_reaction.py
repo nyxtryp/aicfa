@@ -287,6 +287,14 @@ def build_zone_reaction(
                     wide_occupied_bucket_keys_dirty = True
                 else:
                     bucket.append(zone_id)
+                    ordered = wide_zone_bucket_level_sorted.get(bucket_id)
+                    midpoint = float(zone_low[zone_id] + zone_high[zone_id]) * 0.5
+                    if ordered is not None:
+                        item = (midpoint, zone_id)
+                        if not ordered or ordered[-1][0] <= midpoint:
+                            ordered.append(item)
+                        else:
+                            bisect.insort_right(ordered, item)
         else:
             for bucket_id in range(first, last + 1):
                 bucket = zone_buckets.get(bucket_id)
@@ -296,6 +304,14 @@ def build_zone_reaction(
                     occupied_bucket_keys_dirty = True
                 else:
                     bucket.append(zone_id)
+                    ordered = zone_bucket_level_sorted.get(bucket_id)
+                    midpoint = float(zone_low[zone_id] + zone_high[zone_id]) * 0.5
+                    if ordered is not None:
+                        item = (midpoint, zone_id)
+                        if not ordered or ordered[-1][0] <= midpoint:
+                            ordered.append(item)
+                        else:
+                            bisect.insort_right(ordered, item)
 
 
     def _append_zone(*, source, side, low, high, created):
@@ -409,7 +425,7 @@ def build_zone_reaction(
                 continue
 
             ordered = cache.get(bucket_id)
-            if ordered is None or len(ordered) != len(raw_bucket):
+            if ordered is None:
                 ordered = sorted(
                     (
                         (float(zone_low[zone_id] + zone_high[zone_id]) * 0.5, zone_id)
