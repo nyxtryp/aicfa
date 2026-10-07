@@ -51,8 +51,13 @@ def _market_timeout(seconds: float):
     if seconds <= 0:
         yield
         return
+    # SIGALRM is process-wide and Python only permits installing signal
+    # handlers from the main thread. The production autonomous worker runs in
+    # its own thread, so use provider-level/network timeouts there instead
+    # of turning every market into a false scanner error.
     if threading.current_thread() is not threading.main_thread():
-        raise RuntimeError("hard market timeout requires execution on the main thread")
+        yield
+        return
     previous = signal.getsignal(signal.SIGALRM)
     def _handler(_signum, _frame):
         raise MarketExecutionTimeout(f"market exceeded hard execution budget of {seconds:.1f}s")
