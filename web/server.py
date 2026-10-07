@@ -41,7 +41,18 @@ def _journal_payload(path: str, query: dict[str, list[str]]) -> bytes:
     events = journal.read(limit)
 
     if path == "/api/health":
-        payload = {"ok": True, "journal": str(journal.path)}
+        scanner = _scanner_health()
+        payload = {
+            "ok": bool(scanner.get("ok")),
+            "journal": str(journal.path),
+            "scanner": scanner.get("scanner", "unknown"),
+            "scan_number": scanner.get("scan_number"),
+            "cycle_id": scanner.get("cycle_id"),
+            "universe_size": scanner.get("universe_size"),
+            "automatic_scan_paused_until_ms": scanner.get("automatic_scan_paused_until_ms"),
+            "last_scan_status": scanner.get("last_scan_status"),
+            "last_scan_error": scanner.get("last_scan_error", ""),
+        }
     elif path == "/api/journal/events":
         payload = {"events": list(events)}
     elif path == "/api/journal/scans":
@@ -62,6 +73,15 @@ def _journal_payload(path: str, query: dict[str, list[str]]) -> bytes:
     else:
         raise KeyError(path)
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _scanner_health() -> dict[str, object]:
+    try:
+        with urlopen(Request(CONTROL + "/health", method="GET"), timeout=2) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload if isinstance(payload, dict) else {"ok": False, "scanner": "invalid"}
+    except Exception as exc:
+        return {"ok": False, "scanner": "unavailable", "error": str(exc)}
 
 
 def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
