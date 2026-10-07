@@ -48,6 +48,14 @@ class JsonResponse:
         raise AttributeError(name)
 
 
+@pytest.mark.parametrize("limit", [0, -1, 5001])
+def test_bybit_rejects_invalid_kline_limit(limit):
+    with pytest.raises(ValueError):
+        BybitMarketDataProvider().fetch_ohlcv(
+            symbol="BTCUSDT", market_type="spot", timeframe="1m", since_ms=None, limit=limit
+        )
+
+
 def test_bybit_resolves_bare_asset_to_usdt(monkeypatch):
     provider = BybitMarketDataProvider(opener=lambda request, timeout: JsonResponse({
         "retCode": 0,
@@ -242,3 +250,39 @@ def test_bybit_adapter_collects_timestamped_l1_history():
     assert out["timestamp"].tolist() == [1700000000300, 1700000000400]
     assert out["bid_size"].tolist() == ["5.0", "6.0"]
     assert sleeps == [0.25]
+
+
+def test_bybit_adapter_paginates_large_ohlcv_requests():
+    from urllib.parse import parse_qs, urlparse
+
+    calls = []
+
+    def opener(request, timeout):
+        query = parse_qs(urlparse(request.full_url).query)
+        calls.append(query)
+        end_time = query.get("end", [None])[0]
+        if end_time is None:
+            start = 1_000_000
+            rows = [[str(start + (999 - index) * 60_000), "100", "105", "99", "103", "123.4"] for index in range(1000)]
+        else:
+            end = int(end_time)
+            rows = [[str(end - index * 60_000), "100", "105", "99", "103", "123.4"] for index in range(1000)]
+        return JsonResponse({
+            "retCode": 0,
+            "retMsg": "OK",
+            "result": {"list": rows},
+        })
+
+    provider = BybitMarketDataProvider(opener=opener)
+    out = provider.fetch_ohlcv(
+        symbol="BTCUSDT",
+        market_type="futures",
+        timeframe="1m",
+        since_ms=None,
+        limit=2016,
+    )
+
+    assert len(calls) == 3
+    assert all(int(call["limit"][0]) <= 1000 for call in calls)
+    assert len(out) == 2016
+    assert out["timestamp"].is_monotonic_increasing
