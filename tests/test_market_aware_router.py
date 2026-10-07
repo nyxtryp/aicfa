@@ -119,7 +119,13 @@ def test_router_preserves_reverse_symbol_cache_for_previous_markets():
     first = Provider("first", "BTC/USDT")
     second = Provider("second", "ETH/USDT")
     router = MarketAwareFallbackProvider([first, second])
+    router.register_market_symbols(
+        "BTC/USDT", (("first", "BTC/USDT"),), market_type="futures"
+    )
     router.resolve_symbol("BTC/USDT", market_type="futures")
+    router.register_market_symbols(
+        "ETH/USDT", (("second", "ETH/USDT"),), market_type="futures"
+    )
     router.resolve_symbol("ETH/USDT", market_type="futures")
 
     result = router.fetch_ohlcv_with_source(
