@@ -85,7 +85,9 @@ def build_features(
     out["sweep_low_reclaim"]=((l<prev_low)&(c>prev_low)).astype("int8")
 
     from .structure import build_structure
-    structure=build_structure(x)
+    # Pass the already-computed causal displacement into structure so MSS
+    # remains a genuine displacement-confirmed shift, not an always-zero field.
+    structure=build_structure(x, displacement=displacement)
     out = _merge_columns(out, structure, ["swing_high","swing_low","hh","hl","lh","ll","bos_up","bos_down",
                     "choch_up","choch_down","mss_up","mss_down","swing_high_price",
                     "swing_low_price","structure_direction"])
