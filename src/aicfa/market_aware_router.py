@@ -56,10 +56,13 @@ class MarketAwareFallbackProvider:
         }
         if not normalized:
             return
+        previous = self._market_symbols.get(key, {})
         self._market_symbols[key] = normalized
         self._resolved.pop(key, None)
-        for cache_key in tuple(self._by_symbol):
-            if cache_key[1] == market_type:
+        for native_symbol in previous.values():
+            cache_key = (str(native_symbol).upper(), market_type)
+            cached = self._by_symbol.get(cache_key)
+            if cached is not None and cached.asset == key[0]:
                 self._by_symbol.pop(cache_key, None)
         # Make every explicitly mapped native symbol immediately routable.
         # Fetch still tries all mapped venues in configured order.
@@ -83,6 +86,10 @@ class MarketAwareFallbackProvider:
         key = (asset.strip().upper(), market_type)
         cached = self._resolved.get(key)
         if cached is not None:
+            # A previous market registration must never invalidate the
+            # symbol index of another already-resolved market. Rehydrate the
+            # reverse lookup defensively if an older cache entry is missing.
+            self._by_symbol[(cached.symbol.upper(), market_type)] = cached
             return cached
 
         mapped = self._market_symbols.get(key, {})
