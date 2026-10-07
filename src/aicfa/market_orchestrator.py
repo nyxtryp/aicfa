@@ -268,13 +268,23 @@ def analyze_market_horizons(
             for item in mode_lifecycle
             if item.identity is not None
         }
-        if str(result.decision_assessment.action.value) not in {"long", "short"}:
+        # Keep the orchestrator tolerant of lightweight analysis stubs used
+        # by unit/integration tests while production results continue to use
+        # the canonical DecisionAssessment.
+        decision_assessment = getattr(result, "decision_assessment", None)
+        if decision_assessment is not None:
+            action_value = getattr(getattr(decision_assessment, "action", None), "value", "")
+        else:
+            action_value = getattr(result, "decision", "")
+        decision_action = str(action_value).lower()
+        if decision_action not in {"long", "short"}:
             continue
 
+        evidence_assessment = getattr(result, "evidence_assessment", None)
         evidence_concepts = tuple(
             dict.fromkeys(
                 item.concept_id
-                for item in getattr(result.evidence_assessment, "observations", ())
+                for item in getattr(evidence_assessment, "observations", ())
                 if item.state == "observed" and item.confidence >= 0.5
             )
         )
@@ -300,7 +310,7 @@ def analyze_market_horizons(
                         lifecycle_by_identity.get(identity) if identity is not None else None
                     ),
                     evidence_concepts=evidence_concepts,
-                    decision_action=str(result.decision_assessment.action.value),
+                    decision_action=decision_action,
                 )
             )
 
