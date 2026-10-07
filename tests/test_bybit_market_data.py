@@ -286,3 +286,7 @@ def test_bybit_adapter_paginates_large_ohlcv_requests():
     assert all(int(call["limit"][0]) <= 1000 for call in calls)
     assert len(out) == 2016
     assert out["timestamp"].is_monotonic_increasing
+
+
+def test_bybit_normalizes_ccxt_contract_symbol():
+    assert BybitMarketDataProvider._normalize_symbol("XAU/USDT:USDT") == "XAUUSDT"
