@@ -362,6 +362,12 @@ def build_zone_reaction(
     liquidity_arrays = {
         "liquidity_pool_created_low": _column_array(liquidity, "liquidity_pool_created_low", np.nan),
         "liquidity_pool_created_high": _column_array(liquidity, "liquidity_pool_created_high", np.nan),
+        # Current liquidity output stores creation as a 0/1 event and the
+        # actual level in the corresponding *_side_liquidity_price column.
+        # Keep the direct-price fallback for older standalone callers/tests
+        # that supplied the level directly in liquidity_pool_created_*.
+        "sell_side_liquidity_price": _column_array(liquidity, "sell_side_liquidity_price", np.nan),
+        "buy_side_liquidity_price": _column_array(liquidity, "buy_side_liquidity_price", np.nan),
     }
 
     def _active_level(close: float, side: int):
@@ -500,11 +506,22 @@ def build_zone_reaction(
                 created_count += 1
 
         if liquidity is not None:
-            for col, side in (
-                ("liquidity_pool_created_low", "support"),
-                ("liquidity_pool_created_high", "resistance"),
+            for flag_col, price_col, side in (
+                ("liquidity_pool_created_low", "sell_side_liquidity_price", "support"),
+                ("liquidity_pool_created_high", "buy_side_liquidity_price", "resistance"),
             ):
-                price = float(liquidity_arrays[col][i])
+                raw = float(liquidity_arrays[flag_col][i])
+                companion = float(liquidity_arrays[price_col][i])
+                if np.isfinite(companion):
+                    # Canonical liquidity frame: only a creation event creates
+                    # a normalized zone; the companion column carries its price.
+                    if raw != 1:
+                        continue
+                    price = companion
+                else:
+                    # Backward-compatible direct-price input used by older
+                    # standalone callers: NaN means no zone.
+                    price = raw
                 if np.isfinite(price):
                     _append_zone(source="liquidity", side=side, low=price, high=price, created=i)
                     result_binary["zone_created_liquidity"][i] += 1
