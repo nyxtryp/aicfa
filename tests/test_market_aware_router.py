@@ -113,3 +113,18 @@ def test_router_routes_auxiliary_feeds_with_venue_native_symbol():
     assert trades.symbol == "TON/USDT"
     assert book.symbol == "TON/USDT"
     assert history.symbol == "TON/USDT"
+
+
+def test_router_preserves_reverse_symbol_cache_for_previous_markets():
+    first = Provider("first", "BTC/USDT")
+    second = Provider("second", "ETH/USDT")
+    router = MarketAwareFallbackProvider([first, second])
+    router.resolve_symbol("BTC/USDT", market_type="futures")
+    router.resolve_symbol("ETH/USDT", market_type="futures")
+
+    result = router.fetch_ohlcv_with_source(
+        symbol="BTC/USDT", market_type="futures", timeframe="5m",
+        since_ms=None, limit=10,
+    )
+    assert result.provider == "first"
+    assert first.calls == ["BTC/USDT"]
