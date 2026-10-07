@@ -146,6 +146,31 @@ def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
 
 
 
+def _ticker_symbol_candidates(item: dict[str, object]) -> tuple[str, ...]:
+    asset = str(item.get("asset", "")).strip().upper()
+    market_type = str(item.get("market_type", "futures")).strip().lower()
+    candidates: list[str] = []
+
+    def add(value: object) -> None:
+        raw = str(value).strip().upper()
+        if not raw:
+            return
+        # CCXT perpetual notation BASE/USDT:USDT is represented by the
+        # underlying venue ticker BASEUSDT.
+        if ":" in raw:
+            raw = raw.split(":", 1)[0]
+        raw = raw.replace("/", "").replace("-", "").replace("_", "")
+        if raw and raw not in candidates:
+            candidates.append(raw)
+
+    if market_type == "futures":
+        venues = item.get("venue_symbols", {})
+        if isinstance(venues, dict):
+            add(venues.get("bybit"))
+    add(asset)
+    return tuple(candidates)
+
+
 def _market_prices() -> bytes:
     universe_path = ROOT.parent / "config" / "market_universe.json"
     payload = json.loads(universe_path.read_text(encoding="utf-8"))
@@ -154,7 +179,7 @@ def _market_prices() -> bytes:
         "spot": "https://api.binance.com/api/v3/ticker/price",
         "futures": "https://fapi.binance.com/fapi/v1/ticker/price",
     }
-    ticker_maps = {}
+    ticker_maps: dict[str, dict[str, float]] = {}
     for market_type, endpoint in endpoints.items():
         try:
             with urlopen(Request(endpoint, method="GET"), timeout=8) as response:
@@ -167,12 +192,42 @@ def _market_prices() -> bytes:
         except Exception:
             ticker_maps[market_type] = {}
 
-    prices = {}
+    # Binance does not list the synthetic TradFi perpetuals in AICFA's
+    # universe. Bybit does, and its native symbols are already present in the
+    # configured venue mappings. One public bulk request covers the full
+    # linear market set without per-market HTTP calls.
+    try:
+        with urlopen(
+            Request(
+                "https://api.bybit.com/v5/market/tickers?category=linear",
+                method="GET",
+                headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"},
+            ),
+            timeout=8,
+        ) as response:
+            bybit_payload = json.loads(response.read().decode("utf-8"))
+        bybit_rows = bybit_payload.get("result", {}).get("list", [])
+        ticker_maps["bybit_linear"] = {
+            str(item.get("symbol", "")).upper(): float(item["lastPrice"])
+            for item in bybit_rows
+            if item.get("symbol") and item.get("lastPrice") is not None
+        }
+    except Exception:
+        ticker_maps["bybit_linear"] = {}
+
+    prices: dict[str, float] = {}
     for index, item in enumerate(markets):
-        asset = str(item.get("asset", "")).upper()
-        market_type = str(item.get("market_type", "futures")).lower()
-        symbol = asset.replace("/", "").replace(":", "")
-        price = ticker_maps.get(market_type, {}).get(symbol)
+        market_type = str(item.get("market_type", "futures")).strip().lower()
+        candidates = _ticker_symbol_candidates(item)
+        price = None
+        for symbol in candidates:
+            price = ticker_maps.get(market_type, {}).get(symbol)
+            if price is not None:
+                break
+            if market_type == "futures":
+                price = ticker_maps["bybit_linear"].get(symbol)
+                if price is not None:
+                    break
         if price is not None:
             prices[str(index)] = price
     return json.dumps({"prices": prices}, separators=(",", ":")).encode("utf-8")
