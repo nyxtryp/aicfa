@@ -37,7 +37,7 @@ _SCENARIO_RULES = {
         "invalidate": ("decisive structural failure", "acceptance against the active leg"),
     },
     "reversal": {
-        "support": {"market_structure.choch", "liquidity.sweep", "price_action.rejection", "wyckoff.spring"},
+        "support": {"market_structure.choch", "market_structure.mss", "liquidity.sweep", "price_action.rejection", "wyckoff.spring"},
         "confirm": ("structural follow-through", "rejection of the prior state"),
         "invalidate": ("acceptance in the prior direction", "failed structural transition"),
     },
