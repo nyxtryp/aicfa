@@ -80,20 +80,20 @@ def create_handler(engine: Any):
                 if market_index < 0 or market_index >= len(engine.universe.markets):
                     raise ValueError("market_index_out_of_range")
                 result = _scan_payload(engine, market_index)
-            diagnostics = result.get("market", {}).get("diagnostics") or {}
-            status = str(diagnostics.get("status", "completed")).lower()
-            if status in {"error", "timeout"}:
-                self._send(
-                    504 if status == "timeout" else 503,
-                    {
-                        "ok": False,
-                        "error": "scanner_timeout" if status == "timeout" else "scanner_error",
-                        "detail": diagnostics.get("error", ""),
-                        "market": result.get("market", {}),
-                    },
-                )
-            else:
-                self._send(200, result)
+                diagnostics = result.get("market", {}).get("diagnostics") or {}
+                status = str(diagnostics.get("status", "completed")).lower()
+                if status in {"error", "timeout"}:
+                    self._send(
+                        504 if status == "timeout" else 503,
+                        {
+                            "ok": False,
+                            "error": "scanner_timeout" if status == "timeout" else "scanner_error",
+                            "detail": diagnostics.get("error", ""),
+                            "market": result.get("market", {}),
+                        },
+                    )
+                else:
+                    self._send(200, result)
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 self._send(400, {"error": str(exc)})
             except Exception as exc:
