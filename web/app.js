@@ -179,7 +179,7 @@ function render(rows,registry){
 async function refresh(){
  if(refreshInFlight)return;refreshInFlight=true;
  try{
-  const [h,d,r,mk]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/markets?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({markets:[]})),fetch(API_BASE+"/market-prices?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({prices:{}}))]);
+  const [h,d,r,mk,prices]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/markets?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({markets:[]})),fetch(API_BASE+"/market-prices?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({prices:{}}))]);
   state.events=d.events||[];const registry=r.setups||[];state.registry=registry;state.markets=mk.markets||[];const previous=state.prices;state.prices=prices.prices||{};state.previousPrices=previous;const sig=JSON.stringify([state.events,registry,state.markets]);
   if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}else{renderMarkets()}
   $("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now());
