@@ -104,6 +104,39 @@ def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
     ).encode("utf-8")
 
 
+
+def _market_prices() -> bytes:
+    universe_path = ROOT.parent / "config" / "market_universe.json"
+    payload = json.loads(universe_path.read_text(encoding="utf-8"))
+    markets = payload.get("markets", [])
+    endpoints = {
+        "spot": "https://api.binance.com/api/v3/ticker/price",
+        "futures": "https://fapi.binance.com/fapi/v1/ticker/price",
+    }
+    ticker_maps = {}
+    for market_type, endpoint in endpoints.items():
+        try:
+            with urlopen(Request(endpoint, method="GET"), timeout=8) as response:
+                tickers = json.loads(response.read().decode("utf-8"))
+            ticker_maps[market_type] = {
+                str(item.get("symbol", "")).upper(): float(item["price"])
+                for item in tickers
+                if item.get("symbol") and item.get("price") is not None
+            }
+        except Exception:
+            ticker_maps[market_type] = {}
+
+    prices = {}
+    for index, item in enumerate(markets):
+        asset = str(item.get("asset", "")).upper()
+        market_type = str(item.get("market_type", "futures")).lower()
+        symbol = asset.replace("/", "").replace(":", "")
+        price = ticker_maps.get(market_type, {}).get(symbol)
+        if price is not None:
+            prices[str(index)] = price
+    return json.dumps({"prices": prices}, separators=(",", ":")).encode("utf-8")
+
+
 class Handler(SimpleHTTPRequestHandler):
     server_version = "AICFA-Web/1.0"
 
@@ -138,6 +171,12 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self) -> None:
+        if urlsplit(self.path).path == "/api/market-prices":
+            try:
+                self._json(200, _market_prices())
+            except Exception:
+                self._json(503, b'{"error":"market_prices_unavailable","prices":{}}')
+            return
         if self.path.startswith("/api/chart"):
             from urllib.parse import parse_qs
             query = parse_qs(urlsplit(self.path).query)
