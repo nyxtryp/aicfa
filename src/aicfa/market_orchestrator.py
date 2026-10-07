@@ -133,9 +133,7 @@ def _acquire_primary_snapshot(
         register = getattr(shared, "register_market_symbols", None)
         if register is not None:
             register(asset, venue_symbols, market_type=market_type)
-    symbol = str(resolver(asset, market_type)) if resolver is not None else str(
-        shared.resolve_symbol(asset, market_type=market_type)
-    )
+    symbol = str(shared.resolve_symbol(asset, market_type=market_type))
     limits = _primary_snapshot_limits(modes)
     primary_timeframes = ("1w", "1d", "4h", "1h", "15m", "5m")
     timeframes = tuple(timeframe for timeframe in primary_timeframes if timeframe in limits)
