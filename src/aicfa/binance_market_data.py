@@ -63,6 +63,8 @@ class BinanceMarketDataProvider:
         self.retry_backoff_seconds = float(retry_backoff_seconds)
         self._opener = opener
         self._sleeper = sleeper
+        self._symbols_cache: dict[str, tuple[float, frozenset[str]]] = {}
+        self._symbols_cache_ttl_seconds = 60.0
 
     def resolve_symbol(self, asset: str, *, quote_asset: str = "USDT", market_type: str = "spot") -> str:
         """Resolve a user asset to a currently tradable Binance symbol.
@@ -92,6 +94,10 @@ class BinanceMarketDataProvider:
         return requested
 
     def _exchange_symbols(self, market_type: str) -> set[str]:
+        now = time.monotonic()
+        cached = self._symbols_cache.get(market_type)
+        if cached is not None and now - cached[0] < self._symbols_cache_ttl_seconds:
+            return set(cached[1])
         endpoint = "https://api.binance.com/api/v3/exchangeInfo" if market_type == "spot" else "https://fapi.binance.com/fapi/v1/exchangeInfo"
         request = Request(endpoint, headers={"Accept": "application/json", "User-Agent": "AICFA/1.0"}, method="GET")
         with self._opener(request, timeout=self.timeout_seconds) as response:
@@ -108,7 +114,9 @@ class BinanceMarketDataProvider:
             symbol = item.get("symbol")
             if isinstance(symbol, str) and symbol:
                 symbols.add(symbol.upper())
-        return symbols
+        frozen = frozenset(symbols)
+        self._symbols_cache[market_type] = (now, frozen)
+        return set(frozen)
 
     @staticmethod
     def _normalize_symbol(symbol: str) -> str:
