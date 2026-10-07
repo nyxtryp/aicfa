@@ -5,8 +5,8 @@ import pytest
 from aicfa.features import build_features
 
 
-def sample_frame(n: int = 100) -> pd.DataFrame:
-    ts = pd.date_range("2026-01-01", periods=n, freq="min", tz="UTC")
+def sample_frame(n: int = 100, *, freq: str = "min") -> pd.DataFrame:
+    ts = pd.date_range("2026-01-01", periods=n, freq=freq, tz="UTC")
     close = np.arange(n, dtype=float) + 100.0
     return pd.DataFrame({
         "timestamp": ts.astype("int64") // 10**6,
@@ -142,7 +142,12 @@ def aggregate_minutes(base: pd.DataFrame, minutes: int) -> pd.DataFrame:
 
 
 def test_feature_integration_exposes_required_higher_timeframes():
-    base = sample_frame(7 * 24 * 60)
+    # The integration contract is about MTF causality, not the cost of
+    # processing a full week of one-minute candles through every feature
+    # block. Use the production primary base timeframe (5m) so this test
+    # exercises the same six-timeframe grid without multiplying the entire
+    # feature engine by 5x.
+    base = sample_frame(7 * 24 * 12, freq="5min")
     frames = {
         "5m": aggregate_minutes(base, 5),
         "15m": aggregate_minutes(base, 15),
@@ -160,10 +165,10 @@ def test_feature_integration_exposes_required_higher_timeframes():
 
 
 def test_feature_mtf_future_changes_do_not_rewrite_earlier_rows():
-    base = sample_frame(7 * 24 * 60)
+    base = sample_frame(7 * 24 * 12, freq="5min")
     frames = {"5m": aggregate_minutes(base, 5), "15m": aggregate_minutes(base, 15)}
     altered = {key: value.copy() for key, value in frames.items()}
-    cutoff = 4 * 24 * 60
+    cutoff = 4 * 24 * 12
     for frame in altered.values():
         mask = frame["timestamp"] >= base.loc[cutoff, "timestamp"]
         frame.loc[mask, "high"] *= 1000
