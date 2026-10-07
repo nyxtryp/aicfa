@@ -23,6 +23,43 @@ CONTROL = "http://127.0.0.1:8091"
 DATA_DIR = Path(os.getenv("AICFA_DATA_DIR", str(ROOT.parent / "data")))
 RAW_DIR = DATA_DIR / "raw"
 
+def _journal_payload(path: str, query: dict[str, list[str]]) -> bytes:
+    """Serve the terminal journal directly from the shared persistent data directory."""
+    from src.aicfa.persistent_journal import PersistentJournal
+    from src.aicfa.setup_registry import SetupRegistry
+
+    try:
+        limit = int(query.get("limit", ["100"])[0])
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(limit, 500))
+    journal = PersistentJournal(DATA_DIR / "journal" / "events.jsonl")
+    events = journal.read(limit)
+
+    if path == "/api/health":
+        payload = {"ok": True, "journal": str(journal.path)}
+    elif path == "/api/journal/events":
+        payload = {"events": list(events)}
+    elif path == "/api/journal/scans":
+        payload = {"events": [e for e in events if e.get("event_type") == "scan"]}
+    elif path == "/api/journal/setups":
+        setups = []
+        for event in events:
+            if event.get("event_type") != "scan":
+                continue
+            event_payload = event.get("payload", {})
+            for market in event_payload.get("markets", []):
+                for setup in market.get("setups", []):
+                    setups.append({"timestamp_ms": event.get("timestamp_ms"), "asset": market.get("asset"), "setup": setup})
+        payload = {"setups": setups}
+    elif path == "/api/journal/registry":
+        registry = SetupRegistry.from_env()
+        payload = {"setups": list(registry.current()) if registry is not None else []}
+    else:
+        raise KeyError(path)
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
 def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
     raw = symbol.strip().upper()
     normalized = raw.replace("/", "_").replace(":", "_")
@@ -211,6 +248,20 @@ class Handler(SimpleHTTPRequestHandler):
                 self._json(500, json.dumps({"error": "market_universe_unavailable", "detail": str(exc)}).encode("utf-8"))
             return
         if self.path == "/api" or self.path.startswith("/api/"):
+            from urllib.parse import parse_qs
+            parsed = urlsplit(self.path)
+            if parsed.path in {
+                "/api/health",
+                "/api/journal/events",
+                "/api/journal/scans",
+                "/api/journal/setups",
+                "/api/journal/registry",
+            }:
+                try:
+                    self._json(200, _journal_payload(parsed.path, parse_qs(parsed.query)))
+                except Exception as exc:
+                    self._json(503, json.dumps({"error": "journal_unavailable", "detail": str(exc)}).encode("utf-8"))
+                return
             target = FEED + self.path
             try:
                 with urlopen(Request(target, method="GET"), timeout=8) as response:
