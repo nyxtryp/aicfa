@@ -311,18 +311,31 @@ def test_scan_market_turns_unexpected_exception_into_observable_error(monkeypatc
     assert "provider exploded" in market.diagnostics.error
 
 
-def test_automatic_worker_thread_does_not_fail_due_to_main_thread_timeout():
+def test_automatic_worker_thread_does_not_fail_due_to_main_thread_timeout(monkeypatch):
     import threading
+    from types import SimpleNamespace
 
+    def fake_scan_universe(*args, **kwargs):
+        return SimpleNamespace(
+            markets=(SimpleNamespace(
+                asset="BTC/USDT",
+                setups=(),
+                diagnostics=SimpleNamespace(
+                    status="completed",
+                    error="",
+                ),
+            ),)
+        )
+
+    monkeypatch.setattr("aicfa.autonomous_scan.scan_universe", fake_scan_universe)
     engine = AutonomousScanEngine(
         MarketUniverse((MonitoredMarket("BTC/USDT"),)),
         journal=None,
     )
-    original = engine.scan_market
     states = []
 
     def run():
-        states.append(original(0))
+        states.append(engine.scan_market(0))
 
     worker = threading.Thread(target=run)
     worker.start()
@@ -330,5 +343,4 @@ def test_automatic_worker_thread_does_not_fail_due_to_main_thread_timeout():
 
     assert not worker.is_alive()
     assert len(states) == 1
-    market = states[0].result.markets[0]
-    assert "hard market timeout" not in market.diagnostics.error
+    assert states[0].result.markets[0].diagnostics.status == "completed"
