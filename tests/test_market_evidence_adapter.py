@@ -31,7 +31,7 @@ def test_adapter_emits_only_active_base_observations():
         ("market_structure.bos", "1m", "long"),
         ("imbalance.fvg", "1m", "long"),
     }
-    assert "5m:no_active_supported_observation" in evidence.missing_context
+    assert evidence.missing_context == ()
 
 
 def test_adapter_consumes_latest_causal_event_when_latest_row_is_quiet():
@@ -126,3 +126,13 @@ def test_adapter_does_not_treat_context_zone_opposition_as_structural_conflict()
     )
 
     assert evidence.conflicts == ()
+
+
+def test_adapter_reports_missing_context_only_when_analysis_is_unavailable():
+    evidence = build_market_evidence_from_frames(
+        {"1h": _analysis(bos_up=1)},
+        asset="BTC/USDT",
+        timeframes=("1h", "4h"),
+    )
+
+    assert "4h:analysis_not_available" in evidence.missing_context
