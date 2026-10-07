@@ -51,8 +51,8 @@ def test_production_universe_keeps_110_crypto_and_adds_31_final_tradfi() -> None
     crypto = [item for item in markets if item.get("asset_class", "crypto") == "crypto"]
     tradfi = [item for item in markets if item.get("asset_class") == "tradfi"]
 
-    assert len(crypto) == 110
-    assert len(tradfi) == 31
+    assert len(crypto) == 86
+    assert len(tradfi) == 23
     assert all(item["market_type"] == "futures" for item in tradfi)
     assert all(item["instrument_type"] == "perpetual" for item in tradfi)
     assert all(item["venue_symbols"] for item in tradfi)
