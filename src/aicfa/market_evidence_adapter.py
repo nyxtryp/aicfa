@@ -148,7 +148,13 @@ def _latest_active_event(
         available = [column for column in columns if column is not None and column in analysis.columns]
         if not available:
             continue
-        mask = analysis[available].fillna(0).astype(float).ne(0).any(axis=1)
+        # The lifecycle flag on the latest row says that at least one zone
+        # remains active, but the latest historical event may belong to an
+        # already-mitigated zone. Restrict the candidate event to rows where
+        # the lifecycle was active, then choose the newest such creation/event.
+        lifecycle_mask = analysis[lifecycle_column].fillna(0).astype(float).ne(0)
+        event_mask = analysis[available].fillna(0).astype(float).ne(0).any(axis=1)
+        mask = lifecycle_mask & event_mask
         if not mask.any():
             continue
         row = analysis.loc[mask].iloc[-1]
@@ -157,7 +163,7 @@ def _latest_active_event(
             timeframe,
             row,
             columns,
-            notes="currently active lifecycle state",
+            notes="latest event belonging to the currently active lifecycle state",
         )
         if item is not None:
             candidates.append((row["timestamp"], item))
