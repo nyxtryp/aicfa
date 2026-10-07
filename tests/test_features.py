@@ -165,10 +165,14 @@ def test_feature_integration_exposes_required_higher_timeframes():
 
 
 def test_feature_mtf_future_changes_do_not_rewrite_earlier_rows():
-    base = sample_frame(7 * 24 * 12, freq="5min")
+    # This contract only needs a pre-cutoff and post-cutoff region for
+    # 5m/15m causality. Two days at the production 5m base is sufficient and
+    # avoids running the entire feature graph over an unnecessarily large
+    # seven-day fixture twice.
+    base = sample_frame(2 * 24 * 12, freq="5min")
     frames = {"5m": aggregate_minutes(base, 5), "15m": aggregate_minutes(base, 15)}
     altered = {key: value.copy() for key, value in frames.items()}
-    cutoff = 4 * 24 * 12
+    cutoff = 1 * 24 * 12
     for frame in altered.values():
         mask = frame["timestamp"] >= base.loc[cutoff, "timestamp"]
         frame.loc[mask, "high"] *= 1000
