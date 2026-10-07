@@ -176,14 +176,27 @@ function render(rows,registry){
  const m=p.markets?.[0];$("#currentStatus").textContent=String(m?.diagnostics?.status||"—").toUpperCase()+" · "+(m?.setups||[]).length+" SETUPS";$("#lastScan").textContent=p.scan_number?"#"+p.scan_number:"—";$("#progress").style.width=pct+"%";$("#rotationMeta").textContent=u?pos+" of "+u+" markets · "+Math.round(pct)+"%":"waiting";
  $("#active").textContent=registryItems(registry).filter(x=>x.status==="ACTIVE").length;renderRails(ms,rows);renderHistory();renderCenter();
 }let refreshInFlight=false,lastEventSignature="";
+async function getJson(path,fallback){
+ try{
+  const response=await fetch(API_BASE+path+(path.includes("?")?"&":"?")+"t="+Date.now(),{cache:"no-store"});
+  const data=await response.json();
+  return response.ok?data:fallback;
+ }catch(_){return fallback}
+}
 async function refresh(){
  if(refreshInFlight)return;refreshInFlight=true;
  try{
-  const [h,d,r,mk,prices]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/markets?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({markets:[]})),fetch(API_BASE+"/market-prices?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({prices:{}}))]);
+  const [h,d,r,mk,prices]=await Promise.all([
+   getJson("/health",{}),
+   getJson("/journal/scans?limit=500",{events:[]}),
+   getJson("/journal/registry",{setups:[]}),
+   getJson("/markets",{markets:[]}),
+   getJson("/market-prices",{prices:{}})
+  ]);
   state.events=d.events||[];const registry=r.setups||[];state.registry=registry;state.markets=mk.markets||[];const previous=state.prices;state.prices=prices.prices||{};state.previousPrices=previous;const sig=JSON.stringify([state.events,registry,state.markets]);
   if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}else{renderMarkets()}
-  $("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now());
- }catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}
+  $("#statusText").textContent=h.ok?"LIVE":(state.markets.length||state.events.length?"DEGRADED":"OFFLINE");$("#updated").textContent=tm(Date.now());
+ }catch(e){$("#statusText").textContent="DEGRADED";$("#updated").textContent=tm(Date.now())}finally{refreshInFlight=false}
 }
 function formatMarketPrice(value){
  const n=Number(value);
@@ -240,8 +253,9 @@ async function scanMarket(index){
   ui.selected=null;
   ui.centerEmpty=true;
   ui.centerEmptyMarket=market.asset;
+  const detail=error&&error.message?String(error.message):"unknown scanner error";
   $("#workspaceTitle").textContent=market.asset+" · SCAN ERROR";
-  $("#setups").innerHTML='<div class="workspace-empty"><b>MARKET SCAN UNAVAILABLE</b><span>The shared scanner could not return a result.</span></div>';
+  $("#setups").innerHTML='<div class="workspace-empty"><b>MARKET SCAN UNAVAILABLE</b><span>'+esc(detail)+'</span></div>';
  }finally{
   ui.marketBusy=false;
   renderMarkets();
