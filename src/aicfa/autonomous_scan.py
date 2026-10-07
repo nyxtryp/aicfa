@@ -144,10 +144,25 @@ class AutonomousScanEngine:
         self._manual_pause_until_ms = 0
 
     def _journal_state(self, state: AutonomousScanState) -> None:
+        # Persistence is a projection of scanner state, not a reason to kill
+        # the market-analysis worker. A corrupt/locked journal or registry
+        # must be visible in logs while the scanner continues to rotate.
         if self.journal is not None:
-            self.journal.record_scan(state)
+            try:
+                self.journal.record_scan(state)
+            except Exception as exc:
+                print(
+                    f"AICFA journal error: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
         if self.registry is not None:
-            self.registry.record_scan(state)
+            try:
+                self.registry.record_scan(state)
+            except Exception as exc:
+                print(
+                    f"AICFA registry error: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
 
     @property
     def automatic_scan_paused(self) -> bool:
