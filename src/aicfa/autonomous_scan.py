@@ -18,6 +18,7 @@ from .public_market_data import build_public_market_data_provider
 from .market_orchestrator import (
     PRIMARY_TRADING_MODES,
     MarketHorizonScan,
+    MarketScanDiagnostics,
     MultiMarketScan,
     scan_universe,
 )
@@ -30,14 +31,20 @@ from .setup_registry import SetupRegistry
 MAIN_SCAN_INTERVAL_SECONDS = 300
 BATCH_SCAN_INTERVAL_SECONDS = 0
 DEFAULT_MARKETS_PER_BATCH = 1
-# Representative production diagnostics peaked at 13.708s. Keep measured
-# headroom for normal provider variance while guaranteeing queue advancement.
-DEFAULT_MARKET_TIMEOUT_SECONDS = 20.0
+# Whole-market execution includes six MTF feature builds plus deterministic
+# setup/evidence/lifecycle work. 20s was below measured real-world cost on the
+# production 1-vCPU host, so the budget is deliberately generous and configurable.
+DEFAULT_MARKET_TIMEOUT_SECONDS = 90.0
+MANUAL_SCAN_PAUSE_SECONDS = 30.0
 
 
 class MarketExecutionTimeout(TimeoutError):
     """Raised when one market exceeds its whole-market execution budget."""
 
+
+@contextmanager
+def _noop_context():
+    yield
 
 @contextmanager
 def _market_timeout(seconds: float):
@@ -134,12 +141,33 @@ class AutonomousScanEngine:
         self._cycle_id = 0
         self._last_cycle: RotationCycle | None = None
         self._scan_lock = threading.RLock()
+        self._manual_pause_until_ms = 0
 
     def _journal_state(self, state: AutonomousScanState) -> None:
         if self.journal is not None:
             self.journal.record_scan(state)
         if self.registry is not None:
             self.registry.record_scan(state)
+
+    @property
+    def automatic_scan_paused(self) -> bool:
+        return self._clock_ms() < self._manual_pause_until_ms
+
+    @property
+    def automatic_pause_until_ms(self) -> int:
+        return self._manual_pause_until_ms
+
+    def pause_automatic_scanning(self, seconds: float = MANUAL_SCAN_PAUSE_SECONDS) -> int:
+        """Pause the automatic queue for a short manual Market Watch scan window."""
+        if seconds <= 0:
+            raise ValueError("pause duration must be greater than zero")
+        with self._scan_lock:
+            now_ms = self._clock_ms()
+            self._manual_pause_until_ms = max(
+                self._manual_pause_until_ms,
+                now_ms + int(seconds * 1000.0),
+            )
+            return self._manual_pause_until_ms
 
     @property
     def last_state(self) -> AutonomousScanState | None:
@@ -234,6 +262,34 @@ class AutonomousScanEngine:
         return state
 
 
+    def _failure_scan(
+        self,
+        market_index: int,
+        *,
+        status: str,
+        error: str,
+        duration_ms: float = 0.0,
+    ) -> MultiMarketScan:
+        """Turn one-market failures into observable scan results instead of silent skips."""
+        market_asset = self.universe.markets[market_index].asset
+        failed = MarketHorizonScan(
+            asset=market_asset,
+            results=(),
+            setups=(),
+            lifecycle_results=(),
+            diagnostics=MarketScanDiagnostics(
+                total_duration_ms=duration_ms,
+                resolution_duration_ms=0.0,
+                snapshot_duration_ms=0.0,
+                snapshot_metrics=(),
+                horizon_timings=(),
+                refetched_between_horizons=False,
+                status=status,
+                error=error,
+            ),
+        )
+        return MultiMarketScan(markets=(failed,))
+
     def scan_market(
         self,
         market_index: int,
@@ -242,6 +298,7 @@ class AutonomousScanEngine:
         rotation_id: int = 0,
         queue_position: int = 0,
         journal: bool = True,
+        enforce_timeout: bool = True,
     ) -> AutonomousScanState:
         """Run exactly one configured market through the canonical scanner pipeline."""
         if market_index < 0 or market_index >= len(self.universe.markets):
@@ -253,7 +310,8 @@ class AutonomousScanEngine:
             timestamp = self._clock_ms() if now_ms is None else now_ms
             market = MarketUniverse((self.universe.markets[market_index],))
             try:
-                with _market_timeout(self.market_timeout_seconds):
+                timeout_context = _market_timeout(self.market_timeout_seconds) if enforce_timeout else _noop_context()
+                with timeout_context:
                     result = scan_universe(
                         market,
                         provider=self.provider,
@@ -263,26 +321,18 @@ class AutonomousScanEngine:
                         lifecycle=self.lifecycle,
                     )
             except MarketExecutionTimeout as exc:
-                market_asset = self.universe.markets[market_index].asset
-                from .market_orchestrator import MarketHorizonScan, MarketScanDiagnostics
-
-                timed_out = MarketHorizonScan(
-                    asset=market_asset,
-                    results=(),
-                    setups=(),
-                    lifecycle_results=(),
-                    diagnostics=MarketScanDiagnostics(
-                        total_duration_ms=self.market_timeout_seconds * 1000.0,
-                        resolution_duration_ms=0.0,
-                        snapshot_duration_ms=0.0,
-                        snapshot_metrics=(),
-                        horizon_timings=(),
-                        refetched_between_horizons=False,
-                        status="timeout",
-                        error=str(exc),
-                    ),
+                result = self._failure_scan(
+                    market_index,
+                    status="timeout",
+                    error=str(exc),
+                    duration_ms=self.market_timeout_seconds * 1000.0,
                 )
-                result = MultiMarketScan(markets=(timed_out,))
+            except Exception as exc:
+                result = self._failure_scan(
+                    market_index,
+                    status="error",
+                    error=f"{type(exc).__name__}: {exc}",
+                )
 
             self._scan_number += 1
             state = AutonomousScanState(
@@ -385,6 +435,10 @@ class AutonomousScanEngine:
         while True:
             if should_stop is not None and should_stop():
                 return
+            if self.automatic_scan_paused:
+                remaining_ms = max(1, self.automatic_pause_until_ms - self._clock_ms())
+                sleep(min(1.0, remaining_ms / 1000.0))
+                continue
             asset = self.universe.markets[market_index].asset
             queue_position = market_index + 1
             try:
@@ -430,4 +484,4 @@ class AutonomousScanEngine:
             sleep(interval_seconds)
 
 
-__all__ = ["AutonomousScanEngine", "AutonomousScanState", "BATCH_SCAN_INTERVAL_SECONDS", "DEFAULT_MARKET_TIMEOUT_SECONDS", "DEFAULT_MARKETS_PER_BATCH", "MAIN_SCAN_INTERVAL_SECONDS", "MarketExecutionTimeout", "RotationCycle", "RotationMarketMetric"]
+__all__ = ["AutonomousScanEngine", "AutonomousScanState", "BATCH_SCAN_INTERVAL_SECONDS", "DEFAULT_MARKET_TIMEOUT_SECONDS", "MANUAL_SCAN_PAUSE_SECONDS", "DEFAULT_MARKETS_PER_BATCH", "MAIN_SCAN_INTERVAL_SECONDS", "MarketExecutionTimeout", "RotationCycle", "RotationMarketMetric"]
