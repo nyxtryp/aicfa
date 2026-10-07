@@ -162,6 +162,13 @@ def build_fvg(
                     out.at[i, "fvg_invalidated"] = 1
                     zones.remove(zone)
 
+        # The zone remains an active SMC context after creation until its
+        # lifecycle is filled or invalidated. Previously fvg_active was only
+        # marked on the creation candle, so a later valid retest could not
+        # be surfaced as active evidence.
+        if bullish_zones or bearish_zones:
+            out.at[i, "fvg_active"] = 1
+
         if i >= 2:
             bullish = low[i] > high[i - 2] + EPS
             bearish = high[i] < low[i - 2] - EPS
