@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
