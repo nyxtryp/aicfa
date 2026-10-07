@@ -239,4 +239,5 @@ async function scanMarket(index){
 $("#filters").addEventListener("click",e=>{const f=e.target.dataset.filter;if(!f)return;document.querySelectorAll("#filters button").forEach(b=>b.classList.remove("active"));e.target.classList.add("active");state.filter=f;render(scans(),state.registry)});
 $("#marketWatch").addEventListener("click",e=>{const b=e.target.closest("[data-market-index]");if(!b)return;scanMarket(Number(b.dataset.marketIndex))});
 $("#setupHistory").addEventListener("click",e=>{const b=e.target.closest("[data-setup-key]");if(!b)return;ui.selected=b.dataset.setupKey;ui.centerKey=b.dataset.setupKey;ui.centerEmpty=false;ui.centerEmptyMarket="";renderHistory();renderCenter()});
+$(".left-rail").addEventListener("click",e=>{const head=e.target.closest(".rail-head");if(!head)return;const panel=head.parentElement;if(!panel.matches(".market-watch,.rail-panel"))return;panel.classList.toggle("collapsed")});
 refresh();setInterval(refresh,3000);
