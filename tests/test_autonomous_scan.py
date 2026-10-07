@@ -156,14 +156,29 @@ def test_run_forever_can_be_stopped_after_a_scan(monkeypatch):
 
 
 def test_scan_batch_rotates_20_markets_and_revisits_after_ten_batches(monkeypatch):
-    monkeypatch.setattr("aicfa.autonomous_scan.build_public_market_data_provider", lambda **kwargs: SnapshotProvider())
+    # This test verifies deterministic queue rotation only. Keep the canonical
+    # market-analysis pipeline out of the 199-market rotation fixture: running
+    # six feature builds for every market would test the scanner throughput
+    # rather than the queue contract.
     calls = []
 
-    def fake_find_setup(request, **kwargs):
-        calls.append(request.asset)
-        return _result(request.asset, request.mode)
+    from aicfa.market_orchestrator import MarketHorizonScan, MultiMarketScan
 
-    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+    def fake_scan_universe(universe, **kwargs):
+        calls.extend(market.asset for market in universe.markets for _ in range(3))
+        return MultiMarketScan(
+            markets=tuple(
+                MarketHorizonScan(
+                    asset=market.asset,
+                    results=(),
+                    setups=(),
+                    lifecycle_results=(),
+                )
+                for market in universe.markets
+            )
+        )
+
+    monkeypatch.setattr("aicfa.autonomous_scan.scan_universe", fake_scan_universe)
 
     assets = tuple(f"COIN{i:03d}/USDT" for i in range(199))
     engine = AutonomousScanEngine(
