@@ -78,7 +78,12 @@ def test_web_server_entrypoint_starts_outside_pytest_import_path(tmp_path):
             except Exception:
                 time.sleep(0.05)
         else:
-            stderr = process.stderr.read() if process.stderr else ""
+            process.terminate()
+            try:
+                _, stderr = process.communicate(timeout=1)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                _, stderr = process.communicate(timeout=1)
             raise AssertionError(f"web server did not start: {stderr}")
     finally:
         process.terminate()
