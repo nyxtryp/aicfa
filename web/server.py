@@ -157,7 +157,10 @@ class Handler(SimpleHTTPRequestHandler):
         if body is not None:
             request.add_header("Content-Type", "application/json")
         try:
-            with urlopen(request, timeout=25) as response:
+            # The scanner has a 90s per-market budget. The web proxy
+            # must not give up after 25s and falsely report a healthy scanner
+            # as unavailable.
+            with urlopen(request, timeout=100) as response:
                 self._json(response.status, response.read())
         except Exception as exc:
             self._json(503, json.dumps({"error": "scanner_unavailable", "detail": str(exc)}).encode("utf-8"))
