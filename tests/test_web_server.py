@@ -29,3 +29,15 @@ def test_web_journal_api_reads_shared_storage_without_feed(tmp_path, monkeypatch
     assert health["ok"] is True
     assert len(scans["events"]) == 1
     assert scans["events"][0]["payload"]["markets"][0]["asset"] == "BTC/USDT"
+
+
+def test_market_price_candidates_normalize_perpetual_symbols():
+    assert server._ticker_symbol_candidates({
+        "asset": "BTC/USDT",
+        "market_type": "futures",
+    }) == ("BTCUSDT",)
+    assert server._ticker_symbol_candidates({
+        "asset": "XAU/USDT",
+        "market_type": "futures",
+        "venue_symbols": {"bybit": "XAU/USDT:USDT"},
+    }) == ("XAUUSDT",)
