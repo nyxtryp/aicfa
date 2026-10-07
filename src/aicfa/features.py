@@ -84,9 +84,12 @@ def build_features(
     out["sweep_high_reject"]=((h>prev_high)&(c<prev_high)).astype("int8")
     out["sweep_low_reclaim"]=((l<prev_low)&(c>prev_low)).astype("int8")
 
+    # Displacement is a causal prerequisite for MSS, so compute it before
+    # structure and pass the same frame through the downstream feature graph.
+    from .displacement import build_displacement
+    displacement=build_displacement(x)
+
     from .structure import build_structure
-    # Pass the already-computed causal displacement into structure so MSS
-    # remains a genuine displacement-confirmed shift, not an always-zero field.
     structure=build_structure(x, displacement=displacement)
     out = _merge_columns(out, structure, ["swing_high","swing_low","hh","hl","lh","ll","bos_up","bos_down",
                     "choch_up","choch_down","mss_up","mss_down","swing_high_price",
@@ -112,8 +115,6 @@ def build_features(
         "liquidity_pool_invalidated_high","liquidity_pool_invalidated_low",
     ])
 
-    from .displacement import build_displacement
-    displacement=build_displacement(x)
     out = _merge_columns(out, displacement, ["displacement_range_expansion","displacement_body_expansion",
                     "displacement_close_efficiency","displacement_relative_volume",
                     "displacement_close_location","impulsive_close_up","impulsive_close_down",
