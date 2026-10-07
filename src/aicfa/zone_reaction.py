@@ -520,9 +520,10 @@ def build_zone_reaction(
                     price = companion
                 else:
                     # Backward-compatible direct-price input used by older
-                    # standalone callers: NaN means no zone.
-                    price = raw
-                if np.isfinite(price):
+                    # standalone callers. Zero is an event flag, not a valid
+                    # market price, so it must never create a zone.
+                    price = raw if raw > 0 else np.nan
+                if np.isfinite(price) and price > 0:
                     _append_zone(source="liquidity", side=side, low=price, high=price, created=i)
                     result_binary["zone_created_liquidity"][i] += 1
                     created_count += 1
