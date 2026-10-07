@@ -1,5 +1,5 @@
 const API_BASE="/api";
-const state={events:[],registry:[],markets:[],filter:"ALL"};
+const state={events:[],registry:[],markets:[],prices:{},filter:"ALL"};
 const ui={history:[],selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?"—":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -179,16 +179,27 @@ function render(rows,registry){
 async function refresh(){
  if(refreshInFlight)return;refreshInFlight=true;
  try{
-  const [h,d,r,mk]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/markets?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({markets:[]}))]);
-  state.events=d.events||[];const registry=r.setups||[];state.registry=registry;state.markets=mk.markets||[];const sig=JSON.stringify([state.events,registry,state.markets]);
-  if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}
+  const [h,d,r,mk]=await Promise.all([fetch(API_BASE+"/health?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/scans?limit=500&t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/journal/registry?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()),fetch(API_BASE+"/markets?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({markets:[]})),fetch(API_BASE+"/market-prices?t="+Date.now(),{cache:"no-store"}).then(x=>x.json()).catch(()=>({prices:{}}))]);
+  state.events=d.events||[];const registry=r.setups||[];state.registry=registry;state.markets=mk.markets||[];const previous=state.prices;state.prices=prices.prices||{};state.previousPrices=previous;const sig=JSON.stringify([state.events,registry,state.markets]);
+  if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}else{renderMarkets()}
   $("#statusText").textContent=h.ok?"LIVE":"DEGRADED";$("#updated").textContent=tm(Date.now());
  }catch(e){$("#statusText").textContent="OFFLINE";$("#updated").textContent="—"}finally{refreshInFlight=false}
 }
+function formatMarketPrice(value){
+ const n=Number(value);
+ if(!Number.isFinite(n))return "—";
+ if(n>=1000)return n.toLocaleString(undefined,{maximumFractionDigits:2});
+ if(n>=1)return n.toLocaleString(undefined,{maximumFractionDigits:4});
+ if(n>=0.01)return n.toLocaleString(undefined,{maximumFractionDigits:6});
+ return n.toLocaleString(undefined,{maximumFractionDigits:8});
+}
 function renderMarkets(){
  const root=$("#marketWatch"),visible=state.markets||[];
- 
- root.innerHTML=visible.length?visible.map(m=>'<button class="market-item '+(Number(m.index)===Number(ui.marketIndex)?"selected":"")+'" data-market-index="'+esc(m.index)+'"><span class="market-symbol">'+esc(m.asset)+'</span><span class="market-type">'+esc(m.market_type==="futures"?"FUT":"SPOT")+'</span></button>').join(""):'<div class="rail-empty">NO MARKETS</div>';
+ root.innerHTML=visible.length?visible.map(m=>{
+  const key=String(m.index),price=state.prices[key],prev=state.previousPrices?.[key];
+  const move=Number.isFinite(Number(price))&&Number.isFinite(Number(prev))?(Number(price)>Number(prev)?"up":Number(price)<Number(prev)?"down":"flat"):"flat";
+  return '<button class="market-item '+(Number(m.index)===Number(ui.marketIndex)?"selected":"")+'" data-market-index="'+esc(m.index)+'"><span class="market-symbol">'+esc(m.asset)+'</span><span class="market-price '+move+'">'+esc(formatMarketPrice(price))+'</span><span class="market-type">'+esc(m.market_type==="futures"?"FUT":"SPOT")+'</span></button>';
+ }).join(""):'<div class="rail-empty">NO MARKETS</div>';
 }
 async function scanMarket(index){
  const market=state.markets.find(x=>Number(x.index)===Number(index));
