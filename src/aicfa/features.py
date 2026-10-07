@@ -77,6 +77,14 @@ def build_features(
                     "structural_equilibrium","structural_dealing_range_position",
                     "structural_premium_discount","premium","discount","equilibrium"])
 
+    # Preserve the stable public dealing-range aliases used by the feature
+    # contract.  The structural fields above remain the canonical source.
+    out["dealing_range_high"] = out["structural_dealing_range_high"]
+    out["dealing_range_low"] = out["structural_dealing_range_low"]
+    out["dealing_range_equilibrium"] = out["structural_equilibrium"]
+    out["dealing_range_position"] = out["structural_dealing_range_position"]
+    out["premium_discount"] = out["structural_premium_discount"]
+
     prev_high=h.shift(1).rolling(30,min_periods=30).max()
     prev_low=l.shift(1).rolling(30,min_periods=30).min()
     out["breakout_up"]=(h>prev_high).astype("int8")
