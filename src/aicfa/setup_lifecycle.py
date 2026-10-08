@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import threading
 
 from .data_requirements import TradingMode, normalize_trading_mode
 from .setup_analysis import SetupAssessment, SetupCandidate, SetupLevel
@@ -62,6 +63,7 @@ class SetupLifecycle:
 
     def __init__(self) -> None:
         self._active: dict[SetupIdentity, ActiveSetup] = {}
+        self._lock = threading.RLock()
 
     @staticmethod
     def identity(
@@ -248,6 +250,32 @@ class SetupLifecycle:
         return price <= target
 
     def evaluate_all(
+        self,
+        *,
+        symbol: str,
+        market_type: str,
+        horizon: TradingMode | str,
+        assessment: SetupAssessment,
+        current_price: float,
+        now_ms: int,
+        expires_at_ms: int | None = None,
+        current_high: float | None = None,
+        current_low: float | None = None,
+    ) -> tuple[SetupLifecycleResult, ...]:
+        with self._lock:
+            return self._evaluate_all_unlocked(
+                symbol=symbol,
+                market_type=market_type,
+                horizon=horizon,
+                assessment=assessment,
+                current_price=current_price,
+                now_ms=now_ms,
+                expires_at_ms=expires_at_ms,
+                current_high=current_high,
+                current_low=current_low,
+            )
+
+    def _evaluate_all_unlocked(
         self,
         *,
         symbol: str,
