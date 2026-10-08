@@ -18,12 +18,14 @@ jobs:
           COMMAND: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
-          cd /srv/frostdeploy/aicfa
+          cd /srv/frostdeploy/aicfa/current
 
           case "$COMMAND" in
             "/aicfa status")
-              echo "=== git status ==="
-              git status --short --branch
+              echo "=== release ==="
+              readlink -f /srv/frostdeploy/aicfa/current
+              echo "=== files ==="
+              ls -la | head -30
               echo "=== service ==="
               systemctl --no-pager --full status fd-aicfa || true
               ;;
@@ -34,7 +36,8 @@ jobs:
               .venv/bin/pytest -q tests/test_features.py
               ;;
             "/aicfa git")
-              git log -5 --oneline --decorate
+              echo "Git metadata is managed by FrostDeploy."
+              readlink -f /srv/frostdeploy/aicfa/current
               ;;
             *)
               echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa features, /aicfa git"
