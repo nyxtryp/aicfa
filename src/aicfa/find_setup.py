@@ -654,9 +654,17 @@ def find_setup(
             price_frame["close"] = price_frame["mid"]
             price_frame["high"] = price_frame[["open", "close"]].max(axis=1)
             price_frame["low"] = price_frame[["open", "close"]].min(axis=1)
+            # Causal alignment can legitimately produce leading rows with
+            # no trade-flow observation yet (the first book snapshot may precede
+            # the first available trade). Absorption must consume only flow
+            # observations that actually exist; it must never treat alignment
+            # gaps as zero flow or fabricate values.
+            valid_flow = order_flow_analysis.dropna(
+                subset=["timestamp", "taker_buy_volume", "taker_sell_volume"]
+            )
             absorption_analysis = build_absorption(
                 price_frame[["timestamp", "open", "high", "low", "close"]],
-                order_flow_analysis,
+                valid_flow,
                 levels,
             )
 
