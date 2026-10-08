@@ -38,23 +38,33 @@ jobs:
               ;;
             "/aicfa tests")
               {
-                echo "=== AICFA TEST SUITE: ISOLATED FILE MODE ==="
-                echo "Each test file runs in a fresh pytest process."
-                echo "Timeout per file: 120s"
+                echo "=== AICFA TEST SUITE: SAFE ISOLATED MODE ==="
+                echo "One pytest process at a time; 1 CPU core; 1536 MiB virtual-memory cap; 120s timeout per file."
                 echo
                 TOTAL_RC=0
                 for TEST_FILE in tests/test_*.py; do
                   echo "=== START $TEST_FILE ==="
-                  timeout --signal=TERM --kill-after=10s 120s .venv/bin/pytest -q "$TEST_FILE"
-                  FILE_RC=$?
-                  echo "=== END $TEST_FILE exit_code=$FILE_RC ==="
-                  if [ "$FILE_RC" -eq 124 ] || [ "$FILE_RC" -eq 137 ] || [ "$FILE_RC" -eq 143 ]; then
-                    echo "STOP: $TEST_FILE exceeded the per-file safety limit."
-                    TOTAL_RC=$FILE_RC
+                  (
+                    ulimit -v 1572864
+                    ulimit -u 256
+                    exec taskset -c 1 nice -n 10 .venv/bin/pytest -q "$TEST_FILE"
+                  ) &
+                  TEST_PID=$!
+                  timeout 120s tail --pid="$TEST_PID" -f /dev/null
+                  if kill -0 "$TEST_PID" 2>/dev/null; then
+                    echo "STOP: $TEST_FILE exceeded 120s; terminating test process."
+                    kill -TERM "$TEST_PID" 2>/dev/null || true
+                    sleep 2
+                    kill -KILL "$TEST_PID" 2>/dev/null || true
+                    wait "$TEST_PID" 2>/dev/null || true
+                    TOTAL_RC=124
                     break
                   fi
+                  wait "$TEST_PID"
+                  FILE_RC=$?
+                  echo "=== END $TEST_FILE exit_code=$FILE_RC ==="
                   if [ "$FILE_RC" -ne 0 ]; then
-                    echo "STOP: $TEST_FILE failed."
+                    echo "STOP: $TEST_FILE failed or hit its memory/process limit."
                     TOTAL_RC=$FILE_RC
                     break
                   fi
