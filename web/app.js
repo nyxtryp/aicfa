@@ -69,12 +69,12 @@ function syncRegistry(records){
  }
 }function conceptSet(s,x){return new Set([...(s.supporting_concepts||[]),...(s.zone_concepts||[]),...(x?.evidence_concepts||[])])}
 function evidence(s,x){
- const c=conceptSet(s,x),rows=[
+ const c=conceptSet(s,x),side=dir(s),directional=new Set(side==="SHORT"?["order_block.bearish"]:side==="LONG"?["order_block.bullish"]:[]),rows=[
   ["Market Structure",c.has("market_structure.bos")||c.has("market_structure.choch"),c.has("market_structure.bos")?"BOS confirmed":c.has("market_structure.choch")?"CHoCH observed":"Not confirmed"],
   ["Liquidity",c.has("liquidity.sweep"),c.has("liquidity.sweep")?"Sweep observed":"No confirmed sweep"],
   ["BOS",c.has("market_structure.bos"),c.has("market_structure.bos")?"Confirmed":"Not confirmed"],
   ["CHoCH / MSS",c.has("market_structure.choch")||c.has("market_structure.mss"),c.has("market_structure.mss")?"MSS confirmed":c.has("market_structure.choch")?"CHoCH confirmed":"Not confirmed"],
-  ["Order Block",c.has("order_block.bullish")||c.has("order_block.bearish"),c.has("order_block.bullish")?"Bullish OB":c.has("order_block.bearish")?"Bearish OB":"Not present"],
+  ["Order Block",directional.size?([...directional].some(v=>c.has(v))):false,side==="LONG"&&c.has("order_block.bullish")?"Bullish OB":side==="SHORT"&&c.has("order_block.bearish")?"Bearish OB":"No directionally valid OB"],
   ["FVG",c.has("imbalance.fvg"),c.has("imbalance.fvg")?"Active evidence":"Not present"],
   ["Zone Reaction",c.has("price_action.rejection"),c.has("price_action.rejection")?"Confirmed":"Not confirmed"],
   ["Volume",c.has("volume.evidence")||c.has("volume.confirmation"),c.has("volume.evidence")||c.has("volume.confirmation")?"Confirming evidence":"No confirming evidence"]
@@ -189,13 +189,16 @@ async function hydrateCharts(){
 function setupCard(x){
  const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
  const low=entry.length?Math.min(...entry.map(v=>Number(v.value))):NaN,high=entry.length?Math.max(...entry.map(v=>Number(v.value))):NaN,stop=Number(s.invalidation_level?.value),take=targets.length?Number(targets[0]?.value):NaN;
+ const geometryValid=Number.isFinite(low)&&Number.isFinite(high)&&low>0&&high>0&&Number.isFinite(stop)&&stop>0&&Number.isFinite(take)&&take>0;
  const risk=Number.isFinite(low)&&Number.isFinite(high)&&Number.isFinite(stop)?(dir(s)==="LONG"?low-stop:stop-high):NaN;
  const reward=Number.isFinite(low)&&Number.isFinite(high)&&Number.isFinite(take)?(dir(s)==="LONG"?take-high:low-take):NaN;
- const rr=Number.isFinite(risk)&&Number.isFinite(reward)&&risk>0&&reward>0?reward/risk:NaN;
+ const rr=geometryValid&&Number.isFinite(risk)&&Number.isFinite(reward)&&risk>0&&reward>0?reward/risk:NaN;
  const rrText=Number.isFinite(rr)?rr.toFixed(2)+"R":"—";
  const age=Number.isFinite(Number(x.seenAt))&&Number(x.seenAt)>0?Math.max(0,Date.now()-Number(x.seenAt)):NaN;
  const freshness=Number.isFinite(age)?(age<60000?"LIVE":age<3600000?Math.floor(age/60000)+"m ago":Math.floor(age/3600000)+"h ago"):"—";
- const why=(s.rationale||[]).filter(v=>!v.startsWith("MTF hierarchy:")),hierarchy=(s.rationale||[]).filter(v=>v.startsWith("MTF hierarchy:")).join(" · "),side=dir(s),tf=chartTf(x.mode,s);
+ const why=[...(s.rationale||[])].filter(v=>!v.startsWith("MTF hierarchy:")&&!/^setup zone observed on /.test(v));
+ const hierarchy=[...(s.rationale||[])].filter(v=>v.startsWith("MTF hierarchy:")).map(v=>v.replace(/^MTF hierarchy:\s*/,"")).filter((v,i,a)=>a.indexOf(v)===i).join(" · ");
+ const side=dir(s),tf=chartTf(x.mode,s);
  return '<article class="setup '+side.toLowerCase()+'">'+
  '<header class="setup-head"><div class="symbol-block"><b>'+esc(x.asset)+'</b><span>'+esc(hor(x.mode))+' / '+esc(s.scenario||"SETUP")+'</span></div><div class="signal"><i></i><strong>'+esc(side)+'</strong></div></header>'+
  '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-market-type="'+esc(x.market_type||"futures")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:s.chart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP1 <b>'+esc(tp)+'</b></span><span>RR / FRESHNESS <b>'+esc(rrText+" · "+freshness)+'</b></span></div></section>'+
