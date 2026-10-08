@@ -53,10 +53,15 @@ class AnalysisDepthRequirement:
 # timeframes refine/execute. We therefore give each role a different history
 # budget while keeping enough rows for the current causal feature graph.
 _ROLE_DEPTH_ROWS: Mapping[TimeframeRole, int] = {
-    TimeframeRole.BROADER_CONTEXT: 300,
-    TimeframeRole.HIGHER_STRUCTURE: 400,
+    TimeframeRole.BROADER_CONTEXT: 500,
+    TimeframeRole.HIGHER_STRUCTURE: 500,
     TimeframeRole.LOWER_CONFIRMATION: 500,
     TimeframeRole.EXECUTION: 500,
+}
+
+_TIMEFRAME_DEPTH_OVERRIDES: Mapping[str, int] = {
+    "1d": 365,
+    "1w": 200,
 }
 
 _FEATURE_DEPENDENCIES: tuple[DependencyRequirement, ...] = (
@@ -121,7 +126,10 @@ def resolve_analysis_depth(
     return {
         timeframe: AnalysisDepthRequirement(
             timeframe=timeframe,
-            minimum_rows=max(dependency_minimum, _role_depth(plan, timeframe)),
+            minimum_rows=max(
+                dependency_minimum,
+                _TIMEFRAME_DEPTH_OVERRIDES.get(timeframe, _role_depth(plan, timeframe)),
+            ),
             resolutions=tuple(dict.fromkeys(resolutions)),
             dependencies=_FEATURE_DEPENDENCIES,
             adaptive=adaptive,
