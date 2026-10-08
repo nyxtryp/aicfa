@@ -177,6 +177,104 @@ def _visual_geometry(result: Any, candidate: Any) -> dict[str, Any]:
     }
 
 
+def _visual_market_geometry(result: Any) -> dict[str, Any]:
+    """Serialize chart geometry for every scanned market, including WAIT markets."""
+    frames = getattr(result, "frames", {}) or {}
+    zones: list[dict[str, Any]] = []
+    events: list[dict[str, Any]] = []
+    liquidity: list[dict[str, Any]] = []
+
+    def numeric(value: Any) -> float | None:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if number == number and abs(number) != float("inf") else None
+
+    def ts(value: Any) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    for timeframe, frame in frames.items():
+        if frame is None or getattr(frame, "empty", True) or "timestamp" not in frame.columns:
+            continue
+        ordered = frame.sort_values("timestamp").reset_index(drop=True)
+        columns = set(ordered.columns)
+        end = ts(ordered.iloc[-1].get("timestamp"))
+        if end is None:
+            continue
+
+        for kind, active_col, low_col, high_col, event_cols in (
+            ("fvg", "fvg_active", "fvg_bullish_low", "fvg_bullish_high", ("fvg_bullish",)),
+            ("fvg", "fvg_active", "fvg_bearish_low", "fvg_bearish_high", ("fvg_bearish",)),
+            ("ob", "order_block_active", "order_block_bullish_low", "order_block_bullish_high", ("order_block_bullish",)),
+            ("ob", "order_block_active", "order_block_bearish_low", "order_block_bearish_high", ("order_block_bearish",)),
+        ):
+            if low_col not in columns or high_col not in columns:
+                continue
+            seen: set[tuple[float, float]] = set()
+            for i in range(len(ordered) - 1, -1, -1):
+                row = ordered.iloc[i]
+                low, high = numeric(row.get(low_col)), numeric(row.get(high_col))
+                active = numeric(row.get(active_col, 1))
+                if low is None or high is None or not active:
+                    continue
+                key = (min(low, high), max(low, high))
+                if key in seen:
+                    continue
+                created = None
+                for event_col in event_cols:
+                    if event_col in columns and numeric(row.get(event_col, 0)) == 1:
+                        created = ts(row.get("timestamp"))
+                        break
+                if created is None:
+                    created = ts(row.get("timestamp"))
+                zones.append({"type": kind, "priceLow": key[0], "priceHigh": key[1], "timeStart": created, "timeEnd": end, "timeframe": timeframe})
+                seen.add(key)
+                if len(seen) >= 6:
+                    break
+
+        event_specs = (
+            ("BOS", "bos_up", "bos_up_reference_pivot_index", "high"),
+            ("BOS", "bos_down", "bos_down_reference_pivot_index", "low"),
+            ("CHoCH", "choch_up", "bos_up_reference_pivot_index", "high"),
+            ("CHoCH", "choch_down", "bos_down_reference_pivot_index", "low"),
+            ("MSS", "mss_up", "bos_up_reference_pivot_index", "high"),
+            ("MSS", "mss_down", "bos_down_reference_pivot_index", "low"),
+        )
+        for kind, event_col, ref_col, price_col in event_specs:
+            if event_col not in columns:
+                continue
+            count = 0
+            for i in range(len(ordered) - 1, -1, -1):
+                if numeric(ordered.iloc[i].get(event_col, 0)) != 1:
+                    continue
+                price = numeric(ordered.iloc[i].get(price_col))
+                ref = numeric(ordered.iloc[i].get(ref_col, -1)) if ref_col in columns else None
+                if ref is not None and ref >= 0 and int(ref) < len(ordered):
+                    price = numeric(ordered.iloc[int(ref)].get(price_col)) or price
+                start = ts(ordered.iloc[i].get("timestamp"))
+                if price is not None and start is not None:
+                    events.append({"type": kind, "price": price, "timeStart": start, "timeEnd": end, "timeframe": timeframe})
+                    count += 1
+                if count >= 4:
+                    break
+
+        for side, col in (("buy", "active_buy_liquidity_price"), ("sell", "active_sell_liquidity_price")):
+            if col not in columns:
+                continue
+            value = numeric(ordered.iloc[-1].get(col))
+            if value is not None and value > 0:
+                liquidity.append({"type": side, "price": value, "timeStart": ts(ordered.iloc[-1].get("timestamp")), "timeEnd": end, "timeframe": timeframe})
+
+    unique_zones = {json.dumps(z, sort_keys=True): z for z in zones}
+    unique_events = {json.dumps(e, sort_keys=True): e for e in events}
+    unique_liquidity = {json.dumps(x, sort_keys=True): x for x in liquidity}
+    return {"zones": list(unique_zones.values()), "events": list(unique_events.values()), "liquidity": list(unique_liquidity.values())}
+
+
 class PersistentJournal:
     """Append-only JSONL journal with a small read API for the future feed."""
 
@@ -240,6 +338,7 @@ class PersistentJournal:
                     "setup_conflicts": getattr(setup, "conflicts", ()),
                     "decision_action": getattr(decision, "action", None),
                     "decision_reasons": getattr(decision, "reasons", ()),
+                    "chart": _visual_market_geometry(result),
                 })
             result_map = {getattr(result, "mode", None): result for result in getattr(market, "results", ())}
             enriched_setups = []
