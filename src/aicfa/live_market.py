@@ -331,7 +331,7 @@ class BinancePriceMonitor:
         return (
             "wss://stream.binance.com:9443/ws"
             if key.market_type == "spot"
-            else "wss://fstream.binance.com/public/ws"
+            else "wss://fstream.binance.com/ws"
         )
 
     def _run(self, keys: tuple[MarketKey, ...]) -> None:
