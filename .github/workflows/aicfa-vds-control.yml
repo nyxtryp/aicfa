@@ -62,6 +62,28 @@ jobs:
                 test "$PIPE_RC" -eq 0
               } >"$OUTPUT" 2>&1
               ;;
+            "/aicfa inspect-grt")
+              {
+                echo "=== GRT journal/setup registry ==="
+                echo "--- journal matches ---"
+                grep -i 'GRT/USDT' /srv/frostdeploy/aicfa/shared/data/journal/events.jsonl | tail -30 || true
+                echo "--- registry GRT ---"
+                python3 - <<'PY'
+import json
+from pathlib import Path
+p=Path("/srv/frostdeploy/aicfa/shared/data/journal/setup_registry.json")
+if p.exists():
+    data=json.loads(p.read_text())
+    for key, value in data.get("setups", {}).items():
+        if "GRT/USDT" in key:
+            print(json.dumps({"key":key,"status":value.get("status"),"lifecycle_status":value.get("lifecycle_status"),"created_at_ms":value.get("created_at_ms"),"last_seen_at_ms":value.get("last_seen_at_ms"),"last_checked_at_ms":value.get("last_checked_at_ms"),"setup":value.get("setup")}, ensure_ascii=False))
+else:
+    print("registry missing")
+PY
+                echo "--- recent GRT-related lines from service log ---"
+                journalctl -u fd-aicfa --since "2 hours ago" --no-pager | grep -i 'GRT' | tail -80 || true
+              } >"$OUTPUT" 2>&1
+              ;;
             "/aicfa git")
               {
                 echo "Git metadata is managed by FrostDeploy."
@@ -88,7 +110,7 @@ jobs:
               } >"$OUTPUT" 2>&1
               ;;
             *)
-              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa features, /aicfa git, /aicfa deploy-diagnose" >"$OUTPUT"
+              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa features, /aicfa git, /aicfa inspect-grt, /aicfa deploy-diagnose" >"$OUTPUT"
               ;;
           esac
 
