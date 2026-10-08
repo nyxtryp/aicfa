@@ -262,7 +262,13 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    assert all(call[4] in {300, 400, 500, 600, 750, 1000, 1250} for call in provider.calls)
+    for call in provider.calls:
+        baseline = {"4h": 300, "1h": 400, "15m": 500, "5m": 500}[call[2]]
+        value = call[4]
+        while value > baseline:
+            assert value % 2 == 0
+            value //= 2
+        assert value == baseline
     assert [call[4] for call in provider.calls if call[2] == "4h"] == [300, 600, 1200]
 
 
