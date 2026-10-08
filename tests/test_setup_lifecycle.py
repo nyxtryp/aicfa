@@ -340,3 +340,35 @@ def test_active_long_is_invalidated_by_candle_low_even_if_close_recovers_above_s
     )
     assert result.status is SetupLifecycleStatus.INVALIDATED
     assert lifecycle.active(symbol="GRT/USDT") is None
+
+
+def test_new_long_setup_stays_unpublished_until_price_reaches_entry_zone():
+    lifecycle = SetupLifecycle()
+    result = lifecycle.evaluate(
+        symbol="GRT/USDT",
+        market_type="spot",
+        assessment=_ready(),
+        current_price=110.0,
+        current_high=111.0,
+        current_low=109.0,
+        now_ms=1_000,
+    )
+    assert result.status is None
+    assert result.action == "WAIT"
+    assert lifecycle.active(symbol="GRT/USDT") is None
+
+
+def test_new_long_setup_is_missed_after_price_has_fully_passed_below_zone():
+    lifecycle = SetupLifecycle()
+    result = lifecycle.evaluate(
+        symbol="GRT/USDT",
+        market_type="spot",
+        assessment=_ready(),
+        current_price=90.0,
+        current_high=91.0,
+        current_low=89.0,
+        now_ms=1_000,
+    )
+    assert result.status is None
+    assert result.action == "WAIT"
+    assert lifecycle.active(symbol="GRT/USDT") is None
