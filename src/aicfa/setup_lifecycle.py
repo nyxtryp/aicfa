@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .data_requirements import TradingMode, normalize_trading_mode
-from .setup_analysis import SetupAssessment, SetupCandidate
+from .setup_analysis import SetupAssessment, SetupCandidate, SetupLevel
 
 
 class SetupLifecycleStatus(str, Enum):
@@ -98,6 +98,84 @@ class SetupLifecycle:
                 for level in candidate.target_levels
             ),
         )
+
+    @staticmethod
+    def _candidate_from_record(payload: dict) -> SetupCandidate | None:
+        """Rehydrate a lifecycle-owned candidate persisted by SetupRegistry."""
+        raw = payload.get("candidate") if isinstance(payload, dict) else None
+        if not isinstance(raw, dict):
+            return None
+
+        def level(value):
+            if not isinstance(value, dict):
+                return None
+            try:
+                return SetupLevel(
+                    float(value["value"]),
+                    str(value["timeframe"]),
+                    str(value["source"]),
+                )
+            except (KeyError, TypeError, ValueError):
+                return None
+
+        entry_zone = tuple(x for x in (level(v) for v in raw.get("entry_zone", ())) if x is not None)
+        targets = tuple(x for x in (level(v) for v in raw.get("target_levels", ())) if x is not None)
+        invalidation = level(raw.get("invalidation_level"))
+        try:
+            return SetupCandidate(
+                scenario=str(raw.get("scenario", "")),
+                supporting_concepts=tuple(str(x) for x in raw.get("supporting_concepts", ())),
+                zone_concepts=tuple(str(x) for x in raw.get("zone_concepts", ())),
+                zone_locations=tuple(str(x) for x in raw.get("zone_locations", ())),
+                entry_condition=tuple(str(x) for x in raw.get("entry_condition", ())),
+                invalidation=tuple(str(x) for x in raw.get("invalidation", ())),
+                targets=tuple(str(x) for x in raw.get("targets", ())),
+                rationale=tuple(str(x) for x in raw.get("rationale", ())),
+                direction=(str(raw["direction"]) if raw.get("direction") is not None else None),
+                entry_zone=entry_zone,
+                invalidation_level=invalidation,
+                target_levels=targets,
+                confirmation_timeframes=tuple(str(x) for x in raw.get("confirmation_timeframes", ())),
+                source_timeframes=tuple(str(x) for x in raw.get("source_timeframes", ())),
+            )
+        except (TypeError, ValueError):
+            return None
+
+    def restore_from_registry(self, records: dict[str, dict]) -> int:
+        """Restore ACTIVE/TP1_HIT lifecycle state after a process restart."""
+        restored = 0
+        for record in records.values():
+            status = str(record.get("status", "")).upper()
+            if status not in {"ACTIVE", "TP1_HIT"}:
+                continue
+            setup_payload = record.get("setup")
+            candidate = self._candidate_from_record(setup_payload if isinstance(setup_payload, dict) else {})
+            if candidate is None or candidate.direction not in {"long", "short"}:
+                continue
+            try:
+                horizon = normalize_trading_mode(record.get("mode", "intraday"))
+                identity = self.identity(
+                    symbol=str(record["asset"]),
+                    market_type=str(record.get("market_type", "spot")),
+                    horizon=horizon,
+                    candidate=candidate,
+                )
+                created = int(record.get("created_at_ms", 0))
+                last_seen = int(record.get("last_seen_at_ms", created))
+            except (KeyError, TypeError, ValueError):
+                continue
+            self._active[identity] = ActiveSetup(
+                symbol=str(record["asset"]),
+                market_type=str(record.get("market_type", "spot")),
+                horizon=horizon,
+                identity=identity,
+                candidate=candidate,
+                created_at_ms=created,
+                last_seen_at_ms=last_seen,
+                expires_at_ms=None,
+            )
+            restored += 1
+        return restored
 
     def active(
         self,
