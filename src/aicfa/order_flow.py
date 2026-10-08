@@ -24,7 +24,11 @@ def _validate(df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"missing required columns: {sorted(missing)}")
 
     x = df.copy()
-    x["timestamp"] = pd.to_datetime(x["timestamp"], utc=True)
+    numeric_timestamp = pd.to_numeric(x["timestamp"], errors="coerce")
+    if numeric_timestamp.notna().all():
+        x["timestamp"] = pd.to_datetime(numeric_timestamp, unit="ms", utc=True)
+    else:
+        x["timestamp"] = pd.to_datetime(x["timestamp"], utc=True)
     x = (
         x.sort_values("timestamp")
         .drop_duplicates("timestamp", keep="last")
