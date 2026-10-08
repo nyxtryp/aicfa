@@ -47,7 +47,7 @@ jobs:
                 echo "=== service after pipeline ==="
                 systemctl is-active fd-aicfa
                 echo "pipeline_exit_code: $PIPE_RC"
-                exit "$PIPE_RC"
+                test "$PIPE_RC" -eq 0
               } >"$OUTPUT" 2>&1
               ;;
             "/aicfa git")
