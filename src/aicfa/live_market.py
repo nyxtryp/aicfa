@@ -255,6 +255,9 @@ class LiveMarketCoordinator:
         self._threads: list[threading.Thread] = []
         self._seed_thread: threading.Thread | None = None
         self._seed_done = threading.Event()
+        self._dispatch_lock = threading.RLock()
+        self._scheduled_keys: set[MarketKey] = set()
+        self._pending_observations: dict[MarketKey, WebSocketObservation] = {}
 
     @property
     def monitored_timeframes(self) -> tuple[str, ...]:
@@ -293,6 +296,34 @@ class LiveMarketCoordinator:
         """Wait until the initial REST/local history pass has completed."""
         return self._seed_done.wait(timeout)
 
+    def _dispatch(self, observation: WebSocketObservation) -> None:
+        key = observation.key
+        try:
+            current = observation
+            while not self._stopped.is_set():
+                self._handle(current)
+                with self._dispatch_lock:
+                    pending = self._pending_observations.pop(key, None)
+                    if pending is None:
+                        self._scheduled_keys.discard(key)
+                        return
+                current = pending
+        except Exception:
+            with self._dispatch_lock:
+                self._scheduled_keys.discard(key)
+            raise
+
+    def _submit_observation(self, observation: WebSocketObservation) -> None:
+        key = observation.key
+        with self._dispatch_lock:
+            if key in self._scheduled_keys:
+                # Keep only the newest candle for this market/timeframe. A slow
+                # analysis must never build an unbounded queue of stale candles.
+                self._pending_observations[key] = observation
+                return
+            self._scheduled_keys.add(key)
+        self._pool.submit(self._dispatch, observation)
+
     def _handle(self, observation: WebSocketObservation) -> None:
         key = observation.key
         timestamp = int(observation.data["timestamp"].iloc[-1])
@@ -322,7 +353,7 @@ class LiveMarketCoordinator:
                 for observation in transport.stream():
                     if self._stopped.is_set():
                         return
-                    self._pool.submit(self._handle, observation)
+                    self._submit_observation(observation)
             except Exception:
                 if self._stopped.wait(2.0):
                     return
