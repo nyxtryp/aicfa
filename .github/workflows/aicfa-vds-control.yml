@@ -10,15 +10,15 @@ permissions:
 
 jobs:
   control:
-    if: github.event.issue.pull_request == null && github.event.comment.author_association == 'OWNER'
+    if: github.event.issue.pull_request == null && github.event.comment.author_association == 'OWNER' && github.event.comment.body != '/aicfa tests'
     runs-on: self-hosted
     steps:
       - name: Run allowed command and report result
         env:
-          COMMAND: ${{ github.event.comment.body }}
-          GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          REPO: ${{ github.repository }}
+          COMMAND: \${{ github.event.comment.body }}
+          GH_TOKEN: \${{ github.token }}
+          ISSUE_NUMBER: \${{ github.event.issue.number }}
+          REPO: \${{ github.repository }}
         run: |
           set +e
           cd /srv/frostdeploy/aicfa/current
@@ -35,37 +35,6 @@ jobs:
                 echo "=== service ==="
                 systemctl --no-pager --full status fd-aicfa || true
               } >"$OUTPUT" 2>&1
-              ;;
-            "/aicfa tests")
-              {
-                echo "=== AICFA TEST SUITE: SAFE ISOLATED MODE ==="
-                echo "One pytest process at a time; 1 CPU core; autonomous_scan gets 2560 MiB virtual-memory cap; other files 1536 MiB; 120s timeout per file."
-                echo
-                TOTAL_RC=0
-                for TEST_FILE in tests/test_*.py; do
-                  echo "=== START $TEST_FILE ==="
-                  timeout --signal=TERM --kill-after=10s 120s bash -c '
-                    if [ "$1" = "tests/test_autonomous_scan.py" ]; then
-                      ulimit -v 2621440
-                    else
-                      ulimit -v 1572864
-                    fi
-                    ulimit -u 256
-                    exec taskset -c 1 nice -n 10 .venv/bin/pytest -q "$1"
-                  ' _ "$TEST_FILE"
-                  FILE_RC=$?
-                  echo "=== END $TEST_FILE exit_code=$FILE_RC ==="
-                  if [ "$FILE_RC" -ne 0 ]; then
-                    echo "STOP: $TEST_FILE failed, timed out, or hit its resource limit."
-                    TOTAL_RC=$FILE_RC
-                    break
-                  fi
-                  echo
-                done
-                exit "$TOTAL_RC"
-              } 2>&1 | tee "$OUTPUT"
-              TEST_PIPE_RC=${PIPESTATUS[0]}
-              exit "$TEST_PIPE_RC"
               ;;
             "/aicfa features")
               .venv/bin/pytest -q tests/test_features.py >"$OUTPUT" 2>&1
@@ -129,3 +98,79 @@ jobs:
           PY
 
           exit $RC
+
+  tests:
+    if: github.event.issue.pull_request == null && github.event.comment.author_association == 'OWNER' && github.event.comment.body == '/aicfa tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout AICFA
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run isolated AICFA tests on GitHub-hosted runner
+        env:
+          GH_TOKEN: \${{ github.token }}
+          ISSUE_NUMBER: \${{ github.event.issue.number }}
+          REPO: \${{ github.repository }}
+        run: |
+          set +e
+          OUTPUT=$(mktemp)
+          trap 'rm -f "$OUTPUT"' EXIT
+
+          {
+            echo "=== AICFA TEST SUITE: GITHUB-HOSTED RUNNER ==="
+            echo "Tests run on GitHub infrastructure, not the AICFA VDS."
+            echo "One pytest process at a time; 1 CPU core; 120s timeout per file."
+            echo
+            TOTAL_RC=0
+            for TEST_FILE in tests/test_*.py; do
+              echo "=== START $TEST_FILE ==="
+              timeout --signal=TERM --kill-after=10s 120s taskset -c 0 nice -n 10 pytest -q "$TEST_FILE"
+              FILE_RC=$?
+              echo "=== END $TEST_FILE exit_code=$FILE_RC ==="
+              if [ "$FILE_RC" -ne 0 ]; then
+                echo "STOP: $TEST_FILE failed or timed out."
+                TOTAL_RC=$FILE_RC
+                break
+              fi
+              echo
+            done
+            exit "$TOTAL_RC"
+          } 2>&1 | tee "$OUTPUT"
+          TEST_PIPE_RC=\${PIPESTATUS[0]}
+
+          echo "=== AICFA GITHUB TEST RESULT ===" >>"$OUTPUT"
+          echo "exit_code: $TEST_PIPE_RC" >>"$OUTPUT"
+
+          python - "$OUTPUT" "$REPO" "$ISSUE_NUMBER" "$GH_TOKEN" <<'PY'
+          import json, sys, urllib.request
+          path, repo, issue, token = sys.argv[1:]
+          with open(path, encoding="utf-8", errors="replace") as f:
+              output = f.read()
+          if len(output) > 6000:
+              output = output[-6000:]
+          body = "### AICFA tests — GitHub-hosted runner\n\n" + chr(96)*3 + "text\n" + output.replace(chr(96)*3, "'''") + "\n" + chr(96)*3
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/issues/{issue}/comments",
+              data=json.dumps({"body": body}).encode(),
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=20) as resp:
+              resp.read()
+          PY
+
+          exit "$TEST_PIPE_RC"
