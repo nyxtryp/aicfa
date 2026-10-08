@@ -221,10 +221,10 @@ def test_orchestrator_keeps_two_same_horizon_geometries_independent(monkeypatch)
             SetupLevel(100.5, "15m", "second FVG low"),
             SetupLevel(101.5, "15m", "second FVG high"),
         ),
-        "invalidation_level": SetupLevel(92.0, "5m", "second invalidation"),
+        "invalidation_level": SetupLevel(95.0, "5m", "second invalidation"),
         "target_levels": (
-            SetupLevel(108.0, "4h", "second target 1"),
-            SetupLevel(115.0, "1d", "second target 2"),
+            SetupLevel(115.0, "4h", "second target 1"),
+            SetupLevel(125.0, "1d", "second target 2"),
         ),
     })
 
