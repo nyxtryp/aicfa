@@ -177,9 +177,42 @@ def main() -> None:
             flush=True,
         )
 
+    def _initial_scan() -> None:
+        # Populate the terminal immediately from the seeded REST windows.
+        # Live WebSocket events continue the same canonical scanner afterwards.
+        for market_index in range(len(universe.markets)):
+            if stop_event.is_set():
+                return
+            try:
+                state = engine.scan_market(
+                    market_index,
+                    journal=True,
+                    enforce_timeout=False,
+                    modes=engine.modes,
+                )
+                market = state.result.markets[0]
+                diagnostics = market.diagnostics
+                print(
+                    f"AICFA initial scan: {market.asset} "
+                    f"status={diagnostics.status if diagnostics else 'completed'} "
+                    f"setups={len(market.setups)} "
+                    f"error={diagnostics.error if diagnostics else ''}",
+                    flush=True,
+                )
+            except Exception as exc:
+                print(
+                    f"AICFA initial scan error: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
     try:
         coordinator.start()
         price_monitor.start()
+        threading.Thread(
+            target=_initial_scan,
+            name="aicfa-initial-scan",
+            daemon=True,
+        ).start()
         stop_event.wait()
     finally:
         price_monitor.stop()
