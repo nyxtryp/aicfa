@@ -112,42 +112,16 @@ def main() -> None:
         max_workers=max(1, min(4, (os.cpu_count() or 2))),
     )
     engine = AutonomousScanEngine(universe, provider=coordinator.cache)
-    engine._live_symbol_map = {
-        (
-            market.market_type,
-            coordinator.cache.resolve_symbol(market.asset, market_type=market.market_type),
-        ): index
-        for index, market in enumerate(universe.markets)
-    }
     engine_holder["engine"] = engine
 
-    price_keys = tuple(
-        MarketKey(
-            "binance",
-            coordinator.cache.resolve_symbol(market.asset, market_type=market.market_type),
-            market.market_type,
-            "5m",
-        )
-        for market in universe.markets
-    )
-
-    def _on_price(key, price, event_ms) -> None:
-        engine_holder["engine"].monitor_price(
-            symbol=key.symbol,
-            market_type=key.market_type,
-            price=price,
-            now_ms=event_ms,
-        )
-
-    price_monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
+    # Start the control plane before any live-market initialization. Manual
+    # Market Watch must remain usable even if one venue takes time to resolve.
     control_port = int(os.environ.get("AICFA_CONTROL_PORT", "8091"))
 
     def _serve_control() -> None:
         try:
             serve_control(engine, host="127.0.0.1", port=control_port)
         except Exception as exc:
-            # Market Watch is a control plane. Its failure must be explicit,
-            # while the autonomous scanner itself remains alive.
             print(
                 f"AICFA market control stopped: {type(exc).__name__}: {exc}",
                 flush=True,
@@ -159,6 +133,28 @@ def main() -> None:
         daemon=True,
     )
     control_thread.start()
+
+    coordinator.start()
+    resolved_pairs = coordinator._resolved_market_keys
+    engine._live_symbol_map = {
+        (key.market_type, key.symbol): index
+        for index, key in resolved_pairs
+    }
+
+    price_keys = tuple(
+        MarketKey("binance", key.symbol, key.market_type, "5m")
+        for _, key in resolved_pairs
+    )
+
+    def _on_price(key, price, event_ms) -> None:
+        engine_holder["engine"].monitor_price(
+            symbol=key.symbol,
+            market_type=key.market_type,
+            price=price,
+            now_ms=event_ms,
+        )
+
+    price_monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
 
     print(
         f"AICFA live worker started: markets={len(universe.markets)} "
@@ -237,7 +233,6 @@ def main() -> None:
                     )
 
     try:
-        coordinator.start()
         price_monitor.start()
         threading.Thread(
             target=_initial_scan,
