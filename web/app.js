@@ -115,12 +115,49 @@ function renderCandleChart(node,candles,s){
  if(s.stop_loss!=null)addPriceLine(s.stop_loss,"SL","#ff687b",2);else if(s.invalidation_level)addPriceLine(s.invalidation_level,"SL","#ff687b",2);
  (Array.isArray(targets)?targets:[]).forEach((t,i)=>addPriceLine(t,i===0?"TP1":"TP"+(i+1),"#61df9a",2));
  function rangePrice(x){const a=price(x?.priceLow??x?.low??x?.low_price),b=price(x?.priceHigh??x?.high??x?.high_price);return [Math.min(a,b),Math.max(a,b)]}
- function xCoord(t){if(!Number.isFinite(t))return null;return chart.timeScale().timeToCoordinate(Math.floor(t>1e12?t/1000:t))}
+ const chartTimes=data.map(k=>k.time).sort((a,b)=>a-b);
+ function xCoord(t){
+  if(!Number.isFinite(t)||!chartTimes.length)return null;
+  const target=Math.floor(t>1e12?t/1000:t);
+  const exact=chart.timeScale().timeToCoordinate(target);
+  if(exact!=null)return exact;
+  // Visual objects can originate on a higher timeframe (e.g. 4h OB/FVG)
+  // while the chart is rendered on 15m/1h. Those timestamps are not
+  // necessarily exact bars on the displayed time scale. Resolve them to the
+  // nearest displayed bar instead of falling back to 0/viewport edge.
+  let lo=0,hi=chartTimes.length-1;
+  while(lo<=hi){
+    const mid=(lo+hi)>>1;
+    if(chartTimes[mid]===target){lo=mid;break}
+    if(chartTimes[mid]<target)lo=mid+1;else hi=mid-1;
+  }
+  const right=Math.min(chartTimes.length-1,Math.max(0,lo));
+  const left=Math.max(0,right-1);
+  const nearest=Math.abs(chartTimes[right]-target)<Math.abs(chartTimes[left]-target)?right:left;
+  const logical=chart.timeScale().timeToIndex(chartTimes[nearest],true);
+  return logical==null?null:chart.timeScale().logicalToCoordinate(logical);
+ }
  function drawOverlay(){
   const w=node.clientWidth,h=node.clientHeight;ctx.clearRect(0,0,w,h);
   // Entry / SL / TP are native chart price lines, so their position and labels
   // are transformed by Lightweight Charts itself during zoom, pan and resize.
-  const rect=(z,fill,stroke)=>{const [lo,hi]=rangePrice(z);if(!Number.isFinite(lo)||!Number.isFinite(hi))return;const y1=series.priceToCoordinate(hi),y2=series.priceToCoordinate(lo);if(y1==null||y2==null)return;const ts=time(z.timeStart??z.startTime??z.time_start),te=time(z.timeEnd??z.endTime??z.time_end);let x1=xCoord(ts),x2=xCoord(te);if(x1==null)x1=0;if(x2==null)x2=w;if(x2<x1)[x1,x2]=[x2,x1];ctx.fillStyle=fill;ctx.fillRect(x1,Math.min(y1,y2),Math.max(2,x2-x1),Math.abs(y2-y1));ctx.strokeStyle=stroke;ctx.strokeRect(x1,Math.min(y1,y2),Math.max(2,x2-x1),Math.abs(y2-y1))};
+  const rect=(z,fill,stroke)=>{
+   const [lo,hi]=rangePrice(z);
+   if(!Number.isFinite(lo)||!Number.isFinite(hi))return;
+   const y1=series.priceToCoordinate(hi),y2=series.priceToCoordinate(lo);
+   if(y1==null||y2==null)return;
+   const ts=time(z.timeStart??z.startTime??z.time_start),te=time(z.timeEnd??z.endTime??z.time_end);
+   const x1=xCoord(ts),x2=xCoord(te);
+   // Never invent an x position. A zone with no mappable time must not be
+   // stretched from 0 to the viewport edge; that was the source of blocks
+   // appearing detached from the candles.
+   if(x1==null||x2==null)return;
+   const left=Math.min(x1,x2),right=Math.max(x1,x2);
+   ctx.fillStyle=fill;
+   ctx.fillRect(left,Math.min(y1,y2),Math.max(2,right-left),Math.abs(y2-y1));
+   ctx.strokeStyle=stroke;
+   ctx.strokeRect(left,Math.min(y1,y2),Math.max(2,right-left),Math.abs(y2-y1));
+  };
   // Entry zone uses the same price transform as candles/price lines. It is
   // intentionally drawn as a band, not as a second independent coordinate system.
   if(Array.isArray(entry)&&entry.length>=2){
@@ -131,7 +168,7 @@ function renderCandleChart(node,candles,s){
     }
   }
   obs.forEach(z=>rect(z,"rgba(255,184,77,.12)","rgba(255,184,77,.55)"));fvgs.forEach(z=>rect(z,"rgba(174,108,255,.13)","rgba(174,108,255,.6)"));
-  Object.entries(events).forEach(([name,list])=>{for(const e of list){const p=price(e);if(!Number.isFinite(p))continue;const y=series.priceToCoordinate(p);if(y==null)continue;let x1=xCoord(time(e.timeStart??e.startTime??e.time_start)),x2=xCoord(time(e.timeEnd??e.endTime??e.time_end));if(x1==null)x1=0;if(x2==null)x2=w;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([5,5]);ctx.strokeStyle=name==="BOS"?"#f3c74f":name==="CHoCH"?"#67b7ff":"#ff9d66";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(name,Math.min(w-35,Math.max(4,x1+4)),Math.max(11,y-4))}})}
+  Object.entries(events).forEach(([name,list])=>{for(const e of list){const p=price(e);if(!Number.isFinite(p))continue;const y=series.priceToCoordinate(p);if(y==null)continue;let x1=xCoord(time(e.timeStart??e.startTime??e.time_start)),x2=xCoord(time(e.timeEnd??e.endTime??e.time_end));if(x1==null||x2==null)continue;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([5,5]);ctx.strokeStyle=name==="BOS"?"#f3c74f":name==="CHoCH"?"#67b7ff":"#ff9d66";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(name,Math.min(w-35,Math.max(4,x1+4)),Math.max(11,y-4))}})}
  function resize(){const w=Math.max(1,node.clientWidth),h=Math.max(1,node.clientHeight);chart.resize(w,h);overlay.width=Math.floor(w*dpr);overlay.height=Math.floor(h*dpr);overlay.style.width=w+"px";overlay.style.height=h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);drawOverlay()}
  chart.timeScale().fitContent();
  chart.timeScale().subscribeVisibleLogicalRangeChange(drawOverlay);
