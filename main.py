@@ -21,7 +21,7 @@ if str(SRC) not in sys.path:
 
 from aicfa.autonomous_scan import AutonomousScanEngine
 from aicfa.data_requirements import TradingMode
-from aicfa.live_market import LiveMarketCoordinator
+from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator
 from aicfa.market_universe import load_market_universe
 from aicfa.market_control import serve_control
 from aicfa.public_market_data import build_public_market_data_provider
@@ -109,6 +109,26 @@ def main() -> None:
         for index, market in enumerate(universe.markets)
     }
     engine_holder["engine"] = engine
+
+    price_keys = tuple(
+        __import__("aicfa.market_data", fromlist=["MarketKey"]).MarketKey(
+            "binance",
+            coordinator.cache.resolve_symbol(market.asset, market_type=market.market_type),
+            market.market_type,
+            "5m",
+        )
+        for market in universe.markets
+    )
+
+    def _on_price(key, price, event_ms) -> None:
+        engine_holder["engine"].monitor_price(
+            symbol=key.symbol,
+            market_type=key.market_type,
+            price=price,
+            now_ms=event_ms,
+        )
+
+    price_monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
     control_port = int(os.environ.get("AICFA_CONTROL_PORT", "8091"))
 
     def _serve_control() -> None:
@@ -158,8 +178,10 @@ def main() -> None:
 
     try:
         coordinator.start()
+        price_monitor.start()
         stop_event.wait()
     finally:
+        price_monitor.stop()
         coordinator.stop()
 
     print("AICFA autonomous worker stopped.", flush=True)
