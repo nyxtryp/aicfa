@@ -253,6 +253,7 @@ class LiveMarketCoordinator:
         self._stopped = threading.Event()
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="aicfa-live")
         self._threads: list[threading.Thread] = []
+        self._seed_thread: threading.Thread | None = None
 
     @property
     def monitored_timeframes(self) -> tuple[str, ...]:
@@ -330,7 +331,18 @@ class LiveMarketCoordinator:
                     return
 
     def start(self) -> None:
-        self.seed_history()
+        # Do not block live transport on the initial REST seed. With a large
+        # configured universe this is hundreds of HTTP requests; blocking here
+        # leaves the terminal frozen and prevents the price/candle streams from
+        # starting at all. WebSocket events may safely arrive first because the
+        # cache provider refreshes missing/short windows on demand.
+        self._seed_thread = threading.Thread(
+            target=self.seed_history,
+            name="aicfa-history-seed",
+            daemon=True,
+        )
+        self._seed_thread.start()
+
         by_market_type: dict[str, list[MarketKey]] = {}
         for market in self.universe.markets:
             symbol = self.cache.resolve_symbol(market.asset, market_type=market.market_type)
