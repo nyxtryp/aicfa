@@ -197,6 +197,8 @@ def test_multiple_distinct_candidates_activate_and_remain_independent():
         horizon="intraday",
         assessment=assessment,
         current_price=101.0,
+        current_high=103.0,
+        current_low=95.0,
         now_ms=1_000,
     )
 
