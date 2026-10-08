@@ -182,7 +182,6 @@ def main() -> None:
         # Initial population must not serialize 150 markets behind one slow
         # analysis. Wait only for the seed pass, then use bounded concurrency.
         # The live WebSocket remains active while this happens.
-        coordinator.wait_seed()
         if stop_event.is_set():
             return
 
