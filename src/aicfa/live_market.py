@@ -394,9 +394,24 @@ class LiveMarketCoordinator:
             self.cache.register_market_symbols(
                 market.asset, market.venue_symbols, market_type=market.market_type
             )
-            symbol = self.cache.resolve_symbol(
-                market.asset, market_type=market.market_type
-            )
+            # This transport is Binance-only. The fallback provider can
+            # resolve a market to Bybit/CCXT when Binance does not list it;
+            # feeding that symbol into a Binance SUBSCRIBE poisons the whole
+            # multi-stream connection. Keep only markets actually resolved to
+            # Binance in the candle transport.
+            resolver = getattr(self.cache.upstream, "resolve_market", None)
+            if resolver is None:
+                symbol = self.cache.resolve_symbol(
+                    market.asset, market_type=market.market_type
+                )
+            else:
+                resolved = resolver(market.asset, market_type=market.market_type)
+                if str(getattr(resolved, "provider", "")).strip().lower() != "binance":
+                    raise ValueError(
+                        f"market resolved to non-Binance provider: "
+                        f"{getattr(resolved, 'provider', 'unknown')}"
+                    )
+                symbol = str(resolved.symbol)
             return index, market.market_type, symbol
 
         resolved: list[tuple[int, str, str]] = []
