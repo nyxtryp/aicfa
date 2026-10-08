@@ -296,7 +296,6 @@ def test_setup_engine_uses_scenario_specific_zone_family():
             ),
         ),
         timeframes=TFS,
-        mode="swing",
     )
     assessment = assess_market_evidence(evidence)
     scenarios = assess_scenarios(assessment)
