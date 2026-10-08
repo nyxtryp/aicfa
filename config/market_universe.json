@@ -331,12 +331,6 @@
       "category": "crypto"
     },
     {
-      "asset": "BAND/USDT",
-      "market_type": "futures",
-      "asset_class": "crypto",
-      "category": "crypto"
-    },
-    {
       "asset": "VVV/USDT",
       "market_type": "futures",
       "asset_class": "crypto",
