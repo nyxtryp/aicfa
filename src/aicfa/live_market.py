@@ -246,17 +246,25 @@ class LiveMarketCoordinator:
         self.checkpoint.mark(key, timestamp)
 
     def _stream(self, keys: tuple[MarketKey, ...]) -> None:
-        transport = BinanceWebSocketMarketDataTransport(
-            keys=keys,
-            state_store=None,
-            timeout_seconds=10.0,
-            max_reconnects=20,
-            reconnect_backoff_seconds=1.0,
-        )
-        for observation in transport.stream():
-            if self._stopped.is_set():
-                return
-            self._pool.submit(self._handle, observation)
+        # The exchange may close a stream session after a fixed lifetime. Keep
+        # the worker alive and let the transport perform bounded reconnects;
+        # if that budget is exhausted, create a fresh transport session.
+        while not self._stopped.is_set():
+            transport = BinanceWebSocketMarketDataTransport(
+                keys=keys,
+                state_store=None,
+                timeout_seconds=10.0,
+                max_reconnects=20,
+                reconnect_backoff_seconds=1.0,
+            )
+            try:
+                for observation in transport.stream():
+                    if self._stopped.is_set():
+                        return
+                    self._pool.submit(self._handle, observation)
+            except Exception:
+                if self._stopped.wait(2.0):
+                    return
 
     def start(self) -> None:
         self.seed_history()
