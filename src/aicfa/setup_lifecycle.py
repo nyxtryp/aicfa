@@ -217,9 +217,28 @@ class SetupLifecycle:
                     "active setup remains valid; current analytical WAIT does not replace it", setup_id,
                 ))
 
-        # Every distinct actionable candidate may become active. There is no
-        # one-setup-per-market or one-setup-per-horizon restriction.
+        # Every distinct actionable candidate may become active, but only
+        # while its entry is still reachable. Never publish a fresh entry
+        # after price has already crossed the zone or its first target.
         if assessment.decision.value == "ready":
+            for candidate in assessment.candidates:
+                if candidate.direction not in {"long", "short"}:
+                    continue
+                entry_values = [level.value for level in candidate.entry_zone]
+                if not entry_values:
+                    continue
+                entry_low = min(entry_values)
+                entry_high = max(entry_values)
+                if candidate.direction == "long":
+                    entry_already_passed = current_price > entry_high
+                else:
+                    entry_already_passed = current_price < entry_low
+                if entry_already_passed:
+                    continue
+                if self._hit_invalidation(candidate, current_price):
+                    continue
+                if self._hit_target(candidate, current_price, 0):
+                    continue
             for candidate in assessment.candidates:
                 setup_id = self.identity(
                     symbol=symbol,
