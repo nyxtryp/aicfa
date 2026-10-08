@@ -146,6 +146,13 @@ class AutonomousScanEngine:
         self.registry = SetupRegistry.from_env()
         self.modes = tuple(modes)
         self.lifecycle = SetupLifecycle()
+        if self.registry is not None:
+            try:
+                restored = self.lifecycle.restore_from_registry(self.registry.read())
+                if restored:
+                    print(f"AICFA restored {restored} active setup lifecycle(s).", flush=True)
+            except Exception as exc:
+                print(f"AICFA lifecycle restore error: {type(exc).__name__}: {exc}", flush=True)
         self._clock_ms = clock_ms or (lambda: int(time.time() * 1000))
         self._scan_number = 0
         self._last_state: AutonomousScanState | None = None
