@@ -119,9 +119,13 @@ class LiveMarketDataCache:
                 cached = self.store.load(key)
                 if not cached.empty:
                     self._frames[key] = cached
-            if cached is not None and not cached.empty:
+            if cached is not None and not cached.empty and len(cached) >= int(limit):
                 return cached.tail(limit).copy()
-        return self.upstream.fetch_ohlcv(
+        # A cached window can be valid but still too short for an adaptive
+        # analysis request. Refill from the upstream provider instead of
+        # handing the scanner an incomplete history that later becomes a
+        # generic "scanner error".
+        incoming = self.upstream.fetch_ohlcv(
             symbol=symbol, market_type=market_type, timeframe=timeframe,
             since_ms=since_ms, limit=limit,
         )
@@ -318,7 +322,7 @@ class BinancePriceMonitor:
         return (
             "wss://stream.binance.com:9443/ws"
             if key.market_type == "spot"
-            else "wss://fstream.binance.com/market/ws"
+            else "wss://fstream.binance.com/public/ws"
         )
 
     def _run(self, keys: tuple[MarketKey, ...]) -> None:
