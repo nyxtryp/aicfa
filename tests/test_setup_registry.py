@@ -76,3 +76,53 @@ def test_registry_marks_unseen_setup_stale_then_expired(tmp_path):
     State.scanned_at_ms = 48 * 60 * 60_000
     registry.record_scan(State())
     assert next(iter(registry.read().values()))["status"] == "EXPIRED"
+
+    
+def test_registry_keeps_lifecycle_active_setup_alive_during_analytical_wait(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Candidate:
+        scenario = "continuation"
+        direction = "long"
+
+    class Identity:
+        symbol = "ETH/USDT"
+        market_type = "futures"
+        horizon = "swing"
+        scenario = "continuation"
+        direction = "long"
+
+    class Setup:
+        mode = "swing"
+        candidate = Candidate()
+        identity = Identity()
+        lifecycle_result = None
+
+    class Lifecycle:
+        identity = Identity()
+        status = type("Status", (), {"value": "active"})()
+
+    class Market:
+        asset = "ETH/USDT"
+        setups = (Setup(),)
+        lifecycle_results = ()
+
+    class State:
+        scanned_at_ms = 0
+        scan_number = 1
+        result = type("Result", (), {"markets": (Market(),)})()
+
+    registry.record_scan(State())
+
+    # Later scan: no analytical candidate, but the lifecycle engine still
+    # confirms that the existing setup remains active.
+    State.scanned_at_ms = 4 * 24 * 60 * 60_000
+    State.scan_number = 2
+    Market.setups = ()
+    Market.lifecycle_results = (Lifecycle(),)
+    registry.record_scan(State())
+
+    record = next(iter(registry.read().values()))
+    assert record["status"] == "ACTIVE"
+    assert record["lifecycle_status"] == "active"
+    assert record["last_lifecycle_at_ms"] == State.scanned_at_ms
