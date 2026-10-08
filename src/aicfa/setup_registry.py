@@ -168,17 +168,16 @@ class SetupRegistry:
                     record["status"] = status.upper()
                     record["lifecycle_status"] = status
                 elif status in {"active", "tp1_hit"} and record.get("status") not in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
-                    # A lifecycle-active setup can temporarily disappear from
-                    # the analytical setup candidates (for example during a
-                    # quiet/WAIT scan) without becoming stale. Lifecycle is a
-                    # separate source of truth for continued validity.
-                    record["status"] = "ACTIVE"
+                    # Keep TP1_HIT distinct from ACTIVE: the original entry is
+                    # no longer actionable once price has reached TP1, even
+                    # though the setup may remain alive toward later targets.
+                    record["status"] = "TP1_HIT" if status == "tp1_hit" else "ACTIVE"
                     record["lifecycle_status"] = status
                     record["last_lifecycle_at_ms"] = now_ms
 
         for key, record in records.items():
             status = str(record.get("status", "")).upper()
-            if status not in {"ACTIVE", "STALE"}:
+            if status not in {"ACTIVE", "TP1_HIT", "STALE"}:
                 continue
             last_seen = max(
                 int(record.get("last_seen_at_ms", record.get("created_at_ms", now_ms))),
@@ -194,7 +193,7 @@ class SetupRegistry:
 
     def current(self) -> tuple[dict[str, Any], ...]:
         records = list(self.read().values())
-        order = {"ACTIVE": 0, "STALE": 1, "INVALIDATED": 2, "COMPLETED": 3, "EXPIRED": 4}
+        order = {"ACTIVE": 0, "TP1_HIT": 1, "STALE": 2, "INVALIDATED": 3, "COMPLETED": 4, "EXPIRED": 5}
         records.sort(key=lambda x: (order.get(str(x.get("status", "")).upper(), 9), -int(x.get("last_seen_at_ms", 0))))
         return tuple(records)
 
