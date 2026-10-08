@@ -28,7 +28,7 @@ TIMEFRAME_MS = {
 
 STALE_EXECUTION_CANDLES = 2
 EXPIRE_EXECUTION_CANDLES = 4
-REGISTRY_REVISION = 2
+REGISTRY_REVISION = 3
 
 
 class SetupRegistry:
@@ -142,8 +142,13 @@ class SetupRegistry:
                 status = "ACTIVE"
                 lifecycle = getattr(setup, "lifecycle_result", None)
                 lifecycle_status = getattr(getattr(lifecycle, "status", None), "value", None)
-                if lifecycle_status in {"invalidated", "completed", "expired"}:
-                    status = lifecycle_status.upper()
+                # A setup candidate is only actionable after the lifecycle
+                # engine has actually activated it at the POI. A structural
+                # hypothesis still waiting for price to reach its entry zone
+                # must not enter the terminal setup queue.
+                if lifecycle_status not in {"active", "tp1_hit"}:
+                    continue
+                status = "TP1_HIT" if lifecycle_status == "tp1_hit" else "ACTIVE"
                 payload = _jsonable(setup)
                 result = next((item for item in getattr(market, "results", ()) if getattr(item, "mode", None) == getattr(setup, "mode", None)), None)
                 if result is not None:
