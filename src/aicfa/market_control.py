@@ -28,7 +28,7 @@ def _market_payload(engine: Any) -> list[dict[str, Any]]:
 
 def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
     pause_until_ms = engine.pause_automatic_scanning()
-    state = engine.scan_market(market_index, journal=False, enforce_timeout=False)
+    state = engine.scan_market(market_index, journal=True, enforce_timeout=False)
     market = state.result.markets[0]
     registry = engine.registry
     setups: list[dict[str, Any]] = []
