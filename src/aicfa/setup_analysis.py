@@ -426,11 +426,23 @@ def _zone_levels(
     if current_price is None:
         low, high, timeframe, source = zones[0]
     elif direction == "long":
-        below = [zone for zone in zones if zone[1] <= current_price]
-        low, high, timeframe, source = max(below, key=lambda zone: zone[1]) if below else zones[0]
+        containing = [zone for zone in zones if zone[0] <= current_price <= zone[1]]
+        below = [zone for zone in zones if zone[1] < current_price]
+        if containing:
+            low, high, timeframe, source = max(containing, key=lambda zone: zone[1])
+        elif below:
+            low, high, timeframe, source = max(below, key=lambda zone: zone[1])
+        else:
+            return ()
     else:
-        above = [zone for zone in zones if zone[0] >= current_price]
-        low, high, timeframe, source = min(above, key=lambda zone: zone[0]) if above else zones[0]
+        containing = [zone for zone in zones if zone[0] <= current_price <= zone[1]]
+        above = [zone for zone in zones if zone[0] > current_price]
+        if containing:
+            low, high, timeframe, source = min(containing, key=lambda zone: zone[0])
+        elif above:
+            low, high, timeframe, source = min(above, key=lambda zone: zone[0])
+        else:
+            return ()
 
     return (
         SetupLevel(value=low, timeframe=timeframe, source=f"{source} low"),
