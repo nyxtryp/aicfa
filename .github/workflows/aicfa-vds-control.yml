@@ -37,7 +37,31 @@ jobs:
               } >"$OUTPUT" 2>&1
               ;;
             "/aicfa tests")
-              .venv/bin/pytest -q >"$OUTPUT" 2>&1
+              {
+                echo "=== AICFA TEST SUITE: ISOLATED FILE MODE ==="
+                echo "Each test file runs in a fresh pytest process."
+                echo "Timeout per file: 120s"
+                echo
+                TOTAL_RC=0
+                for TEST_FILE in tests/test_*.py; do
+                  echo "=== START $TEST_FILE ==="
+                  timeout --signal=TERM --kill-after=10s 120s .venv/bin/pytest -q "$TEST_FILE"
+                  FILE_RC=$?
+                  echo "=== END $TEST_FILE exit_code=$FILE_RC ==="
+                  if [ "$FILE_RC" -eq 124 ] || [ "$FILE_RC" -eq 137 ] || [ "$FILE_RC" -eq 143 ]; then
+                    echo "STOP: $TEST_FILE exceeded the per-file safety limit."
+                    TOTAL_RC=$FILE_RC
+                    break
+                  fi
+                  if [ "$FILE_RC" -ne 0 ]; then
+                    echo "STOP: $TEST_FILE failed."
+                    TOTAL_RC=$FILE_RC
+                    break
+                  fi
+                  echo
+                done
+                exit "$TOTAL_RC"
+              } >"$OUTPUT" 2>&1
               ;;
             "/aicfa features")
               .venv/bin/pytest -q tests/test_features.py >"$OUTPUT" 2>&1
@@ -84,7 +108,7 @@ jobs:
               output = f.read()
           if len(output) > 6000:
               output = output[-6000:]
-          body = chr(96)*3 + "text\\n" + output.replace(chr(96)*3, "'''") + "\\n" + chr(96)*3
+          body = chr(96)*3 + "text\n" + output.replace(chr(96)*3, "'''") + "\n" + chr(96)*3
           req = urllib.request.Request(
               f"https://api.github.com/repos/{repo}/issues/{issue}/comments",
               data=json.dumps({"body": body}).encode(),
