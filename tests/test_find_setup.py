@@ -130,7 +130,7 @@ def test_find_setup_fetches_only_selected_intraday_timeframes():
 
 
 @pytest.mark.parametrize("mode, expected", [
-    ("scalping", ("15m", "5m", "1m")),
+    ("scalping", ("1h", "15m", "5m")),
     ("intraday", ("4h", "1h", "15m", "5m")),
     ("swing", ("1d", "4h", "1h")),
     ("position", ("1w", "1d", "4h")),
@@ -214,12 +214,12 @@ def test_find_setup_uses_mode_aware_analysis_depth_when_no_diagnostic_limit_is_g
         now_ms=120 * 60_000,
     )
     # FindSetup defaults to Intraday: the first pass uses the role-aware
-    # SMC history 4h=300, 1h=400, 15m=500, 5m=500. Adaptive expansion continues
+    # SMC history uses 500 rows for 5m/15m/1h/4h. Adaptive expansion continues
     # only while the provider returns additional history or the evidence state
     # changes; it is no longer capped at an arbitrary number of passes.
     limits = [call[4] for call in provider.calls]
-    assert limits[:4] == [300, 400, 500, 500]
-    assert all(limit >= baseline for limit, baseline in zip(limits[:4], [300, 400, 500, 500]))
+    assert limits[:4] == [500, 500, 500, 500]
+    assert all(limit >= baseline for limit, baseline in zip(limits[:4], [500, 500, 500, 500]))
     assert all(limit > 0 for limit in limits[4:])
     assert len(limits) <= 40
 
@@ -241,7 +241,7 @@ def test_find_setup_expands_missing_context_until_provider_boundary():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    for timeframe, baseline in (("4h", 300), ("1h", 400), ("15m", 500), ("5m", 500)):
+    for timeframe, baseline in (("4h", 500), ("1h", 500), ("15m", 500), ("5m", 500)):
         calls = [call[4] for call in provider.calls if call[2] == timeframe]
         assert calls[0] == baseline
         assert calls == sorted(set(calls))
@@ -263,13 +263,13 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
     for call in provider.calls:
-        baseline = {"4h": 300, "1h": 400, "15m": 500, "5m": 500}[call[2]]
+        baseline = {"4h": 500, "1h": 500, "15m": 500, "5m": 500}[call[2]]
         value = call[4]
         while value > baseline:
             assert value % 2 == 0
             value //= 2
         assert value == baseline
-    assert [call[4] for call in provider.calls if call[2] == "4h"] == [300, 600, 1200]
+    assert [call[4] for call in provider.calls if call[2] == "4h"] == [500, 1000, 2000]
 
 
 def test_find_setup_does_not_fetch_optional_microstructure_by_default():
