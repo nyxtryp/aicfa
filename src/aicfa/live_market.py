@@ -290,6 +290,88 @@ class LiveMarketCoordinator:
         self._pool.shutdown(wait=False, cancel_futures=True)
 
 
+
+class BinancePriceMonitor:
+    """Lightweight ticker stream used only for active SL/TP lifecycle checks."""
+
+    def __init__(self, keys: Sequence[MarketKey], *, on_price: Callable[[MarketKey, float, int], None]) -> None:
+        if not keys:
+            raise ValueError("price monitor requires at least one market key")
+        self.keys = tuple(keys)
+        self.on_price = on_price
+        self._stopped = threading.Event()
+        self._threads: list[threading.Thread] = []
+
+    @staticmethod
+    def _stream_name(key: MarketKey) -> str:
+        symbol = key.symbol.replace("/", "").replace("-", "").lower()
+        return f"{symbol}@miniTicker"
+
+    @staticmethod
+    def _url(key: MarketKey) -> str:
+        return (
+            "wss://stream.binance.com:9443/ws"
+            if key.market_type == "spot"
+            else "wss://fstream.binance.com/market/ws"
+        )
+
+    def _run(self, keys: tuple[MarketKey, ...]) -> None:
+        import json
+        from .websocket_market_data import default_websocket_connector
+        while not self._stopped.is_set():
+            connection = None
+            try:
+                connection = default_websocket_connector(self._url(keys[0]), timeout=10.0)
+                connection.send(json.dumps({
+                    "method": "SUBSCRIBE",
+                    "params": [self._stream_name(key) for key in keys],
+                    "id": 2,
+                }))
+                while not self._stopped.is_set():
+                    payload = json.loads(connection.recv())
+                    if isinstance(payload, dict) and "data" in payload:
+                        payload = payload["data"]
+                    if not isinstance(payload, dict) or payload.get("e") != "24hrMiniTicker":
+                        continue
+                    symbol = str(payload.get("s", "")).upper()
+                    try:
+                        price = float(payload["c"])
+                        event_ms = int(payload.get("E", 0))
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    for key in keys:
+                        expected = key.symbol.replace("/", "").replace("-", "").upper()
+                        if expected == symbol:
+                            self.on_price(key, price, event_ms)
+                            break
+            except Exception:
+                if self._stopped.wait(2.0):
+                    return
+            finally:
+                if connection is not None:
+                    try:
+                        connection.close()
+                    except OSError:
+                        pass
+
+    def start(self) -> None:
+        by_market_type: dict[str, list[MarketKey]] = {}
+        for key in self.keys:
+            by_market_type.setdefault(key.market_type, []).append(key)
+        for market_type, keys in by_market_type.items():
+            thread = threading.Thread(
+                target=self._run,
+                args=(tuple(keys),),
+                name=f"aicfa-price-{market_type}",
+                daemon=True,
+            )
+            self._threads.append(thread)
+            thread.start()
+
+    def stop(self) -> None:
+        self._stopped.set()
+
+
 __all__ = [
     "WINDOWS",
     "CandleEvent",
@@ -297,4 +379,5 @@ __all__ = [
     "LiveMarketDataCache",
     "CandleCheckpoint",
     "LiveMarketCoordinator",
+    "BinancePriceMonitor",
 ]
