@@ -24,6 +24,7 @@ from aicfa.data_requirements import TradingMode
 from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator
 from aicfa.market_universe import load_market_universe
 from aicfa.market_control import serve_control
+from aicfa.market_data import MarketKey
 from aicfa.public_market_data import build_public_market_data_provider
 
 
@@ -111,7 +112,7 @@ def main() -> None:
     engine_holder["engine"] = engine
 
     price_keys = tuple(
-        __import__("aicfa.market_data", fromlist=["MarketKey"]).MarketKey(
+        MarketKey(
             "binance",
             coordinator.cache.resolve_symbol(market.asset, market_type=market.market_type),
             market.market_type,
