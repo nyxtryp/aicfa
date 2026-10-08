@@ -239,7 +239,7 @@ class SetupLifecycle:
                     continue
                 if self._hit_target(candidate, current_price, 0):
                     continue
-            for candidate in assessment.candidates:
+
                 setup_id = self.identity(
                     symbol=symbol,
                     market_type=market_type,
