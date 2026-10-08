@@ -211,7 +211,6 @@ def _expand_missing_context(
     current_missing = tuple(missing_context)
     previous_signature: tuple[object, ...] | None = None
     expansion_passes = 0
-    max_expansion_passes = 2
     current_analyses = dict(analyses)
 
     while True:
