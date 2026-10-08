@@ -113,6 +113,8 @@ class SetupRegistry:
         for market in state.result.markets:
             asset = market.asset
             market_type = "spot"
+            market_keys: set[str] = set()
+            active_lifecycle_keys: set[str] = set()
             for setup in getattr(market, "setups", ()):
                 identity = getattr(setup, "identity", None)
                 if identity is not None:
@@ -134,6 +136,10 @@ class SetupRegistry:
                 if lifecycle_status in {"invalidated", "completed", "expired"}:
                     status = lifecycle_status.upper()
                 payload = _jsonable(setup)
+                result = next((item for item in getattr(market, "results", ()) if getattr(item, "mode", None) == getattr(setup, "mode", None)), None)
+                if result is not None:
+                    payload["chart"] = _visual_geometry(result, candidate)
+                market_keys.add(key)
                 stale_after, expire_after = self._mode_ttl_ms(setup.mode)
                 records[key] = {
                     **previous,
@@ -159,6 +165,8 @@ class SetupRegistry:
             for lifecycle in getattr(market, "lifecycle_results", ()):
                 identity = getattr(lifecycle, "identity", None)
                 key = self._key_from_identity(identity)
+                if key:
+                    active_lifecycle_keys.add(key)
                 if not key or key not in records:
                     continue
                 status = getattr(getattr(lifecycle, "status", None), "value", None)
@@ -174,6 +182,16 @@ class SetupRegistry:
                     record["status"] = "TP1_HIT" if status == "tp1_hit" else "ACTIVE"
                     record["lifecycle_status"] = status
                     record["last_lifecycle_at_ms"] = now_ms
+
+            for key, record in records.items():
+                if str(record.get("asset", "")) != str(asset):
+                    continue
+                if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
+                    continue
+                if key not in market_keys and key not in active_lifecycle_keys:
+                    record["status"] = "STALE"
+                    record["lifecycle_status"] = "stale"
+                    record["last_checked_at_ms"] = now_ms
 
         for key, record in records.items():
             status = str(record.get("status", "")).upper()
