@@ -322,7 +322,17 @@ class LiveMarketCoordinator:
                 self._pending_observations[key] = observation
                 return
             self._scheduled_keys.add(key)
-        self._pool.submit(self._dispatch, observation)
+        future = self._pool.submit(self._dispatch, observation)
+        def _report_failure(done) -> None:
+            try:
+                done.result()
+            except Exception as exc:
+                print(
+                    f"AICFA live candle dispatch error: {key.symbol} {key.timeframe}: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+        future.add_done_callback(_report_failure)
 
     def _handle(self, observation: WebSocketObservation) -> None:
         key = observation.key
