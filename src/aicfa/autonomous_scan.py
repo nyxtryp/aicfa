@@ -125,7 +125,12 @@ class AutonomousScanEngine:
         *,
         provider: object | None = None,
         resolver: Callable[[str, str], str] | None = None,
-        modes: Sequence[TradingMode] = PRIMARY_TRADING_MODES,
+        modes: Sequence[TradingMode] = (
+            TradingMode.SCALPING,
+            TradingMode.INTRADAY,
+            TradingMode.SWING,
+            TradingMode.POSITION,
+        ),
         clock_ms: Callable[[], int] | None = None,
         market_timeout_seconds: float = DEFAULT_MARKET_TIMEOUT_SECONDS,
         journal: PersistentJournal | None = None,
@@ -322,6 +327,7 @@ class AutonomousScanEngine:
         queue_position: int = 0,
         journal: bool = True,
         enforce_timeout: bool = True,
+        modes: Sequence[TradingMode] | None = None,
     ) -> AutonomousScanState:
         """Run exactly one configured market through the canonical scanner pipeline."""
         if market_index < 0 or market_index >= len(self.universe.markets):
@@ -340,7 +346,7 @@ class AutonomousScanEngine:
                         provider=self.provider,
                         now_ms=timestamp,
                         resolver=self.resolver,
-                        modes=self.modes,
+                        modes=tuple(modes) if modes is not None else self.modes,
                         lifecycle=self.lifecycle,
                     )
             except MarketExecutionTimeout as exc:
