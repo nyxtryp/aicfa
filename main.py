@@ -11,6 +11,7 @@ from pathlib import Path
 import signal
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Keep the source-layout package importable when FrostDeploy starts main.py
 # directly from the repository root without an installed editable package.
@@ -178,11 +179,15 @@ def main() -> None:
         )
 
     def _initial_scan() -> None:
-        # Populate the terminal immediately from the seeded REST windows.
-        # Live WebSocket events continue the same canonical scanner afterwards.
-        for market_index in range(len(universe.markets)):
-            if stop_event.is_set():
-                return
+        # Initial population must not serialize 150 markets behind one slow
+        # analysis. Wait only for the seed pass, then use bounded concurrency.
+        # The live WebSocket remains active while this happens.
+        coordinator.wait_seed()
+        if stop_event.is_set():
+            return
+
+        def scan_one(market_index: int) -> None:
+            market = universe.markets[market_index]
             try:
                 state = engine.scan_market(
                     market_index,
@@ -190,20 +195,38 @@ def main() -> None:
                     enforce_timeout=False,
                     modes=engine.modes,
                 )
-                market = state.result.markets[0]
-                diagnostics = market.diagnostics
+                result_market = state.result.markets[0]
+                diagnostics = result_market.diagnostics
                 print(
-                    f"AICFA initial scan: {market.asset} "
+                    f"AICFA initial scan: {result_market.asset} "
                     f"status={diagnostics.status if diagnostics else 'completed'} "
-                    f"setups={len(market.setups)} "
+                    f"setups={len(result_market.setups)} "
                     f"error={diagnostics.error if diagnostics else ''}",
                     flush=True,
                 )
             except Exception as exc:
                 print(
-                    f"AICFA initial scan error: {type(exc).__name__}: {exc}",
+                    f"AICFA initial scan error: {market.asset}: "
+                    f"{type(exc).__name__}: {exc}",
                     flush=True,
                 )
+
+        workers = max(1, min(4, (os.cpu_count() or 2)))
+        with ThreadPoolExecutor(
+            max_workers=workers,
+            thread_name_prefix="aicfa-initial",
+        ) as pool:
+            futures = [pool.submit(scan_one, i) for i in range(len(universe.markets))]
+            for future in as_completed(futures):
+                if stop_event.is_set():
+                    break
+                try:
+                    future.result()
+                except Exception as exc:
+                    print(
+                        f"AICFA initial scan worker error: {type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
 
     try:
         coordinator.start()
