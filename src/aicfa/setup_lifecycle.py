@@ -206,12 +206,13 @@ class SetupLifecycle:
         horizon: TradingMode | str | None = None,
     ) -> tuple[ActiveSetup, ...]:
         normalized = normalize_trading_mode(horizon) if horizon is not None else None
-        return tuple(
-            setup for setup in self._active.values()
-            if (symbol is None or setup.symbol == symbol)
-            and (market_type is None or setup.market_type == market_type)
-            and (normalized is None or setup.horizon == normalized)
-        )
+        with self._lock:
+            return tuple(
+                setup for setup in self._active.values()
+                if (symbol is None or setup.symbol == symbol)
+                and (market_type is None or setup.market_type == market_type)
+                and (normalized is None or setup.horizon == normalized)
+            )
 
     @staticmethod
     def _hit_invalidation(candidate: SetupCandidate, price: float) -> bool:
