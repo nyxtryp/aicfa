@@ -10,8 +10,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  regression:
+    name: Regression partition ${{ matrix.partition }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,6 +25,25 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
-      - run: python -m pytest -q --tb=short
+      - name: Run pytest partition
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(find tests -maxdepth 1 -type f -name 'test_*.py' | sort | awk 'NR % 4 == '"'"'${{ matrix.partition }}'"'"'')"
+          test -n "$files"
+          python -m pytest -q --tb=short $files
+
+  syntax:
+    name: Syntax checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
       - run: python -m compileall -q src main.py web
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - run: node --check web/app.js
