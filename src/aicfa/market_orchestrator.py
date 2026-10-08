@@ -152,12 +152,15 @@ def _latest_execution_range(result: FindSetupResult, mode: TradingMode) -> tuple
     """Read the latest completed execution candle close/high/low for lifecycle checks."""
     timeframe = mode_timeframe_profile(mode).execution_timeframe
     frame = result.frames.get(timeframe)
-    if frame is None or frame.empty or not {"close", "high", "low"}.issubset(frame.columns):
+    if frame is None or frame.empty or "close" not in frame.columns:
         raise ValueError(
-            f"execution timeframe {timeframe} has no OHLC data for lifecycle evaluation"
+            f"execution timeframe {timeframe} has no close data for lifecycle evaluation"
         )
     row = frame.iloc[-1]
-    return float(row["close"]), float(row["high"]), float(row["low"])
+    close = float(row["close"])
+    high = float(row["high"]) if "high" in frame.columns else close
+    low = float(row["low"]) if "low" in frame.columns else close
+    return close, high, low
 
 
 def analyze_market_horizons(
