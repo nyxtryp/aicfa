@@ -111,25 +111,61 @@ class LiveMarketDataCache:
             self._frames[key] = updated
             return updated.copy()
 
+    @staticmethod
+    def _candle_is_closed(timestamp_ms: int, timeframe: str, now_ms: int | None = None) -> bool:
+        durations = {
+            "1m": 60_000,
+            "5m": 300_000,
+            "15m": 900_000,
+            "1h": 3_600_000,
+            "4h": 14_400_000,
+            "1d": 86_400_000,
+            "1w": 604_800_000,
+        }
+        duration = durations.get(str(timeframe))
+        if duration is None:
+            return True
+        current_ms = int(time.time() * 1000) if now_ms is None else int(now_ms)
+        return int(timestamp_ms) + duration <= current_ms
+
+    @classmethod
+    def _closed_only(cls, frame: pd.DataFrame, timeframe: str) -> pd.DataFrame:
+        if frame.empty or "timestamp" not in frame.columns:
+            return frame.copy()
+        now_ms = int(time.time() * 1000)
+        mask = frame["timestamp"].map(
+            lambda value: cls._candle_is_closed(int(value), timeframe, now_ms)
+        )
+        return frame.loc[mask].reset_index(drop=True)
+
     def fetch_ohlcv(self, *, symbol, market_type, timeframe, since_ms, limit):
         key = MarketKey("binance", symbol, market_type, timeframe)
+        cached = pd.DataFrame()
+        needs_refresh = True
         with self._lock:
             cached = self._frames.get(key)
             if cached is None:
                 cached = self.store.load(key)
                 if not cached.empty:
                     self._frames[key] = cached
-            if cached is not None and not cached.empty and len(cached) >= int(limit):
-                return cached.tail(limit).copy()
-        # A cached window can be valid but still too short for an adaptive
-        # analysis request. Refill from the upstream provider instead of
-        # handing the scanner an incomplete history that later becomes a
-        # generic "scanner error".
+            closed = self._closed_only(cached, timeframe) if cached is not None else pd.DataFrame()
+            if not closed.empty and len(closed) >= int(limit):
+                # Never hand the analysis pipeline an open candle. The previous
+                # implementation returned a full cached window even when its
+                # newest row was the currently forming candle, which could make
+                # completed_ohlcv reject the market with a generic scanner error.
+                return closed.tail(limit).copy()
+            needs_refresh = True
+
+        # Refresh whenever the cache does not contain enough *closed* candles.
+        # This also repairs a cache seeded with an open final candle.
+        refresh_limit = max(int(limit) + 1, int(limit))
         incoming = self.upstream.fetch_ohlcv(
             symbol=symbol, market_type=market_type, timeframe=timeframe,
-            since_ms=since_ms, limit=limit,
+            since_ms=since_ms, limit=refresh_limit,
         )
         merged = merge_ohlcv(cached if cached is not None else pd.DataFrame(), incoming)
+        closed = self._closed_only(merged, timeframe)
         if not merged.empty:
             with self._lock:
                 merged = merged.tail(
@@ -137,7 +173,7 @@ class LiveMarketDataCache:
                 ).reset_index(drop=True)
                 self._frames[key] = merged
                 self.store.append(key, incoming)
-        return merged.tail(limit).copy()
+        return closed.tail(limit).copy()
 
     def fetch_trades(self, *, symbol, market_type, limit):
         return self.upstream.fetch_trades(symbol=symbol, market_type=market_type, limit=limit)
@@ -223,27 +259,41 @@ class LiveMarketCoordinator:
         return tuple(WINDOWS)
 
     def seed_history(self) -> None:
-        """Restore local windows first; fetch only when a window is incomplete."""
+        """Restore local windows without letting one bad market abort startup."""
+        failures: list[str] = []
         for market in self.universe.markets:
-            self.cache.register_market_symbols(
-                market.asset, market.venue_symbols, market_type=market.market_type
-            )
-            symbol = self.cache.resolve_symbol(market.asset, market_type=market.market_type)
+            try:
+                self.cache.register_market_symbols(
+                    market.asset, market.venue_symbols, market_type=market.market_type
+                )
+                symbol = self.cache.resolve_symbol(market.asset, market_type=market.market_type)
+            except Exception as exc:
+                failures.append(f"{market.asset}:symbol:{type(exc).__name__}:{exc}")
+                continue
             for timeframe in self.monitored_timeframes:
-                key = MarketKey("binance", symbol, market.market_type, timeframe)
-                existing = self.cache.store.load(key)
-                target = WINDOWS[timeframe]
-                if len(existing) < target:
-                    incoming = self.cache.upstream.fetch_ohlcv(
-                        symbol=symbol,
-                        market_type=market.market_type,
-                        timeframe=timeframe,
-                        since_ms=None,
-                        limit=target,
-                    )
-                    self.cache.seed(key, incoming)
-                else:
-                    self.cache.seed(key, existing.tail(target))
+                try:
+                    key = MarketKey("binance", symbol, market.market_type, timeframe)
+                    existing = self.cache.store.load(key)
+                    target = WINDOWS[timeframe]
+                    if len(existing) < target:
+                        incoming = self.cache.upstream.fetch_ohlcv(
+                            symbol=symbol,
+                            market_type=market.market_type,
+                            timeframe=timeframe,
+                            since_ms=None,
+                            limit=target,
+                        )
+                        self.cache.seed(key, incoming)
+                    else:
+                        self.cache.seed(key, existing.tail(target))
+                except Exception as exc:
+                    failures.append(f"{market.asset}:{timeframe}:{type(exc).__name__}:{exc}")
+        if failures:
+            print(
+                "AICFA live history seed skipped failed market/timeframe(s): "
+                + " | ".join(failures[:20]),
+                flush=True,
+            )
 
     def _handle(self, observation: WebSocketObservation) -> None:
         key = observation.key
