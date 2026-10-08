@@ -57,7 +57,7 @@ class WebSocketObservation:
 
 
 _SPOT_WS_URL = "wss://stream.binance.com:9443/ws"
-_FUTURES_WS_URL = "wss://fstream.binance.com/market/ws"
+_FUTURES_WS_URL = "wss://fstream.binance.com/public/ws"
 
 
 def _stream_name(key: MarketKey) -> str:
