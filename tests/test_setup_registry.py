@@ -189,9 +189,9 @@ def test_registry_migrates_only_lifecycle_owned_revision_three_setup(tmp_path):
 
     assert len(current) == 1
     assert current[0]["asset"] == "BTC/USDT"
-    assert current[0]["strategy_revision"] == 4
+    assert current[0]["strategy_revision"] == 5
     records = registry.read()
-    assert records["BTC/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 4
+    assert records["BTC/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 5
     assert records["ETH/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 2
 
 
@@ -209,5 +209,5 @@ def test_registry_migrates_tp1_hit_but_keeps_it_out_of_actionable_queue(tmp_path
 
     assert registry.current() == ()
     record = next(iter(registry.read().values()))
-    assert record["strategy_revision"] == 4
+    assert record["strategy_revision"] == 5
     assert record["status"] == "TP1_HIT"
