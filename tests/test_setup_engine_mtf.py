@@ -69,7 +69,6 @@ def _evidence():
         asset="BTC/USDT",
         observations=observations,
         timeframes=TFS,
-        mode="swing",
     )
 
 
@@ -214,7 +213,6 @@ def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
             ),
         ),
         timeframes=TFS,
-        mode="swing",
     )
     assessment = assess_market_evidence(evidence)
     scenarios = assess_scenarios(assessment)
