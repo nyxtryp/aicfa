@@ -73,6 +73,8 @@ def test_bullish_fvg_lifecycle_touch_partial_fill_is_causal():
     assert r.loc[3, "fvg_active"] == 1
     assert r.loc[4, "fvg_bullish_state"] == FVG_PARTIAL
     assert r.loc[4, "fvg_active"] == 1
+    assert r.loc[4, "fvg_bullish_low"] == 102
+    assert r.loc[4, "fvg_bullish_high"] == 105
     assert 0.0 < r.loc[4, "fvg_bullish_penetration"] < 1.0
     assert r.loc[5, "fvg_filled"] == 1
     assert r.loc[5, "fvg_mitigated"] == 1
