@@ -17,6 +17,13 @@ from .persistent_journal import _jsonable, _visual_geometry
 
 REGISTRY_REVISION = 4
 
+# Revision 3 introduced the lifecycle-owned setup queue. Those ACTIVE/TP1_HIT
+# records are real trade lifecycles and must survive a code deploy. Older
+# revisions may contain analytical candidates that were never lifecycle-
+# activated, so they are intentionally not migrated.
+_MIGRATABLE_PREVIOUS_REVISION = 3
+_MIGRATABLE_LIFECYCLE_STATUSES = {"active", "tp1_hit"}
+
 
 class SetupRegistry:
     """Durable current-state registry keyed by setup identity.
@@ -85,12 +92,44 @@ class SetupRegistry:
         )
         temp.replace(self.path)
 
-    def record_scan(self, state: Any) -> None:
-        records = {
+    @staticmethod
+    def _migrate_lifecycle_records(records: dict[str, dict[str, Any]]) -> bool:
+        """Migrate only genuinely lifecycle-owned setups across registry revisions.
+
+        A registry/code revision is not a trading event. An ACTIVE lifecycle
+        setup therefore survives deployment. Revision 2 and earlier records
+        are not migrated because they predate the rule that only POI-activated
+        setups enter this durable queue.
+        """
+        changed = False
+        for record in records.values():
+            try:
+                revision = int(record.get("strategy_revision", 0))
+            except (TypeError, ValueError):
+                revision = 0
+            lifecycle_status = str(record.get("lifecycle_status", "")).lower()
+            status = str(record.get("status", "")).upper()
+            if (
+                revision == _MIGRATABLE_PREVIOUS_REVISION
+                and lifecycle_status in _MIGRATABLE_LIFECYCLE_STATUSES
+                and status in {"ACTIVE", "TP1_HIT"}
+            ):
+                record["strategy_revision"] = REGISTRY_REVISION
+                changed = True
+        return changed
+
+    def _current_revision_records(self) -> dict[str, dict[str, Any]]:
+        records = self.read()
+        if self._migrate_lifecycle_records(records):
+            self._write(records)
+        return {
             key: value
-            for key, value in self.read().items()
+            for key, value in records.items()
             if int(value.get("strategy_revision", 0)) == REGISTRY_REVISION
         }
+
+    def record_scan(self, state: Any) -> None:
+        records = self._current_revision_records()
         now_ms = int(state.scanned_at_ms)
 
         scanned_assets: set[str] = set()
@@ -200,9 +239,7 @@ class SetupRegistry:
         # setup merely because a wall-clock TTL elapsed between rotations;
         # the lifecycle engine must invalidate it from actual price action.
         records = []
-        for record in self.read().values():
-            if int(record.get("strategy_revision", 0)) != REGISTRY_REVISION:
-                continue
+        for record in self._current_revision_records().values():
             if str(record.get("status", "")).upper() != "ACTIVE":
                 continue
             records.append(record)
