@@ -38,7 +38,7 @@ def _candidate():
         ),
         invalidation_level=SetupLevel(95.0, "5m", "previous low"),
         target_levels=(
-            SetupLevel(110.0, "4h", "previous high"),
+            SetupLevel(115.0, "4h", "previous high"),
             SetupLevel(120.0, "1d", "previous high"),
         ),
     )
@@ -98,8 +98,8 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
         **{
             **first.__dict__,
             "entry_zone": (
-                SetupLevel(96.0, "15m", "second FVG low"),
-                SetupLevel(98.0, "15m", "second FVG high"),
+                SetupLevel(100.5, "15m", "second FVG low"),
+                SetupLevel(101.5, "15m", "second FVG high"),
             ),
             "invalidation_level": SetupLevel(92.0, "5m", "second invalidation"),
         }
