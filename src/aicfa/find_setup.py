@@ -255,7 +255,7 @@ def _expand_missing_context(
         )
         signature = _context_signature(evidence)
         expansion_passes += 1
-        if signature == previous_signature or expansion_passes >= max_expansion_passes:
+        if signature == previous_signature:
             return current_frames, current_limits, current_analyses
         previous_signature = signature
         current_missing = evidence.missing_context
