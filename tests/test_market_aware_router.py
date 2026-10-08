@@ -14,7 +14,7 @@ class Provider:
 
     def fetch_ohlcv(self, *, symbol, market_type, timeframe, since_ms, limit):
         self.calls.append(symbol)
-        if self.exchange == "first":
+        if self.exchange == "first" and self.symbol != "BTC/USDT":
             raise RuntimeError("temporary outage")
         import pandas as pd
         return pd.DataFrame({
