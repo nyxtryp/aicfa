@@ -158,7 +158,11 @@ class AutonomousScanEngine:
         self._last_state: AutonomousScanState | None = None
         self._cycle_id = 0
         self._last_cycle: RotationCycle | None = None
-        self._scan_lock = threading.RLock()
+        # Analysis is allowed to run concurrently across markets. The old
+        # process-wide scan lock serialized every 5m/15m/1h event behind one
+        # slow market, which made the live scanner appear frozen. State
+        # persistence remains serialized separately below.
+        self._state_lock = threading.RLock()
         self._manual_pause_until_ms = 0
 
     def _journal_state(self, state: AutonomousScanState) -> None:
@@ -240,12 +244,14 @@ class AutonomousScanEngine:
         result_tuple = tuple(results)
         if self.registry is not None and result_tuple:
             try:
-                self.registry.record_lifecycle_results(result_tuple, now_ms=timestamp)
+                with self._state_lock:
+                    self.registry.record_lifecycle_results(result_tuple, now_ms=timestamp)
             except Exception as exc:
                 print(f"AICFA registry error: {type(exc).__name__}: {exc}", flush=True)
         if self.journal is not None and result_tuple:
             try:
-                self.journal.append(
+                with self._state_lock:
+                    self.journal.append(
                     "lifecycle_price",
                     timestamp,
                     {"symbol": symbol, "market_type": market_type, "price": float(price), "results": result_tuple},
@@ -392,34 +398,36 @@ class AutonomousScanEngine:
                 f"market_index must be between 0 and {len(self.universe.markets) - 1}"
             )
 
-        with self._scan_lock:
-            timestamp = self._clock_ms() if now_ms is None else now_ms
-            market = MarketUniverse((self.universe.markets[market_index],))
-            try:
-                timeout_context = _market_timeout(self.market_timeout_seconds) if enforce_timeout else _noop_context()
-                with timeout_context:
-                    result = scan_universe(
-                        market,
-                        provider=self.provider,
-                        now_ms=timestamp,
-                        resolver=self.resolver,
-                        modes=tuple(modes) if modes is not None else self.modes,
-                        lifecycle=self.lifecycle,
-                    )
-            except MarketExecutionTimeout as exc:
-                result = self._failure_scan(
-                    market_index,
-                    status="timeout",
-                    error=str(exc),
-                    duration_ms=self.market_timeout_seconds * 1000.0,
+        timestamp = self._clock_ms() if now_ms is None else now_ms
+        market = MarketUniverse((self.universe.markets[market_index],))
+        try:
+            timeout_context = _market_timeout(self.market_timeout_seconds) if enforce_timeout else _noop_context()
+            with timeout_context:
+                result = scan_universe(
+                    market,
+                    provider=self.provider,
+                    now_ms=timestamp,
+                    resolver=self.resolver,
+                    modes=tuple(modes) if modes is not None else self.modes,
+                    lifecycle=self.lifecycle,
                 )
-            except Exception as exc:
-                result = self._failure_scan(
-                    market_index,
-                    status="error",
-                    error=f"{type(exc).__name__}: {exc}",
-                )
+        except MarketExecutionTimeout as exc:
+            result = self._failure_scan(
+                market_index,
+                status="timeout",
+                error=str(exc),
+                duration_ms=self.market_timeout_seconds * 1000.0,
+            )
+        except Exception as exc:
+            result = self._failure_scan(
+                market_index,
+                status="error",
+                error=f"{type(exc).__name__}: {exc}",
+            )
 
+        # Only the tiny mutable-state/persistence section is serialized. The
+        # expensive network + feature + setup analysis above is concurrent.
+        with self._state_lock:
             self._scan_number += 1
             state = AutonomousScanState(
                 scan_number=self._scan_number,
@@ -431,22 +439,7 @@ class AutonomousScanEngine:
             )
             self._last_state = state
             if journal:
-                if self.journal is not None:
-                    try:
-                        self.journal.record_scan(state)
-                    except Exception as exc:
-                        print(
-                            f"AICFA journal error: {type(exc).__name__}: {exc}",
-                            flush=True,
-                        )
-            if self.registry is not None:
-                try:
-                    self.registry.record_scan(state)
-                except Exception as exc:
-                    print(
-                        f"AICFA registry error: {type(exc).__name__}: {exc}",
-                        flush=True,
-                    )
+                self._journal_state(state)
             return state
 
     def run_cycle(
