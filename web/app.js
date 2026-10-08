@@ -32,18 +32,23 @@ function active(ms){
  return out;
 }
 function registryItems(records){
- const out=[];
+ const latestById=new Map();
  for(const r of records||[]){
-  // The registry also retains STALE records for durable lifecycle/history
-  // bookkeeping, but the terminal must never present a stale setup as an
-  // actionable signal. Only ACTIVE records enter the current setup queue.
+  // STALE records remain durable lifecycle/history bookkeeping, but only
+  // ACTIVE records are actionable in the terminal.
   if(String(r.status||"").toUpperCase()!=="ACTIVE")continue;
-  const wrapper=r.setup||{},base=wrapper.candidate||wrapper,candidate={...base,chart:wrapper.chart||base.chart};
   const key=String(r.setup_id||"");
   if(!key)continue;
-  out.push({asset:r.asset,market_type:r.market_type||"futures",mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||"active",status:"ACTIVE",key,seenAt:Number(r.last_seen_at_ms||r.created_at_ms||0),lastConfirmedAt:Number(r.last_confirmed_at_ms||0),setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
+  const seenAt=Number(r.last_seen_at_ms||r.created_at_ms||0);
+  const lastConfirmedAt=Number(r.last_confirmed_at_ms||0);
+  const existing=latestById.get(key);
+  // The journal can contain repeated ACTIVE snapshots for one setup_id.
+  // Collapse them here so Market Watch/history can never render duplicates.
+  if(existing && Math.max(existing.lastConfirmedAt,existing.seenAt)>=Math.max(lastConfirmedAt,seenAt))continue;
+  const wrapper=r.setup||{},base=wrapper.candidate||wrapper,candidate={...base,chart:wrapper.chart||base.chart};
+  latestById.set(key,{asset:r.asset,market_type:r.market_type||"futures",mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||"active",status:"ACTIVE",key,seenAt,lastConfirmedAt,setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
  }
- return out.sort((a,b)=>Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
+ return [...latestById.values()].sort((a,b)=>Math.max(b.lastConfirmedAt,b.seenAt)-Math.max(a.lastConfirmedAt,a.seenAt));
 }
 function syncRegistry(records){
  const items=registryItems(records),previous=ui.selected,oldKeys=new Set(ui.history.map(x=>x.key));
