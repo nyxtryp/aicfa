@@ -73,7 +73,12 @@ def test_web_server_entrypoint_starts_outside_pytest_import_path(tmp_path):
                 with urlopen(f"http://127.0.0.1:{port}/api/markets", timeout=1) as response:
                     payload = json.loads(response.read().decode("utf-8"))
                 assert response.status == 200
-                assert len(payload["markets"]) == 109
+                expected_count = len(json.loads(
+                    (server.ROOT.parent / "config" / "market_universe.json").read_text(
+                        encoding="utf-8"
+                    )
+                )["markets"])
+                assert len(payload["markets"]) == expected_count
                 break
             except Exception:
                 time.sleep(0.05)
