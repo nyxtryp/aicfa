@@ -626,6 +626,7 @@ def _target_levels(
     current_price: float | None,
     preferred_timeframes: tuple[str, ...] = (),
     entry_timeframe: str | None = None,
+    entry_zone: tuple[SetupLevel, ...] = (),
 ) -> tuple[SetupLevel, ...]:
     # A target is the next causal draw-on-liquidity/objective, not an arbitrary
     # number above/below price. The hierarchy follows the market-delivery logic:
@@ -667,6 +668,17 @@ def _target_levels(
                 if direction == "long" and value <= current_price:
                     continue
                 if direction == "short" and value >= current_price:
+                    continue
+            # A target must be outside the entire entry zone, not merely
+            # beyond the current price. This matters when price is still
+            # inside the POI: otherwise TP1 can be placed inside the entry
+            # zone and the setup geometry becomes internally contradictory.
+            if entry_zone:
+                entry_low = min(level.value for level in entry_zone)
+                entry_high = max(level.value for level in entry_zone)
+                if direction == "long" and value <= entry_high:
+                    continue
+                if direction == "short" and value >= entry_low:
                     continue
             distance = (
                 abs(value - current_price) if current_price is not None else 0.0
@@ -936,6 +948,7 @@ def analyze_setups(
                 current_price,
                 source_tfs,
                 entry_timeframe,
+                entry_levels,
             )
             entry_conditions = _entry_confirmation_conditions(
                 hypothesis.scenario,
