@@ -539,7 +539,17 @@ def _invalidation_level(
     entry_high = max(level.value for level in entry_zone)
     candidates: list[SetupLevel] = []
 
-    allowed = tuple(tf for tf in context.timeframes if tf != context.execution_timeframe)
+    # Invalidation must come from the mode's active structural hierarchy.
+    # A current Intraday setup may not borrow a weeks-old 1D/1W swing merely
+    # because that level is present in the broader evidence set.
+    profile_timeframes = {
+        context.context_timeframe,
+        context.structure_timeframe,
+    }
+    allowed = tuple(
+        tf for tf in context.timeframes
+        if tf != context.execution_timeframe and tf in profile_timeframes
+    )
     ordered_timeframes = tuple(
         tf for tf in source_timeframes if tf in allowed
     ) + tuple(
@@ -1016,13 +1026,20 @@ def analyze_setups(
             if not target_levels:
                 missing.append(f"{hypothesis.scenario}: no geometrically valid target is available")
                 continue
-            # Risk/reward is derived geometry, not a strategy gate.
-            # The setup engine exposes structurally valid Entry/Invalidation/Target
-            # even when the resulting RR is below an arbitrary fixed threshold.
-            # Statistical evaluation belongs to the later backtest/evaluation layer.
-            _risk_reward_value(
+            # A setup is not actionable if the first causal target does not
+            # provide at least 2R from the structural invalidation. RR is not
+            # used to invent geometry; it is a final viability gate after
+            # Entry/SL/TP have been derived from structure.
+            rr = _risk_reward_value(
                 direction, entry_levels, invalidation_level, target_levels
             )
+            if rr is None or rr < 2.0:
+                missing.append(
+                    f"{hypothesis.scenario}: structural RR {rr:.2f}R is below the 2.0R minimum"
+                    if rr is not None
+                    else f"{hypothesis.scenario}: structural RR cannot be calculated"
+                )
+                continue
 
         candidates.append(
             SetupCandidate(
