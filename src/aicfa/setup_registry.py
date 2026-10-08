@@ -27,6 +27,7 @@ TIMEFRAME_MS = {
 
 STALE_STRUCTURE_CANDLES = 3
 EXPIRE_STRUCTURE_CANDLES = 12
+REGISTRY_REVISION = 2
 
 
 class SetupRegistry:
@@ -107,9 +108,7 @@ class SetupRegistry:
         temp.replace(self.path)
 
     def record_scan(self, state: Any) -> None:
-        records = self.read()
-        now_ms = int(state.scanned_at_ms)
-
+        records = {\n            key: value\n            for key, value in self.read().items()\n            if int(value.get("strategy_revision", 0)) == REGISTRY_REVISION\n        }\n        now_ms = int(state.scanned_at_ms)\n
         for market in state.result.markets:
             asset = market.asset
             market_type = "spot"
@@ -128,9 +127,7 @@ class SetupRegistry:
                     mode=setup.mode,
                     candidate=candidate,
                 )
-                previous = records.get(key, {})
-                created_at = int(previous.get("created_at_ms", now_ms))
-                status = "ACTIVE"
+                previous = records.get(key, {})\n                created_at = int(previous.get("created_at_ms", now_ms))\n                status = "ACTIVE"
                 lifecycle = getattr(setup, "lifecycle_result", None)
                 lifecycle_status = getattr(getattr(lifecycle, "status", None), "value", None)
                 if lifecycle_status in {"invalidated", "completed", "expired"}:
@@ -143,7 +140,7 @@ class SetupRegistry:
                 stale_after, expire_after = self._mode_ttl_ms(setup.mode)
                 records[key] = {
                     **previous,
-                    "setup_id": key,
+                    "strategy_revision": REGISTRY_REVISION,\n                    "setup_id": key,
                     "asset": asset,
                     "market_type": market_type,
                     "mode": normalize_trading_mode(setup.mode).value,
@@ -210,7 +207,7 @@ class SetupRegistry:
         self._write(records)
 
     def current(self) -> tuple[dict[str, Any], ...]:
-        records = list(self.read().values())
+        records = [\n            record for record in self.read().values()\n            if int(record.get("strategy_revision", 0)) == REGISTRY_REVISION\n        ]
         order = {"ACTIVE": 0, "TP1_HIT": 1, "STALE": 2, "INVALIDATED": 3, "COMPLETED": 4, "EXPIRED": 5}
         records.sort(key=lambda x: (order.get(str(x.get("status", "")).upper(), 9), -int(x.get("last_seen_at_ms", 0))))
         return tuple(records)
