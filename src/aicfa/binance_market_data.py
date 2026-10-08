@@ -153,7 +153,7 @@ class BinanceMarketDataProvider:
 
         total = self._validate_limit(limit)
         normalized_symbol = self._normalize_symbol(symbol)
-        interval = timeframe_ms(timeframe)
+        interval = None if timeframe == "1M" else timeframe_ms(timeframe)
         rows: list[list[object]] = []
         remaining = total
         next_start = int(since_ms) if since_ms is not None else None
