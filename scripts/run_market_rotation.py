@@ -24,7 +24,7 @@ SEVEN_BLOCKS = (
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run one finite AICFA production market rotation")
     parser.add_argument("--universe", default="config/market_universe.json")
-    parser.add_argument("--market-timeout", type=float, default=20.0)
+    parser.add_argument("--market-timeout", type=float, default=60.0)
     args = parser.parse_args()
 
     universe = load_market_universe(Path(args.universe))
