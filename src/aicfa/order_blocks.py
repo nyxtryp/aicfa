@@ -223,4 +223,20 @@ def build_order_blocks(
                 out.at[i, "order_block_bearish_volume_confirmed"] = int(ratio >= 1.5)
             out.at[i, "order_block_active"] = 1
 
+        # Persist active OB geometry on every subsequent candle. The setup
+        # engine reads the latest row, so a zone that was created earlier must
+        # remain addressable until its lifecycle invalidates it.
+        if active_bullish is not None:
+            low_bound, high_bound, state = active_bullish
+            out.at[i, "order_block_bullish_low"] = low_bound
+            out.at[i, "order_block_bullish_high"] = high_bound
+            out.at[i, "order_block_bullish_state"] = state
+            out.at[i, "order_block_active"] = 1
+        if active_bearish is not None:
+            low_bound, high_bound, state = active_bearish
+            out.at[i, "order_block_bearish_low"] = low_bound
+            out.at[i, "order_block_bearish_high"] = high_bound
+            out.at[i, "order_block_bearish_state"] = state
+            out.at[i, "order_block_active"] = 1
+
     return out
