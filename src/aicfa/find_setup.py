@@ -547,7 +547,7 @@ def find_setup(
         )
         if not trades.empty:
             trade_work = trades.copy()
-            trade_work["timestamp"] = pd.to_datetime(trade_work["timestamp"], unit="ms", utc=True)
+            trade_work["timestamp"] = pd.to_datetime(pd.to_numeric(trade_work["timestamp"], errors="coerce"), unit="ms", utc=True)
             latest_trade_timestamp = trade_work["timestamp"].max()
             flow_base = pd.DataFrame({"timestamp": [latest_trade_timestamp]})
             order_flow_analysis = build_trade_order_flow(
