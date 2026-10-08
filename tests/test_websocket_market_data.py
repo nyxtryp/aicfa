@@ -203,7 +203,7 @@ def test_transport_resubscribes_after_reconnect():
     sockets = [FakeSocket([]), FakeSocket([_message(interval="5m")])]
 
     def connector(url, *, timeout):
-        assert url == "wss://fstream.binance.com/market/ws"
+        assert url == "wss://fstream.binance.com/public/ws"
         return sockets.pop(0)
 
     transport = BinanceWebSocketMarketDataTransport(
