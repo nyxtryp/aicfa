@@ -167,15 +167,23 @@ class SetupRegistry:
                 if status in {"invalidated", "completed", "expired"}:
                     record["status"] = status.upper()
                     record["lifecycle_status"] = status
-                elif status in {"active", "tp1_hit"} and record.get("status") not in {"INVALIDATED", "COMPLETED"}:
+                elif status in {"active", "tp1_hit"} and record.get("status") not in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
+                    # A lifecycle-active setup can temporarily disappear from
+                    # the analytical setup candidates (for example during a
+                    # quiet/WAIT scan) without becoming stale. Lifecycle is a
+                    # separate source of truth for continued validity.
                     record["status"] = "ACTIVE"
                     record["lifecycle_status"] = status
+                    record["last_lifecycle_at_ms"] = now_ms
 
         for key, record in records.items():
             status = str(record.get("status", "")).upper()
             if status not in {"ACTIVE", "STALE"}:
                 continue
-            last_seen = int(record.get("last_seen_at_ms", record.get("created_at_ms", now_ms)))
+            last_seen = max(
+                int(record.get("last_seen_at_ms", record.get("created_at_ms", now_ms))),
+                int(record.get("last_lifecycle_at_ms", 0)),
+            )
             age = max(0, now_ms - last_seen)
             if age >= int(record.get("expire_after_ms", 0)):
                 record["status"] = "EXPIRED"
