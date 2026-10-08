@@ -189,7 +189,7 @@ def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
             ),
             MarketObservation(
                 concept_id="market_structure.choch",
-                timeframe="15m",
+                timeframe="1h",
                 state="observed",
                 confidence=1.0,
                 evidence=("choch_up=1",),
@@ -197,7 +197,7 @@ def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
             ),
             MarketObservation(
                 concept_id="liquidity.sweep",
-                timeframe="15m",
+                timeframe="1h",
                 state="observed",
                 confidence=1.0,
                 evidence=("sweep_low=1",),
