@@ -254,6 +254,7 @@ class LiveMarketCoordinator:
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="aicfa-live")
         self._threads: list[threading.Thread] = []
         self._seed_thread: threading.Thread | None = None
+        self._seed_done = threading.Event()
 
     @property
     def monitored_timeframes(self) -> tuple[str, ...]:
@@ -295,6 +296,11 @@ class LiveMarketCoordinator:
                 + " | ".join(failures[:20]),
                 flush=True,
             )
+        self._seed_done.set()
+
+    def wait_seed(self, timeout: float | None = None) -> bool:
+        """Wait until the initial REST/local history pass has completed."""
+        return self._seed_done.wait(timeout)
 
     def _handle(self, observation: WebSocketObservation) -> None:
         key = observation.key
