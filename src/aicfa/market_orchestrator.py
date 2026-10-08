@@ -183,9 +183,6 @@ def analyze_market_horizons(
     normalized_modes = tuple(modes)
     if not normalized_modes:
         raise ValueError("at least one trading mode is required")
-    if any(mode is TradingMode.SCALPING for mode in normalized_modes):
-        raise ValueError("scalping is isolated from the primary horizon scan")
-
     market_started = time.perf_counter()
     acquisition_started = time.perf_counter()
     shared_provider, symbol, prefetched_frames = _acquire_primary_snapshot(
