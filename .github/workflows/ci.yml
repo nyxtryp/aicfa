@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        partition: [0, 1, 2, 3]
+        partition: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files="$(PARTITION=${{ matrix.partition }} python -c 'import os,pathlib; ps=sorted(pathlib.Path("tests").glob("test_*.py")); p=int(os.environ["PARTITION"]); print(" ".join(str(x) for i,x in enumerate(ps) if i % 4 == p))')"
+          files="$(PARTITION=${{ matrix.partition }} python -c 'import os,pathlib; ps=sorted(pathlib.Path("tests").glob("test_*.py")); p=int(os.environ["PARTITION"]); print(" ".join(str(x) for i,x in enumerate(ps) if i % 8 == p))')"
           test -n "$files"
           python -m pytest -q --tb=short $files
 
