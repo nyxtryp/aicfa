@@ -189,6 +189,7 @@ function renderCandleChart(node,candles,s){
     }
   }
   obs.forEach(z=>rect(z,"rgba(255,184,77,.12)","rgba(255,184,77,.55)"));fvgs.forEach(z=>rect(z,"rgba(174,108,255,.13)","rgba(174,108,255,.6)"));
+  (chartData.liquidity||[]).forEach(z=>{const p=price(z);if(!Number.isFinite(p))return;const y=series.priceToCoordinate(p);const x1=xCoord(time(z.timeStart)),x2=xCoord(time(z.timeEnd));if(y==null||x1==null||x2==null)return;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([2,4]);ctx.strokeStyle=z.type==="buy"?"#5bd7ff":"#ff8b9e";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(z.type==="buy"?"BUY LIQ":"SELL LIQ",Math.min(w-55,Math.max(4,x1+4)),Math.max(11,y-4))});
   Object.entries(events).forEach(([name,list])=>{for(const e of list){const p=price(e);if(!Number.isFinite(p))continue;const y=series.priceToCoordinate(p);if(y==null)continue;let x1=xCoord(time(e.timeStart??e.startTime??e.time_start)),x2=xCoord(time(e.timeEnd??e.endTime??e.time_end));if(x1==null||x2==null)continue;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([5,5]);ctx.strokeStyle=name==="BOS"?"#f3c74f":name==="CHoCH"?"#67b7ff":"#ff9d66";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(name,Math.min(w-35,Math.max(4,x1+4)),Math.max(11,y-4))}})}
  function resize(){const w=Math.max(1,node.clientWidth),h=Math.max(1,node.clientHeight);chart.resize(w,h);overlay.width=Math.floor(w*dpr);overlay.height=Math.floor(h*dpr);overlay.style.width=w+"px";overlay.style.height=h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);drawOverlay()}
  chart.timeScale().fitContent();
@@ -226,10 +227,10 @@ function setupCard(x){
  '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-market-type="'+esc(x.market_type||"futures")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:fullChart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP1 <b>'+esc(tp)+'</b></span><span>RR / FRESHNESS <b>'+esc(rrText+" · "+freshness)+'</b></span></div></section>'+
  '<aside class="setup-side"><div class="scenario"><span class="panel-kicker">SCENARIO</span><p>'+esc(scenarioText(s))+'</p></div><div class="evidence"><span class="panel-kicker">EVIDENCE</span>'+evidence(s,x)+'</div><div class="decision"><span class="panel-kicker">WHY '+esc(side)+'</span><p>'+esc(why.length?why.join(" · "):"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></aside></div></article>';
 }
-function marketVisualCard(asset,mode,visual){
+function marketVisualCard(asset,mode,visual,marketType="futures"){
  const tf=chartTf(mode,{});
  const payload={chart:visual||{zones:[],events:[],liquidity:[]}};
- return '<article class="setup market-only"><header class="setup-head"><div class="symbol-block"><b>'+esc(asset)+'</b><span>'+esc(hor(mode))+' / MARKET STRUCTURE</span></div><div class="signal"><i></i><strong>ANALYSIS</strong></div></header><div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(asset||"")+'" data-market-type="futures" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify(payload))+'"></div><div class="chart-meta"><span>FVG / OB <b>VISIBLE</b></span><span>BOS / CHoCH / MSS <b>VISIBLE</b></span><span>LIQUIDITY <b>VISIBLE</b></span></div></section><aside class="setup-side"><div class="scenario"><span class="panel-kicker">MARKET MAP</span><p>All SMC geometry is taken from the same AICFA feature frames used by the scanner and projected onto the selected candles.</p></div><div class="evidence"><span class="panel-kicker">OBJECTS</span><p>FVG · Order Block · BOS · CHoCH · MSS · Liquidity</p></div></aside></div></article>';
+ return '<article class="setup market-only"><header class="setup-head"><div class="symbol-block"><b>'+esc(asset)+'</b><span>'+esc(hor(mode))+' / MARKET STRUCTURE</span></div><div class="signal"><i></i><strong>ANALYSIS</strong></div></header><div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(asset||"")+'" data-market-type="'+esc(marketType)+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify(payload))+'"></div><div class="chart-meta"><span>FVG / OB <b>VISIBLE</b></span><span>BOS / CHoCH / MSS <b>VISIBLE</b></span><span>LIQUIDITY <b>VISIBLE</b></span></div></section><aside class="setup-side"><div class="scenario"><span class="panel-kicker">MARKET MAP</span><p>All SMC geometry is taken from the same AICFA feature frames used by the scanner and projected onto the selected candles.</p></div><div class="evidence"><span class="panel-kicker">OBJECTS</span><p>FVG · Order Block · BOS · CHoCH · MSS · Liquidity</p></div></aside></div></article>';
 }
 function waitCards(ms){
  const out=[];
@@ -360,7 +361,7 @@ async function scanMarket(index){
    const root=$("#setups");
    root.dataset.signature="market-"+market.asset+JSON.stringify(visual);
    $("#workspaceTitle").textContent=market.asset+" · MARKET MAP";
-   root.innerHTML=marketVisualCard(market.asset,"INTRADAY",visual);
+   root.innerHTML=marketVisualCard(market.asset,"INTRADAY",visual,market.market_type||"futures");
    hydrateCharts();
   }
  }catch(error){
