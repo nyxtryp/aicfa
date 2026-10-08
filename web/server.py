@@ -43,7 +43,8 @@ def _journal_payload(path: str, query: dict[str, list[str]]) -> bytes:
     if path == "/api/health":
         scanner = _scanner_health()
         payload = {
-            "ok": bool(scanner.get("ok")),
+            "ok": bool(journal.path.is_file()),
+            "scanner_ok": bool(scanner.get("ok")),
             "journal": str(journal.path),
             "scanner": scanner.get("scanner", "unknown"),
             "scan_number": scanner.get("scan_number"),
