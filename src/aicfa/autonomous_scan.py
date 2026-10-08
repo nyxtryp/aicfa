@@ -23,6 +23,7 @@ from .market_orchestrator import (
     scan_universe,
 )
 from .market_universe import MarketUniverse
+from .setup_analysis import SetupAssessment, SetupDecision
 from .setup_lifecycle import ActiveSetup, SetupLifecycle
 from .persistent_journal import PersistentJournal
 from .setup_registry import SetupRegistry
@@ -196,6 +197,55 @@ class AutonomousScanEngine:
             now_ms + int(seconds * 1000.0),
         )
         return self._manual_pause_until_ms
+
+    def monitor_price(self, *, symbol: str, market_type: str, price: float, now_ms: int | None = None) -> tuple:
+        """Evaluate active setups against a realtime price without rerunning SMC."""
+        if price <= 0:
+            raise ValueError("price must be positive")
+        timestamp = self._clock_ms() if now_ms is None else int(now_ms)
+        wait = SetupAssessment(
+            decision=SetupDecision.NEED_MORE_EVIDENCE,
+            candidates=(),
+            missing_context=("realtime price monitoring",),
+            conflicts=(),
+            reasons=("price stream updates lifecycle only; it never creates a setup",),
+        )
+        results = []
+        horizons = {
+            setup.horizon
+            for setup in self.lifecycle.active_setups(
+                symbol=symbol, market_type=market_type
+            )
+        }
+        for horizon in horizons:
+            results.extend(
+                self.lifecycle.evaluate_all(
+                    symbol=symbol,
+                    market_type=market_type,
+                    horizon=horizon,
+                    assessment=wait,
+                    current_price=float(price),
+                    current_high=float(price),
+                    current_low=float(price),
+                    now_ms=timestamp,
+                )
+            )
+        result_tuple = tuple(results)
+        if self.registry is not None and result_tuple:
+            try:
+                self.registry.record_lifecycle_results(result_tuple, now_ms=timestamp)
+            except Exception as exc:
+                print(f"AICFA registry error: {type(exc).__name__}: {exc}", flush=True)
+        if self.journal is not None and result_tuple:
+            try:
+                self.journal.append(
+                    "lifecycle_price",
+                    timestamp,
+                    {"symbol": symbol, "market_type": market_type, "price": float(price), "results": result_tuple},
+                )
+            except Exception as exc:
+                print(f"AICFA journal error: {type(exc).__name__}: {exc}", flush=True)
+        return result_tuple
 
     @property
     def last_state(self) -> AutonomousScanState | None:
