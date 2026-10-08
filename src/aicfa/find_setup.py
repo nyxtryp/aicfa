@@ -546,15 +546,27 @@ def find_setup(
             )
         )
         if not trades.empty:
+            # Normalize venue trade timestamps once before passing the snapshot
+            # to every downstream enrichment. Some providers serialize epoch-ms
+            # values as strings; pandas no longer accepts those strings with
+            # unit="ms" in to_datetime. Keep the internal contract
+            # datetime64[ns, UTC] and pass the normalized frame onward.
             trade_work = trades.copy()
-            trade_work["timestamp"] = pd.to_datetime(pd.to_numeric(trade_work["timestamp"], errors="coerce"), unit="ms", utc=True)
+            trade_epoch_ms = pd.to_numeric(
+                trade_work["timestamp"], errors="coerce"
+            )
+            if trade_epoch_ms.isna().any():
+                raise ValueError("trade timestamp must be numeric epoch milliseconds")
+            trade_work["timestamp"] = pd.to_datetime(
+                trade_epoch_ms, unit="ms", utc=True
+            )
             latest_trade_timestamp = trade_work["timestamp"].max()
             flow_base = pd.DataFrame({"timestamp": [latest_trade_timestamp]})
             order_flow_analysis = build_trade_order_flow(
-                flow_base, trades, baseline_window=24, event_window=60
+                flow_base, trade_work, baseline_window=24, event_window=60
             )
             cvd_analysis = build_trade_cvd(
-                pd.DataFrame({"timestamp": [latest_trade_timestamp]}), trades
+                pd.DataFrame({"timestamp": [latest_trade_timestamp]}), trade_work
             )
 
     if request.market_type == "futures" or requirements.requires(DataKind.ORDER_BOOK):
