@@ -81,7 +81,8 @@ def test_registry_marks_unseen_setup_stale_then_expired(tmp_path):
 
     State.scanned_at_ms = 48 * 60 * 60_000
     registry.record_scan(State())
-    assert next(iter(registry.read().values()))["status"] == "EXPIRED"
+    assert next(iter(registry.read().values()))["status"] == "STALE"
+    assert registry.current() == ()
 
     
 def test_registry_keeps_lifecycle_active_setup_alive_during_analytical_wait(tmp_path):
