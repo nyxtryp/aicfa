@@ -408,7 +408,7 @@ def _zone_levels(
                 continue
             low = _numeric(row, low_col)
             high = _numeric(row, high_col)
-            if low is None or high is None or low > high:
+            if low is None or high is None or low > high or low <= 0 or high <= 0:
                 continue
             if current_price is not None:
                 if direction == "long" and low >= current_price:
@@ -519,7 +519,7 @@ def _invalidation_level(
             continue
         for column, source in preferred:
             value = _numeric(row, column)
-            if value is None:
+            if value is None or value <= 0:
                 continue
             if direction == "long" and value < entry_low:
                 candidates.append(SetupLevel(value=value, timeframe=timeframe, source=source))
@@ -674,7 +674,7 @@ def _target_levels(
             if row is None:
                 continue
             value = _numeric(row, column)
-            if value is None:
+            if value is None or value <= 0:
                 continue
             if current_price is not None:
                 if direction == "long" and value <= current_price:
