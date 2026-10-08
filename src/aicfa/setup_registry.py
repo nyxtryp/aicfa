@@ -234,6 +234,28 @@ class SetupRegistry:
 
         self._write(records)
 
+    def record_lifecycle_results(self, results: tuple[Any, ...], *, now_ms: int) -> None:
+        """Apply price-stream lifecycle transitions to the durable current projection."""
+        records = self._current_revision_records()
+        changed = False
+        for result in results:
+            identity = getattr(result, "identity", None)
+            key = self._key_from_identity(identity)
+            if not key or key not in records:
+                continue
+            status = getattr(getattr(result, "status", None), "value", None)
+            if status is None:
+                continue
+            record = records[key]
+            record["last_checked_at_ms"] = int(now_ms)
+            record["last_lifecycle_at_ms"] = int(now_ms)
+            if status in {"active", "tp1_hit", "invalidated", "completed", "expired"}:
+                record["lifecycle_status"] = status
+                record["status"] = "TP1_HIT" if status == "tp1_hit" else status.upper()
+                changed = True
+        if changed:
+            self._write(records)
+
     def current(self) -> tuple[dict[str, Any], ...]:
         # Actionable state is lifecycle-owned. Do not expire a real active
         # setup merely because a wall-clock TTL elapsed between rotations;
