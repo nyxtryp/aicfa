@@ -161,6 +161,8 @@ class SetupLifecycle:
         current_price: float,
         now_ms: int,
         expires_at_ms: int | None = None,
+        current_high: float | None = None,
+        current_low: float | None = None,
     ) -> tuple[SetupLifecycleResult, ...]:
         """Evaluate all existing setups and activate every distinct new candidate."""
         normalized = normalize_trading_mode(horizon)
@@ -180,7 +182,8 @@ class SetupLifecycle:
                 ))
                 continue
 
-            if self._hit_invalidation(active.candidate, current_price):
+            invalidation_price = current_low if active.candidate.direction == "long" and current_low is not None else current_high if active.candidate.direction == "short" and current_high is not None else current_price
+            if self._hit_invalidation(active.candidate, invalidation_price):
                 del self._active[setup_id]
                 results.append(SetupLifecycleResult(
                     SetupLifecycleStatus.INVALIDATED, active.candidate, "WAIT",
@@ -200,13 +203,14 @@ class SetupLifecycle:
             )
             self._active[setup_id] = refreshed
 
-            if self._hit_target(active.candidate, current_price, 1):
+            target2_price = current_high if active.candidate.direction == "long" and current_high is not None else current_low if active.candidate.direction == "short" and current_low is not None else current_price
+            if self._hit_target(active.candidate, target2_price, 1):
                 del self._active[setup_id]
                 results.append(SetupLifecycleResult(
                     SetupLifecycleStatus.COMPLETED, active.candidate, "WAIT",
                     "active setup reached Target 2 and is completed", setup_id,
                 ))
-            elif self._hit_target(active.candidate, current_price, 0):
+            elif self._hit_target(active.candidate, target2_price, 0):
                 results.append(SetupLifecycleResult(
                     SetupLifecycleStatus.TP1_HIT, active.candidate, active.candidate.direction.upper(),
                     "active setup remains valid after Target 1; Target 2 remains", setup_id,
@@ -235,9 +239,11 @@ class SetupLifecycle:
                     entry_already_passed = current_price < entry_low
                 if entry_already_passed:
                     continue
-                if self._hit_invalidation(candidate, current_price):
+                invalidation_price = current_low if candidate.direction == "long" and current_low is not None else current_high if candidate.direction == "short" and current_high is not None else current_price
+                target_price = current_high if candidate.direction == "long" and current_high is not None else current_low if candidate.direction == "short" and current_low is not None else current_price
+                if self._hit_invalidation(candidate, invalidation_price):
                     continue
-                if self._hit_target(candidate, current_price, 0):
+                if self._hit_target(candidate, target_price, 0):
                     continue
 
                 setup_id = self.identity(
@@ -283,6 +289,8 @@ class SetupLifecycle:
         now_ms: int,
         expires_at_ms: int | None = None,
         horizon: TradingMode | str = TradingMode.INTRADAY,
+        current_high: float | None = None,
+        current_low: float | None = None,
     ) -> SetupLifecycleResult:
         """Backward-compatible single-result view over evaluate_all()."""
         results = self.evaluate_all(
@@ -293,6 +301,8 @@ class SetupLifecycle:
             current_price=current_price,
             now_ms=now_ms,
             expires_at_ms=expires_at_ms,
+            current_high=current_high,
+            current_low=current_low,
         )
         return results[0]
 
