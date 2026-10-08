@@ -117,12 +117,10 @@ class DataRequirementPlan:
 
 
 _MODE_PROFILES = {
-    # Primary AICFA horizons. Scalping remains available as an isolated mode
-    # for the later dedicated fast/scalping product surface.
     TradingMode.SCALPING: ModeTimeframeProfile(
         TradingMode.SCALPING,
-        ("15m", "5m", "1m"),
-        (("15m", TimeframeRole.BROADER_CONTEXT), ("5m", TimeframeRole.HIGHER_STRUCTURE), ("1m", TimeframeRole.EXECUTION)),
+        ("1h", "15m", "5m"),
+        (("1h", TimeframeRole.BROADER_CONTEXT), ("15m", TimeframeRole.HIGHER_STRUCTURE), ("5m", TimeframeRole.EXECUTION)),
     ),
     TradingMode.INTRADAY: ModeTimeframeProfile(
         TradingMode.INTRADAY,
