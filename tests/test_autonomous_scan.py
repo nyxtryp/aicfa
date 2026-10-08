@@ -46,6 +46,7 @@ def _candidate():
 
 def _result(asset, mode):
     execution = {
+        TradingMode.SCALPING: "5m",
         TradingMode.INTRADAY: "5m",
         TradingMode.SWING: "1h",
         TradingMode.POSITION: "4h",
@@ -87,8 +88,8 @@ def test_scan_once_reuses_lifecycle_state(monkeypatch):
     assert first.scan_number == 1
     assert second.scan_number == 2
     assert engine.last_state == second
-    assert len(calls) == 12
-    assert len(engine.active_setups()) == 6
+    assert len(calls) == 16
+    assert len(engine.active_setups()) == 8
 
 
 def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
@@ -115,7 +116,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
             request=SimpleNamespace(market_type="spot"),
             analysis=pd.DataFrame({"timestamp": [1_000 + calls["count"]]}),
             frames={
-                {TradingMode.INTRADAY: "5m", TradingMode.SWING: "1h", TradingMode.POSITION: "4h"}[request.mode]:
+                {TradingMode.SCALPING: "5m", TradingMode.INTRADAY: "5m", TradingMode.SWING: "1h", TradingMode.POSITION: "4h"}[request.mode]:
                 pd.DataFrame({"close": [101.0]})
             },
             decision="LONG",
@@ -131,7 +132,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
     engine.scan_once(now_ms=1_000)
     engine.scan_once(now_ms=2_000)
 
-    assert len(engine.active_setups(symbol="BTC/USDT")) == 4
+    assert len(engine.active_setups(symbol="BTC/USDT")) == 5
 
 
 def test_run_forever_can_be_stopped_after_a_scan(monkeypatch):
