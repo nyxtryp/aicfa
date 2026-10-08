@@ -73,6 +73,7 @@ def _pipeline(frames):
         observations=evidence.observations,
         analyses=frames,
         timeframes=TFS,
+        mode="swing",
     )
 
 
