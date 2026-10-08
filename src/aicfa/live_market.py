@@ -259,6 +259,7 @@ class LiveMarketCoordinator:
         self._dispatch_lock = threading.RLock()
         self._scheduled_keys: set[MarketKey] = set()
         self._pending_observations: dict[MarketKey, WebSocketObservation] = {}
+        self._resolved_market_keys: tuple[tuple[int, MarketKey], ...] = ()
 
     @property
     def monitored_timeframes(self) -> tuple[str, ...]:
@@ -382,13 +383,48 @@ class LiveMarketCoordinator:
         )
         self._seed_thread.start()
 
+        # Symbol resolution used to happen serially here. One unmapped/slow
+        # market could therefore block startup for minutes, before the control
+        # endpoint and initial scanner were even started. Resolve the configured
+        # universe in bounded parallelism and keep failed markets out of the WS
+        # transport; the canonical scanner can still resolve/fallback that market
+        # when a manual or initial scan explicitly reaches it.
+        def resolve_market(item: tuple[int, object]):
+            index, market = item
+            self.cache.register_market_symbols(
+                market.asset, market.venue_symbols, market_type=market.market_type
+            )
+            symbol = self.cache.resolve_symbol(
+                market.asset, market_type=market.market_type
+            )
+            return index, market.market_type, symbol
+
+        resolved: list[tuple[int, str, str]] = []
+        with ThreadPoolExecutor(max_workers=min(12, max(1, len(self.universe.markets)))) as pool:
+            futures = [
+                pool.submit(resolve_market, (index, market))
+                for index, market in enumerate(self.universe.markets)
+            ]
+            for future in futures:
+                try:
+                    resolved.append(future.result())
+                except Exception as exc:
+                    print(
+                        f"AICFA live symbol resolution skipped market: "
+                        f"{type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+
         by_market_type: dict[str, list[MarketKey]] = {}
-        for market in self.universe.markets:
-            symbol = self.cache.resolve_symbol(market.asset, market_type=market.market_type)
+        resolved_pairs: list[tuple[int, MarketKey]] = []
+        for index, market_type, symbol in resolved:
             for timeframe in self.monitored_timeframes:
-                by_market_type.setdefault(market.market_type, []).append(
-                    MarketKey("binance", symbol, market.market_type, timeframe)
-                )
+                key = MarketKey("binance", symbol, market_type, timeframe)
+                by_market_type.setdefault(market_type, []).append(key)
+            resolved_pairs.append((index, MarketKey("binance", symbol, market_type, "5m")))
+
+        self._resolved_market_keys = tuple(resolved_pairs)
+
         # Six candle timeframes per market => 900 streams at 150 markets.
         # Keep each connection below Binance's 1024-stream ceiling and open a
         # second connection automatically as the configured universe grows.
