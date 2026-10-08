@@ -1026,20 +1026,16 @@ def analyze_setups(
             if not target_levels:
                 missing.append(f"{hypothesis.scenario}: no geometrically valid target is available")
                 continue
-            # A setup is not actionable if the first causal target does not
-            # provide at least 2R from the structural invalidation. RR is not
-            # used to invent geometry; it is a final viability gate after
-            # Entry/SL/TP have been derived from structure.
+            # RR is derived from structural Entry/SL/TP geometry. It is
+            # exposed for evaluation, but activation is decided by lifecycle:
+            # the setup must actually reach the POI and satisfy the actionable
+            # risk/reward policy there. This keeps structural analysis honest
+            # without allowing RR to invent or distort the geometry.
             rr = _risk_reward_value(
                 direction, entry_levels, invalidation_level, target_levels
             )
-            if rr is None or rr < 2.0:
-                missing.append(
-                    f"{hypothesis.scenario}: structural RR {rr:.2f}R is below the 2.0R minimum"
-                    if rr is not None
-                    else f"{hypothesis.scenario}: structural RR cannot be calculated"
-                )
-                continue
+            if rr is not None:
+                rationale = _unique(list(rationale) + [f"structural RR: {rr:.2f}R"])
 
         candidates.append(
             SetupCandidate(
