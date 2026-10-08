@@ -84,7 +84,7 @@ def _scanner_health() -> dict[str, object]:
         return {"ok": False, "scanner": "unavailable", "error": str(exc)}
 
 
-def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
+def _chart_data(symbol: str, timeframe: str, limit: int = 160, market_type: str = "futures") -> bytes:
     raw = symbol.strip().upper()
     normalized = raw.replace("/", "_").replace(":", "_")
     if normalized.endswith("_USDT_USDT"):
@@ -95,6 +95,9 @@ def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
         raise ValueError("invalid symbol")
     if timeframe not in {"1m", "5m", "15m", "1h", "4h", "1d", "1w"}:
         raise ValueError("invalid timeframe")
+    market_type = str(market_type or "futures").strip().lower()
+    if market_type not in {"spot", "futures"}:
+        raise ValueError("invalid market_type")
     try:
         limit = max(20, min(int(limit), 300))
     except (TypeError, ValueError):
@@ -136,7 +139,7 @@ def _chart_data(symbol: str, timeframe: str, limit: int = 160) -> bytes:
     if not rows:
         from urllib.parse import urlencode
         quote = aliases.get(normalized, normalized).replace("_", "")
-        if raw.endswith(":USDT"):
+        if market_type == "futures" or raw.endswith(":USDT"):
             endpoint = "https://fapi.binance.com/fapi/v1/klines"
         else:
             endpoint = "https://api.binance.com/api/v3/klines"
@@ -300,7 +303,7 @@ class Handler(SimpleHTTPRequestHandler):
             from urllib.parse import parse_qs
             query = parse_qs(urlsplit(self.path).query)
             try:
-                self._json(200, _chart_data(query.get("symbol", [""])[0], query.get("timeframe", ["15m"])[0], query.get("limit", ["160"])[0]))
+                self._json(200, _chart_data(query.get("symbol", [""])[0], query.get("timeframe", ["15m"])[0], query.get("limit", ["160"])[0], query.get("market_type", ["futures"])[0]))
             except FileNotFoundError:
                 self._json(404, b'{"error":"chart_data_not_found"}')
             except ValueError as exc:
