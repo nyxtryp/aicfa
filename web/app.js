@@ -89,7 +89,28 @@ function scenarioText(s){
  };
  return map[String(s.scenario||"").toLowerCase()]||"Scenario is supported by the currently observed market evidence.";
 }
-function chartTf(_mode,setup){const entry=Array.isArray(setup?.entry_zone)?setup.entry_zone[0]:null;return String(entry?.timeframe||setup?.timeframe||"").toLowerCase()}
+function chartTf(mode,setup){
+ const entry=Array.isArray(setup?.entry_zone)?setup.entry_zone[0]:null;
+ if(entry?.timeframe)return String(entry.timeframe).toLowerCase();
+ const m=String(mode||"").toUpperCase();
+ return m==="POSITION"?"1d":m==="SWING"?"4h":"1h";
+}
+function mergeVisualCharts(base,extra){
+ const a=base||{},b=extra||{};
+ return {
+  zones:[...(a.zones||[]),...(b.zones||[])],
+  events:[...(a.events||[]),...(b.events||[])],
+  liquidity:[...(a.liquidity||[]),...(b.liquidity||[])]
+ };
+}
+function marketVisual(asset,mode){
+ const rows=latest(scans());
+ const m=rows.find(x=>String(x.asset||"").toUpperCase()===String(asset||"").toUpperCase());
+ const horizons=m?.horizons||[];
+ const wanted=String(mode||"").toUpperCase();
+ const h=horizons.find(x=>String(x.mode||"").toUpperCase()===wanted)||horizons[0];
+ return h?.chart||null;
+}
 function renderCandleChart(node,candles,s){
  if(!candles?.length){node.innerHTML='<div class="chart-empty">NO OHLCV DATA</div>';return}
  if(!window.LightweightCharts){node.innerHTML='<div class="chart-empty">CHART LIBRARY UNAVAILABLE</div>';return}
@@ -188,6 +209,7 @@ async function hydrateCharts(){
 }
 function setupCard(x){
  const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
+ const fullChart=mergeVisualCharts(marketVisual(x.asset,x.mode),s.chart);
  const low=entry.length?Math.min(...entry.map(v=>Number(v.value))):NaN,high=entry.length?Math.max(...entry.map(v=>Number(v.value))):NaN,stop=Number(s.invalidation_level?.value),take=targets.length?Number(targets[0]?.value):NaN;
  const geometryValid=Number.isFinite(low)&&Number.isFinite(high)&&low>0&&high>0&&Number.isFinite(stop)&&stop>0&&Number.isFinite(take)&&take>0;
  const risk=Number.isFinite(low)&&Number.isFinite(high)&&Number.isFinite(stop)?(dir(s)==="LONG"?low-stop:stop-high):NaN;
@@ -201,8 +223,13 @@ function setupCard(x){
  const side=dir(s),tf=chartTf(x.mode,s);
  return '<article class="setup '+side.toLowerCase()+'">'+
  '<header class="setup-head"><div class="symbol-block"><b>'+esc(x.asset)+'</b><span>'+esc(hor(x.mode))+' / '+esc(s.scenario||"SETUP")+'</span></div><div class="signal"><i></i><strong>'+esc(side)+'</strong></div></header>'+
- '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-market-type="'+esc(x.market_type||"futures")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:s.chart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP1 <b>'+esc(tp)+'</b></span><span>RR / FRESHNESS <b>'+esc(rrText+" · "+freshness)+'</b></span></div></section>'+
+ '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-market-type="'+esc(x.market_type||"futures")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:fullChart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP1 <b>'+esc(tp)+'</b></span><span>RR / FRESHNESS <b>'+esc(rrText+" · "+freshness)+'</b></span></div></section>'+
  '<aside class="setup-side"><div class="scenario"><span class="panel-kicker">SCENARIO</span><p>'+esc(scenarioText(s))+'</p></div><div class="evidence"><span class="panel-kicker">EVIDENCE</span>'+evidence(s,x)+'</div><div class="decision"><span class="panel-kicker">WHY '+esc(side)+'</span><p>'+esc(why.length?why.join(" · "):"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></aside></div></article>';
+}
+function marketVisualCard(asset,mode,visual){
+ const tf=chartTf(mode,{});
+ const payload={chart:visual||{zones:[],events:[],liquidity:[]}};
+ return '<article class="setup market-only"><header class="setup-head"><div class="symbol-block"><b>'+esc(asset)+'</b><span>'+esc(hor(mode))+' / MARKET STRUCTURE</span></div><div class="signal"><i></i><strong>ANALYSIS</strong></div></header><div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(asset||"")+'" data-market-type="futures" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify(payload))+'"></div><div class="chart-meta"><span>FVG / OB <b>VISIBLE</b></span><span>BOS / CHoCH / MSS <b>VISIBLE</b></span><span>LIQUIDITY <b>VISIBLE</b></span></div></section><aside class="setup-side"><div class="scenario"><span class="panel-kicker">MARKET MAP</span><p>All SMC geometry is taken from the same AICFA feature frames used by the scanner and projected onto the selected candles.</p></div><div class="evidence"><span class="panel-kicker">OBJECTS</span><p>FVG · Order Block · BOS · CHoCH · MSS · Liquidity</p></div></aside></div></article>';
 }
 function waitCards(ms){
  const out=[];
@@ -325,9 +352,16 @@ async function scanMarket(index){
   }else{
    ui.centerKey=null;
    ui.selected=null;
-   ui.centerEmpty=true;
+   ui.centerEmpty=false;
    ui.centerEmptyMarket=market.asset;
-   renderCenter();
+   const fresh=await getJson("/journal/scans?limit=50",{events:[]});
+   state.events=fresh.events||state.events;
+   const visual=marketVisual(market.asset,"INTRADAY");
+   const root=$("#setups");
+   root.dataset.signature="market-"+market.asset+JSON.stringify(visual);
+   $("#workspaceTitle").textContent=market.asset+" · MARKET MAP";
+   root.innerHTML=marketVisualCard(market.asset,"INTRADAY",visual);
+   hydrateCharts();
   }
  }catch(error){
   ui.centerKey=null;
