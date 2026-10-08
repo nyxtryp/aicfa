@@ -328,7 +328,10 @@ class BybitMarketDataProvider:
                 break
 
             if next_start is not None:
-                next_value = max(timestamps) + interval
+                if interval is None:
+                    next_value = int((pd.Timestamp(max(timestamps), unit="ms", tz="UTC") + pd.offsets.MonthBegin(1)).timestamp() * 1000)
+                else:
+                    next_value = max(timestamps) + interval
                 if next_value <= next_start:
                     break
                 next_start = next_value
