@@ -145,7 +145,7 @@ jobs:
             done
             exit "$TOTAL_RC"
           } 2>&1 | tee "$OUTPUT"
-          TEST_PIPE_RC=\${PIPESTATUS[0]}
+          TEST_PIPE_RC=${PIPESTATUS[0]}
 
           echo "=== AICFA GITHUB TEST RESULT ===" >>"$OUTPUT"
           echo "exit_code: $TEST_PIPE_RC" >>"$OUTPUT"
