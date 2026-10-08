@@ -69,6 +69,7 @@ def _evidence():
         asset="BTC/USDT",
         observations=observations,
         timeframes=TFS,
+        mode="swing",
     )
 
 
@@ -213,6 +214,7 @@ def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
             ),
         ),
         timeframes=TFS,
+        mode="swing",
     )
     assessment = assess_market_evidence(evidence)
     scenarios = assess_scenarios(assessment)
@@ -222,6 +224,7 @@ def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
         observations=evidence.observations,
         analyses=frames,
         timeframes=TFS,
+        mode="swing",
     )
 
     assert len(result.candidates) == 1
@@ -295,6 +298,7 @@ def test_setup_engine_uses_scenario_specific_zone_family():
             ),
         ),
         timeframes=TFS,
+        mode="swing",
     )
     assessment = assess_market_evidence(evidence)
     scenarios = assess_scenarios(assessment)
@@ -304,6 +308,7 @@ def test_setup_engine_uses_scenario_specific_zone_family():
         observations=evidence.observations,
         analyses=frames,
         timeframes=TFS,
+        mode="swing",
     )
 
     by_scenario = {candidate.scenario: candidate for candidate in result.candidates}
