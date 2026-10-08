@@ -164,3 +164,50 @@ def test_registry_does_not_queue_pending_candidate_without_lifecycle_activation(
     registry.record_scan(State())
     assert registry.read() == {}
     assert registry.current() == ()
+
+
+def test_registry_migrates_only_lifecycle_owned_revision_three_setup(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+    registry._write({
+        "BTC/USDT|spot|INTRADAY|continuation|long|1h": {
+            "strategy_revision": 3,
+            "status": "ACTIVE",
+            "lifecycle_status": "active",
+            "asset": "BTC/USDT",
+            "last_seen_at_ms": 1000,
+        },
+        "ETH/USDT|spot|INTRADAY|continuation|long|1h": {
+            "strategy_revision": 2,
+            "status": "ACTIVE",
+            "lifecycle_status": "active",
+            "asset": "ETH/USDT",
+            "last_seen_at_ms": 1000,
+        },
+    })
+
+    current = registry.current()
+
+    assert len(current) == 1
+    assert current[0]["asset"] == "BTC/USDT"
+    assert current[0]["strategy_revision"] == 4
+    records = registry.read()
+    assert records["BTC/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 4
+    assert records["ETH/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 2
+
+
+def test_registry_migrates_tp1_hit_but_keeps_it_out_of_actionable_queue(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+    registry._write({
+        "CAKE/USDT|spot|INTRADAY|reversal|short|1h": {
+            "strategy_revision": 3,
+            "status": "TP1_HIT",
+            "lifecycle_status": "tp1_hit",
+            "asset": "CAKE/USDT",
+            "last_seen_at_ms": 1000,
+        },
+    })
+
+    assert registry.current() == ()
+    record = next(iter(registry.read().values()))
+    assert record["strategy_revision"] == 4
+    assert record["status"] == "TP1_HIT"
