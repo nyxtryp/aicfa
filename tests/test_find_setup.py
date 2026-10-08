@@ -152,6 +152,31 @@ def test_find_setup_timeframes_match_exact_mode_contract(mode, expected):
         assert all(call[2] != "1m" for call in provider.calls)
 
 
+def test_find_setup_normalizes_string_trade_epoch_milliseconds():
+    provider = FakeProvider()
+    original_fetch_trades = provider.fetch_trades
+
+    def fetch_string_trades(*, symbol, market_type, limit):
+        frame = original_fetch_trades(
+            symbol=symbol, market_type=market_type, limit=limit
+        )
+        frame["timestamp"] = frame["timestamp"].astype(str)
+        return frame
+
+    provider.fetch_trades = fetch_string_trades
+
+    result = find_setup(
+        FindSetupRequest("BTC/USDT", market_type="futures"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+        limit=120,
+    )
+
+    assert result.order_flow_analysis.shape[0] == 1
+    assert result.cvd_analysis.shape[0] == 1
+
+
 def test_find_setup_does_not_decide_from_an_open_latest_candle():
     provider = FakeProvider()
     result = find_setup(
