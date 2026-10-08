@@ -93,7 +93,9 @@ class SetupRegistry:
         }
         now_ms = int(state.scanned_at_ms)
 
+        scanned_assets: set[str] = set()
         for market in state.result.markets:
+            scanned_assets.add(str(market.asset))
             asset = market.asset
             market_type = "spot"
             market_keys: set[str] = set()
@@ -179,6 +181,17 @@ class SetupRegistry:
                     record["lifecycle_status"] = "stale"
                     record["last_checked_at_ms"] = now_ms
 
+
+        # A full scan state is authoritative: markets absent from this
+        # rotation were not observed and must not remain actionable forever.
+        for key, record in records.items():
+            if str(record.get("asset", "")) in scanned_assets:
+                continue
+            if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
+                continue
+            record["status"] = "STALE"
+            record["lifecycle_status"] = "stale"
+            record["last_checked_at_ms"] = now_ms
 
         self._write(records)
 
