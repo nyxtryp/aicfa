@@ -1,8 +1,6 @@
 from types import SimpleNamespace
 
 import pandas as pd
-import pytest
-
 from aicfa.data_requirements import TradingMode
 from aicfa.setup_analysis import SetupCandidate, SetupLevel
 from aicfa.market_orchestrator import (
@@ -64,6 +62,7 @@ def _candidate(direction="long", scenario="continuation"):
 
 def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAIT"):
     execution = {
+        TradingMode.SCALPING: "5m",
         TradingMode.INTRADAY: "5m",
         TradingMode.SWING: "1h",
         TradingMode.POSITION: "4h",
@@ -154,13 +153,23 @@ def test_distinct_concurrent_horizon_setups_are_preserved(monkeypatch):
     assert [item.description.direction for item in result.setups] == ["long", "long", "short"]
 
 
-def test_primary_orchestrator_rejects_scalping(monkeypatch):
-    with pytest.raises(ValueError, match="scalping"):
-        analyze_market_horizons(
-            "BTC/USDT",
-            now_ms=1000,
-            modes=(TradingMode.SCALPING,),
-        )
+def test_primary_orchestrator_supports_scalping(monkeypatch):
+    calls = []
+
+    def fake_find_setup(request, **kwargs):
+        calls.append(request.mode)
+        return _fake_result(request.asset, request.mode, decision="WAIT")
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    result = analyze_market_horizons(
+        "BTC/USDT",
+        now_ms=1000,
+        modes=(TradingMode.SCALPING,),
+    )
+
+    assert [item.mode for item in result.results] == [TradingMode.SCALPING]
+    assert calls == [TradingMode.SCALPING]
 
 
 def test_configured_market_universe_controls_assets_and_market_type(monkeypatch):
