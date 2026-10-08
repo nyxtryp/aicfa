@@ -129,6 +129,15 @@ class LiveMarketDataCache:
             symbol=symbol, market_type=market_type, timeframe=timeframe,
             since_ms=since_ms, limit=limit,
         )
+        merged = merge_ohlcv(cached if cached is not None else pd.DataFrame(), incoming)
+        if not merged.empty:
+            with self._lock:
+                merged = merged.tail(
+                    self.store.windows.get(timeframe, max(int(limit), 500))
+                ).reset_index(drop=True)
+                self._frames[key] = merged
+                self.store.append(key, incoming)
+        return merged.tail(limit).copy()
 
     def fetch_trades(self, *, symbol, market_type, limit):
         return self.upstream.fetch_trades(symbol=symbol, market_type=market_type, limit=limit)
