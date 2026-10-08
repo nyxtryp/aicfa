@@ -101,7 +101,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
                 SetupLevel(100.5, "15m", "second FVG low"),
                 SetupLevel(101.5, "15m", "second FVG high"),
             ),
-            "invalidation_level": SetupLevel(92.0, "5m", "second invalidation"),
+            "invalidation_level": SetupLevel(95.0, "5m", "second invalidation"),
         }
     )
     calls = {"count": 0}
