@@ -37,6 +37,9 @@ jobs:
                 systemctl --no-pager --full status fd-aicfa || true
               } >"$OUTPUT" 2>&1
               ;;
+            "/aicfa lifecycle-tests")
+              .venv/bin/pytest -q tests/test_setup_lifecycle.py tests/test_persistent_journal.py >"$OUTPUT" 2>&1
+              ;;
             "/aicfa features")
               .venv/bin/pytest -q tests/test_features.py >"$OUTPUT" 2>&1
               ;;
@@ -110,7 +113,7 @@ PY
               } >"$OUTPUT" 2>&1
               ;;
             *)
-              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa features, /aicfa git, /aicfa inspect-grt, /aicfa deploy-diagnose" >"$OUTPUT"
+              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa lifecycle-tests, /aicfa features, /aicfa git, /aicfa inspect-grt, /aicfa deploy-diagnose" >"$OUTPUT"
               ;;
           esac
 
