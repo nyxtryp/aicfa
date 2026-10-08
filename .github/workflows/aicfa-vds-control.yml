@@ -1,0 +1,43 @@
+name: AICFA VDS Control
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  control:
+    if: github.event.issue.pull_request == null && github.event.comment.author_association == 'OWNER'
+    runs-on: self-hosted
+    steps:
+      - name: Run allowed command
+        env:
+          COMMAND: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          cd /srv/frostdeploy/aicfa
+
+          case "$COMMAND" in
+            "/aicfa status")
+              echo "=== git status ==="
+              git status --short --branch
+              echo "=== service ==="
+              systemctl --no-pager --full status fd-aicfa || true
+              ;;
+            "/aicfa tests")
+              .venv/bin/pytest -q
+              ;;
+            "/aicfa features")
+              .venv/bin/pytest -q tests/test_features.py
+              ;;
+            "/aicfa git")
+              git log -5 --oneline --decorate
+              ;;
+            *)
+              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa features, /aicfa git"
+              exit 1
+              ;;
+          esac
