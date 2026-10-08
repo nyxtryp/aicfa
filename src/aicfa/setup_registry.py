@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from pathlib import Path
 from typing import Any
 
@@ -16,19 +15,7 @@ from .data_requirements import TradingMode, mode_timeframe_profile, normalize_tr
 from .persistent_journal import _jsonable, _visual_geometry
 
 
-TIMEFRAME_MS = {
-    "1m": 60_000,
-    "5m": 5 * 60_000,
-    "15m": 15 * 60_000,
-    "1h": 60 * 60_000,
-    "4h": 4 * 60 * 60_000,
-    "1d": 24 * 60 * 60_000,
-    "1w": 7 * 24 * 60 * 60_000,
-}
-
-STALE_EXECUTION_CANDLES = 2
-EXPIRE_EXECUTION_CANDLES = 4
-REGISTRY_REVISION = 3
+REGISTRY_REVISION = 4
 
 
 class SetupRegistry:
@@ -79,19 +66,6 @@ class SetupRegistry:
             str(identity.direction).strip().lower(),
             mode_timeframe_profile(normalize_trading_mode(identity.horizon)).structure_timeframe,
         ))
-
-    @staticmethod
-    def _mode_ttl_ms(mode: TradingMode | str) -> tuple[int, int]:
-        normalized = normalize_trading_mode(mode)
-        # Terminal freshness is governed by the execution timeframe, not the
-        # higher structural timeframe. An Intraday setup must not remain in
-        # the actionable queue for hours just because its 1h structure is old.
-        tf = mode_timeframe_profile(normalized).execution_timeframe
-        candle_ms = TIMEFRAME_MS[tf]
-        return (
-            STALE_EXECUTION_CANDLES * candle_ms,
-            EXPIRE_EXECUTION_CANDLES * candle_ms,
-        )
 
     def read(self) -> dict[str, dict[str, Any]]:
         if not self.path.exists():
@@ -154,7 +128,6 @@ class SetupRegistry:
                 if result is not None:
                     payload["chart"] = _visual_geometry(result, candidate)
                 market_keys.add(key)
-                stale_after, expire_after = self._mode_ttl_ms(setup.mode)
                 records[key] = {
                     **previous,
                     "strategy_revision": REGISTRY_REVISION,
@@ -172,8 +145,6 @@ class SetupRegistry:
                     "last_confirmed_at_ms": now_ms,
                     "last_checked_at_ms": now_ms,
                     "last_scan_number": int(state.scan_number),
-                    "stale_after_ms": stale_after,
-                    "expire_after_ms": expire_after,
                     "setup": payload,
                 }
 
@@ -208,42 +179,23 @@ class SetupRegistry:
                     record["lifecycle_status"] = "stale"
                     record["last_checked_at_ms"] = now_ms
 
-        for key, record in records.items():
-            status = str(record.get("status", "")).upper()
-            if status not in {"ACTIVE", "TP1_HIT", "STALE"}:
-                continue
-            last_seen = max(
-                int(record.get("last_seen_at_ms", record.get("created_at_ms", now_ms))),
-                int(record.get("last_lifecycle_at_ms", 0)),
-            )
-            age = max(0, now_ms - last_seen)
-            if age >= int(record.get("expire_after_ms", 0)):
-                record["status"] = "EXPIRED"
-            elif age >= int(record.get("stale_after_ms", 0)):
-                record["status"] = "STALE"
 
         self._write(records)
 
     def current(self) -> tuple[dict[str, Any], ...]:
-        now_ms = int(time.time() * 1000)
+        # Actionable state is lifecycle-owned. Do not expire a real active
+        # setup merely because a wall-clock TTL elapsed between rotations;
+        # the lifecycle engine must invalidate it from actual price action.
         records = []
         for record in self.read().values():
             if int(record.get("strategy_revision", 0)) != REGISTRY_REVISION:
                 continue
-            # Never present an ACTIVE setup after its execution-time freshness
-            # window has elapsed, even when no new rotation has written the file.
             if str(record.get("status", "")).upper() != "ACTIVE":
-                continue
-            last_seen = max(
-                int(record.get("last_seen_at_ms", record.get("created_at_ms", 0))),
-                int(record.get("last_lifecycle_at_ms", 0)),
-            )
-            stale_after = int(record.get("stale_after_ms", 0))
-            if stale_after <= 0 or now_ms - last_seen >= stale_after:
                 continue
             records.append(record)
         records.sort(key=lambda x: -int(x.get("last_seen_at_ms", 0)))
         return tuple(records)
+
 
 
 __all__ = ["SetupRegistry"]
