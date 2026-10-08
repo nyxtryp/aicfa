@@ -148,15 +148,16 @@ def _acquire_primary_snapshot(
     return shared, symbol, {timeframe: item.frame for timeframe, item in snapshot.items()}
 
 
-def _latest_execution_price(result: FindSetupResult, mode: TradingMode) -> float:
-    """Read the latest completed execution close used by lifecycle evaluation."""
+def _latest_execution_range(result: FindSetupResult, mode: TradingMode) -> tuple[float, float, float]:
+    """Read the latest completed execution candle close/high/low for lifecycle checks."""
     timeframe = mode_timeframe_profile(mode).execution_timeframe
     frame = result.frames.get(timeframe)
-    if frame is None or frame.empty or "close" not in frame.columns:
+    if frame is None or frame.empty or not {"close", "high", "low"}.issubset(frame.columns):
         raise ValueError(
-            f"execution timeframe {timeframe} has no close data for lifecycle evaluation"
+            f"execution timeframe {timeframe} has no OHLC data for lifecycle evaluation"
         )
-    return float(frame["close"].iloc[-1])
+    row = frame.iloc[-1]
+    return float(row["close"]), float(row["high"]), float(row["low"])
 
 
 def analyze_market_horizons(
@@ -253,12 +254,15 @@ def analyze_market_horizons(
 
         mode_lifecycle: tuple[SetupLifecycleResult, ...] = ()
         if lifecycle is not None:
+            execution_close, execution_high, execution_low = _latest_execution_range(result, mode)
             mode_lifecycle = lifecycle.evaluate_all(
                 symbol=result.symbol,
                 market_type=market_type,
                 horizon=mode,
                 assessment=result.setup_assessment,
-                current_price=_latest_execution_price(result, mode),
+                current_price=execution_close,
+                current_high=execution_high,
+                current_low=execution_low,
                 now_ms=now_ms,
             )
             lifecycle_results.extend(mode_lifecycle)
