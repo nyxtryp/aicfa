@@ -21,7 +21,7 @@ def _candidate():
         ),
         invalidation_level=SetupLevel(95.0, "5m", "sell-side liquidity"),
         target_levels=(
-            SetupLevel(110.0, "4h", "previous high"),
+            SetupLevel(115.0, "4h", "previous high"),
             SetupLevel(120.0, "1d", "previous high"),
         ),
         confirmation_timeframes=("15m", "5m"),
@@ -198,7 +198,7 @@ def test_multiple_distinct_candidates_activate_and_remain_independent():
         assessment=assessment,
         current_price=101.0,
         current_high=103.0,
-        current_low=95.0,
+        current_low=99.0,
         now_ms=1_000,
     )
 
@@ -305,7 +305,7 @@ def test_long_setup_reaching_tp1_on_execution_candle_is_not_reported_as_fresh_en
         market_type="spot",
         assessment=_ready(),
         current_price=106.0,
-        current_high=111.0,
+        current_high=116.0,
         current_low=100.5,
         now_ms=1_000,
     )
