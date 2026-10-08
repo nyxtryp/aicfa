@@ -24,6 +24,38 @@ from aicfa.scenario_reasoning import ScenarioAssessment, ScenarioHypothesis
 from aicfa.visual_evidence import VisualObservation
 
 SETUP_TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
+
+_TIMEFRAME_MS = {
+    "1m": 60_000,
+    "5m": 5 * 60_000,
+    "15m": 15 * 60_000,
+    "1h": 60 * 60_000,
+    "4h": 4 * 60 * 60_000,
+    "1d": 24 * 60 * 60_000,
+    "1w": 7 * 24 * 60 * 60_000,
+}
+_MAX_INVALIDATION_AGE_CANDLES = 12
+
+
+def _timestamp_ms(value: object) -> int | None:
+    try:
+        if isinstance(value, pd.Timestamp):
+            return int(value.value // 1_000_000)
+        numeric = float(value)
+        if abs(numeric) >= 1e11:
+            return int(numeric)
+        return int(numeric * 1000)
+    except (TypeError, ValueError, OverflowError):
+        try:
+            return int(pd.Timestamp(value).value // 1_000_000)
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+
+def _row_timestamp_ms(row: pd.Series) -> int | None:
+    if "timestamp" in row.index:
+        return _timestamp_ms(row.get("timestamp"))
+    return _timestamp_ms(row.name)
 _HIGHER_STRUCTURE = ("1w", "1d", "4h", "1h")
 _CONFIRMATION = ("15m", "5m")
 _EXECUTION = ("1m",)
@@ -516,6 +548,12 @@ def _invalidation_level(
     for timeframe in ordered_timeframes:
         row = context.latest_rows.get(timeframe)
         if row is None:
+            continue
+        row_ts = _row_timestamp_ms(row)
+        execution_row = context.latest_rows.get(context.execution_timeframe)
+        execution_ts = _row_timestamp_ms(execution_row) if execution_row is not None else None
+        max_age = _TIMEFRAME_MS.get(timeframe, 0) * _MAX_INVALIDATION_AGE_CANDLES
+        if row_ts is None or execution_ts is None or max_age <= 0 or execution_ts - row_ts > max_age:
             continue
         for column, source in preferred:
             value = _numeric(row, column)
