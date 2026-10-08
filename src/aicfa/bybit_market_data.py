@@ -346,7 +346,6 @@ class BybitMarketDataProvider:
             return pd.DataFrame(columns=_OHLCV_COLUMNS)
 
         frame = pd.DataFrame(rows, columns=_OHLCV_COLUMNS)
-        frame["timestamp"] = pd.to_numeric(frame["timestamp"], errors="raise")
         frame = (
             frame.drop_duplicates(subset=["timestamp"], keep="last")
             .sort_values("timestamp")
