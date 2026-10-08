@@ -188,7 +188,28 @@ function renderCandleChart(node,candles,s){
       if(y1!=null&&y2!=null){ctx.fillStyle="rgba(215,255,88,.07)";ctx.fillRect(0,Math.min(y1,y2),w,Math.abs(y2-y1));}
     }
   }
-  obs.forEach(z=>rect(z,"rgba(255,184,77,.12)","rgba(255,184,77,.55)"));fvgs.forEach(z=>rect(z,"rgba(174,108,255,.13)","rgba(174,108,255,.6)"));
+  const drawZone=(z,fill,stroke,label)=>{
+    const [lo,hi]=rangePrice(z);
+    if(!Number.isFinite(lo)||!Number.isFinite(hi))return;
+    const y1=series.priceToCoordinate(hi),y2=series.priceToCoordinate(lo);
+    if(y1==null||y2==null)return;
+    const ts=time(z.timeStart??z.startTime??z.time_start),te=time(z.timeEnd??z.endTime??z.time_end);
+    const x1=xCoord(ts),x2=xCoord(te);
+    if(x1==null||x2==null)return;
+    const top=Math.min(y1,y2),height=Math.max(2,Math.abs(y2-y1)),left=Math.min(x1,x2),width=Math.max(3,Math.abs(x2-x1));
+    ctx.save();
+    ctx.fillStyle=fill;
+    ctx.fillRect(left,top,width,height);
+    ctx.strokeStyle=stroke;
+    ctx.lineWidth=1;
+    ctx.strokeRect(left+.5,top+.5,Math.max(1,width-1),Math.max(1,height-1));
+    ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";
+    ctx.fillStyle=stroke;
+    ctx.fillText(label,Math.max(3,left+4),Math.max(11,top+12));
+    ctx.restore();
+  };
+  obs.forEach(z=>drawZone(z,"rgba(255,184,77,.24)","rgba(255,184,77,.95)","OB"));
+  fvgs.forEach(z=>drawZone(z,"rgba(174,108,255,.24)","rgba(174,108,255,.95)","FVG"));
   (chartData.liquidity||[]).forEach(z=>{const p=price(z);if(!Number.isFinite(p))return;const y=series.priceToCoordinate(p);const x1=xCoord(time(z.timeStart)),x2=xCoord(time(z.timeEnd));if(y==null||x1==null||x2==null)return;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([2,4]);ctx.strokeStyle=z.type==="buy"?"#5bd7ff":"#ff8b9e";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(z.type==="buy"?"BUY LIQ":"SELL LIQ",Math.min(w-55,Math.max(4,x1+4)),Math.max(11,y-4))});
   Object.entries(events).forEach(([name,list])=>{for(const e of list){const p=price(e);if(!Number.isFinite(p))continue;const y=series.priceToCoordinate(p);if(y==null)continue;let x1=xCoord(time(e.timeStart??e.startTime??e.time_start)),x2=xCoord(time(e.timeEnd??e.endTime??e.time_end));if(x1==null||x2==null)continue;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([5,5]);ctx.strokeStyle=name==="BOS"?"#f3c74f":name==="CHoCH"?"#67b7ff":"#ff9d66";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(name,Math.min(w-35,Math.max(4,x1+4)),Math.max(11,y-4))}})}
  function resize(){const w=Math.max(1,node.clientWidth),h=Math.max(1,node.clientHeight);chart.resize(w,h);overlay.width=Math.floor(w*dpr);overlay.height=Math.floor(h*dpr);overlay.style.width=w+"px";overlay.style.height=h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);drawOverlay()}
