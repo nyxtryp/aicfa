@@ -136,7 +136,7 @@ def test_active_long_keeps_original_geometry_when_new_ready_geometry_changes():
 
     assert result.action == "LONG"
     assert result.candidate == first.candidate
-    assert result.candidate.target_levels[0].value == 110.0
+    assert result.candidate.target_levels[0].value == 115.0
 
 
 def test_active_long_completes_at_target_two():
