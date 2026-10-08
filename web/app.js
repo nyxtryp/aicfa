@@ -34,12 +34,16 @@ function active(ms){
 function registryItems(records){
  const out=[];
  for(const r of records||[]){
-  const status=String(r.status||"").toUpperCase();
-  if(status!=="ACTIVE"&&status!=="STALE")continue;
+  // The registry also retains STALE records for durable lifecycle/history
+  // bookkeeping, but the terminal must never present a stale setup as an
+  // actionable signal. Only ACTIVE records enter the current setup queue.
+  if(String(r.status||"").toUpperCase()!=="ACTIVE")continue;
   const wrapper=r.setup||{},base=wrapper.candidate||wrapper,candidate={...base,chart:wrapper.chart||base.chart};
-  out.push({asset:r.asset,mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||status.toLowerCase(),status,key:r.setup_id,seenAt:Number(r.last_seen_at_ms||r.created_at_ms||0),lastConfirmedAt:Number(r.last_confirmed_at_ms||0),setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
+  const key=String(r.setup_id||"");
+  if(!key)continue;
+  out.push({asset:r.asset,mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||"active",status:"ACTIVE",key,seenAt:Number(r.last_seen_at_ms||r.created_at_ms||0),lastConfirmedAt:Number(r.last_confirmed_at_ms||0),setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
  }
- return out.sort((a,b)=>(a.status==="ACTIVE"?0:1)-(b.status==="ACTIVE"?0:1)||Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
+ return out.sort((a,b)=>Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
 }
 function syncRegistry(records){
  const items=registryItems(records),previous=ui.selected,oldKeys=new Set(ui.history.map(x=>x.key));
