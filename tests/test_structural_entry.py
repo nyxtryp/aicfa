@@ -6,6 +6,7 @@ from aicfa.scenario_reasoning import assess_scenarios
 from aicfa.setup_analysis import (
     SetupDecision,
     _target_levels,
+    SetupLevel,
     analyze_setups,
     build_multi_timeframe_context,
 )
@@ -139,6 +140,40 @@ def test_target_contract_allows_liquidity_as_draw_not_invalidation():
     assert candidate.target_levels[0].source == "active buy-side liquidity"
     assert candidate.invalidation_level is not None
     assert candidate.invalidation_level.source != "active buy-side liquidity"
+
+
+def test_target_contract_rejects_objective_inside_entry_zone():
+    frames = _frames()
+    frames["4h"].loc[0, "active_buy_liquidity_price"] = 102.5
+    frames["4h"].loc[0, "previous_high"] = 110.0
+    context = build_multi_timeframe_context(
+        (
+            MarketObservation(
+                concept_id="market_structure.bos",
+                timeframe="4h",
+                state="observed",
+                confidence=1.0,
+                evidence=("bos_up=1",),
+                direction="long",
+            ),
+        ),
+        frames,
+        timeframes=TFS,
+    )
+    entry = (
+        SetupLevel(value=101.0, timeframe="4h", source="active bullish FVG low"),
+        SetupLevel(value=103.0, timeframe="4h", source="active bullish FVG high"),
+    )
+    targets = _target_levels(
+        context,
+        "long",
+        current_price=102.0,
+        preferred_timeframes=TFS,
+        entry_timeframe="4h",
+        entry_zone=entry,
+    )
+    assert targets
+    assert targets[0].value == 110.0
 
 
 def test_target_contract_excludes_execution_timeframe():
