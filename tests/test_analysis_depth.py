@@ -37,7 +37,9 @@ def test_mode_less_plan_uses_conservative_depth_when_roles_are_ambiguous():
     # Without a trading mode, a timeframe-to-role mapping is ambiguous.
     # The resolver deliberately avoids guessing and uses the conservative depth.
     assert tuple(resolved) == plan.required_timeframes
-    assert {item.minimum_rows for item in resolved.values()} == {500}
+    assert {timeframe: item.minimum_rows for timeframe, item in resolved.items()} == {
+        "1m": 500, "5m": 500, "15m": 500, "1h": 500, "4h": 500, "1d": 365, "1w": 200
+    }
 
 
 def test_setup_requirements_request_adaptive_event_and_active_state_context():
