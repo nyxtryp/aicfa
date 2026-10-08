@@ -176,8 +176,10 @@ def _ticker_symbol_candidates(item: dict[str, object]) -> tuple[str, ...]:
     candidates: list[str] = []
 
     def add(value: object) -> None:
+        if value is None:
+            return
         raw = str(value).strip().upper()
-        if not raw:
+        if not raw or raw == "NONE":
             return
         # CCXT perpetual notation BASE/USDT:USDT is represented by the
         # underlying venue ticker BASEUSDT.
