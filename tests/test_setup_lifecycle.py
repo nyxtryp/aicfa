@@ -277,3 +277,66 @@ def test_new_short_setup_is_not_activated_after_price_passed_entry_and_tp1():
     assert result.status is None
     assert result.action == "WAIT"
     assert lifecycle.active(symbol="BNB/USDT") is None
+
+
+def test_long_setup_is_invalidated_when_execution_candle_wicks_through_stop():
+    lifecycle = SetupLifecycle()
+    first = lifecycle.evaluate(
+        symbol="GRT/USDT",
+        market_type="spot",
+        assessment=_ready(),
+        current_price=101.0,
+        current_high=103.0,
+        current_low=94.0,
+        now_ms=1_000,
+    )
+    assert first.status is SetupLifecycleStatus.INVALIDATED
+    assert lifecycle.active(symbol="GRT/USDT") is None
+
+
+def test_long_setup_reaching_tp1_on_execution_candle_is_not_reported_as_fresh_entry():
+    lifecycle = SetupLifecycle()
+    result = lifecycle.evaluate(
+        symbol="GRT/USDT",
+        market_type="spot",
+        assessment=_ready(),
+        current_price=106.0,
+        current_high=111.0,
+        current_low=100.5,
+        now_ms=1_000,
+    )
+    assert result.status is None
+    assert result.action == "WAIT"
+    assert lifecycle.active(symbol="GRT/USDT") is None
+
+
+def test_active_long_is_invalidated_by_candle_low_even_if_close_recovers_above_stop():
+    lifecycle = SetupLifecycle()
+    first = lifecycle.evaluate(
+        symbol="GRT/USDT",
+        market_type="spot",
+        assessment=_ready(),
+        current_price=101.0,
+        current_high=103.0,
+        current_low=100.0,
+        now_ms=1_000,
+    )
+    assert first.status is SetupLifecycleStatus.ACTIVE
+
+    result = lifecycle.evaluate(
+        symbol="GRT/USDT",
+        market_type="spot",
+        assessment=SetupAssessment(
+            decision=SetupDecision.NEED_MORE_EVIDENCE,
+            candidates=(),
+            missing_context=("temporary gap",),
+            conflicts=(),
+            reasons=("no new setup",),
+        ),
+        current_price=99.0,
+        current_high=101.0,
+        current_low=94.0,
+        now_ms=2_000,
+    )
+    assert result.status is SetupLifecycleStatus.INVALIDATED
+    assert lifecycle.active(symbol="GRT/USDT") is None
