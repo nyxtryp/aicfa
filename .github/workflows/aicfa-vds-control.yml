@@ -22,6 +22,7 @@ jobs:
         run: |
           set +e
           cd /srv/frostdeploy/aicfa/current
+          export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
           OUTPUT=$(mktemp)
           trap 'rm -f "$OUTPUT"' EXIT
 
