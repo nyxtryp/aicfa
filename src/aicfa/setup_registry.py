@@ -25,8 +25,8 @@ TIMEFRAME_MS = {
     "1w": 7 * 24 * 60 * 60_000,
 }
 
-STALE_STRUCTURE_CANDLES = 3
-EXPIRE_STRUCTURE_CANDLES = 12
+STALE_EXECUTION_CANDLES = 2
+EXPIRE_EXECUTION_CANDLES = 4
 REGISTRY_REVISION = 2
 
 
@@ -82,11 +82,14 @@ class SetupRegistry:
     @staticmethod
     def _mode_ttl_ms(mode: TradingMode | str) -> tuple[int, int]:
         normalized = normalize_trading_mode(mode)
-        tf = mode_timeframe_profile(normalized).structure_timeframe
+        # Terminal freshness is governed by the execution timeframe, not the
+        # higher structural timeframe. An Intraday setup must not remain in
+        # the actionable queue for hours just because its 1h structure is old.
+        tf = mode_timeframe_profile(normalized).execution_timeframe
         candle_ms = TIMEFRAME_MS[tf]
         return (
-            STALE_STRUCTURE_CANDLES * candle_ms,
-            EXPIRE_STRUCTURE_CANDLES * candle_ms,
+            STALE_EXECUTION_CANDLES * candle_ms,
+            EXPIRE_EXECUTION_CANDLES * candle_ms,
         )
 
     def read(self) -> dict[str, dict[str, Any]]:
