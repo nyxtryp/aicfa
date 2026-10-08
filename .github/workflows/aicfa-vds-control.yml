@@ -44,34 +44,24 @@ jobs:
                 TOTAL_RC=0
                 for TEST_FILE in tests/test_*.py; do
                   echo "=== START $TEST_FILE ==="
-                  (
+                  timeout --signal=TERM --kill-after=10s 120s bash -c '
                     ulimit -v 1572864
                     ulimit -u 256
-                    exec taskset -c 1 nice -n 10 .venv/bin/pytest -q "$TEST_FILE"
-                  ) &
-                  TEST_PID=$!
-                  timeout 120s tail --pid="$TEST_PID" -f /dev/null
-                  if kill -0 "$TEST_PID" 2>/dev/null; then
-                    echo "STOP: $TEST_FILE exceeded 120s; terminating test process."
-                    kill -TERM "$TEST_PID" 2>/dev/null || true
-                    sleep 2
-                    kill -KILL "$TEST_PID" 2>/dev/null || true
-                    wait "$TEST_PID" 2>/dev/null || true
-                    TOTAL_RC=124
-                    break
-                  fi
-                  wait "$TEST_PID"
+                    exec taskset -c 1 nice -n 10 .venv/bin/pytest -q "$1"
+                  ' _ "$TEST_FILE"
                   FILE_RC=$?
                   echo "=== END $TEST_FILE exit_code=$FILE_RC ==="
                   if [ "$FILE_RC" -ne 0 ]; then
-                    echo "STOP: $TEST_FILE failed or hit its memory/process limit."
+                    echo "STOP: $TEST_FILE failed, timed out, or hit its resource limit."
                     TOTAL_RC=$FILE_RC
                     break
                   fi
                   echo
                 done
                 exit "$TOTAL_RC"
-              } >"$OUTPUT" 2>&1
+              } 2>&1 | tee "$OUTPUT"
+              TEST_PIPE_RC=${PIPESTATUS[0]}
+              exit "$TEST_PIPE_RC"
               ;;
             "/aicfa features")
               .venv/bin/pytest -q tests/test_features.py >"$OUTPUT" 2>&1
