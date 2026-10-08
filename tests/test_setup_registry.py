@@ -12,11 +12,14 @@ def test_registry_refreshes_same_identity_without_duplicate(tmp_path):
         scenario = "reversal"
         direction = "long"
 
+    class Lifecycle:
+        status = type("Status", (), {"value": "active"})()
+
     class Setup:
         mode = "intraday"
         candidate = Candidate()
         identity = None
-        lifecycle_result = None
+        lifecycle_result = Lifecycle()
         evidence_concepts = ("market_structure.choch",)
         decision_action = "long"
 
@@ -49,11 +52,14 @@ def test_registry_marks_unseen_setup_stale_then_expired(tmp_path):
         scenario = "continuation"
         direction = "long"
 
+    class Lifecycle:
+        status = type("Status", (), {"value": "active"})()
+
     class Setup:
         mode = "swing"
         candidate = Candidate()
         identity = None
-        lifecycle_result = None
+        lifecycle_result = Lifecycle()
         evidence_concepts = ()
         decision_action = "long"
 
@@ -92,11 +98,14 @@ def test_registry_keeps_lifecycle_active_setup_alive_during_analytical_wait(tmp_
         scenario = "continuation"
         direction = "long"
 
+    class LifecycleResult:
+        status = type("Status", (), {"value": "active"})()
+
     class Setup:
         mode = "swing"
         candidate = Candidate()
         identity = Identity()
-        lifecycle_result = None
+        lifecycle_result = LifecycleResult()
 
     class Lifecycle:
         identity = Identity()
@@ -126,3 +135,31 @@ def test_registry_keeps_lifecycle_active_setup_alive_during_analytical_wait(tmp_
     assert record["status"] == "ACTIVE"
     assert record["lifecycle_status"] == "active"
     assert record["last_lifecycle_at_ms"] == State.scanned_at_ms
+
+
+def test_registry_does_not_queue_pending_candidate_without_lifecycle_activation(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Candidate:
+        scenario = "continuation"
+        direction = "long"
+
+    class Setup:
+        mode = "intraday"
+        candidate = Candidate()
+        identity = None
+        lifecycle_result = None
+
+    class Market:
+        asset = "GRT/USDT"
+        setups = (Setup(),)
+        lifecycle_results = ()
+
+    class State:
+        scanned_at_ms = 1_000
+        scan_number = 1
+        result = type("Result", (), {"markets": (Market(),)})()
+
+    registry.record_scan(State())
+    assert registry.read() == {}
+    assert registry.current() == ()
