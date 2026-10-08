@@ -275,15 +275,21 @@ class LiveMarketCoordinator:
                 by_market_type.setdefault(market.market_type, []).append(
                     MarketKey("binance", symbol, market.market_type, timeframe)
                 )
+        # Six candle timeframes per market => 900 streams at 150 markets.
+        # Keep each connection below Binance's 1024-stream ceiling and open a
+        # second connection automatically as the configured universe grows.
+        chunk_size = 900
         for market_type, keys in by_market_type.items():
-            thread = threading.Thread(
-                target=self._stream,
-                args=(tuple(keys),),
-                name=f"aicfa-ws-{market_type}",
-                daemon=True,
-            )
-            self._threads.append(thread)
-            thread.start()
+            for offset in range(0, len(keys), chunk_size):
+                chunk = tuple(keys[offset:offset + chunk_size])
+                thread = threading.Thread(
+                    target=self._stream,
+                    args=(chunk,),
+                    name=f"aicfa-ws-{market_type}-{offset // chunk_size + 1}",
+                    daemon=True,
+                )
+                self._threads.append(thread)
+                thread.start()
 
     def stop(self) -> None:
         self._stopped.set()
