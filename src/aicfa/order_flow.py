@@ -18,17 +18,30 @@ _REQUIRED = {"timestamp", "taker_buy_volume"}
 _OPTIONAL = {"taker_sell_volume", "total_volume"}
 
 
+def _coerce_timestamp(values: pd.Series) -> pd.Series:
+    """Parse numeric epochs using their actual magnitude (s/us/ms/ns)."""
+    numeric = pd.to_numeric(values, errors="coerce")
+    if not numeric.notna().all():
+        return pd.to_datetime(values, utc=True)
+    magnitude = float(numeric.abs().median()) if len(numeric) else 0.0
+    if magnitude >= 1e17:
+        unit = "ns"
+    elif magnitude >= 1e14:
+        unit = "us"
+    elif magnitude >= 1e11:
+        unit = "ms"
+    else:
+        unit = "s"
+    return pd.to_datetime(numeric, unit=unit, utc=True)
+
+
 def _validate(df: pd.DataFrame) -> pd.DataFrame:
     missing = _REQUIRED - set(df.columns)
     if missing:
         raise ValueError(f"missing required columns: {sorted(missing)}")
 
     x = df.copy()
-    numeric_timestamp = pd.to_numeric(x["timestamp"], errors="coerce")
-    if numeric_timestamp.notna().all():
-        x["timestamp"] = pd.to_datetime(numeric_timestamp, unit="ms", utc=True)
-    else:
-        x["timestamp"] = pd.to_datetime(x["timestamp"], utc=True)
+    x["timestamp"] = _coerce_timestamp(x["timestamp"])
     x = (
         x.sort_values("timestamp")
         .drop_duplicates("timestamp", keep="last")
@@ -113,10 +126,7 @@ def build_trade_order_flow(
     b["timestamp"] = pd.to_datetime(b["timestamp"], utc=True)
     b = b.sort_values("timestamp").reset_index(drop=True)
     d = trades.copy()
-    if pd.api.types.is_numeric_dtype(d["timestamp"]):
-        d["timestamp"] = pd.to_datetime(d["timestamp"], unit="ms", utc=True)
-    else:
-        d["timestamp"] = pd.to_datetime(d["timestamp"], utc=True)
+    d["timestamp"] = _coerce_timestamp(d["timestamp"])
     d["volume"] = pd.to_numeric(d["volume"], errors="coerce")
     d["side"] = pd.to_numeric(d["side"], errors="coerce")
     if d[["volume", "side"]].isna().any().any():
