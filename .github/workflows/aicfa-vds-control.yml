@@ -15,10 +15,10 @@ jobs:
     steps:
       - name: Run allowed command and report result
         env:
-          COMMAND: \${{ github.event.comment.body }}
-          GH_TOKEN: \${{ github.token }}
-          ISSUE_NUMBER: \${{ github.event.issue.number }}
-          REPO: \${{ github.repository }}
+          COMMAND: ${{ github.event.comment.body }}
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           set +e
           cd /srv/frostdeploy/aicfa/current
@@ -117,9 +117,9 @@ jobs:
 
       - name: Run isolated AICFA tests on GitHub-hosted runner
         env:
-          GH_TOKEN: \${{ github.token }}
-          ISSUE_NUMBER: \${{ github.event.issue.number }}
-          REPO: \${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           set +e
           OUTPUT=$(mktemp)
