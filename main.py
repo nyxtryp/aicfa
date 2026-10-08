@@ -85,6 +85,7 @@ def main() -> None:
             market_index,
             modes=modes,
             enforce_timeout=False,
+            journal=True,
         )
         market = state.result.markets[0]
         diagnostics = market.diagnostics
