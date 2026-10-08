@@ -136,6 +136,8 @@ def test_order_block_lifecycle_tracks_touch_partial_deep_and_invalidation():
     assert r.loc[3, "order_block_bullish_state"] == "TOUCHED"
     assert r.loc[4, "order_block_bullish_state"] == "PARTIAL"
     assert r.loc[5, "order_block_bullish_state"] == "DEEP"
+    assert r.loc[5, "order_block_bullish_low"] == 100
+    assert r.loc[5, "order_block_bullish_high"] == 103
     assert r.loc[4, "order_block_bullish_penetration"] == pytest.approx(1 / 3)
     assert r.loc[5, "order_block_bullish_penetration"] == pytest.approx(5 / 6)
 
