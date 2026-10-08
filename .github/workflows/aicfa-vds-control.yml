@@ -39,6 +39,17 @@ jobs:
             "/aicfa features")
               .venv/bin/pytest -q tests/test_features.py >"$OUTPUT" 2>&1
               ;;
+            "/aicfa pipeline")
+              {
+                echo "=== production pipeline: BTC/USDT ==="
+                timeout --signal=TERM --kill-after=10s 120s taskset -c 1 nice -n 10 .venv/bin/python scripts/diagnose_market_pipeline.py --assets BTC/USDT
+                PIPE_RC=$?
+                echo "=== service after pipeline ==="
+                systemctl is-active fd-aicfa
+                echo "pipeline_exit_code: $PIPE_RC"
+                exit "$PIPE_RC"
+              } >"$OUTPUT" 2>&1
+              ;;
             "/aicfa git")
               {
                 echo "Git metadata is managed by FrostDeploy."
