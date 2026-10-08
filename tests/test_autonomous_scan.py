@@ -257,7 +257,7 @@ def test_run_forever_batches_continues_after_market_error(monkeypatch):
     calls = []
     errors = []
 
-    def fake_scan_market(index, *, now_ms=None):
+    def fake_scan_market(index, *, now_ms=None, rotation_id=0, queue_position=0):
         asset = engine.universe.markets[index].asset
         calls.append(asset)
         if asset == "COIN000/USDT" and calls.count(asset) == 1:
