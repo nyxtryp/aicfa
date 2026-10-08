@@ -233,6 +233,22 @@ class BinanceWebSocketMarketDataTransport:
                             ) from exc
                         continue
 
+                    # Binance returns subscription errors as ordinary JSON
+                    # messages. Previously those were silently ignored, leaving
+                    # a bad 900-stream socket alive forever and producing no
+                    # candle events, so autonomous scanning looked frozen.
+                    try:
+                        envelope = json.loads(raw)
+                    except (TypeError, json.JSONDecodeError) as exc:
+                        raise WebSocketTransportError(
+                            "Invalid Binance WebSocket JSON"
+                        ) from exc
+                    if isinstance(envelope, dict) and envelope.get("code") is not None:
+                        raise WebSocketTransportError(
+                            f"Binance WebSocket subscription error: "
+                            f"{envelope.get('code')}: {envelope.get('msg', '')}"
+                        )
+
                     # Any successfully received stream message proves that the
                     # connection is active. Open kline updates are deliberately
                     # ignored as market observations, but they still reset the
@@ -241,10 +257,25 @@ class BinanceWebSocketMarketDataTransport:
                         received_at = self._clock()
                         idle_deadline = received_at + self._idle_timeout_seconds
 
+                    kline = envelope.get("k") if isinstance(envelope, dict) else None
+                    if not isinstance(kline, dict):
+                        # SUBSCRIBE acknowledgements and other control frames
+                        # are valid transport traffic, not market observations.
+                        continue
+                    identity = (
+                        str(kline.get("s", "")).upper(),
+                        str(kline.get("i", "")).lower(),
+                    )
                     for key in self.keys:
+                        expected = (
+                            key.symbol.replace("/", "").replace("-", "").upper(),
+                            key.timeframe.lower(),
+                        )
+                        if identity != expected:
+                            continue
                         observation = parse_binance_kline_message(raw, key)
                         if observation is None:
-                            continue
+                            break
                         if self._state_store is not None:
                             self._state_store.update(
                                 key,
