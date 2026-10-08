@@ -261,7 +261,7 @@ class LiveMarketCoordinator:
         return tuple(WINDOWS)
 
     def seed_history(self) -> None:
-        """Restore local windows without letting one bad market abort startup."""
+        """Restore only local rolling windows; never duplicate the startup REST scan."""
         failures: list[str] = []
         for market in self.universe.markets:
             try:
@@ -276,23 +276,14 @@ class LiveMarketCoordinator:
                 try:
                     key = MarketKey("binance", symbol, market.market_type, timeframe)
                     existing = self.cache.store.load(key)
-                    target = WINDOWS[timeframe]
-                    if len(existing) < target:
-                        incoming = self.cache.upstream.fetch_ohlcv(
-                            symbol=symbol,
-                            market_type=market.market_type,
-                            timeframe=timeframe,
-                            since_ms=None,
-                            limit=target,
-                        )
-                        self.cache.seed(key, incoming)
-                    else:
-                        self.cache.seed(key, existing.tail(target))
+                    if existing.empty:
+                        continue
+                    self.cache.seed(key, existing.tail(WINDOWS[timeframe]))
                 except Exception as exc:
                     failures.append(f"{market.asset}:{timeframe}:{type(exc).__name__}:{exc}")
         if failures:
             print(
-                "AICFA live history seed skipped failed market/timeframe(s): "
+                "AICFA local history restore skipped failed market/timeframe(s): "
                 + " | ".join(failures[:20]),
                 flush=True,
             )
