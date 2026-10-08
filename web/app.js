@@ -107,7 +107,11 @@ function renderCandleChart(node,candles,s){
  const chartEvents=chartData.events||[],events={BOS:[...chartEvents.filter(e=>e.type==="BOS"),...(s.bos||s.BOS||[])],CHoCH:[...chartEvents.filter(e=>e.type==="CHoCH"),...(s.choch||s.CHoCH||[])],MSS:[...chartEvents.filter(e=>e.type==="MSS"),...(s.mss||s.MSS||[])]};
  const priceLines=[];
  const addPriceLine=(value,title,color,lineStyle=2)=>{const p=price(value);if(!Number.isFinite(p))return;priceLines.push(series.createPriceLine({price:p,color,lineWidth:1,lineStyle,axisLabelVisible:true,title}))};
- if(Array.isArray(entry))entry.forEach(e=>addPriceLine(e,"ENTRY","#d7ff58",2));else addPriceLine(entry,"ENTRY","#d7ff58",2);
+ // Entry is a zone, not two unrelated signals. Keep its boundaries native to
+ // Lightweight Charts so vertical/horizontal zoom and pan always transform them.
+ if(Array.isArray(entry)){
+   entry.forEach((e,i)=>addPriceLine(e,i===0?"ENTRY LOW":"ENTRY HIGH","#d7ff58",2));
+ }else addPriceLine(entry,"ENTRY","#d7ff58",2);
  if(s.stop_loss!=null)addPriceLine(s.stop_loss,"SL","#ff687b",2);else if(s.invalidation_level)addPriceLine(s.invalidation_level,"SL","#ff687b",2);
  (Array.isArray(targets)?targets:[]).forEach((t,i)=>addPriceLine(t,i===0?"TP1":"TP"+(i+1),"#61df9a",2));
  function rangePrice(x){const a=price(x?.priceLow??x?.low??x?.low_price),b=price(x?.priceHigh??x?.high??x?.high_price);return [Math.min(a,b),Math.max(a,b)]}
@@ -117,11 +121,29 @@ function renderCandleChart(node,candles,s){
   // Entry / SL / TP are native chart price lines, so their position and labels
   // are transformed by Lightweight Charts itself during zoom, pan and resize.
   const rect=(z,fill,stroke)=>{const [lo,hi]=rangePrice(z);if(!Number.isFinite(lo)||!Number.isFinite(hi))return;const y1=series.priceToCoordinate(hi),y2=series.priceToCoordinate(lo);if(y1==null||y2==null)return;const ts=time(z.timeStart??z.startTime??z.time_start),te=time(z.timeEnd??z.endTime??z.time_end);let x1=xCoord(ts),x2=xCoord(te);if(x1==null)x1=0;if(x2==null)x2=w;if(x2<x1)[x1,x2]=[x2,x1];ctx.fillStyle=fill;ctx.fillRect(x1,Math.min(y1,y2),Math.max(2,x2-x1),Math.abs(y2-y1));ctx.strokeStyle=stroke;ctx.strokeRect(x1,Math.min(y1,y2),Math.max(2,x2-x1),Math.abs(y2-y1))};
+  // Entry zone uses the same price transform as candles/price lines. It is
+  // intentionally drawn as a band, not as a second independent coordinate system.
+  if(Array.isArray(entry)&&entry.length>=2){
+    const vals=entry.map(price).filter(Number.isFinite);
+    if(vals.length>=2){
+      const y1=series.priceToCoordinate(Math.max(...vals)),y2=series.priceToCoordinate(Math.min(...vals));
+      if(y1!=null&&y2!=null){ctx.fillStyle="rgba(215,255,88,.07)";ctx.fillRect(0,Math.min(y1,y2),w,Math.abs(y2-y1));}
+    }
+  }
   obs.forEach(z=>rect(z,"rgba(255,184,77,.12)","rgba(255,184,77,.55)"));fvgs.forEach(z=>rect(z,"rgba(174,108,255,.13)","rgba(174,108,255,.6)"));
   Object.entries(events).forEach(([name,list])=>{for(const e of list){const p=price(e);if(!Number.isFinite(p))continue;const y=series.priceToCoordinate(p);if(y==null)continue;let x1=xCoord(time(e.timeStart??e.startTime??e.time_start)),x2=xCoord(time(e.timeEnd??e.endTime??e.time_end));if(x1==null)x1=0;if(x2==null)x2=w;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([5,5]);ctx.strokeStyle=name==="BOS"?"#f3c74f":name==="CHoCH"?"#67b7ff":"#ff9d66";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(name,Math.min(w-35,Math.max(4,x1+4)),Math.max(11,y-4))}})}
  function resize(){const w=Math.max(1,node.clientWidth),h=Math.max(1,node.clientHeight);chart.resize(w,h);overlay.width=Math.floor(w*dpr);overlay.height=Math.floor(h*dpr);overlay.style.width=w+"px";overlay.style.height=h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);drawOverlay()}
- chart.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(drawOverlay);if(chart.timeScale().subscribeVisibleTimeRangeChange)chart.timeScale().subscribeVisibleTimeRangeChange(drawOverlay);
- const ro=new ResizeObserver(resize);ro.observe(node);resize();node._aicfaChartCleanup=()=>{ro.disconnect();priceLines.forEach(p=>{try{series.removePriceLine(p)}catch(_){}});chart.remove()};
+ chart.timeScale().fitContent();
+ chart.timeScale().subscribeVisibleLogicalRangeChange(drawOverlay);
+ if(chart.timeScale().subscribeVisibleTimeRangeChange)chart.timeScale().subscribeVisibleTimeRangeChange(drawOverlay);
+ // Lightweight Charts owns the actual price scale. The overlay is only a
+ // visual layer, so redraw it after every pointer/zoom gesture as well; this
+ // covers vertical price-scale zoom where the visible time range is unchanged.
+ let raf=0;
+ const scheduleOverlay=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;drawOverlay()})};
+ ["pointermove","pointerdown","wheel","touchmove"].forEach(evt=>node.addEventListener(evt,scheduleOverlay,{passive:true}));
+ const ro=new ResizeObserver(resize);ro.observe(node);resize();
+ node._aicfaChartCleanup=()=>{ro.disconnect();if(raf)cancelAnimationFrame(raf);["pointermove","pointerdown","wheel","touchmove"].forEach(evt=>node.removeEventListener(evt,scheduleOverlay));priceLines.forEach(p=>{try{series.removePriceLine(p)}catch(_){}});chart.remove()};
 }
 async function hydrateCharts(){
  const nodes=[...document.querySelectorAll(".market-chart[data-symbol]")];
