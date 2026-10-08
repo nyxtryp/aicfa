@@ -43,7 +43,7 @@ jobs:
             "/aicfa rotation")
               {
                 echo "=== production market rotation ==="
-                timeout --signal=TERM --kill-after=10s 120s taskset -c 1 nice -n 10 .venv/bin/python scripts/run_market_rotation.py --market-timeout 10
+                timeout --signal=TERM --kill-after=10s 900s taskset -c 1 nice -n 10 .venv/bin/python scripts/run_market_rotation.py --market-timeout 60
                 ROTATION_RC=$?
                 echo "=== service after rotation ==="
                 systemctl is-active fd-aicfa
