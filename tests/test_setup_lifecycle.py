@@ -241,3 +241,39 @@ def test_same_market_can_hold_independent_horizons():
     )
 
     assert len(lifecycle.active_setups(symbol="BTC/USDT")) == 3
+
+
+def test_new_short_setup_is_not_activated_after_price_passed_entry_and_tp1():
+    lifecycle = SetupLifecycle()
+    candidate = SetupCandidate(
+        **{**_candidate().__dict__,
+           "direction": "short",
+           "entry_zone": (
+               SetupLevel(757.63, "1h", "bearish OB low"),
+               SetupLevel(760.06, "1h", "bearish OB high"),
+           ),
+           "invalidation_level": SetupLevel(770.64, "1h", "structure invalidation"),
+           "target_levels": (
+               SetupLevel(745.17, "15m", "sell-side liquidity"),
+               SetupLevel(735.00, "5m", "next liquidity"),
+           )}
+    )
+    assessment = SetupAssessment(
+        decision=SetupDecision.READY,
+        candidates=(candidate,),
+        missing_context=(),
+        conflicts=(),
+        reasons=("ready reversal",),
+    )
+
+    result = lifecycle.evaluate(
+        symbol="BNB/USDT",
+        market_type="spot",
+        assessment=assessment,
+        current_price=737.0,
+        now_ms=1_000,
+    )
+
+    assert result.status is None
+    assert result.action == "WAIT"
+    assert lifecycle.active(symbol="BNB/USDT") is None
