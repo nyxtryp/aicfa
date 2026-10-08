@@ -214,12 +214,12 @@ def test_find_setup_uses_mode_aware_analysis_depth_when_no_diagnostic_limit_is_g
         now_ms=120 * 60_000,
     )
     # FindSetup defaults to Intraday: the first pass uses the role-aware
-    # baseline 4h=120, 1h=180, 15m=240, 5m=240. Adaptive expansion continues
+    # SMC history 4h=300, 1h=400, 15m=500, 5m=500. Adaptive expansion continues
     # only while the provider returns additional history or the evidence state
     # changes; it is no longer capped at an arbitrary number of passes.
     limits = [call[4] for call in provider.calls]
-    assert limits[:4] == [120, 180, 240, 240]
-    assert all(limit >= baseline for limit, baseline in zip(limits[:4], [120, 180, 240, 240]))
+    assert limits[:4] == [300, 400, 500, 500]
+    assert all(limit >= baseline for limit, baseline in zip(limits[:4], [300, 400, 500, 500]))
     assert all(limit > 0 for limit in limits[4:])
     assert len(limits) <= 40
 
@@ -241,7 +241,7 @@ def test_find_setup_expands_missing_context_until_provider_boundary():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    for timeframe, baseline in (("4h", 120), ("1h", 180), ("15m", 240), ("5m", 240)):
+    for timeframe, baseline in (("4h", 300), ("1h", 400), ("15m", 500), ("5m", 500)):
         calls = [call[4] for call in provider.calls if call[2] == timeframe]
         assert calls[0] == baseline
         assert calls == sorted(set(calls))
@@ -262,8 +262,8 @@ def test_find_setup_stops_expansion_when_context_signature_stalls():
     )
 
     assert result.decision in {"LONG", "SHORT", "WAIT", "NO TRADE"}
-    assert all(call[4] in {120, 180, 240, 360, 480, 720, 960} for call in provider.calls)
-    assert [call[4] for call in provider.calls if call[2] == "4h"] == [120, 240, 480]
+    assert all(call[4] in {300, 400, 500, 600, 750, 1000, 1250} for call in provider.calls)
+    assert [call[4] for call in provider.calls if call[2] == "4h"] == [300, 600, 1200]
 
 
 def test_find_setup_does_not_fetch_optional_microstructure_by_default():
