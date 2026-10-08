@@ -230,10 +230,14 @@ def _expand_missing_context(
             limits=requested,
         )
         for timeframe in unresolved:
+            previous_rows = len(current_frames.get(timeframe, ()))
             rows = len(fetched[timeframe])
             current_frames[timeframe] = fetched[timeframe]
             current_limits[timeframe] = requested[timeframe]
-            if rows < requested[timeframe]:
+            # A provider may legitimately return fewer rows than requested
+            # because history is bounded. Only stop expanding when the new
+            # request produces no additional history.
+            if rows <= previous_rows:
                 exhausted.add(timeframe)
 
         for timeframe in unresolved:
