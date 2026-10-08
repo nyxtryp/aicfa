@@ -162,12 +162,37 @@ def build_fvg(
                     out.at[i, "fvg_invalidated"] = 1
                     zones.remove(zone)
 
-        # The zone remains an active SMC context after creation until its
-        # lifecycle is filled or invalidated. Previously fvg_active was only
-        # marked on the creation candle, so a later valid retest could not
-        # be surfaced as active evidence.
+        # Persist the currently relevant active zone bounds on every later
+        # candle. The setup engine consumes the latest row; keeping bounds
+        # only on the creation candle makes older valid FVGs disappear.
         if bullish_zones or bearish_zones:
             out.at[i, "fvg_active"] = 1
+            if bullish_zones:
+                bullish_zone = min(
+                    bullish_zones,
+                    key=lambda z: (
+                        0 if z["low"] <= close[i] <= z["high"] else 1,
+                        abs(((z["low"] + z["high"]) / 2.0) - close[i]),
+                        -z["creation_index"],
+                    ),
+                )
+                out.at[i, "fvg_bullish_low"] = bullish_zone["low"]
+                out.at[i, "fvg_bullish_high"] = bullish_zone["high"]
+                out.at[i, "fvg_bullish_creation_index"] = bullish_zone["creation_index"]
+                out.at[i, "fvg_bullish_creation_timestamp"] = timestamps[bullish_zone["creation_index"]]
+            if bearish_zones:
+                bearish_zone = min(
+                    bearish_zones,
+                    key=lambda z: (
+                        0 if z["low"] <= close[i] <= z["high"] else 1,
+                        abs(((z["low"] + z["high"]) / 2.0) - close[i]),
+                        -z["creation_index"],
+                    ),
+                )
+                out.at[i, "fvg_bearish_low"] = bearish_zone["low"]
+                out.at[i, "fvg_bearish_high"] = bearish_zone["high"]
+                out.at[i, "fvg_bearish_creation_index"] = bearish_zone["creation_index"]
+                out.at[i, "fvg_bearish_creation_timestamp"] = timestamps[bearish_zone["creation_index"]]
 
         if i >= 2:
             bullish = low[i] > high[i - 2] + EPS
