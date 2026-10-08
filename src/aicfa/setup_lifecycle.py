@@ -245,17 +245,24 @@ class SetupLifecycle:
                     continue
                 invalidation_price = current_low if candidate.direction == "long" and current_low is not None else current_high if candidate.direction == "short" and current_high is not None else current_price
                 target_price = current_high if candidate.direction == "long" and current_high is not None else current_low if candidate.direction == "short" and current_low is not None else current_price
-                if self._hit_invalidation(candidate, invalidation_price):
-                    continue
-                if self._hit_target(candidate, target_price, 0):
-                    continue
-
                 setup_id = self.identity(
                     symbol=symbol,
                     market_type=market_type,
                     horizon=normalized,
                     candidate=candidate,
                 )
+                if self._hit_invalidation(candidate, invalidation_price):
+                    results.append(SetupLifecycleResult(
+                        SetupLifecycleStatus.INVALIDATED,
+                        candidate,
+                        "WAIT",
+                        "new setup was touched but invalidated on the same execution candle",
+                        setup_id,
+                    ))
+                    continue
+                if self._hit_target(candidate, target_price, 0):
+                    continue
+
                 if setup_id in self._active:
                     continue
                 active = ActiveSetup(
