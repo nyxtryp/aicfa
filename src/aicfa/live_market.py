@@ -240,12 +240,10 @@ class LiveMarketCoordinator:
             return
         self.cache.update(key, observation.data)
         event = CandleEvent(key=key, timestamp_ms=timestamp, observed_at_ms=observation.observed_at_ms)
-        try:
-            self.on_candle(event)
-        finally:
-            # A failed analysis is retried after restart instead of silently
-            # advancing the recovery checkpoint.
-            self.checkpoint.mark(key, timestamp)
+        self.on_candle(event)
+        # Advance the durable checkpoint only after the candle was accepted by
+        # the analysis pipeline. A failed analysis is replayed after restart.
+        self.checkpoint.mark(key, timestamp)
 
     def _stream(self, keys: tuple[MarketKey, ...]) -> None:
         transport = BinanceWebSocketMarketDataTransport(
