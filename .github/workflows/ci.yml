@@ -29,7 +29,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files="$(find tests -maxdepth 1 -type f -name 'test_*.py' | sort | awk 'NR % 4 == '"'"'${{ matrix.partition }}'"'"'')"
+          files="$(PARTITION=${{ matrix.partition }} python - <<'PY'
+import os
+from pathlib import Path
+files=sorted(Path("tests").glob("test_*.py"))
+part=int(os.environ["PARTITION"])
+print("\n".join(str(p) for i,p in enumerate(files) if i % 4 == part))
+PY
+          )"
           test -n "$files"
           python -m pytest -q --tb=short $files
 
