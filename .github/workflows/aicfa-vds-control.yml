@@ -40,6 +40,17 @@ jobs:
             "/aicfa features")
               .venv/bin/pytest -q tests/test_features.py >"$OUTPUT" 2>&1
               ;;
+            "/aicfa rotation")
+              {
+                echo "=== production market rotation ==="
+                timeout --signal=TERM --kill-after=10s 120s taskset -c 1 nice -n 10 .venv/bin/python scripts/run_market_rotation.py --market-timeout 10
+                ROTATION_RC=$?
+                echo "=== service after rotation ==="
+                systemctl is-active fd-aicfa
+                echo "rotation_exit_code: $ROTATION_RC"
+                test "$ROTATION_RC" -eq 0
+              } >"$OUTPUT" 2>&1
+              ;;
             "/aicfa pipeline")
               {
                 echo "=== production pipeline: BTC/USDT ==="
