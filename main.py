@@ -20,8 +20,11 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from aicfa.autonomous_scan import AutonomousScanEngine
+from aicfa.data_requirements import TradingMode
+from aicfa.live_market import LiveMarketCoordinator
 from aicfa.market_universe import load_market_universe
 from aicfa.market_control import serve_control
+from aicfa.public_market_data import build_public_market_data_provider
 
 
 DEFAULT_UNIVERSE_PATH = ROOT / "config" / "market_universe.json"
@@ -44,7 +47,68 @@ def main() -> None:
 
     universe_path = _universe_path()
     universe = load_market_universe(universe_path)
-    engine = AutonomousScanEngine(universe)
+
+    # REST seeds the local rolling windows once. From that point the scanner is
+    # event-driven: only a closed candle for a configured market/timeframe
+    # schedules analysis. The cache remains the provider seen by the canonical
+    # setup engine, so scans never refetch the whole history from the exchange.
+    upstream = build_public_market_data_provider(timeout_seconds=10.0)
+    engine_holder: dict[str, AutonomousScanEngine] = {}
+
+    def _on_candle(event) -> None:
+        engine = engine_holder["engine"]
+        key = event.key
+        mode_map = {
+            "5m": (TradingMode.SCALPING, TradingMode.INTRADAY),
+            "15m": (TradingMode.INTRADAY,),
+            "1h": (TradingMode.SCALPING, TradingMode.SWING),
+            "4h": (TradingMode.INTRADAY, TradingMode.POSITION),
+            "1d": (TradingMode.SWING, TradingMode.POSITION),
+            "1w": (TradingMode.POSITION,),
+        }
+        modes = mode_map.get(key.timeframe, ())
+        if not modes:
+            return
+        market_index = next(
+            (
+                index for index, market in enumerate(universe.markets)
+                if market.market_type == key.market_type
+                and engine._live_symbol_map.get((key.market_type, key.symbol)) == index
+            ),
+            None,
+        )
+        if market_index is None:
+            return
+        state = engine.scan_market(
+            market_index,
+            modes=modes,
+            enforce_timeout=False,
+        )
+        market = state.result.markets[0]
+        diagnostics = market.diagnostics
+        print(
+            f"AICFA live candle: {market.asset} {key.timeframe} "
+            f"status={diagnostics.status if diagnostics else 'completed'} "
+            f"setups={len(market.setups)}",
+            flush=True,
+        )
+
+    coordinator = LiveMarketCoordinator(
+        universe,
+        provider=upstream,
+        data_dir=os.environ.get("AICFA_DATA_DIR", str(ROOT / "data")),
+        on_candle=_on_candle,
+        max_workers=max(1, min(4, (os.cpu_count() or 2))),
+    )
+    engine = AutonomousScanEngine(universe, provider=coordinator.cache)
+    engine._live_symbol_map = {
+        (
+            market.market_type,
+            coordinator.cache.resolve_symbol(market.asset, market_type=market.market_type),
+        ): index
+        for index, market in enumerate(universe.markets)
+    }
+    engine_holder["engine"] = engine
     control_port = int(os.environ.get("AICFA_CONTROL_PORT", "8091"))
 
     def _serve_control() -> None:
@@ -66,13 +130,13 @@ def main() -> None:
     control_thread.start()
 
     print(
-        f"AICFA autonomous worker started: markets={len(universe.markets)} "
+        f"AICFA live worker started: markets={len(universe.markets)} "
         f"universe={universe_path}",
         flush=True,
     )
     print(
-        "AICFA scanner: Intraday + Swing + Position; "
-        "persistent journal enabled by environment.",
+        "AICFA scanner: Scalping + Intraday + Swing + Position; "
+        "closed-candle event triggers + persistent recovery checkpoints.",
         flush=True,
     )
 
@@ -92,13 +156,11 @@ def main() -> None:
             flush=True,
         )
 
-    engine.run_forever_batches(
-        interval_seconds=0,
-        batch_size=1,
-        on_scan=on_scan,
-        on_error=on_error,
-        should_stop=stop_event.is_set,
-    )
+    try:
+        coordinator.start()
+        stop_event.wait()
+    finally:
+        coordinator.stop()
 
     print("AICFA autonomous worker stopped.", flush=True)
 
