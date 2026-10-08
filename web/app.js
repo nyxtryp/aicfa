@@ -86,7 +86,7 @@ function renderCandleChart(node,candles,s){
  if(!window.LightweightCharts){node.innerHTML='<div class="chart-empty">CHART LIBRARY UNAVAILABLE</div>';return}
  node.innerHTML="";
  const chart=LightweightCharts.createChart(node,{width:node.clientWidth,height:390,layout:{background:{type:"solid",color:"#090c10"},textColor:"#7e8795"},grid:{vertLines:{color:"#171c23"},horzLines:{color:"#171c23"}},crosshair:{mode:LightweightCharts.CrosshairMode.Normal},rightPriceScale:{borderColor:"#252b34"},timeScale:{borderColor:"#252b34",timeVisible:true,secondsVisible:false},handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true},handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true}});
- const series=chart.addCandlestickSeries({upColor:"#61df9a",downColor:"#ff687b",borderUpColor:"#61df9a",borderDownColor:"#ff687b",wickUpColor:"#61df9a",wickDownColor:"#ff687b"});
+ const series=chart.addCandlestickSeries({upColor:"#61df9a",downColor:"#ff687b",borderUpColor:"#61df9a",borderDownColor:"#ff687b",wickUpColor:"#61df9a",wickDownColor:"#61df9a"});
  const data=candles.map(k=>({time:Math.floor(Number(k.timestamp)/1000),open:Number(k.open),high:Number(k.high),low:Number(k.low),close:Number(k.close)})).filter(k=>Number.isFinite(k.time)&&Number.isFinite(k.open)&&Number.isFinite(k.high)&&Number.isFinite(k.low)&&Number.isFinite(k.close));
  series.setData(data);
  const overlay=document.createElement("canvas");overlay.className="chart-overlay";node.appendChild(overlay);
@@ -96,20 +96,23 @@ function renderCandleChart(node,candles,s){
  const entry=s.entry||s.entry_zone||[],targets=s.take_profits||s.target_levels||[];
  const chartData=s.chart||{},zones=s.zones||{},chartZones=chartData.zones||[],obs=[...chartZones.filter(z=>String(z.type).toLowerCase()==="ob"),...(zones.order_blocks||s.order_blocks||[]),...(zones.ob||[])],fvgs=[...chartZones.filter(z=>String(z.type).toLowerCase()==="fvg"),...(zones.fvgs||s.fvgs||[]),...(zones.fvg||[])];
  const chartEvents=chartData.events||[],events={BOS:[...chartEvents.filter(e=>e.type==="BOS"),...(s.bos||s.BOS||[])],CHoCH:[...chartEvents.filter(e=>e.type==="CHoCH"),...(s.choch||s.CHoCH||[])],MSS:[...chartEvents.filter(e=>e.type==="MSS"),...(s.mss||s.MSS||[])]};
+ const priceLines=[];
+ const addPriceLine=(value,title,color,lineStyle=2)=>{const p=price(value);if(!Number.isFinite(p))return;priceLines.push(series.createPriceLine({price:p,color,lineWidth:1,lineStyle,axisLabelVisible:true,title}))};
+ if(Array.isArray(entry))entry.forEach(e=>addPriceLine(e,"ENTRY","#d7ff58",2));else addPriceLine(entry,"ENTRY","#d7ff58",2);
+ if(s.stop_loss!=null)addPriceLine(s.stop_loss,"SL","#ff687b",2);else if(s.invalidation_level)addPriceLine(s.invalidation_level,"SL","#ff687b",2);
+ (Array.isArray(targets)?targets:[]).forEach((t,i)=>addPriceLine(t,i===0?"TP1":"TP"+(i+1),"#61df9a",2));
  function rangePrice(x){const a=price(x?.priceLow??x?.low??x?.low_price),b=price(x?.priceHigh??x?.high??x?.high_price);return [Math.min(a,b),Math.max(a,b)]}
  function xCoord(t){if(!Number.isFinite(t))return null;return chart.timeScale().timeToCoordinate(Math.floor(t>1e12?t/1000:t))}
  function drawOverlay(){
   const w=node.clientWidth,h=node.clientHeight;ctx.clearRect(0,0,w,h);
-  const line=(p,label,kind,dash=[7,5])=>{if(!Number.isFinite(p))return;const y=series.priceToCoordinate(p);if(y==null)return;ctx.beginPath();ctx.moveTo(0,y+.5);ctx.lineTo(w,y+.5);ctx.setLineDash(dash);ctx.lineWidth=1;ctx.strokeStyle=kind==="sl"?"#ff687b":kind==="tp"?"#61df9a":"#d7ff58";ctx.stroke();ctx.setLineDash([]);ctx.font="700 10px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;const text=label+"  "+p;ctx.fillText(text,Math.max(6,w-ctx.measureText(text).width-10),Math.max(12,y-5))};
-  if(Array.isArray(entry))for(const e of entry)line(price(e),"ENTRY","entry");else if(entry)line(price(entry),"ENTRY","entry");
-  if(s.stop_loss)line(price(s.stop_loss),"SL","sl",[6,5]);else if(s.invalidation_level)line(price(s.invalidation_level),"SL","sl",[6,5]);
-  for(const t of Array.isArray(targets)?targets:[])line(price(t),targets.indexOf(t)===0?"TP1":"TP"+(targets.indexOf(t)+1),"tp",[7,5]);
+  // Entry / SL / TP are native chart price lines, so their position and labels
+  // are transformed by Lightweight Charts itself during zoom, pan and resize.
   const rect=(z,fill,stroke)=>{const [lo,hi]=rangePrice(z);if(!Number.isFinite(lo)||!Number.isFinite(hi))return;const y1=series.priceToCoordinate(hi),y2=series.priceToCoordinate(lo);if(y1==null||y2==null)return;const ts=time(z.timeStart??z.startTime??z.time_start),te=time(z.timeEnd??z.endTime??z.time_end);let x1=xCoord(ts),x2=xCoord(te);if(x1==null)x1=0;if(x2==null)x2=w;if(x2<x1)[x1,x2]=[x2,x1];ctx.fillStyle=fill;ctx.fillRect(x1,Math.min(y1,y2),Math.max(2,x2-x1),Math.abs(y2-y1));ctx.strokeStyle=stroke;ctx.strokeRect(x1,Math.min(y1,y2),Math.max(2,x2-x1),Math.abs(y2-y1))};
   obs.forEach(z=>rect(z,"rgba(255,184,77,.12)","rgba(255,184,77,.55)"));fvgs.forEach(z=>rect(z,"rgba(174,108,255,.13)","rgba(174,108,255,.6)"));
   Object.entries(events).forEach(([name,list])=>{for(const e of list){const p=price(e);if(!Number.isFinite(p))continue;const y=series.priceToCoordinate(p);if(y==null)continue;let x1=xCoord(time(e.timeStart??e.startTime??e.time_start)),x2=xCoord(time(e.timeEnd??e.endTime??e.time_end));if(x1==null)x1=0;if(x2==null)x2=w;ctx.beginPath();ctx.moveTo(x1,y+.5);ctx.lineTo(x2,y+.5);ctx.setLineDash([5,5]);ctx.strokeStyle=name==="BOS"?"#f3c74f":name==="CHoCH"?"#67b7ff":"#ff9d66";ctx.stroke();ctx.setLineDash([]);ctx.font="700 9px system-ui,-apple-system,Segoe UI,sans-serif";ctx.fillStyle=ctx.strokeStyle;ctx.fillText(name,Math.min(w-35,Math.max(4,x1+4)),Math.max(11,y-4))}})}
  function resize(){const w=Math.max(1,node.clientWidth),h=Math.max(1,node.clientHeight);chart.resize(w,h);overlay.width=Math.floor(w*dpr);overlay.height=Math.floor(h*dpr);overlay.style.width=w+"px";overlay.style.height=h+"px";ctx.setTransform(dpr,0,0,dpr,0,0);drawOverlay()}
  chart.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(drawOverlay);if(chart.timeScale().subscribeVisibleTimeRangeChange)chart.timeScale().subscribeVisibleTimeRangeChange(drawOverlay);
- const ro=new ResizeObserver(resize);ro.observe(node);resize();node._aicfaChartCleanup=()=>{ro.disconnect();chart.remove()};
+ const ro=new ResizeObserver(resize);ro.observe(node);resize();node._aicfaChartCleanup=()=>{ro.disconnect();priceLines.forEach(p=>{try{series.removePriceLine(p)}catch(_){}});chart.remove()};
 }
 async function hydrateCharts(){
  const nodes=[...document.querySelectorAll(".market-chart[data-symbol]")];
