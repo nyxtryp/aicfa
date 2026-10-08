@@ -143,6 +143,24 @@ class SetupLifecycle:
         return price >= level.value
 
     @staticmethod
+    def _risk_reward(candidate: SetupCandidate) -> float | None:
+        """Return first-target structural RR without inventing prices."""
+        if candidate.direction not in {"long", "short"}:
+            return None
+        if candidate.invalidation_level is None or not candidate.entry_zone or not candidate.target_levels:
+            return None
+        entry_low = min(level.value for level in candidate.entry_zone)
+        entry_high = max(level.value for level in candidate.entry_zone)
+        entry = (entry_low + entry_high) / 2.0
+        stop = candidate.invalidation_level.value
+        target = candidate.target_levels[0].value
+        risk = entry - stop if candidate.direction == "long" else stop - entry
+        reward = target - entry if candidate.direction == "long" else entry - target
+        if risk <= 0 or reward <= 0:
+            return None
+        return reward / risk
+
+    @staticmethod
     def _hit_target(candidate: SetupCandidate, price: float, index: int) -> bool:
         if len(candidate.target_levels) <= index or candidate.direction is None:
             return False
@@ -265,6 +283,20 @@ class SetupLifecycle:
 
                 if setup_id in self._active:
                     continue
+
+                rr = self._risk_reward(candidate)
+                if rr is None or rr < 2.0:
+                    results.append(SetupLifecycleResult(
+                        None, candidate, "WAIT",
+                        (
+                            f"new setup rejected: structural RR {rr:.2f}R is below the 2.0R minimum"
+                            if rr is not None
+                            else "new setup rejected: structural RR cannot be calculated"
+                        ),
+                        setup_id,
+                    ))
+                    continue
+
                 active = ActiveSetup(
                     symbol=symbol,
                     market_type=market_type,
