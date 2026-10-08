@@ -192,14 +192,8 @@ class SetupLifecycle:
             if setup_id.symbol != symbol or setup_id.market_type != market_type or setup_id.horizon != normalized:
                 continue
 
-            if active.expires_at_ms is not None and now_ms >= active.expires_at_ms:
-                del self._active[setup_id]
-                results.append(SetupLifecycleResult(
-                    SetupLifecycleStatus.EXPIRED, active.candidate, "WAIT",
-                    "active setup expired", setup_id,
-                ))
-                continue
-
+            # An active trade is closed by market structure: stop or target.
+            # Wall-clock expiry must never silently remove a live setup.
             invalidation_price = current_low if active.candidate.direction == "long" and current_low is not None else current_high if active.candidate.direction == "short" and current_high is not None else current_price
             if self._hit_invalidation(active.candidate, invalidation_price):
                 del self._active[setup_id]
