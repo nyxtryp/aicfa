@@ -376,3 +376,39 @@ def test_new_long_setup_is_missed_after_price_has_fully_passed_below_zone():
     assert result.status is None
     assert result.action == "WAIT"
     assert lifecycle.active(symbol="GRT/USDT") is None
+
+
+def test_active_setup_is_not_closed_by_wall_clock_expiry(tmp_path):
+    lifecycle = SetupLifecycle()
+    first = lifecycle.evaluate_all(
+        symbol="BTC/USDT",
+        market_type="spot",
+        horizon="intraday",
+        assessment=_ready(),
+        current_price=101.0,
+        current_high=103.0,
+        current_low=100.5,
+        now_ms=1_000,
+        expires_at_ms=1_001,
+    )
+    assert first[-1].status is SetupLifecycleStatus.ACTIVE
+
+    later = lifecycle.evaluate_all(
+        symbol="BTC/USDT",
+        market_type="spot",
+        horizon="intraday",
+        assessment=SetupAssessment(
+            decision=SetupDecision.NEED_MORE_EVIDENCE,
+            candidates=(),
+            missing_context=("no new setup",),
+            conflicts=(),
+            reasons=("analytical wait",),
+        ),
+        current_price=104.0,
+        current_high=105.0,
+        current_low=103.0,
+        now_ms=86_400_000,
+    )
+
+    assert later[-1].status is SetupLifecycleStatus.ACTIVE
+    assert lifecycle.active(symbol="BTC/USDT", horizon="intraday") is not None
