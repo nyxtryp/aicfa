@@ -48,6 +48,17 @@ def _candidate(direction="long", scenario="continuation"):
         targets=("next liquidity",),
         rationale=("BOS followed by displacement",),
         direction=direction,
+        entry_zone=(
+            SetupLevel(100.0, "15m", "active bullish OB low"),
+            SetupLevel(102.0, "15m", "active bullish OB high"),
+        ),
+        invalidation_level=SetupLevel(95.0, "5m", "protected structural low"),
+        target_levels=(
+            SetupLevel(115.0, "4h", "buy-side liquidity"),
+            SetupLevel(125.0, "1d", "higher-timeframe liquidity"),
+        ),
+        confirmation_timeframes=("15m", "5m"),
+        source_timeframes=("4h", "1h", "15m", "5m"),
     )
 
 
@@ -207,8 +218,8 @@ def test_orchestrator_keeps_two_same_horizon_geometries_independent(monkeypatch)
     second = SetupCandidate(**{
         **first.__dict__,
         "entry_zone": (
-            SetupLevel(96.0, "15m", "second FVG low"),
-            SetupLevel(98.0, "15m", "second FVG high"),
+            SetupLevel(100.5, "15m", "second FVG low"),
+            SetupLevel(101.5, "15m", "second FVG high"),
         ),
         "invalidation_level": SetupLevel(92.0, "5m", "second invalidation"),
         "target_levels": (
