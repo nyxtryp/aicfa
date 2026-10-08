@@ -39,13 +39,17 @@ jobs:
             "/aicfa tests")
               {
                 echo "=== AICFA TEST SUITE: SAFE ISOLATED MODE ==="
-                echo "One pytest process at a time; 1 CPU core; 1536 MiB virtual-memory cap; 120s timeout per file."
+                echo "One pytest process at a time; 1 CPU core; autonomous_scan gets 2560 MiB virtual-memory cap; other files 1536 MiB; 120s timeout per file."
                 echo
                 TOTAL_RC=0
                 for TEST_FILE in tests/test_*.py; do
                   echo "=== START $TEST_FILE ==="
                   timeout --signal=TERM --kill-after=10s 120s bash -c '
-                    ulimit -v 1572864
+                    if [ "$1" = "tests/test_autonomous_scan.py" ]; then
+                      ulimit -v 2621440
+                    else
+                      ulimit -v 1572864
+                    fi
                     ulimit -u 256
                     exec taskset -c 1 nice -n 10 .venv/bin/pytest -q "$1"
                   ' _ "$TEST_FILE"
