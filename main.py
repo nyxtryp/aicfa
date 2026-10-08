@@ -88,12 +88,20 @@ def main() -> None:
         )
         market = state.result.markets[0]
         diagnostics = market.diagnostics
+        status = str(diagnostics.status if diagnostics else "completed").lower()
         print(
             f"AICFA live candle: {market.asset} {key.timeframe} "
-            f"status={diagnostics.status if diagnostics else 'completed'} "
-            f"setups={len(market.setups)}",
+            f"status={status} setups={len(market.setups)}",
             flush=True,
         )
+        # The coordinator advances its durable candle checkpoint only when
+        # this callback succeeds. Do not acknowledge a failed/timeout scan,
+        # otherwise a broken analysis would be permanently skipped after
+        # restart and the live stream could silently move past it.
+        if status in {"error", "timeout"}:
+            raise RuntimeError(
+                diagnostics.error or f"live scan returned {status}"
+            )
 
     coordinator = LiveMarketCoordinator(
         universe,
