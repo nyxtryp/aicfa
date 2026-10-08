@@ -236,8 +236,8 @@ def test_setup_engine_collapses_duplicate_actionable_scenario_geometry():
 def test_setup_engine_uses_scenario_specific_zone_family():
     frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     for tf, frame in frames.items():
-        frame.loc[0, "order_block_bullish_low"] = 101.0 if tf == "1h" else float("nan")
-        frame.loc[0, "order_block_bullish_high"] = 103.0 if tf == "1h" else float("nan")
+        frame.loc[0, "order_block_bullish_low"] = 101.0 if tf == "4h" else float("nan")
+        frame.loc[0, "order_block_bullish_high"] = 103.0 if tf == "4h" else float("nan")
         frame.loc[0, "fvg_bullish_low"] = 96.0 if tf == "4h" else float("nan")
         frame.loc[0, "fvg_bullish_high"] = 99.0 if tf == "4h" else float("nan")
     frames["4h"].loc[0, "smc_sweep_low_level"] = 90.0
@@ -320,8 +320,8 @@ def test_setup_engine_prioritizes_active_liquidity_over_nearer_structural_extrem
         frame.loc[0, "previous_high"] = float("nan")
         frame.loc[0, "internal_previous_high"] = float("nan")
         frame.loc[0, "rolling_high_60"] = float("nan")
-    frames["1h"].loc[0, "active_buy_liquidity_price"] = 108.0
-    frames["1h"].loc[0, "previous_high"] = 106.0
+    frames["4h"].loc[0, "active_buy_liquidity_price"] = 108.0
+    frames["4h"].loc[0, "previous_high"] = 106.0
 
     result = _pipeline(frames)
     candidate = result.candidates[0]
