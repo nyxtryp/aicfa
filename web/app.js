@@ -41,7 +41,7 @@ function registryItems(records){
   const wrapper=r.setup||{},base=wrapper.candidate||wrapper,candidate={...base,chart:wrapper.chart||base.chart};
   const key=String(r.setup_id||"");
   if(!key)continue;
-  out.push({asset:r.asset,mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||"active",status:"ACTIVE",key,seenAt:Number(r.last_seen_at_ms||r.created_at_ms||0),lastConfirmedAt:Number(r.last_confirmed_at_ms||0),setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
+  out.push({asset:r.asset,market_type:r.market_type||"futures",mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||"active",status:"ACTIVE",key,seenAt:Number(r.last_seen_at_ms||r.created_at_ms||0),lastConfirmedAt:Number(r.last_confirmed_at_ms||0),setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
  }
  return out.sort((a,b)=>Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
 }
@@ -120,7 +120,7 @@ function renderCandleChart(node,candles,s){
 }
 async function hydrateCharts(){
  const nodes=[...document.querySelectorAll(".market-chart[data-symbol]")];
- await Promise.all(nodes.map(async node=>{try{const q=new URLSearchParams({symbol:node.dataset.symbol,timeframe:node.dataset.timeframe,limit:"200"});const response=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"});const data=response.ok?await response.json():null;renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"))}catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}}));
+ await Promise.all(nodes.map(async node=>{try{const q=new URLSearchParams({symbol:node.dataset.symbol,market_type:node.dataset.marketType||"futures",timeframe:node.dataset.timeframe,limit:"200"});const response=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"});const data=response.ok?await response.json():null;renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"))}catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}}));
 }
 function setupCard(x){
  const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
@@ -134,7 +134,7 @@ function setupCard(x){
  const why=(s.rationale||[]).filter(v=>!v.startsWith("MTF hierarchy:")),hierarchy=(s.rationale||[]).filter(v=>v.startsWith("MTF hierarchy:")).join(" · "),side=dir(s),tf=chartTf(x.mode,s);
  return '<article class="setup '+side.toLowerCase()+'">'+
  '<header class="setup-head"><div class="symbol-block"><b>'+esc(x.asset)+'</b><span>'+esc(hor(x.mode))+' / '+esc(s.scenario||"SETUP")+'</span></div><div class="signal"><i></i><strong>'+esc(side)+'</strong></div></header>'+
- '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:s.chart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP1 <b>'+esc(tp)+'</b></span><span>RR / FRESHNESS <b>'+esc(rrText+" · "+freshness)+'</b></span></div></section>'+
+ '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-market-type="'+esc(x.market_type||"futures")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:s.chart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP1 <b>'+esc(tp)+'</b></span><span>RR / FRESHNESS <b>'+esc(rrText+" · "+freshness)+'</b></span></div></section>'+
  '<aside class="setup-side"><div class="scenario"><span class="panel-kicker">SCENARIO</span><p>'+esc(scenarioText(s))+'</p></div><div class="evidence"><span class="panel-kicker">EVIDENCE</span>'+evidence(s,x)+'</div><div class="decision"><span class="panel-kicker">WHY '+esc(side)+'</span><p>'+esc(why.length?why.join(" · "):"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></aside></div></article>';
 }
 function waitCards(ms){
