@@ -202,9 +202,11 @@ def test_multiple_distinct_candidates_activate_and_remain_independent():
         now_ms=1_000,
     )
 
-    assert len(results) == 2
-    assert all(result.status is SetupLifecycleStatus.ACTIVE for result in results)
-    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 2
+    # Only the candidate whose POI is actually touched by the execution
+    # candle may become actionable. The second zone is still below price.
+    assert len(results) == 1
+    assert results[0].status is SetupLifecycleStatus.ACTIVE
+    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 1
 
 
 def test_same_candidate_on_next_scan_does_not_create_duplicate():
