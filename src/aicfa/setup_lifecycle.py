@@ -233,11 +233,15 @@ class SetupLifecycle:
                     continue
                 entry_low = min(entry_values)
                 entry_high = max(entry_values)
-                if candidate.direction == "long":
-                    entry_already_passed = current_price > entry_high
-                else:
-                    entry_already_passed = current_price < entry_low
-                if entry_already_passed:
+                # A candidate is only an actionable entry after price has
+                # actually reached its POI. A zone sitting below/above price is
+                # a pending setup, not a live trade. If price has already passed
+                # through the zone, the opportunity is missed and must not be
+                # published as a fresh entry.
+                candle_high = current_high if current_high is not None else current_price
+                candle_low = current_low if current_low is not None else current_price
+                zone_touched = candle_low <= entry_high and candle_high >= entry_low
+                if not zone_touched:
                     continue
                 invalidation_price = current_low if candidate.direction == "long" and current_low is not None else current_high if candidate.direction == "short" and current_high is not None else current_price
                 target_price = current_high if candidate.direction == "long" and current_high is not None else current_low if candidate.direction == "short" and current_low is not None else current_price
