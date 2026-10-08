@@ -48,8 +48,27 @@ jobs:
                 readlink -f /srv/frostdeploy/aicfa/current
               } >"$OUTPUT" 2>&1
               ;;
+            "/aicfa deploy-diagnose")
+              {
+                echo "=== current ==="
+                readlink -f /srv/frostdeploy/aicfa/current
+                echo "=== releases ==="
+                ls -lt --time-style=long-iso /srv/frostdeploy/aicfa/releases | head -20
+                echo "=== deploy-related processes ==="
+                ps -eo pid,ppid,user,lstart,cmd --sort=-start_time | grep -Ei 'frostdeploy|freim|deploy' | grep -v grep | head -80
+                echo "=== deploy-related services ==="
+                systemctl list-units --all --type=service --no-pager | grep -Ei 'frost|freim|deploy' || true
+                echo "=== deploy commands ==="
+                for x in frostdeploy freimctl freim frostctl fdctl; do
+                  command -v "$x" 2>/dev/null && "$x" --version 2>/dev/null | head -3
+                done
+                echo "=== project metadata ==="
+                ls -la /srv/frostdeploy/aicfa
+                stat /srv/frostdeploy/aicfa/current /srv/frostdeploy/aicfa/.freim-deploy 2>/dev/null || true
+              } >"$OUTPUT" 2>&1
+              ;;
             *)
-              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa features, /aicfa git" >"$OUTPUT"
+              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa features, /aicfa git, /aicfa deploy-diagnose" >"$OUTPUT"
               ;;
           esac
 
