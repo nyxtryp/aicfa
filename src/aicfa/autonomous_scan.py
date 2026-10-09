@@ -32,10 +32,9 @@ from .setup_registry import SetupRegistry
 MAIN_SCAN_INTERVAL_SECONDS = 30
 BATCH_SCAN_INTERVAL_SECONDS = 0
 DEFAULT_MARKETS_PER_BATCH = 1
-# Whole-market execution includes six MTF feature builds plus deterministic
-# setup/evidence/lifecycle work. 20s was below measured real-world cost on the
-# production 1-vCPU host, so the budget is deliberately generous and configurable.
-DEFAULT_MARKET_TIMEOUT_SECONDS = 90.0
+# The automatic rotation runs on the process main thread so SIGALRM can enforce
+# a real per-market hard deadline. Keep the budget below the 30-second cadence.
+DEFAULT_MARKET_TIMEOUT_SECONDS = 25.0
 MANUAL_SCAN_PAUSE_SECONDS = 30.0
 
 
@@ -532,26 +531,26 @@ class AutonomousScanEngine:
                 continue
             asset = self.universe.markets[market_index].asset
             queue_position = market_index + 1
+            # The interval is a start-to-start cadence, not an extra delay after
+            # analysis. A 12-second scan therefore sleeps 18 seconds at a
+            # 30-second cadence; a timed-out 25-second scan sleeps at most 5.
+            scan_started = time.monotonic()
             try:
                 state = self.scan_market(market_index, rotation_id=rotation_id, queue_position=queue_position)
             except Exception as exc:
                 if on_error is not None:
                     on_error(asset, exc)
-                market_index = (market_index + 1) % universe_size
-                if market_index == 0:
-                    rotation_id += 1
-                if interval_seconds:
-                    sleep(interval_seconds)
-                continue
-            if on_scan is not None:
+                state = None
+            if state is not None and on_scan is not None:
                 on_scan(state)
             if should_stop is not None and should_stop():
                 return
             market_index = (market_index + 1) % universe_size
             if market_index == 0:
                 rotation_id += 1
-            if interval_seconds:
-                sleep(interval_seconds)
+            remaining = interval_seconds - (time.monotonic() - scan_started)
+            if remaining > 0:
+                sleep(remaining)
     def run_forever(
         self,
         *,
