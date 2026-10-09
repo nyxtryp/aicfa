@@ -88,7 +88,7 @@ def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAI
     )
 
 
-def test_one_market_runs_all_three_primary_horizons(monkeypatch):
+def test_one_market_runs_all_four_primary_horizons_including_scalping(monkeypatch):
     calls = []
 
     def fake_find_setup(request, **kwargs):
@@ -119,8 +119,8 @@ def test_multiple_markets_keep_results_independent(monkeypatch):
     assert [market.asset for market in result.markets] == ["BTC/USDT", "ETH/USDT"]
     assert len(result.setups) == 6
     assert [item[0] for item in result.setups] == [
-        "BTC/USDT", "BTC/USDT", "BTC/USDT",
-        "ETH/USDT", "ETH/USDT", "ETH/USDT",
+        "BTC/USDT", "BTC/USDT", "BTC/USDT", "BTC/USDT",
+        "ETH/USDT", "ETH/USDT", "ETH/USDT", "ETH/USDT",
     ]
 
 
@@ -133,7 +133,7 @@ def test_waiting_horizon_does_not_force_a_signal(monkeypatch):
     result = analyze_market_horizons("BTC/USDT", now_ms=1000)
 
     assert result.setups == ()
-    assert [item.decision for item in result.results] == ["WAIT", "WAIT", "WAIT"]
+    assert [item.decision for item in result.results] == ["WAIT", "WAIT", "WAIT", "WAIT"]
 
 def test_waiting_decision_preserves_candidate_for_watch_panel(monkeypatch):
     candidate = _candidate()
@@ -145,7 +145,7 @@ def test_waiting_decision_preserves_candidate_for_watch_panel(monkeypatch):
 
     result = analyze_market_horizons("BTC/USDT", now_ms=1000)
 
-    assert len(result.setups) == 3
+    assert len(result.setups) == 4
     assert all(item.decision_action == "wait" for item in result.setups)
     assert all(item.candidate.entry_zone[0].value == 100.0 for item in result.setups)
 
@@ -207,6 +207,8 @@ def test_configured_market_universe_controls_assets_and_market_type(monkeypatch)
         ("BTC/USDT", "spot"),
         ("BTC/USDT", "spot"),
         ("BTC/USDT", "spot"),
+        ("BTC/USDT", "spot"),
+        ("ETH/USDT", "futures"),
         ("ETH/USDT", "futures"),
         ("ETH/USDT", "futures"),
         ("ETH/USDT", "futures"),
