@@ -721,11 +721,13 @@ def _target_levels(
     # higher-structure ATR (falling back to broader context ATR); when ATR is
     # unavailable, preserve legacy behavior rather than inventing a distance.
     max_target_atr = {
-        TradingMode.SCALPING: 6.0,
-        TradingMode.INTRADAY: 10.0,
-        TradingMode.SWING: 12.0,
-        TradingMode.POSITION: 15.0,
-    }.get(normalize_trading_mode(context.mode), 10.0)
+        # TP1 is the nearest actionable objective, not a distant macro draw.
+        # Use tighter volatility envelopes for shorter holding periods.
+        TradingMode.SCALPING: 2.5,
+        TradingMode.INTRADAY: 3.5,
+        TradingMode.SWING: 6.0,
+        TradingMode.POSITION: 10.0,
+    }.get(normalize_trading_mode(context.mode), 3.5)
     atr_row = context.latest_rows.get(context.structure_timeframe)
     atr_value = _numeric(atr_row, "atr") if atr_row is not None else None
     if atr_value is None or atr_value <= 0:
