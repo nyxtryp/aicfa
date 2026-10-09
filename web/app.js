@@ -1,6 +1,6 @@
 const API_BASE="/api";
 const state={events:[],registry:[],markets:[],prices:{},filter:"ALL"};
-const ui={history:[],selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
+const ui={history:[],manualItems:[],manualView:null,selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?"—":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const pick=(o,...k)=>{for(const x of k)if(o&&o[x]!=null)return o[x]};
@@ -20,6 +20,7 @@ function latest(rows){
  return [...m.values()];
 }
 function setupKey(x){return String(x.key||[x.asset,hor(x.mode),(x.setup?.scenario||""),dir(x.setup||""),x.setupTimeframe||""].join("|"))}
+function allHistory(){return [...ui.manualItems,...ui.history.filter(x=>!ui.manualItems.some(m=>m.key===x.key))]}
 function active(ms){
  const out=[],seen=new Set();
  for(const m of ms)for(const s of m.setups||[]){
@@ -231,7 +232,7 @@ async function hydrateCharts(){
 }
 function setupCard(x){
  const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
- const fullChart=mergeVisualCharts(marketVisual(x.asset,x.mode),s.chart);
+ const fullChart=mergeVisualCharts(x.suppressMarketVisual?null:marketVisual(x.asset,x.mode),s.chart);
  const low=entry.length?Math.min(...entry.map(v=>Number(v.value))):NaN,high=entry.length?Math.max(...entry.map(v=>Number(v.value))):NaN,stop=Number(s.invalidation_level?.value),take=targets.length?Number(targets[0]?.value):NaN;
  const geometryValid=Number.isFinite(low)&&Number.isFinite(high)&&low>0&&high>0&&Number.isFinite(stop)&&stop>0&&Number.isFinite(take)&&take>0;
  const risk=Number.isFinite(low)&&Number.isFinite(high)&&Number.isFinite(stop)?(dir(s)==="LONG"?low-stop:stop-high):NaN;
@@ -286,13 +287,45 @@ function historyCard(x){
 }
 function renderCenter(){
  const root=$("#setups");
+ if(ui.manualView){
+  const view=ui.manualView;
+  if(view.state==="analyzing"){
+   const sig="manual-analyzing|"+view.asset;
+   if(root.dataset.signature!==sig){
+    root.dataset.signature=sig;
+    $("#workspaceTitle").textContent=view.asset+" · ANALYZING";
+    root.innerHTML='<div class="workspace-empty"><b>ANALYZING MARKET</b><span>Running the selected market through AICFA analysis.</span></div>';
+   }
+   return;
+  }
+  if(view.state==="result"){
+   const sig="manual-result|"+view.asset+"|"+view.scanNumber+"|"+JSON.stringify(view.items||[])+"|"+JSON.stringify(view.visual||{});
+   if(root.dataset.signature!==sig){
+    root.dataset.signature=sig;
+    if(view.items?.length){
+     $("#workspaceTitle").textContent=view.asset+" · "+view.items.length+" WATCH";
+     root.innerHTML='<div class="workspace-empty"><b>WATCH — НЕ АКТИВНЫЕ СДЕЛКИ</b><span>Кандидаты из текущего ручного сканирования. Они не являются активными сделками.</span></div>'+view.items.map(setupCard).join("");
+     hydrateCharts();
+    }else{
+     $("#workspaceTitle").textContent=view.asset+" · NO SETUP";
+     root.innerHTML=marketVisualCard(view.asset,view.mode||"INTRADAY",view.visual||{zones:[],events:[],liquidity:[]},view.marketType||"futures");
+     const note=document.createElement("div");
+     note.className="workspace-empty";
+     note.innerHTML="<b>NO ACTIONABLE SETUP</b><span>Текущее сканирование завершено. Старые зоны и сетапы не подмешиваются.</span>";
+     root.prepend(note);
+     hydrateCharts();
+    }
+   }
+   return;
+  }
+ }
  if(ui.centerEmpty){
   root.dataset.signature="";
   $("#workspaceTitle").textContent=(ui.centerEmptyMarket||"MARKET")+" · NO SETUP";
   root.innerHTML='<div class="workspace-empty"><b>NO ACTIVE SETUP</b><span>This market was analyzed by the same AICFA scanner pipeline. No actionable setup was found.</span></div>';
   return;
  }
- const x=ui.history.find(h=>h.key===ui.centerKey);
+ const x=[...ui.manualItems,...ui.history].find(h=>h.key===ui.centerKey);
  if(!x){
   root.dataset.signature="";
   $("#workspaceTitle").textContent="Waiting for setup";
@@ -303,6 +336,12 @@ function renderCenter(){
  if(root.dataset.signature===sig)return;
  root.dataset.signature=sig;$("#workspaceTitle").textContent=x.asset+" · "+hor(x.mode);
  root.innerHTML=setupCard(x);hydrateCharts();
+}
+function renderHistory(){
+ const visible=allHistory().filter(x=>state.filter==="ALL"||hor(x.mode)===state.filter);
+ if(visible.length&&!visible.some(x=>x.key===ui.selected))ui.selected=visible[0].key;
+ $("#historyCount").textContent=visible.length;
+ $("#setupHistory").innerHTML=visible.length?visible.map(historyCard).join(""):'<div class="rail-empty">NO SETUPS YET</div>';
 }
 function renderRails(ms,rows){
  const waits=waitCards(ms).filter(s=>state.filter==="ALL"||String(s.mode).toUpperCase()===state.filter);
@@ -359,71 +398,47 @@ function renderMarkets(){
 }
 async function scanMarket(index){
  const market=state.markets.find(x=>Number(x.index)===Number(index));
- if(!market)return;
+ if(!market||ui.marketBusy)return;
  ui.marketIndex=Number(index);
  ui.marketBusy=true;
- ui.centerEmpty=false;
- ui.centerKey=null;
- ui.centerEmptyMarket=market.asset;
- $("#workspaceTitle").textContent=market.asset+" · ANALYZING";
+ ui.manualItems=[];
+ ui.manualView={state:"analyzing",asset:market.asset};
+ ui.centerEmpty=false;ui.centerKey=null;ui.centerEmptyMarket=market.asset;
  $("#setups").dataset.signature="";
- $("#setups").innerHTML='<div class="workspace-empty"><b>ANALYZING MARKET</b><span>Running the same AICFA scanner pipeline used by the autonomous queue.</span></div>';
- renderMarkets();
+ renderMarkets();renderHistory();renderCenter();
  try{
   const response=await fetch(API_BASE+"/market-scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({market_index:Number(index)})});
   const data=await response.json();
-  if(!response.ok)throw new Error(data.error||"scan_failed");
+  if(!response.ok)throw new Error(data.detail||data.error||"scan_failed");
   const items=registryItems(data.setups||[]);
   if(items.length){
    const keys=new Set(items.map(x=>x.key));
-   ui.history=[...ui.history.filter(x=>!keys.has(x.key)),...items].sort((a,b)=>(a.status==="ACTIVE"?0:1)-(b.status==="ACTIVE"?0:1)||Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
-   const item=items[0];
-   ui.centerKey=item.key;
-   ui.selected=item.key;
-   ui.centerEmpty=false;
-   ui.centerEmptyMarket="";
-   renderHistory();
-   renderCenter();
-  }else if((data.watch_candidates||[]).length){
+   ui.history=[...ui.history.filter(x=>!keys.has(x.key)),...items].sort((a,b)=>Number(b.lastConfirmedAt||b.seenAt)-Number(a.lastConfirmedAt||a.seenAt));
+   ui.manualView=null;ui.manualItems=[];
+   const item=items[0];ui.centerKey=item.key;ui.selected=item.key;ui.centerEmpty=false;ui.centerEmptyMarket="";
+  }else{
    const pendingItems=(data.watch_candidates||[]).map((pending,index)=>{
     const candidate=pending.candidate||{},mode=hor(pending.mode),asset=pending.asset||market.asset;
-    return {asset,mode,setup:candidate,lifecycle:"WATCH",status:"WATCH",key:"watch|"+asset+"|"+mode+"|"+String(candidate.scenario||"")+"|"+String(candidate.direction||"")+"|"+index,seenAt:Number(data.scanned_at_ms||Date.now()),market_type:market.market_type||"futures"};
+    return {asset,mode,setup:candidate,lifecycle:"WATCH",status:"WATCH",key:"watch|"+asset+"|"+mode+"|"+String(candidate.scenario||"")+"|"+String(candidate.direction||"")+"|"+index,seenAt:Number(data.scanned_at_ms||Date.now()),market_type:market.market_type||"futures",suppressMarketVisual:true};
    });
+   ui.manualItems=pendingItems;
+   ui.manualView={state:"result",asset:market.asset,scanNumber:data.scan_number,items:pendingItems,visual:data.market_visual||{zones:[],events:[],liquidity:[]},mode:"INTRADAY",marketType:market.market_type||"futures"};
    ui.centerKey=null;ui.selected=null;ui.centerEmpty=false;ui.centerEmptyMarket="";
-   const root=$("#setups");
-   root.dataset.signature=pendingItems.map(item=>item.key+JSON.stringify(item.setup)).join("|");
-   $("#workspaceTitle").textContent=market.asset+" · "+pendingItems.length+" WATCH";
-   root.innerHTML='<div class="workspace-empty"><b>WATCH — НЕ АКТИВНЫЕ СДЕЛКИ</b><span>Кандидаты ожидают подтверждения по правилам жизненного цикла; это не торговые сигналы.</span></div>'+pendingItems.map(setupCard).join("");
-   hydrateCharts();
-  }else{
-   ui.centerKey=null;
-   ui.selected=null;
-   ui.centerEmpty=false;
-   ui.centerEmptyMarket=market.asset;
-   const fresh=await getJson("/journal/scans?limit=50",{events:[]});
-   state.events=fresh.events||state.events;
-   const visual=marketVisual(market.asset,"INTRADAY");
-   const root=$("#setups");
-   root.dataset.signature="market-"+market.asset+JSON.stringify(visual);
-   $("#workspaceTitle").textContent=market.asset+" · MARKET MAP";
-   root.innerHTML=marketVisualCard(market.asset,"INTRADAY",visual,market.market_type||"futures");
-   hydrateCharts();
   }
+  renderHistory();renderCenter();
  }catch(error){
-  ui.centerKey=null;
-  ui.selected=null;
-  ui.centerEmpty=true;
-  ui.centerEmptyMarket=market.asset;
+  ui.manualView=null;ui.manualItems=[];
+  ui.centerKey=null;ui.selected=null;ui.centerEmpty=true;ui.centerEmptyMarket=market.asset;
   const detail=error&&error.message?String(error.message):"unknown scanner error";
   $("#workspaceTitle").textContent=market.asset+" · SCAN ERROR";
+  $("#setups").dataset.signature="";
   $("#setups").innerHTML='<div class="workspace-empty"><b>MARKET SCAN UNAVAILABLE</b><span>'+esc(detail)+'</span></div>';
  }finally{
-  ui.marketBusy=false;
-  renderMarkets();
+  ui.marketBusy=false;renderMarkets();
  }
 }
 $("#filters").addEventListener("click",e=>{const f=e.target.dataset.filter;if(!f)return;document.querySelectorAll("#filters button").forEach(b=>b.classList.remove("active"));e.target.classList.add("active");state.filter=f;render(scans(),state.registry)});
 $("#marketWatch").addEventListener("click",e=>{const b=e.target.closest("[data-market-index]");if(!b)return;scanMarket(Number(b.dataset.marketIndex))});
-$("#setupHistory").addEventListener("click",e=>{const b=e.target.closest("[data-setup-key]");if(!b)return;ui.selected=b.dataset.setupKey;ui.centerKey=b.dataset.setupKey;ui.centerEmpty=false;ui.centerEmptyMarket="";renderHistory();renderCenter()});
+$("#setupHistory").addEventListener("click",e=>{const b=e.target.closest("[data-setup-key]");if(!b)return;const key=b.dataset.setupKey;ui.selected=key;ui.centerKey=key;ui.manualView=null;ui.centerEmpty=false;ui.centerEmptyMarket="";renderHistory();renderCenter()});
 $(".left-rail").addEventListener("click",e=>{const head=e.target.closest(".rail-head");if(!head)return;const panel=head.parentElement;if(!panel.matches(".market-watch,.rail-panel"))return;panel.classList.toggle("collapsed")});
 refresh();setInterval(refresh,3000);
