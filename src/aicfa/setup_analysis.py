@@ -724,7 +724,7 @@ def _target_levels(
         # TP1 is the nearest actionable objective, not a distant macro draw.
         # Use tighter volatility envelopes for shorter holding periods.
         TradingMode.SCALPING: 2.5,
-        TradingMode.INTRADAY: 3.5,
+        TradingMode.INTRADAY: 4.5,
         TradingMode.SWING: 6.0,
         TradingMode.POSITION: 10.0,
     }.get(normalize_trading_mode(context.mode), 3.5)
