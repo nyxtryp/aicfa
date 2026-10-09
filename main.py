@@ -111,6 +111,13 @@ def main() -> None:
         max_workers=max(1, min(4, (os.cpu_count() or 2))),
     )
     engine = AutonomousScanEngine(universe, provider=coordinator.cache)
+    # Keep automatic-rotation health separate from last_state, which manual
+    # scans can overwrite while the background queue is running.
+    engine.automatic_worker_running = False
+    engine.last_automatic_scan_at_ms = 0
+    engine.last_automatic_scan_asset = ""
+    engine.last_automatic_scan_status = "not_started"
+    engine.last_automatic_scan_error = ""
     engine_holder["engine"] = engine
 
     # Start the control plane before any live-market initialization. Manual
@@ -137,6 +144,10 @@ def main() -> None:
         market = state.result.markets[0]
         diagnostics = market.diagnostics
         status = diagnostics.status if diagnostics is not None else "completed"
+        engine.last_automatic_scan_at_ms = int(state.scanned_at_ms)
+        engine.last_automatic_scan_asset = market.asset
+        engine.last_automatic_scan_status = str(status).lower()
+        engine.last_automatic_scan_error = diagnostics.error if diagnostics is not None else ""
         duration_ms = diagnostics.total_duration_ms if diagnostics is not None else 0.0
         error = diagnostics.error if diagnostics is not None else ""
         analyses = tuple(getattr(market, "results", ()) or ())
@@ -225,6 +236,8 @@ def main() -> None:
         # provider, persistence, or callback event.
         while not stop_event.is_set():
             try:
+                engine.automatic_worker_running = True
+                engine.last_automatic_scan_status = "starting"
                 engine.run_forever_batches(
                     interval_seconds=30.0,
                     batch_size=1,
@@ -234,6 +247,9 @@ def main() -> None:
                 )
                 break  # normal return means the stop event was requested
             except Exception as exc:
+                engine.automatic_worker_running = False
+                engine.last_automatic_scan_status = "restarting"
+                engine.last_automatic_scan_error = f"{type(exc).__name__}: {exc}"
                 print(
                     f"AICFA automatic rotation crashed: {type(exc).__name__}: {exc}; "
                     "retrying in 5s.",
@@ -242,6 +258,7 @@ def main() -> None:
                 if stop_event.wait(5.0):
                     break
     finally:
+        engine.automatic_worker_running = False
         stop_event.set()
         monitor = price_monitor_holder.get("monitor")
         if monitor is not None:
