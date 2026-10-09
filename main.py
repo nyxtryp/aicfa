@@ -133,39 +133,6 @@ def main() -> None:
     )
     control_thread.start()
 
-    coordinator.start()
-    resolved_pairs = coordinator._resolved_market_keys
-    engine._live_symbol_map = {
-        (key.market_type, key.symbol): index
-        for index, key in resolved_pairs
-    }
-
-    price_keys = tuple(
-        MarketKey("binance", key.symbol, key.market_type, "5m")
-        for _, key in resolved_pairs
-    )
-
-    def _on_price(key, price, event_ms) -> None:
-        engine_holder["engine"].monitor_price(
-            symbol=key.symbol,
-            market_type=key.market_type,
-            price=price,
-            now_ms=event_ms,
-        )
-
-    price_monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
-
-    print(
-        f"AICFA live worker started: markets={len(universe.markets)} "
-        f"universe={universe_path}",
-        flush=True,
-    )
-    print(
-        "AICFA scanner: Scalping + Intraday + Swing + Position; "
-        "closed-candle event triggers + persistent recovery checkpoints.",
-        flush=True,
-    )
-
     def on_scan(state) -> None:
         market = state.result.markets[0]
         diagnostics = market.diagnostics
@@ -200,13 +167,49 @@ def main() -> None:
                 flush=True,
             )
 
+    # Launch the sequential scanner before live symbol resolution / WebSocket
+    # startup so a slow exchange connection cannot block automatic scans.
+    threading.Thread(
+        target=_automatic_rotation,
+        name="aicfa-automatic-rotation",
+        daemon=True,
+    ).start()
+
+    coordinator.start()
+    resolved_pairs = coordinator._resolved_market_keys
+    engine._live_symbol_map = {
+        (key.market_type, key.symbol): index
+        for index, key in resolved_pairs
+    }
+
+    price_keys = tuple(
+        MarketKey("binance", key.symbol, key.market_type, "5m")
+        for _, key in resolved_pairs
+    )
+
+    def _on_price(key, price, event_ms) -> None:
+        engine_holder["engine"].monitor_price(
+            symbol=key.symbol,
+            market_type=key.market_type,
+            price=price,
+            now_ms=event_ms,
+        )
+
+    price_monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
+
+    print(
+        f"AICFA live worker started: markets={len(universe.markets)} "
+        f"universe={universe_path}",
+        flush=True,
+    )
+    print(
+        "AICFA scanner: Scalping + Intraday + Swing + Position; "
+        "closed-candle event triggers + persistent recovery checkpoints.",
+        flush=True,
+    )
+
     try:
         price_monitor.start()
-        threading.Thread(
-            target=_automatic_rotation,
-            name="aicfa-automatic-rotation",
-            daemon=True,
-        ).start()
         stop_event.wait()
     finally:
         price_monitor.stop()
