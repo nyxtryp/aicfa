@@ -1,0 +1,36 @@
+name: chart-vision-benchmark
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/chart-vision-benchmark.yml"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download chart
+        run: curl -L --fail --retry 3 -o /tmp/btc.png "https://storage.googleapis.com/citronai-images/chart-BTC-1769340590503.png"
+      - name: Clone candidate
+        run: git clone --depth 1 https://github.com/Rudra-kakade/vision-market-structure-analyzer.git /tmp/vision-market-structure-analyzer
+      - name: Install dependencies
+        run: python -m pip install opencv-python-headless numpy scipy
+      - name: Run multi-scale benchmark
+        run: |
+          python - <<'PY'
+          import json, sys, time
+          sys.path.insert(0, "/tmp/vision-market-structure-analyzer")
+          from new_markings import run_markings_logic
+          for scale in (1, 3, 5, 7, 9):
+              out = f"/tmp/pivots-{scale}.json"
+              t0 = time.perf_counter()
+              rect, _ = run_markings_logic("/tmp/btc.png", scale, out, (0,0,512,512))
+              elapsed = time.perf_counter() - t0
+              with open(out) as f:
+                  pivots = json.load(f)
+              labels = [p["label"] for p in pivots]
+              print(f"SCALE={scale} RUNTIME_SECONDS={elapsed:.4f} PIVOT_COUNT={len(pivots)} LABELS={labels}")
+              for p in pivots:
+                  print(json.dumps(p, ensure_ascii=False))
+          PY
