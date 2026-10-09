@@ -361,3 +361,50 @@ def test_automatic_worker_thread_does_not_fail_due_to_main_thread_timeout(monkey
     assert not worker.is_alive()
     assert len(states) == 1
     assert states[0].result.markets[0].diagnostics.status == "completed"
+
+
+def test_run_forever_batches_survives_scan_and_error_callback_failures(monkeypatch):
+    assets = ("COIN000/USDT", "COIN001/USDT")
+    engine = AutonomousScanEngine(
+        MarketUniverse(tuple(MonitoredMarket(asset) for asset in assets)),
+        journal=None,
+    )
+    calls = []
+    seen = []
+    errors = []
+
+    def fake_scan_market(index, *, now_ms=None, rotation_id=0, queue_position=0):
+        asset = engine.universe.markets[index].asset
+        calls.append(asset)
+        return SimpleNamespace(
+            scan_number=len(calls),
+            result=SimpleNamespace(
+                markets=(SimpleNamespace(
+                    asset=asset,
+                    diagnostics=SimpleNamespace(status="completed", error=""),
+                    setups=(),
+                ),)
+            ),
+        )
+
+    def broken_on_scan(state):
+        if state.scan_number == 1:
+            raise RuntimeError("UI callback broke")
+        seen.append(state.result.markets[0].asset)
+
+    def broken_on_error(asset, exc):
+        errors.append((asset, str(exc)))
+        raise RuntimeError("logger callback broke")
+
+    monkeypatch.setattr(engine, "scan_market", fake_scan_market)
+    engine.run_forever_batches(
+        interval_seconds=0,
+        batch_size=1,
+        on_scan=broken_on_scan,
+        on_error=broken_on_error,
+        should_stop=lambda: len(calls) >= 3,
+    )
+
+    assert calls == ["COIN000/USDT", "COIN001/USDT", "COIN000/USDT"]
+    assert seen == ["COIN001/USDT", "COIN000/USDT"]
+    assert errors == [("COIN000/USDT", "UI callback broke")]
