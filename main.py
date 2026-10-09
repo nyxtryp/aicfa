@@ -171,6 +171,9 @@ def main() -> None:
         )
 
     def on_error(asset: str, exc: Exception) -> None:
+        engine.last_automatic_scan_asset = asset
+        engine.last_automatic_scan_status = "error"
+        engine.last_automatic_scan_error = f"{type(exc).__name__}: {exc}"
         print(
             f"AICFA scan error: {asset}: {type(exc).__name__}: {exc}",
             flush=True,
