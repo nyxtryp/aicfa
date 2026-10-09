@@ -461,3 +461,83 @@ def test_tp1_is_withheld_when_only_objective_exceeds_mode_atr_envelope():
     )
 
     assert targets == ()
+
+
+
+def test_intraday_tp1_skips_distant_eth_liquidity_for_nearer_structural_low():
+    from aicfa.setup_analysis import MultiTimeframeContext, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("4h", "1h", "15m", "5m"),
+        mode="intraday",
+        latest_rows={
+            "4h": row(
+                active_sell_liquidity_price=1862.655,
+                previous_low=2300.0,
+                atr=90.0,
+                smc_structure_direction=-1,
+            ),
+            "1h": row(smc_structure_direction=-1),
+            "15m": row(smc_structure_direction=-1),
+            "5m": row(smc_structure_direction=-1),
+        },
+        observations=(),
+        structure_direction="short",
+        structure_timeframe="4h",
+        context_timeframe="1h",
+        execution_timeframe="5m",
+    )
+
+    targets = _target_levels(
+        context,
+        "short",
+        current_price=2495.0,
+        preferred_timeframes=("4h", "1h", "15m"),
+        entry_timeframe="4h",
+        entry_zone=(),
+    )
+
+    assert targets
+    assert targets[0].value == 2300.0
+    assert targets[0].source == "previous low"
+
+
+def test_intraday_tp1_is_withheld_when_only_eth_style_macro_liquidity_exists():
+    from aicfa.setup_analysis import MultiTimeframeContext, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("4h", "1h", "15m", "5m"),
+        mode="intraday",
+        latest_rows={
+            "4h": row(
+                active_sell_liquidity_price=1862.655,
+                atr=90.0,
+                smc_structure_direction=-1,
+            ),
+            "1h": row(smc_structure_direction=-1),
+            "15m": row(smc_structure_direction=-1),
+            "5m": row(smc_structure_direction=-1),
+        },
+        observations=(),
+        structure_direction="short",
+        structure_timeframe="4h",
+        context_timeframe="1h",
+        execution_timeframe="5m",
+    )
+
+    targets = _target_levels(
+        context,
+        "short",
+        current_price=2495.0,
+        preferred_timeframes=("4h", "1h", "15m"),
+        entry_timeframe="4h",
+        entry_zone=(),
+    )
+
+    assert targets == ()

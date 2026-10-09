@@ -7,7 +7,7 @@ from enum import Enum
 import threading
 
 from .data_requirements import TradingMode, normalize_trading_mode
-from .setup_analysis import SetupAssessment, SetupCandidate, SetupLevel
+from .setup_analysis import SetupAssessment, SetupCandidate, SetupDecision, SetupLevel
 
 
 class SetupLifecycleStatus(str, Enum):
@@ -100,6 +100,23 @@ class SetupLifecycle:
                 for level in candidate.target_levels
             ),
         )
+
+    @staticmethod
+    def _same_setup_family(left: SetupCandidate, right: SetupCandidate) -> bool:
+        """Match a setup's structural geometry while allowing TP objectives to refresh."""
+        if left.scenario != right.scenario or left.direction != right.direction:
+            return False
+        left_entry = tuple(sorted(round(level.value, 10) for level in left.entry_zone))
+        right_entry = tuple(sorted(round(level.value, 10) for level in right.entry_zone))
+        left_stop = (
+            round(left.invalidation_level.value, 10)
+            if left.invalidation_level is not None else None
+        )
+        right_stop = (
+            round(right.invalidation_level.value, 10)
+            if right.invalidation_level is not None else None
+        )
+        return bool(left_entry) and left_entry == right_entry and left_stop == right_stop
 
     @staticmethod
     def _candidate_from_record(payload: dict) -> SetupCandidate | None:
@@ -292,12 +309,75 @@ class SetupLifecycle:
         """Evaluate all existing setups and activate every distinct new candidate."""
         normalized = normalize_trading_mode(horizon)
         results: list[SetupLifecycleResult] = []
+        fresh_candidates = (
+            assessment.candidates
+            if assessment.decision is SetupDecision.READY
+            else ()
+        )
+        unavailable_target_scenarios = {
+            str(reason).split(":", 1)[0]
+            for reason in getattr(assessment, "missing_context", ())
+            if "no geometrically valid target" in str(reason)
+        }
 
-        # Existing setups are evaluated independently. A temporary analytical
-        # WAIT never removes a still-valid setup.
+        # Existing setups survive transient evidence gaps, but not a fresh
+        # analysis that explicitly cannot produce a valid TP1 for that scenario.
         for setup_id, active in tuple(self._active.items()):
             if setup_id.symbol != symbol or setup_id.market_type != market_type or setup_id.horizon != normalized:
                 continue
+
+            if active.candidate.scenario in unavailable_target_scenarios:
+                del self._active[setup_id]
+                results.append(SetupLifecycleResult(
+                    SetupLifecycleStatus.INVALIDATED,
+                    active.candidate,
+                    "WAIT",
+                    "fresh analysis found no geometrically valid TP1; stale setup removed",
+                    setup_id,
+                ))
+                continue
+
+            # When the same setup geometry is reanalysed, replace its objective
+            # levels instead of preserving an obsolete TP1 as a second active card.
+            replacement = next(
+                (
+                    candidate for candidate in fresh_candidates
+                    if self._same_setup_family(active.candidate, candidate)
+                ),
+                None,
+            )
+            if replacement is not None:
+                replacement_rr = self._risk_reward(replacement)
+                if replacement_rr is None or replacement_rr < 2.0:
+                    del self._active[setup_id]
+                    results.append(SetupLifecycleResult(
+                        SetupLifecycleStatus.INVALIDATED,
+                        active.candidate,
+                        "WAIT",
+                        "fresh structural geometry no longer meets the 2.0R minimum; stale setup removed",
+                        setup_id,
+                    ))
+                    continue
+                new_identity = self.identity(
+                    symbol=symbol,
+                    market_type=market_type,
+                    horizon=normalized,
+                    candidate=replacement,
+                )
+                if new_identity != setup_id:
+                    del self._active[setup_id]
+                active = ActiveSetup(
+                    symbol=active.symbol,
+                    market_type=active.market_type,
+                    horizon=active.horizon,
+                    identity=new_identity,
+                    candidate=replacement,
+                    created_at_ms=active.created_at_ms,
+                    last_seen_at_ms=now_ms,
+                    expires_at_ms=active.expires_at_ms,
+                )
+                self._active[new_identity] = active
+                setup_id = new_identity
 
             # An active trade is closed by market structure: stop or target.
             # Wall-clock expiry must never silently remove a live setup.

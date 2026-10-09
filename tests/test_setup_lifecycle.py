@@ -101,7 +101,7 @@ def test_active_long_closes_only_when_invalidation_is_hit():
     assert lifecycle.active(symbol="BTC/USDT") is None
 
 
-def test_active_long_keeps_original_geometry_when_new_ready_geometry_changes():
+def test_active_long_refreshes_tp_geometry_when_same_setup_is_reanalysed():
     lifecycle = SetupLifecycle()
     first = lifecycle.evaluate(
         symbol="BTC/USDT",
@@ -114,7 +114,7 @@ def test_active_long_keeps_original_geometry_when_new_ready_geometry_changes():
     changed = _candidate()
     changed = SetupCandidate(
         **{**changed.__dict__, "target_levels": (
-            SetupLevel(111.0, "4h", "new previous high"),
+            SetupLevel(113.0, "4h", "new previous high"),
             SetupLevel(125.0, "1d", "new previous high"),
         )}
     )
@@ -135,8 +135,11 @@ def test_active_long_keeps_original_geometry_when_new_ready_geometry_changes():
     )
 
     assert result.action == "LONG"
-    assert result.candidate == first.candidate
-    assert result.candidate.target_levels[0].value == 115.0
+    assert result.candidate.target_levels[0].value == 113.0
+    active = lifecycle.active(symbol="BTC/USDT", horizon="intraday")
+    assert active is not None
+    assert active.candidate.target_levels[0].value == 113.0
+    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 1
 
 
 def test_active_long_completes_at_target_two():
@@ -412,3 +415,35 @@ def test_active_setup_is_not_closed_by_wall_clock_expiry(tmp_path):
 
     assert later[-1].status is SetupLifecycleStatus.ACTIVE
     assert lifecycle.active(symbol="BTC/USDT", horizon="intraday") is not None
+
+
+
+def test_active_setup_is_removed_when_fresh_analysis_has_no_valid_tp1():
+    lifecycle = SetupLifecycle()
+    first = lifecycle.evaluate(
+        symbol="BTC/USDT",
+        market_type="spot",
+        assessment=_ready(),
+        current_price=101.0,
+        now_ms=1_000,
+    )
+    assert first.status is SetupLifecycleStatus.ACTIVE
+
+    no_target = SetupAssessment(
+        decision=SetupDecision.NEED_MORE_EVIDENCE,
+        candidates=(),
+        missing_context=("continuation: no geometrically valid target is available",),
+        conflicts=(),
+        reasons=("no valid target within current mode envelope",),
+    )
+    result = lifecycle.evaluate(
+        symbol="BTC/USDT",
+        market_type="spot",
+        assessment=no_target,
+        current_price=103.0,
+        now_ms=2_000,
+    )
+
+    assert result.status is SetupLifecycleStatus.INVALIDATED
+    assert "no geometrically valid TP1" in result.reason
+    assert lifecycle.active(symbol="BTC/USDT", horizon="intraday") is None
