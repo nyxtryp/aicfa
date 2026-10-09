@@ -82,3 +82,46 @@ def test_manual_scan_does_not_duplicate_lifecycle_active_candidates_as_watch():
     payload = _scan_payload(engine, 0)
 
     assert payload["watch_candidates"] == []
+
+
+def test_health_reports_automatic_worker_state_not_last_manual_scan():
+    import json
+    import threading
+    from http.server import ThreadingHTTPServer
+    from urllib.request import urlopen
+
+    from aicfa.market_control import create_handler
+
+    engine = SimpleNamespace(
+        last_state=SimpleNamespace(
+            result=SimpleNamespace(markets=(
+                SimpleNamespace(diagnostics=SimpleNamespace(status="completed", error="")),
+            ))
+        ),
+        scan_number=9,
+        cycle_id=2,
+        universe=SimpleNamespace(markets=(SimpleNamespace(asset="BTC/USDT"),)),
+        automatic_pause_until_ms=0,
+        automatic_worker_running=False,
+        last_automatic_scan_status="restarting",
+        last_automatic_scan_error="RuntimeError: worker callback failed",
+        last_automatic_scan_at_ms=123456,
+        last_automatic_scan_asset="ETH/USDT",
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(engine))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with urlopen(f"http://127.0.0.1:{server.server_port}/health", timeout=2) as response:
+            payload = json.loads(response.read())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert payload["scanner"] == "stopped"
+    assert payload["automatic_worker_running"] is False
+    assert payload["last_scan_status"] == "restarting"
+    assert payload["last_scan_error"] == "RuntimeError: worker callback failed"
+    assert payload["last_automatic_scan_at_ms"] == 123456
+    assert payload["last_automatic_scan_asset"] == "ETH/USDT"
