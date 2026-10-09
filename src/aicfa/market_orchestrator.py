@@ -281,9 +281,10 @@ def analyze_market_horizons(
         else:
             action_value = getattr(result, "decision", "")
         decision_action = str(action_value).lower()
-        if decision_action not in {"long", "short"}:
-            continue
 
+        # Preserve analytical candidates even when the final decision is WAIT.
+        # They are watch-only hypotheses until the lifecycle engine activates
+        # them at the POI; SetupRegistry separately enforces that activation.
         evidence_assessment = getattr(result, "evidence_assessment", None)
         evidence_concepts = tuple(
             dict.fromkeys(
