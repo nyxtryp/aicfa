@@ -149,53 +149,48 @@ def main() -> None:
             flush=True,
         )
 
-    def _automatic_rotation() -> None:
-        # Keep the original 24/7 sequential scanner alive independently of
-        # WebSocket candle events and manual Market Watch requests. One market
-        # is analyzed, then the next configured market starts after 30 seconds.
+    # SIGALRM only works in Python's main thread. Run the market rotation
+    # here (rather than in a daemon worker) so a pathological market cannot
+    # block the queue for minutes. Live candle/WebSocket startup stays separate.
+    price_monitor_holder: dict[str, BinancePriceMonitor] = {}
+
+    def _start_live_services() -> None:
         try:
-            engine.run_forever_batches(
-                interval_seconds=30.0,
-                batch_size=1,
-                on_scan=on_scan,
-                on_error=on_error,
-                should_stop=stop_event.is_set,
+            coordinator.start()
+            resolved_pairs = coordinator._resolved_market_keys
+            engine._live_symbol_map = {
+                (key.market_type, key.symbol): index
+                for index, key in resolved_pairs
+            }
+
+            price_keys = tuple(
+                MarketKey("binance", key.symbol, key.market_type, "5m")
+                for _, key in resolved_pairs
             )
+
+            def _on_price(key, price, event_ms) -> None:
+                engine_holder["engine"].monitor_price(
+                    symbol=key.symbol,
+                    market_type=key.market_type,
+                    price=price,
+                    now_ms=event_ms,
+                )
+
+            if price_keys and not stop_event.is_set():
+                monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
+                price_monitor_holder["monitor"] = monitor
+                monitor.start()
         except Exception as exc:
             print(
-                f"AICFA automatic rotation stopped: {type(exc).__name__}: {exc}",
+                f"AICFA live services startup error: {type(exc).__name__}: {exc}",
                 flush=True,
             )
 
-    # Launch the sequential scanner before live symbol resolution / WebSocket
-    # startup so a slow exchange connection cannot block automatic scans.
     threading.Thread(
-        target=_automatic_rotation,
-        name="aicfa-automatic-rotation",
+        target=_start_live_services,
+        name="aicfa-live-startup",
         daemon=True,
     ).start()
-
-    coordinator.start()
-    resolved_pairs = coordinator._resolved_market_keys
-    engine._live_symbol_map = {
-        (key.market_type, key.symbol): index
-        for index, key in resolved_pairs
-    }
-
-    price_keys = tuple(
-        MarketKey("binance", key.symbol, key.market_type, "5m")
-        for _, key in resolved_pairs
-    )
-
-    def _on_price(key, price, event_ms) -> None:
-        engine_holder["engine"].monitor_price(
-            symbol=key.symbol,
-            market_type=key.market_type,
-            price=price,
-            now_ms=event_ms,
-        )
-
-    price_monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
 
     print(
         f"AICFA live worker started: markets={len(universe.markets)} "
@@ -209,10 +204,23 @@ def main() -> None:
     )
 
     try:
-        price_monitor.start()
-        stop_event.wait()
+        engine.run_forever_batches(
+            interval_seconds=30.0,
+            batch_size=1,
+            on_scan=on_scan,
+            on_error=on_error,
+            should_stop=stop_event.is_set,
+        )
+    except Exception as exc:
+        print(
+            f"AICFA automatic rotation stopped: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
     finally:
-        price_monitor.stop()
+        stop_event.set()
+        monitor = price_monitor_holder.get("monitor")
+        if monitor is not None:
+            monitor.stop()
         coordinator.stop()
 
     print("AICFA autonomous worker stopped.", flush=True)
