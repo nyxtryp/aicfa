@@ -406,6 +406,7 @@ class AutonomousScanEngine:
         queue_position: int = 0,
         journal: bool = True,
         enforce_timeout: bool = True,
+        timeout_seconds: float | None = None,
         modes: Sequence[TradingMode] | None = None,
     ) -> AutonomousScanState:
         """Run exactly one configured market through the canonical scanner pipeline."""
@@ -425,7 +426,8 @@ class AutonomousScanEngine:
         market_lock = self._market_locks[market_index]
         with market_lock:
             try:
-                timeout_context = _market_timeout(self.market_timeout_seconds) if enforce_timeout else _noop_context()
+                budget = self.market_timeout_seconds if timeout_seconds is None else max(0.001, float(timeout_seconds))
+                timeout_context = _market_timeout(budget) if enforce_timeout else _noop_context()
                 with timeout_context:
                     result = scan_universe(
                         market,
@@ -440,7 +442,7 @@ class AutonomousScanEngine:
                     market_index,
                     status="timeout",
                     error=str(exc),
-                    duration_ms=self.market_timeout_seconds * 1000.0,
+                    duration_ms=budget * 1000.0,
                 )
             except Exception as exc:
                 result = self._failure_scan(
