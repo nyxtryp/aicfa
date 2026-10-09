@@ -92,13 +92,34 @@ def create_handler(engine: Any):
                     200,
                     {
                         "ok": True,
-                        "scanner": "running",
+                        # Older test doubles/embedded callers may not expose
+                        # worker lifecycle fields. Production main.py does.
+                        "scanner": (
+                            "running"
+                            if getattr(engine, "automatic_worker_running", False)
+                            else "stopped"
+                        ),
+                        "automatic_worker_running": getattr(
+                            engine, "automatic_worker_running", False
+                        ),
                         "scan_number": engine.scan_number,
                         "cycle_id": engine.cycle_id,
                         "universe_size": len(engine.universe.markets),
                         "automatic_scan_paused_until_ms": engine.automatic_pause_until_ms,
-                        "last_scan_status": getattr(diagnostics, "status", None),
-                        "last_scan_error": getattr(diagnostics, "error", ""),
+                        "last_scan_status": getattr(
+                            engine, "last_automatic_scan_status",
+                            getattr(diagnostics, "status", None),
+                        ),
+                        "last_scan_error": getattr(
+                            engine, "last_automatic_scan_error",
+                            getattr(diagnostics, "error", ""),
+                        ),
+                        "last_automatic_scan_at_ms": getattr(
+                            engine, "last_automatic_scan_at_ms", 0
+                        ),
+                        "last_automatic_scan_asset": getattr(
+                            engine, "last_automatic_scan_asset", ""
+                        ),
                     },
                 )
                 return
