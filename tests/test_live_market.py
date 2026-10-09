@@ -1,3 +1,5 @@
+import time
+
 import pandas as pd
 
 from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, WINDOWS
@@ -66,7 +68,10 @@ def test_cache_prefers_local_window_after_seed(tmp_path):
     cache = LiveMarketDataCache(provider, store)
     key = MarketKey("binance", "BTC/USDT", "spot", "5m")
 
-    cache.seed(key, _frame(count=20))
+    now_ms = int(time.time() * 1000)
+    duration_ms = 5 * 60_000
+    current_open = (now_ms // duration_ms) * duration_ms
+    cache.seed(key, _frame(start=current_open - 20 * duration_ms, count=20))
     result = cache.fetch_ohlcv(
         symbol="BTC/USDT",
         market_type="spot",
@@ -77,3 +82,22 @@ def test_cache_prefers_local_window_after_seed(tmp_path):
 
     assert len(result) == 10
     assert provider.calls == []
+
+
+def test_cache_refreshes_when_a_full_window_is_stale(tmp_path):
+    provider = Provider()
+    store = PersistentCandleStore(tmp_path / "raw")
+    cache = LiveMarketDataCache(provider, store)
+    key = MarketKey("binance", "BTC/USDT", "spot", "5m")
+
+    # The old rows are enough in quantity but far behind the current market.
+    cache.seed(key, _frame(start=0, count=WINDOWS["5m"]))
+    cache.fetch_ohlcv(
+        symbol="BTC/USDT",
+        market_type="spot",
+        timeframe="5m",
+        since_ms=None,
+        limit=10,
+    )
+
+    assert provider.calls == [("BTC/USDT", "spot", "5m", 11)]
