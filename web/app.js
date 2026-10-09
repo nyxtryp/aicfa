@@ -385,15 +385,15 @@ async function scanMarket(index){
    renderHistory();
    renderCenter();
   }else if((data.watch_candidates||[]).length){
-   const pending=data.watch_candidates[0];
-   const candidate=pending.candidate||{};
-   const mode=hor(pending.mode);
-   const item={asset:pending.asset||market.asset,mode,setup:candidate,lifecycle:"WATCH",status:"WATCH",key:"watch|"+(pending.asset||market.asset)+"|"+mode+"|"+String(candidate.scenario||"")+"|"+String(candidate.direction||""),seenAt:Number(data.scanned_at_ms||Date.now()),market_type:market.market_type||"futures"};
+   const pendingItems=(data.watch_candidates||[]).map((pending,index)=>{
+    const candidate=pending.candidate||{},mode=hor(pending.mode),asset=pending.asset||market.asset;
+    return {asset,mode,setup:candidate,lifecycle:"WATCH",status:"WATCH",key:"watch|"+asset+"|"+mode+"|"+String(candidate.scenario||"")+"|"+String(candidate.direction||"")+"|"+index,seenAt:Number(data.scanned_at_ms||Date.now()),market_type:market.market_type||"futures"};
+   });
    ui.centerKey=null;ui.selected=null;ui.centerEmpty=false;ui.centerEmptyMarket="";
    const root=$("#setups");
-   root.dataset.signature=item.key+JSON.stringify(candidate);
-   $("#workspaceTitle").textContent=item.asset+" · "+mode+" · WATCH";
-   root.innerHTML='<div class="workspace-empty"><b>WATCH — НЕ АКТИВНАЯ СДЕЛКА</b><span>Структурный кандидат найден. Активация произойдёт только по правилам жизненного цикла.</span></div>'+setupCard(item);
+   root.dataset.signature=pendingItems.map(item=>item.key+JSON.stringify(item.setup)).join("|");
+   $("#workspaceTitle").textContent=market.asset+" · "+pendingItems.length+" WATCH";
+   root.innerHTML='<div class="workspace-empty"><b>WATCH — НЕ АКТИВНЫЕ СДЕЛКИ</b><span>Кандидаты ожидают подтверждения по правилам жизненного цикла; это не торговые сигналы.</span></div>'+pendingItems.map(setupCard).join("");
    hydrateCharts();
   }else{
    ui.centerKey=null;
