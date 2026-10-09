@@ -758,7 +758,10 @@ def _target_levels(
     # First target = the nearest valid objective within the highest available
     # objective class. This prevents a random nearby swing from outranking an
     # actual active liquidity draw.
-    candidates.sort(key=lambda item: item[:3])
+    # TP1 is the nearest valid opposing objective, not the farthest/highest-priority
+    # class by default. A distant liquidity pool must not outrank a nearer
+    # structural extreme when choosing the first take-profit.
+    candidates.sort(key=lambda item: (item[1], item[0], item[2]))
     first = candidates[0]
     result = [
         SetupLevel(value=first[5], timeframe=first[3], source=first[4])
