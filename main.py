@@ -220,18 +220,27 @@ def main() -> None:
     )
 
     try:
-        engine.run_forever_batches(
-            interval_seconds=30.0,
-            batch_size=1,
-            on_scan=on_scan,
-            on_error=on_error,
-            should_stop=stop_event.is_set,
-        )
-    except Exception as exc:
-        print(
-            f"AICFA automatic rotation stopped: {type(exc).__name__}: {exc}",
-            flush=True,
-        )
+        # Treat an unexpected rotation-level exception as recoverable. A
+        # long-running market worker must not silently exit after one bad
+        # provider, persistence, or callback event.
+        while not stop_event.is_set():
+            try:
+                engine.run_forever_batches(
+                    interval_seconds=30.0,
+                    batch_size=1,
+                    on_scan=on_scan,
+                    on_error=on_error,
+                    should_stop=stop_event.is_set,
+                )
+                break  # normal return means the stop event was requested
+            except Exception as exc:
+                print(
+                    f"AICFA automatic rotation crashed: {type(exc).__name__}: {exc}; "
+                    "retrying in 5s.",
+                    flush=True,
+                )
+                if stop_event.wait(5.0):
+                    break
     finally:
         stop_event.set()
         monitor = price_monitor_holder.get("monitor")
