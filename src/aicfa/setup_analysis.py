@@ -716,6 +716,26 @@ def _target_levels(
     ) + tuple(tf for tf in allowed if tf not in preferred_timeframes)
 
     candidates: list[tuple[int, float, int, str, str, float]] = []
+    # A structurally valid level can still be an unusable TP1 if it is far
+    # outside the current mode's normal volatility envelope. Use the mode's
+    # higher-structure ATR (falling back to broader context ATR); when ATR is
+    # unavailable, preserve legacy behavior rather than inventing a distance.
+    max_target_atr = {
+        TradingMode.SCALPING: 6.0,
+        TradingMode.INTRADAY: 10.0,
+        TradingMode.SWING: 12.0,
+        TradingMode.POSITION: 15.0,
+    }.get(normalize_trading_mode(context.mode), 10.0)
+    atr_row = context.latest_rows.get(context.structure_timeframe)
+    atr_value = _numeric(atr_row, "atr") if atr_row is not None else None
+    if atr_value is None or atr_value <= 0:
+        atr_row = context.latest_rows.get(context.context_timeframe)
+        atr_value = _numeric(atr_row, "atr") if atr_row is not None else None
+    max_target_distance = (
+        atr_value * max_target_atr
+        if atr_value is not None and atr_value > 0
+        else None
+    )
     for source_priority, (column, source) in enumerate(columns):
         for timeframe in ordered:
             row = context.latest_rows.get(timeframe)
@@ -743,6 +763,16 @@ def _target_levels(
             distance = (
                 abs(value - current_price) if current_price is not None else 0.0
             )
+            # Do not promote a distant historical swing/liquidity pool into
+            # TP1 merely because no nearer target feature was found. If all
+            # candidates exceed this mode-aware ATR envelope, return no target
+            # and let setup analysis withhold the actionable setup.
+            if (
+                max_target_distance is not None
+                and current_price is not None
+                and distance > max_target_distance
+            ):
+                continue
             candidates.append((
                 source_priority,
                 distance,
