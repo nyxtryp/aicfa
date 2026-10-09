@@ -10,7 +10,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from .persistent_journal import _jsonable
+from .persistent_journal import _jsonable, _visual_geometry, _visual_market_geometry
 
 
 def _market_payload(engine: Any) -> list[dict[str, Any]]:
@@ -34,21 +34,49 @@ def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
     registry = engine.registry
     setups: list[dict[str, Any]] = []
     watch_candidates: list[dict[str, Any]] = []
+    results = tuple(getattr(market, "results", ()) or ())
+    market_visual = {"zones": [], "events": [], "liquidity": []}
+    for result in results:
+        geometry = _visual_market_geometry(result)
+        for key in market_visual:
+            market_visual[key].extend(geometry.get(key, ()))
     for setup in getattr(market, "setups", ()):
         candidate = getattr(setup, "candidate", None)
-        if candidate is None or str(getattr(candidate, "direction", "")).upper() not in {"LONG", "SHORT"}:
+        raw_direction = getattr(candidate, "direction", "") if candidate is not None else ""
+        direction = str(getattr(raw_direction, "value", raw_direction)).upper()
+        if candidate is None or direction not in {"LONG", "SHORT"}:
             continue
         lifecycle = getattr(setup, "lifecycle_result", None)
-        lifecycle_status = str(getattr(getattr(lifecycle, "status", None), "value", getattr(lifecycle, "status", ""))).lower()
+        raw_status = getattr(getattr(lifecycle, "status", None), "value", getattr(lifecycle, "status", ""))
+        lifecycle_status = str(raw_status).lower()
         if lifecycle_status in {"active", "tp1_hit", "invalidated", "completed", "expired"}:
             continue
+        mode = getattr(setup, "mode", "")
+        mode_value = getattr(mode, "value", mode)
+        candidate_payload = _jsonable(candidate)
+        matching_result = next(
+            (item for item in results if getattr(item, "mode", None) == mode),
+            None,
+        )
+        if matching_result is not None:
+            candidate_payload["chart"] = _visual_geometry(matching_result, candidate)
+        action = getattr(setup, "decision_action", "wait")
         watch_candidates.append({
             "asset": market.asset,
-            "mode": getattr(setup, "mode", ""),
-            "candidate": _jsonable(candidate),
+            "mode": _jsonable(mode_value),
+            "candidate": candidate_payload,
             "lifecycle_status": lifecycle_status or "waiting",
-            "decision_action": str(getattr(setup, "decision_action", "wait")),
+            "decision_action": str(getattr(action, "value", action)),
         })
+    # This geometry is built from this manual scan's own frames. Never make
+    # the browser borrow an older automatic scan's zones for this market.
+    for key in market_visual:
+        seen = set()
+        market_visual[key] = [
+            item for item in market_visual[key]
+            if not (json.dumps(item, sort_keys=True, default=str) in seen
+                    or seen.add(json.dumps(item, sort_keys=True, default=str)))
+        ]
     if registry is not None:
         for record in registry.current():
             if record.get("asset") == market.asset and int(record.get("last_seen_at_ms", -1)) == int(state.scanned_at_ms):
@@ -64,6 +92,7 @@ def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
         },
         "setups": setups,
         "watch_candidates": watch_candidates,
+        "market_visual": market_visual,
         "automatic_scan_paused_until_ms": pause_until_ms,
     }
 
