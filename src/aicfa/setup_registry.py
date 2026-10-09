@@ -146,10 +146,14 @@ class SetupRegistry:
         records = self._current_revision_records()
         now_ms = int(state.scanned_at_ms)
 
+        state_markets = tuple(state.result.markets)
         scanned_assets: set[str] = set()
-        for market in state.result.markets:
+        for market in state_markets:
             scanned_assets.add(str(market.asset))
             asset = market.asset
+            diagnostics = getattr(market, "diagnostics", None)
+            scan_status = str(getattr(diagnostics, "status", "completed")).strip().lower()
+            market_scan_succeeded = scan_status not in {"error", "timeout"}
             market_type = "spot"
             market_keys: set[str] = set()
             active_lifecycle_keys: set[str] = set()
@@ -224,27 +228,43 @@ class SetupRegistry:
                     record["lifecycle_status"] = status
                     record["last_lifecycle_at_ms"] = now_ms
 
+            # A failed/timeout scan provides no evidence that an existing setup
+            # is stale. Preserve its last known lifecycle until a successful
+            # analysis of that same market can confirm or invalidate it.
+            if market_scan_succeeded:
+                for key, record in records.items():
+                    if str(record.get("asset", "")) != str(asset):
+                        continue
+                    if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
+                        continue
+                    if key not in market_keys and key not in active_lifecycle_keys:
+                        record["status"] = "STALE"
+                        record["lifecycle_status"] = "stale"
+                        record["last_checked_at_ms"] = now_ms
+
+        # Only a complete universe pass can stale records for markets absent
+        # from the result. The production rotation/manual endpoints normally
+        # provide one-market snapshots; treating those as a full scan used to
+        # erase every other market's active setups on each request.
+        full_scan_marker = getattr(state, "is_full_universe_scan", None)
+        if full_scan_marker is None:
+            universe_size = getattr(state, "universe_size", None)
+            is_full_universe_scan = (
+                universe_size is None
+                or len(state_markets) >= int(universe_size)
+            )
+        else:
+            is_full_universe_scan = bool(full_scan_marker)
+
+        if is_full_universe_scan:
             for key, record in records.items():
-                if str(record.get("asset", "")) != str(asset):
+                if str(record.get("asset", "")) in scanned_assets:
                     continue
                 if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
                     continue
-                if key not in market_keys and key not in active_lifecycle_keys:
-                    record["status"] = "STALE"
-                    record["lifecycle_status"] = "stale"
-                    record["last_checked_at_ms"] = now_ms
-
-
-        # A full scan state is authoritative: markets absent from this
-        # rotation were not observed and must not remain actionable forever.
-        for key, record in records.items():
-            if str(record.get("asset", "")) in scanned_assets:
-                continue
-            if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
-                continue
-            record["status"] = "STALE"
-            record["lifecycle_status"] = "stale"
-            record["last_checked_at_ms"] = now_ms
+                record["status"] = "STALE"
+                record["lifecycle_status"] = "stale"
+                record["last_checked_at_ms"] = now_ms
 
         self._write(records)
 
