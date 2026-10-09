@@ -51,6 +51,36 @@ def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
         lifecycle_status = str(raw_status).lower()
         if lifecycle_status in {"active", "tp1_hit", "invalidated", "completed", "expired"}:
             continue
+        # A descriptive candidate is not a trade setup. Manual analysis must
+        # return NO SETUP unless the canonical decision pipeline explicitly
+        # approves the same direction; WAIT hypotheses stay internal.
+        action = getattr(setup, "decision_action", "wait")
+        action_value = str(getattr(action, "value", action)).strip().lower()
+        if action_value != direction.lower():
+            continue
+
+        # Reject malformed risk geometry before it reaches the UI. Entry is a
+        # zone; the stop must sit beyond it and the first target must be beyond
+        # the entry in the trade direction.
+        entry_zone = tuple(getattr(candidate, "entry_zone", ()) or ())
+        stop = getattr(candidate, "invalidation_level", None)
+        targets = tuple(getattr(candidate, "target_levels", ()) or ())
+        try:
+            entry_values = [float(getattr(level, "value")) for level in entry_zone]
+            stop_value = float(getattr(stop, "value"))
+            target_value = float(getattr(targets[0], "value"))
+        except (TypeError, ValueError, IndexError, AttributeError):
+            continue
+        if len(entry_values) < 2:
+            continue
+        entry_low, entry_high = min(entry_values), max(entry_values)
+        if direction == "LONG":
+            geometry_valid = stop_value < entry_low and target_value > entry_high
+        else:
+            geometry_valid = stop_value > entry_high and target_value < entry_low
+        if not geometry_valid:
+            continue
+
         mode = getattr(setup, "mode", "")
         mode_value = getattr(mode, "value", mode)
         candidate_payload = _jsonable(candidate)
@@ -60,13 +90,12 @@ def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
         )
         if matching_result is not None:
             candidate_payload["chart"] = _visual_geometry(matching_result, candidate)
-        action = getattr(setup, "decision_action", "wait")
         watch_candidates.append({
             "asset": market.asset,
             "mode": _jsonable(mode_value),
             "candidate": candidate_payload,
             "lifecycle_status": lifecycle_status or "waiting",
-            "decision_action": str(getattr(action, "value", action)),
+            "decision_action": action_value,
         })
     # This geometry is built from this manual scan's own frames. Never make
     # the browser borrow an older automatic scan's zones for this market.
