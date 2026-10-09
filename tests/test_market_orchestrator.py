@@ -135,6 +135,20 @@ def test_waiting_horizon_does_not_force_a_signal(monkeypatch):
     assert result.setups == ()
     assert [item.decision for item in result.results] == ["WAIT", "WAIT", "WAIT"]
 
+def test_waiting_decision_preserves_candidate_for_watch_panel(monkeypatch):
+    candidate = _candidate()
+
+    def fake_find_setup(request, **kwargs):
+        return _fake_result(request.asset, request.mode, candidate=candidate, decision="WAIT")
+
+    monkeypatch.setattr("aicfa.market_orchestrator.find_setup", fake_find_setup)
+
+    result = analyze_market_horizons("BTC/USDT", now_ms=1000)
+
+    assert len(result.setups) == 3
+    assert all(item.decision_action == "wait" for item in result.setups)
+    assert all(item.candidate.entry_zone[0].value == 100.0 for item in result.setups)
+
 
 def test_distinct_concurrent_horizon_setups_are_preserved(monkeypatch):
     def fake_find_setup(request, **kwargs):
