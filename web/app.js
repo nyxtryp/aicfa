@@ -255,10 +255,23 @@ function marketVisualCard(asset,mode,visual,marketType="futures"){
 }
 function waitCards(ms){
  const out=[];
- for(const m of ms)for(const h of m.horizons||[]){
-  const action=String(h.decision_action||h.decision||"").toUpperCase();if(action==="LONG"||action==="SHORT"||action==="READY")continue;
-  const c=new Set(h.supported_concepts||[]),checks=[["Liquidity",c.has("liquidity.sweep")],["Market Structure",c.has("market_structure.bos")||c.has("market_structure.choch")],["OB",c.has("order_block.bullish")||c.has("order_block.bearish")],["FVG",c.has("imbalance.fvg")],["Zone Reaction",c.has("price_action.rejection")],["Volume",c.has("volume.evidence")||c.has("volume.confirmation")]];
-  out.push({asset:m.asset,mode:h.mode,action:action||"WAIT",checks,why:(h.setup_reasons||h.decision_reasons||["structural setup is incomplete"])[0]});
+ for(const m of ms){
+  const pendingModes=new Set();
+  for(const s of m.setups||[]){
+   const c=s.candidate||s,lifeStatus=life(s.lifecycle_result);
+   if(!["LONG","SHORT"].includes(dir(c))||["ACTIVE","TP1_HIT"].includes(lifeStatus))continue;
+   const mode=hor(s.mode),entry=(c.entry_zone||[]).map(x=>Number(x.value)).filter(Number.isFinite);
+   const sl=Number(c.invalidation_level?.value??c.stop_loss);
+   const tp=Number(c.target_levels?.[0]?.value??c.take_profit);
+   const fmt=v=>Number.isFinite(v)?String(Number(v.toPrecision(8))):"—";
+   out.push({asset:m.asset,mode,action:"WATCH",checks:[],why:(c.rationale||c.invalidation||["Waiting for price to reach the entry zone"])[0],details:"ENTRY "+(entry.length?entry.map(fmt).join("–"):"—")+" · SL "+fmt(sl)+" · TP1 "+fmt(tp)});
+   pendingModes.add(mode);
+  }
+  for(const h of m.horizons||[]){
+   const action=String(h.decision_action||h.decision||"").toUpperCase();if(action==="LONG"||action==="SHORT"||action==="READY"||pendingModes.has(hor(h.mode)))continue;
+   const c=new Set(h.supported_concepts||[]),checks=[["Liquidity",c.has("liquidity.sweep")],["Market Structure",c.has("market_structure.bos")||c.has("market_structure.choch")],["OB",c.has("order_block.bullish")||c.has("order_block.bearish")],["FVG",c.has("imbalance.fvg")],["Zone Reaction",c.has("price_action.rejection")],["Volume",c.has("volume.evidence")||c.has("volume.confirmation")]];
+   out.push({asset:m.asset,mode:h.mode,action:action||"WAIT",checks,why:(h.setup_reasons||h.decision_reasons||["structural setup is incomplete"])[0]});
+  }
  }
  return out;
 }
@@ -294,7 +307,7 @@ function renderCenter(){
 function renderRails(ms,rows){
  const waits=waitCards(ms).filter(s=>state.filter==="ALL"||String(s.mode).toUpperCase()===state.filter);
  
- $("#waits").innerHTML=waits.length?waits.map(w=>'<article class="wait"><div><b>'+esc(w.asset)+'</b><span>'+esc(w.mode)+'</span></div><strong>'+esc(w.action)+'</strong><div class="checks">'+w.checks.map(c=>'<span class="'+(c[1]?"ok":"missing")+'">'+(c[1]?"✓":"—")+" "+esc(c[0])+'</span>').join("")+'</div><p>'+esc(w.why)+'</p></article>').join(""):'<div class="rail-empty">NO WAIT ANALYSIS</div>';
+ $("#waits").innerHTML=waits.length?waits.map(w=>'<article class="wait"><div><b>'+esc(w.asset)+'</b><span>'+esc(w.mode)+'</span></div><strong>'+esc(w.action)+'</strong><div class="checks">'+w.checks.map(c=>'<span class="'+(c[1]?"ok":"missing")+'">'+(c[1]?"✓":"—")+" "+esc(c[0])+'</span>').join("")+'</div>'+(w.details?'<small class="wait-levels">'+esc(w.details)+'</small>':'')+'<p>'+esc(w.why)+'</p></article>').join(""):'<div class="rail-empty">NO WAIT ANALYSIS</div>';
  const recent=rows.slice(0,80);
  $("#activity").innerHTML=recent.map(e=>{const p=e.payload||{},m=p.markets?.[0],d=m?.diagnostics||{};return '<div class="row"><time>'+tm(e.timestamp_ms)+'</time><b>'+esc(m?.asset)+'</b><span class="'+String(d.status||"").toLowerCase()+'">'+esc(String(d.status||"—").toUpperCase())+'</span><small>'+(m?.setups||[]).length+' setups</small></div>'}).join("");
 }
