@@ -29,7 +29,7 @@ from .persistent_journal import PersistentJournal
 from .setup_registry import SetupRegistry
 
 
-MAIN_SCAN_INTERVAL_SECONDS = 300
+MAIN_SCAN_INTERVAL_SECONDS = 30
 BATCH_SCAN_INTERVAL_SECONDS = 0
 DEFAULT_MARKETS_PER_BATCH = 1
 # Whole-market execution includes six MTF feature builds plus deterministic
