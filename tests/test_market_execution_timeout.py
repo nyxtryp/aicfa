@@ -31,3 +31,22 @@ def test_scan_market_timeout_records_failure_and_advances(monkeypatch):
     assert second.scan_number == 2
     assert second.result.markets[0].asset == "ETH/USDT"
     assert second.result.markets[0].diagnostics.status == "timeout"
+
+
+def test_scan_market_accepts_request_specific_timeout_without_changing_default(monkeypatch):
+    def slow_scan(*args, **kwargs):
+        time.sleep(0.05)
+
+    monkeypatch.setattr("aicfa.autonomous_scan.scan_universe", slow_scan)
+    engine = AutonomousScanEngine(
+        MarketUniverse((MonitoredMarket("BTC/USDT"),)),
+        market_timeout_seconds=1.0,
+        journal=None,
+    )
+
+    state = engine.scan_market(0, timeout_seconds=0.01)
+
+    market = state.result.markets[0]
+    assert market.diagnostics.status == "timeout"
+    assert "0.0s" in market.diagnostics.error
+    assert engine.market_timeout_seconds == 1.0
