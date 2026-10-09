@@ -162,6 +162,7 @@ class AutonomousScanEngine:
         # slow market, which made the live scanner appear frozen. State
         # persistence remains serialized separately below.
         self._state_lock = threading.RLock()
+        self._lifecycle_lock = threading.RLock()
         self._market_locks = tuple(threading.RLock() for _ in universe.markets)
         self._manual_pause_until_ms = 0
 
@@ -221,44 +222,54 @@ class AutonomousScanEngine:
             conflicts=(),
             reasons=("price stream updates lifecycle only; it never creates a setup",),
         )
-        results = []
-        horizons = {
-            setup.horizon
-            for setup in self.lifecycle.active_setups(
-                symbol=symbol, market_type=market_type
-            )
-        }
-        for horizon in horizons:
-            results.extend(
-                self.lifecycle.evaluate_all(
-                    symbol=symbol,
-                    market_type=market_type,
-                    horizon=horizon,
-                    assessment=wait,
-                    current_price=float(price),
-                    current_high=float(price),
-                    current_low=float(price),
-                    now_ms=timestamp,
+        market_index = getattr(self, "_live_symbol_map", {}).get((market_type, symbol))
+        lifecycle_lock = (
+            self._market_locks[market_index]
+            if isinstance(market_index, int) and 0 <= market_index < len(self._market_locks)
+            else self._lifecycle_lock
+        )
+        # Price ticks can arrive while a candle/manual scan is updating the
+        # same setup lifecycle. Apply transitions under the same market lock so
+        # an older scan cannot resurrect a setup just invalidated by live price.
+        with lifecycle_lock:
+            results = []
+            horizons = {
+                setup.horizon
+                for setup in self.lifecycle.active_setups(
+                    symbol=symbol, market_type=market_type
                 )
-            )
-        result_tuple = tuple(results)
-        if self.registry is not None and result_tuple:
-            try:
-                with self._state_lock:
-                    self.registry.record_lifecycle_results(result_tuple, now_ms=timestamp)
-            except Exception as exc:
-                print(f"AICFA registry error: {type(exc).__name__}: {exc}", flush=True)
-        if self.journal is not None and result_tuple:
-            try:
-                with self._state_lock:
-                    self.journal.append(
-                    "lifecycle_price",
-                    timestamp,
-                    {"symbol": symbol, "market_type": market_type, "price": float(price), "results": result_tuple},
+            }
+            for horizon in horizons:
+                results.extend(
+                    self.lifecycle.evaluate_all(
+                        symbol=symbol,
+                        market_type=market_type,
+                        horizon=horizon,
+                        assessment=wait,
+                        current_price=float(price),
+                        current_high=float(price),
+                        current_low=float(price),
+                        now_ms=timestamp,
+                    )
                 )
-            except Exception as exc:
-                print(f"AICFA journal error: {type(exc).__name__}: {exc}", flush=True)
-        return result_tuple
+            result_tuple = tuple(results)
+            if self.registry is not None and result_tuple:
+                try:
+                    with self._state_lock:
+                        self.registry.record_lifecycle_results(result_tuple, now_ms=timestamp)
+                except Exception as exc:
+                    print(f"AICFA registry error: {type(exc).__name__}: {exc}", flush=True)
+            if self.journal is not None and result_tuple:
+                try:
+                    with self._state_lock:
+                        self.journal.append(
+                            "lifecycle_price",
+                            timestamp,
+                            {"symbol": symbol, "market_type": market_type, "price": float(price), "results": result_tuple},
+                        )
+                except Exception as exc:
+                    print(f"AICFA journal error: {type(exc).__name__}: {exc}", flush=True)
+            return result_tuple
 
     @property
     def last_state(self) -> AutonomousScanState | None:
