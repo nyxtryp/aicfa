@@ -162,6 +162,7 @@ class AutonomousScanEngine:
         # slow market, which made the live scanner appear frozen. State
         # persistence remains serialized separately below.
         self._state_lock = threading.RLock()
+        self._market_locks = tuple(threading.RLock() for _ in universe.markets)
         self._manual_pause_until_ms = 0
 
     def _journal_state(self, state: AutonomousScanState) -> None:
@@ -399,47 +400,55 @@ class AutonomousScanEngine:
 
         timestamp = self._clock_ms() if now_ms is None else now_ms
         market = MarketUniverse((self.universe.markets[market_index],))
-        try:
-            timeout_context = _market_timeout(self.market_timeout_seconds) if enforce_timeout else _noop_context()
-            with timeout_context:
-                result = scan_universe(
-                    market,
-                    provider=self.provider,
-                    now_ms=timestamp,
-                    resolver=self.resolver,
-                    modes=tuple(modes) if modes is not None else self.modes,
-                    lifecycle=self.lifecycle,
-                )
-        except MarketExecutionTimeout as exc:
-            result = self._failure_scan(
-                market_index,
-                status="timeout",
-                error=str(exc),
-                duration_ms=self.market_timeout_seconds * 1000.0,
-            )
-        except Exception as exc:
-            result = self._failure_scan(
-                market_index,
-                status="error",
-                error=f"{type(exc).__name__}: {exc}",
-            )
 
-        # Only the tiny mutable-state/persistence section is serialized. The
-        # expensive network + feature + setup analysis above is concurrent.
-        with self._state_lock:
-            self._scan_number += 1
-            state = AutonomousScanState(
-                scan_number=self._scan_number,
-                scanned_at_ms=timestamp,
-                result=result,
-                rotation_id=rotation_id,
-                queue_position=queue_position,
-                universe_size=len(self.universe.markets),
-            )
-            self._last_state = state
-            if journal:
-                self._journal_state(state)
-            return state
+        # Automatic rotation, manual Market Watch and closed-candle callbacks
+        # can request the same market concurrently. SetupLifecycle is stateful:
+        # overlapping scans for one asset can race its identity/lifecycle
+        # transitions and persist an older snapshot after a newer one. Serialize
+        # only per market; unrelated markets still analyze concurrently.
+        market_lock = self._market_locks[market_index]
+        with market_lock:
+            try:
+                timeout_context = _market_timeout(self.market_timeout_seconds) if enforce_timeout else _noop_context()
+                with timeout_context:
+                    result = scan_universe(
+                        market,
+                        provider=self.provider,
+                        now_ms=timestamp,
+                        resolver=self.resolver,
+                        modes=tuple(modes) if modes is not None else self.modes,
+                        lifecycle=self.lifecycle,
+                    )
+            except MarketExecutionTimeout as exc:
+                result = self._failure_scan(
+                    market_index,
+                    status="timeout",
+                    error=str(exc),
+                    duration_ms=self.market_timeout_seconds * 1000.0,
+                )
+            except Exception as exc:
+                result = self._failure_scan(
+                    market_index,
+                    status="error",
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+
+            # Persist and publish this market's result before another scan of
+            # the same market can overwrite its registry/journal projection.
+            with self._state_lock:
+                self._scan_number += 1
+                state = AutonomousScanState(
+                    scan_number=self._scan_number,
+                    scanned_at_ms=timestamp,
+                    result=result,
+                    rotation_id=rotation_id,
+                    queue_position=queue_position,
+                    universe_size=len(self.universe.markets),
+                )
+                self._last_state = state
+                if journal:
+                    self._journal_state(state)
+                return state
 
     def run_cycle(
         self,
