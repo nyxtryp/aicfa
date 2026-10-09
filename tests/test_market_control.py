@@ -159,7 +159,7 @@ def test_manual_scan_normalizes_enum_direction_and_returns_fresh_visual_payload(
         INTRADAY = "intraday"
 
     candidate = Candidate(direction=Direction.LONG)
-    setup = Setup(mode=Mode.INTRADAY, candidate=candidate)
+    setup = Setup(mode=Mode.INTRADAY, candidate=candidate, decision_action=Direction.LONG.value)
     market = SimpleNamespace(
         asset="ETH/USDT",
         diagnostics=SimpleNamespace(status="completed", error=""),
