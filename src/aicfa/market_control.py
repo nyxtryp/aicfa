@@ -40,7 +40,7 @@ def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
             continue
         lifecycle = getattr(setup, "lifecycle_result", None)
         lifecycle_status = str(getattr(getattr(lifecycle, "status", None), "value", getattr(lifecycle, "status", ""))).lower()
-        if lifecycle_status in {"active", "tp1_hit"}:
+        if lifecycle_status in {"active", "tp1_hit", "invalidated", "completed", "expired"}:
             continue
         watch_candidates.append({
             "asset": market.asset,
