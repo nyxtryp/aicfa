@@ -408,3 +408,60 @@ def test_run_forever_batches_survives_scan_and_error_callback_failures(monkeypat
     assert calls == ["COIN000/USDT", "COIN001/USDT", "COIN000/USDT"]
     assert seen == ["COIN001/USDT", "COIN000/USDT"]
     assert errors == [("COIN000/USDT", "UI callback broke")]
+
+
+
+def test_concurrent_scans_of_same_market_are_serialized(monkeypatch):
+    import threading
+    import time
+
+    from aicfa.market_orchestrator import MarketHorizonScan, MultiMarketScan
+
+    entered = threading.Event()
+    release = threading.Event()
+    guard = threading.Lock()
+    calls = {"count": 0, "active": 0, "max_active": 0}
+
+    def fake_scan_universe(universe, **kwargs):
+        with guard:
+            calls["count"] += 1
+            calls["active"] += 1
+            calls["max_active"] = max(calls["max_active"], calls["active"])
+        entered.set()
+        release.wait(timeout=3)
+        with guard:
+            calls["active"] -= 1
+        return MultiMarketScan(markets=tuple(
+            MarketHorizonScan(
+                asset=market.asset,
+                results=(),
+                setups=(),
+                lifecycle_results=(),
+            )
+            for market in universe.markets
+        ))
+
+    monkeypatch.setattr("aicfa.autonomous_scan.scan_universe", fake_scan_universe)
+    engine = AutonomousScanEngine(
+        MarketUniverse((MonitoredMarket("BTC/USDT"),)),
+        journal=None,
+    )
+    first = threading.Thread(target=lambda: engine.scan_market(0, enforce_timeout=False))
+    second = threading.Thread(target=lambda: engine.scan_market(0, enforce_timeout=False))
+
+    first.start()
+    assert entered.wait(timeout=2)
+    second.start()
+    time.sleep(0.05)
+
+    # The second scan must not enter stateful lifecycle analysis concurrently
+    # for the same market.
+    assert calls["count"] == 1
+    release.set()
+    first.join(timeout=2)
+    second.join(timeout=2)
+
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert calls["count"] == 2
+    assert calls["max_active"] == 1
