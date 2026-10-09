@@ -335,6 +335,40 @@ def test_tp1_prefers_nearest_valid_objective_over_distant_liquidity_pool():
     assert targets[0].source == "previous low"
 
 
+def test_intraday_tp1_rejects_targets_beyond_tighter_atr_envelope():
+    from aicfa.setup_analysis import MultiTimeframeContext, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("4h", "1h", "15m", "5m"),
+        mode="intraday",
+        latest_rows={
+            "4h": row(active_sell_liquidity_price=96.8, previous_low=96.8),
+            "1h": row(atr=1.0, active_sell_liquidity_price=96.8, previous_low=96.8),
+            "15m": row(previous_low=96.8),
+            "5m": row(previous_low=96.8),
+        },
+        observations=(),
+        structure_direction="short",
+        structure_timeframe="1h",
+        context_timeframe="4h",
+        execution_timeframe="5m",
+    )
+
+    # A 3.2 ATR draw is not an actionable intraday TP1. The old 4.5 ATR
+    # ceiling accepted it and could display a distant liquidity pool as TP1.
+    targets = _target_levels(
+        context,
+        "short",
+        current_price=100.0,
+        preferred_timeframes=("1h", "4h", "15m"),
+        entry_zone=(),
+    )
+    assert targets == ()
+
+
 def test_primary_mode_hierarchies_are_independent():
     from aicfa.data_requirements import mode_timeframe_profile
 
