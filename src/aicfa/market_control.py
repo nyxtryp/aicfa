@@ -27,8 +27,12 @@ def _market_payload(engine: Any) -> list[dict[str, Any]]:
 
 
 def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
-    # Manual scans run independently; they must never pause the automatic rotation.
-    state = engine.scan_market(market_index, journal=True, enforce_timeout=False)
+    # Manual scans share the canonical pipeline but have their own strict
+    # per-market deadline. The per-market lock keeps lifecycle transitions safe;
+    # this call never pauses the automatic rotation.
+    state = engine.scan_market(
+        market_index, journal=True, enforce_timeout=True, timeout_seconds=30.0
+    )
     pause_until_ms = engine.automatic_pause_until_ms
     market = state.result.markets[0]
     registry = engine.registry
