@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 from aicfa.market_control import _scan_payload
@@ -16,8 +16,8 @@ class Candidate:
     direction: str = "long"
     scenario: str = "reversal"
     entry_zone: tuple = (Level(100.0), Level(101.0))
-    invalidation_level: Level = Level(98.0)
-    target_levels: tuple = (Level(106.0),)
+    invalidation_level: Level = field(default_factory=lambda: Level(98.0))
+    target_levels: tuple = field(default_factory=lambda: (Level(106.0),))
     rationale: tuple = ("Waiting for price to reach the entry zone",)
 
 
