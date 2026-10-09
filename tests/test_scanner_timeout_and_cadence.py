@@ -108,6 +108,6 @@ def test_manual_scan_does_not_pause_automatic_rotation():
     payload = _scan_payload(engine, 0)
 
     assert engine.pause_calls == 0
-    assert engine.scan_kwargs == (0, {"journal": True, "enforce_timeout": False})
+    assert engine.scan_kwargs == (0, {"journal": True, "enforce_timeout": True, "timeout_seconds": 30.0})
     assert payload["automatic_scan_paused_until_ms"] == 0
     assert payload["market"]["diagnostics"] is not None
