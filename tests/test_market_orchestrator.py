@@ -306,7 +306,7 @@ def test_market_diagnostics_expose_snapshot_and_horizon_timings(monkeypatch):
     assert result.diagnostics.refetched_between_horizons is False
     assert result.diagnostics.status == "completed"
     assert result.diagnostics.error == ""
-    assert len(result.diagnostics.block_timings) == 12
+    assert len(result.diagnostics.block_timings) == 16
     assert result.diagnostics.feature_duration_ms >= 0
     assert result.diagnostics.evidence_duration_ms >= 0
     assert result.diagnostics.setup_duration_ms >= 0
