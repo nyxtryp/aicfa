@@ -19,7 +19,7 @@ from typing import Callable, Sequence
 import pandas as pd
 
 from .data_requirements import TradingMode
-from .market_data import MarketKey, merge_ohlcv, validate_ohlcv
+from .market_data import MarketKey, merge_ohlcv, timeframe_ms, validate_ohlcv
 from .websocket_market_data import BinanceWebSocketMarketDataTransport, WebSocketObservation
 
 
@@ -151,11 +151,23 @@ class LiveMarketDataCache:
                     self._frames[key] = cached
             closed = self._closed_only(cached, timeframe) if cached is not None else pd.DataFrame()
             if not closed.empty and len(closed) >= int(limit):
-                # Never hand the analysis pipeline an open candle. The previous
-                # implementation returned a full cached window even when its
-                # newest row was the currently forming candle, which could make
-                # completed_ohlcv reject the market with a generic scanner error.
-                return closed.tail(limit).copy()
+                # A full cache is not necessarily a current cache. If the WS
+                # stream disconnected, the old implementation returned these
+                # rows forever and the scanner kept analyzing stale candles.
+                now_ms = int(time.time() * 1000)
+                if timeframe == "1w":
+                    now = pd.Timestamp(now_ms, unit="ms", tz="UTC")
+                    current_week_open = now.normalize() - pd.Timedelta(days=now.weekday())
+                    expected_latest_open = int(
+                        (current_week_open - pd.Timedelta(days=7)).timestamp() * 1000
+                    )
+                else:
+                    duration_ms = timeframe_ms(timeframe)
+                    expected_latest_open = (now_ms // duration_ms) * duration_ms - duration_ms
+                latest_cached_open = int(closed["timestamp"].iloc[-1])
+                if latest_cached_open >= expected_latest_open:
+                    # Never hand the analysis pipeline an open candle.
+                    return closed.tail(limit).copy()
             needs_refresh = True
 
         # Refresh whenever the cache does not contain enough *closed* candles.
