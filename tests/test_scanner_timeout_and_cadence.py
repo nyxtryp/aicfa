@@ -70,3 +70,44 @@ def test_rotation_uses_start_to_start_interval_not_extra_post_scan_delay(monkeyp
 
     assert seen == ["BTC/USDT", "ETH/USDT"]
     assert sleeps == [18.0]
+
+
+
+def test_manual_scan_does_not_pause_automatic_rotation():
+    from aicfa.market_control import _scan_payload
+
+    market_result = SimpleNamespace(
+        asset="BTC/USDT",
+        diagnostics=SimpleNamespace(status="completed", error=""),
+        setups=(),
+    )
+    state = SimpleNamespace(
+        scan_number=1,
+        scanned_at_ms=123,
+        result=SimpleNamespace(markets=(market_result,)),
+    )
+
+    class FakeEngine:
+        universe = SimpleNamespace(markets=(SimpleNamespace(asset="BTC/USDT"),))
+        registry = None
+        automatic_pause_until_ms = 0
+
+        def __init__(self):
+            self.pause_calls = 0
+            self.scan_kwargs = None
+
+        def pause_automatic_scanning(self, *args, **kwargs):
+            self.pause_calls += 1
+            return 30_123
+
+        def scan_market(self, market_index, **kwargs):
+            self.scan_kwargs = (market_index, kwargs)
+            return state
+
+    engine = FakeEngine()
+    payload = _scan_payload(engine, 0)
+
+    assert engine.pause_calls == 0
+    assert engine.scan_kwargs == (0, {"journal": True, "enforce_timeout": False})
+    assert payload["automatic_scan_paused_until_ms"] == 0
+    assert payload["market"]["diagnostics"]["status"] == "completed"
