@@ -125,3 +125,39 @@ def test_health_reports_automatic_worker_state_not_last_manual_scan():
     assert payload["last_scan_error"] == "RuntimeError: worker callback failed"
     assert payload["last_automatic_scan_at_ms"] == 123456
     assert payload["last_automatic_scan_asset"] == "ETH/USDT"
+
+
+def test_manual_scan_normalizes_enum_direction_and_returns_fresh_visual_payload():
+    from enum import Enum
+
+    class Direction(Enum):
+        LONG = "long"
+
+    class Mode(Enum):
+        INTRADAY = "intraday"
+
+    candidate = Candidate(direction=Direction.LONG)
+    setup = Setup(mode=Mode.INTRADAY, candidate=candidate)
+    market = SimpleNamespace(
+        asset="ETH/USDT",
+        diagnostics=SimpleNamespace(status="completed", error=""),
+        setups=(setup,),
+        results=(),
+    )
+    state = SimpleNamespace(
+        scanned_at_ms=5678,
+        scan_number=10,
+        result=SimpleNamespace(markets=(market,)),
+    )
+    engine = SimpleNamespace(
+        scan_market=lambda *args, **kwargs: state,
+        automatic_pause_until_ms=0,
+        registry=None,
+    )
+
+    payload = _scan_payload(engine, 0)
+
+    assert len(payload["watch_candidates"]) == 1
+    assert payload["watch_candidates"][0]["candidate"]["direction"] == "long"
+    assert payload["watch_candidates"][0]["mode"] == "intraday"
+    assert payload["market_visual"] == {"zones": [], "events": [], "liquidity": []}
