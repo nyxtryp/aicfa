@@ -80,6 +80,7 @@ class AutonomousScanState:
     rotation_id: int = 0
     queue_position: int = 0
     universe_size: int = 0
+    is_full_universe_scan: bool = False
 
 
 @dataclass(frozen=True)
@@ -337,6 +338,8 @@ class AutonomousScanEngine:
             scan_number=self._scan_number,
             scanned_at_ms=timestamp,
             result=result,
+            universe_size=len(self.universe.markets),
+            is_full_universe_scan=len(batch.markets) == len(self.universe.markets),
         )
         self._last_state = state
         self._journal_state(state)
@@ -358,6 +361,8 @@ class AutonomousScanEngine:
             scan_number=self._scan_number,
             scanned_at_ms=timestamp,
             result=result,
+            universe_size=len(self.universe.markets),
+            is_full_universe_scan=True,
         )
         self._last_state = state
         self._journal_state(state)
@@ -455,6 +460,7 @@ class AutonomousScanEngine:
                     rotation_id=rotation_id,
                     queue_position=queue_position,
                     universe_size=len(self.universe.markets),
+                    is_full_universe_scan=len(self.universe.markets) == 1,
                 )
                 self._last_state = state
                 if journal:
