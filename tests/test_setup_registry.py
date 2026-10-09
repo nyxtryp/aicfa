@@ -211,3 +211,119 @@ def test_registry_migrates_tp1_hit_but_keeps_it_out_of_actionable_queue(tmp_path
     record = next(iter(registry.read().values()))
     assert record["strategy_revision"] == 5
     assert record["status"] == "TP1_HIT"
+
+
+
+def test_partial_market_scan_does_not_stale_setups_for_other_markets(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Candidate:
+        scenario = "continuation"
+        direction = "long"
+
+    class Lifecycle:
+        status = type("Status", (), {"value": "active"})()
+
+    class Setup:
+        mode = "intraday"
+        candidate = Candidate()
+        identity = None
+        lifecycle_result = Lifecycle()
+        evidence_concepts = ()
+        decision_action = "long"
+
+    class Diagnostics:
+        status = "completed"
+
+    class Market:
+        diagnostics = Diagnostics()
+        setups = (Setup(),)
+        lifecycle_results = ()
+
+        def __init__(self, asset):
+            self.asset = asset
+
+    class FullState:
+        scanned_at_ms = 1_000
+        scan_number = 1
+        universe_size = 2
+        is_full_universe_scan = True
+        result = type("Result", (), {
+            "markets": (Market("BTC/USDT"), Market("ETH/USDT"))
+        })()
+
+    registry.record_scan(FullState())
+
+    class PartialState:
+        scanned_at_ms = 2_000
+        scan_number = 2
+        universe_size = 2
+        is_full_universe_scan = False
+        result = type("Result", (), {"markets": (Market("BTC/USDT"),)})()
+
+    registry.record_scan(PartialState())
+
+    records = registry.read()
+    assert {record["asset"]: record["status"] for record in records.values()} == {
+        "BTC/USDT": "ACTIVE",
+        "ETH/USDT": "ACTIVE",
+    }
+
+
+def test_failed_partial_scan_does_not_stale_existing_setup(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Candidate:
+        scenario = "continuation"
+        direction = "long"
+
+    class Lifecycle:
+        status = type("Status", (), {"value": "active"})()
+
+    class Setup:
+        mode = "intraday"
+        candidate = Candidate()
+        identity = None
+        lifecycle_result = Lifecycle()
+        evidence_concepts = ()
+        decision_action = "long"
+
+    class GoodDiagnostics:
+        status = "completed"
+
+    class FailedDiagnostics:
+        status = "error"
+
+    class GoodMarket:
+        asset = "BTC/USDT"
+        diagnostics = GoodDiagnostics()
+        setups = (Setup(),)
+        lifecycle_results = ()
+
+    class FailedMarket:
+        asset = "BTC/USDT"
+        diagnostics = FailedDiagnostics()
+        setups = ()
+        lifecycle_results = ()
+
+    class InitialState:
+        scanned_at_ms = 1_000
+        scan_number = 1
+        universe_size = 1
+        is_full_universe_scan = True
+        result = type("Result", (), {"markets": (GoodMarket(),)})()
+
+    registry.record_scan(InitialState())
+
+    class FailedState:
+        scanned_at_ms = 2_000
+        scan_number = 2
+        universe_size = 2
+        is_full_universe_scan = False
+        result = type("Result", (), {"markets": (FailedMarket(),)})()
+
+    registry.record_scan(FailedState())
+
+    record = next(iter(registry.read().values()))
+    assert record["status"] == "ACTIVE"
+    assert record["lifecycle_status"] == "active"
