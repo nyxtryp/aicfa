@@ -11,7 +11,6 @@ from pathlib import Path
 import signal
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Keep the source-layout package importable when FrostDeploy starts main.py
 # directly from the repository root without an installed editable package.
@@ -183,60 +182,29 @@ def main() -> None:
             flush=True,
         )
 
-    def _initial_scan() -> None:
-        # Initial population must not serialize 150 markets behind one slow
-        # analysis. Wait only for the seed pass, then use bounded concurrency.
-        # The live WebSocket remains active while this happens.
-        if stop_event.is_set():
-            return
-
-        def scan_one(market_index: int) -> None:
-            market = universe.markets[market_index]
-            try:
-                state = engine.scan_market(
-                    market_index,
-                    journal=True,
-                    enforce_timeout=False,
-                    modes=engine.modes,
-                )
-                result_market = state.result.markets[0]
-                diagnostics = result_market.diagnostics
-                print(
-                    f"AICFA initial scan: {result_market.asset} "
-                    f"status={diagnostics.status if diagnostics else 'completed'} "
-                    f"setups={len(result_market.setups)} "
-                    f"error={diagnostics.error if diagnostics else ''}",
-                    flush=True,
-                )
-            except Exception as exc:
-                print(
-                    f"AICFA initial scan error: {market.asset}: "
-                    f"{type(exc).__name__}: {exc}",
-                    flush=True,
-                )
-
-        workers = max(1, min(4, (os.cpu_count() or 2)))
-        with ThreadPoolExecutor(
-            max_workers=workers,
-            thread_name_prefix="aicfa-initial",
-        ) as pool:
-            futures = [pool.submit(scan_one, i) for i in range(len(universe.markets))]
-            for future in as_completed(futures):
-                if stop_event.is_set():
-                    break
-                try:
-                    future.result()
-                except Exception as exc:
-                    print(
-                        f"AICFA initial scan worker error: {type(exc).__name__}: {exc}",
-                        flush=True,
-                    )
+    def _automatic_rotation() -> None:
+        # Keep the original 24/7 sequential scanner alive independently of
+        # WebSocket candle events and manual Market Watch requests. One market
+        # is analyzed, then the next configured market starts after 30 seconds.
+        try:
+            engine.run_forever_batches(
+                interval_seconds=30.0,
+                batch_size=1,
+                on_scan=on_scan,
+                on_error=on_error,
+                should_stop=stop_event.is_set,
+            )
+        except Exception as exc:
+            print(
+                f"AICFA automatic rotation stopped: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
     try:
         price_monitor.start()
         threading.Thread(
-            target=_initial_scan,
-            name="aicfa-initial-scan",
+            target=_automatic_rotation,
+            name="aicfa-automatic-rotation",
             daemon=True,
         ).start()
         stop_event.wait()
