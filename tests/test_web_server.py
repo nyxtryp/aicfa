@@ -22,6 +22,11 @@ def test_web_journal_api_reads_shared_storage_without_feed(tmp_path, monkeypatch
     )
     monkeypatch.setattr(server, "DATA_DIR", data_dir)
     monkeypatch.setenv("AICFA_DATA_DIR", str(data_dir))
+    monkeypatch.setattr(server, "_scanner_health", lambda: {
+        "ok": True,
+        "scanner": "running",
+        "automatic_worker_running": True,
+    })
 
     health = json.loads(server._journal_payload("/api/health", {}))
     scans = json.loads(server._journal_payload("/api/journal/scans", {"limit": ["10"]}))
@@ -97,3 +102,24 @@ def test_web_server_entrypoint_starts_outside_pytest_import_path(tmp_path):
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=2)
+
+
+
+def test_web_health_does_not_report_live_when_scanner_worker_is_stopped(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    journal = PersistentJournal(data_dir / "journal" / "events.jsonl")
+    journal.append("scan", 123, {"scan_number": 1, "markets": []})
+    monkeypatch.setattr(server, "DATA_DIR", data_dir)
+    monkeypatch.setattr(server, "_scanner_health", lambda: {
+        "ok": True,
+        "scanner": "stopped",
+        "automatic_worker_running": False,
+        "last_scan_status": "restarting",
+    })
+
+    health = json.loads(server._journal_payload("/api/health", {}))
+
+    assert health["journal_ok"] is True
+    assert health["automatic_worker_running"] is False
+    assert health["scanner_ok"] is False
+    assert health["ok"] is False

@@ -42,9 +42,19 @@ def _journal_payload(path: str, query: dict[str, list[str]]) -> bytes:
 
     if path == "/api/health":
         scanner = _scanner_health()
+        journal_ok = journal.path.is_file()
+        worker_running = (
+            scanner.get("scanner") == "running"
+            and scanner.get("automatic_worker_running") is True
+        )
+        scanner_ok = bool(scanner.get("ok")) and worker_running
         payload = {
-            "ok": bool(journal.path.is_file()),
-            "scanner_ok": bool(scanner.get("ok")),
+            # "LIVE" in the browser must mean the scanner worker is running,
+            # not merely that an old journal file exists on disk.
+            "ok": journal_ok and scanner_ok,
+            "journal_ok": journal_ok,
+            "scanner_ok": scanner_ok,
+            "automatic_worker_running": worker_running,
             "journal": str(journal.path),
             "scanner": scanner.get("scanner", "unknown"),
             "scan_number": scanner.get("scan_number"),
