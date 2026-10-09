@@ -316,7 +316,7 @@ class SetupLifecycle:
         )
         unavailable_target_scenarios = {
             str(reason).split(":", 1)[0]
-            for reason in assessment.missing_context
+            for reason in getattr(assessment, "missing_context", ())
             if "no geometrically valid target" in str(reason)
         }
 
