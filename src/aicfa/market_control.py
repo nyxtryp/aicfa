@@ -33,6 +33,22 @@ def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
     market = state.result.markets[0]
     registry = engine.registry
     setups: list[dict[str, Any]] = []
+    watch_candidates: list[dict[str, Any]] = []
+    for setup in getattr(market, "setups", ()):
+        candidate = getattr(setup, "candidate", None)
+        if candidate is None or str(getattr(candidate, "direction", "")).upper() not in {"LONG", "SHORT"}:
+            continue
+        lifecycle = getattr(setup, "lifecycle_result", None)
+        lifecycle_status = str(getattr(getattr(lifecycle, "status", None), "value", getattr(lifecycle, "status", ""))).lower()
+        if lifecycle_status in {"active", "tp1_hit"}:
+            continue
+        watch_candidates.append({
+            "asset": market.asset,
+            "mode": getattr(setup, "mode", ""),
+            "candidate": _jsonable(candidate),
+            "lifecycle_status": lifecycle_status or "waiting",
+            "decision_action": str(getattr(setup, "decision_action", "wait")),
+        })
     if registry is not None:
         for record in registry.current():
             if record.get("asset") == market.asset and int(record.get("last_seen_at_ms", -1)) == int(state.scanned_at_ms):
@@ -47,6 +63,7 @@ def _scan_payload(engine: Any, market_index: int) -> dict[str, Any]:
             "diagnostics": _jsonable(market.diagnostics),
         },
         "setups": setups,
+        "watch_candidates": watch_candidates,
         "automatic_scan_paused_until_ms": pause_until_ms,
     }
 
