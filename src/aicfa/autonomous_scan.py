@@ -522,6 +522,23 @@ class AutonomousScanEngine:
         market_index = 0
         rotation_id = 1
         universe_size = len(self.universe.markets)
+
+        def report_error(asset: str, exc: Exception) -> None:
+            # Observability hooks must never become a single point of failure
+            # for the 24/7 rotation. Keep scanning even if a logger/consumer
+            # callback itself is broken.
+            if on_error is None:
+                print(f"AICFA rotation error: {asset}: {type(exc).__name__}: {exc}", flush=True)
+                return
+            try:
+                on_error(asset, exc)
+            except Exception as callback_exc:
+                print(
+                    f"AICFA error callback failed for {asset}: "
+                    f"{type(callback_exc).__name__}: {callback_exc}",
+                    flush=True,
+                )
+
         while True:
             if should_stop is not None and should_stop():
                 return
@@ -538,11 +555,15 @@ class AutonomousScanEngine:
             try:
                 state = self.scan_market(market_index, rotation_id=rotation_id, queue_position=queue_position)
             except Exception as exc:
-                if on_error is not None:
-                    on_error(asset, exc)
+                report_error(asset, exc)
                 state = None
             if state is not None and on_scan is not None:
-                on_scan(state)
+                try:
+                    on_scan(state)
+                except Exception as exc:
+                    # A UI/logging callback failure is not a market-analysis
+                    # failure and must not terminate the perpetual worker.
+                    report_error(asset, exc)
             if should_stop is not None and should_stop():
                 return
             market_index = (market_index + 1) % universe_size
