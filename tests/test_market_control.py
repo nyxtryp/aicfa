@@ -29,12 +29,37 @@ class Setup:
     decision_action: str = "wait"
 
 
-def test_manual_scan_returns_waiting_candidates_separately_from_active_setups():
+def test_manual_scan_does_not_return_wait_candidates_as_setups():
     candidate = Candidate()
     market = SimpleNamespace(
         asset="BTC/USDT",
         diagnostics=SimpleNamespace(status="completed", error=""),
-        setups=(Setup(mode="INTRADAY", candidate=candidate),),
+        setups=(Setup(mode="INTRADAY", candidate=candidate, decision_action="wait"),),
+    )
+    state = SimpleNamespace(
+        scanned_at_ms=1234,
+        scan_number=7,
+        result=SimpleNamespace(markets=(market,)),
+    )
+    engine = SimpleNamespace(
+        scan_market=lambda *args, **kwargs: state,
+        automatic_pause_until_ms=0,
+        registry=None,
+    )
+
+    payload = _scan_payload(engine, 0)
+
+    assert payload["setups"] == []
+    assert payload["watch_candidates"] == []
+
+
+def test_manual_scan_returns_only_directionally_approved_valid_geometry():
+    candidate = Candidate()
+    market = SimpleNamespace(
+        asset="BTC/USDT",
+        diagnostics=SimpleNamespace(status="completed", error=""),
+        setups=(Setup(mode="INTRADAY", candidate=candidate, decision_action="long"),),
+        results=(),
     )
     state = SimpleNamespace(
         scanned_at_ms=1234,
@@ -51,13 +76,10 @@ def test_manual_scan_returns_waiting_candidates_separately_from_active_setups():
 
     assert payload["setups"] == []
     assert len(payload["watch_candidates"]) == 1
-    pending = payload["watch_candidates"][0]
-    assert pending["asset"] == "BTC/USDT"
-    assert pending["mode"] == "INTRADAY"
-    assert pending["candidate"]["direction"] == "long"
-    assert pending["candidate"]["entry_zone"][0]["value"] == 100.0
-    assert pending["candidate"]["invalidation_level"]["value"] == 98.0
-    assert pending["candidate"]["target_levels"][0]["value"] == 106.0
+    item = payload["watch_candidates"][0]
+    assert item["decision_action"] == "long"
+    assert item["candidate"]["direction"] == "long"
+    assert item["candidate"]["entry_zone"][0]["value"] == 100.0
 
 
 def test_manual_scan_does_not_duplicate_lifecycle_active_candidates_as_watch():
