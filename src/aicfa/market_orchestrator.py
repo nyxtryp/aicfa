@@ -24,6 +24,7 @@ from .trade_description import TradeDescription, build_trade_description
 
 
 PRIMARY_TRADING_MODES: tuple[TradingMode, ...] = (
+    TradingMode.SCALPING,
     TradingMode.INTRADAY,
     TradingMode.SWING,
     TradingMode.POSITION,
