@@ -441,7 +441,7 @@ def test_tp1_rejects_distant_historical_low_when_nearer_valid_low_exists():
         mode="intraday",
         latest_rows={
             "4h": row(previous_low=0.98775, atr=0.04, smc_structure_direction=-1),
-            "1h": row(previous_low=1.35, atr=0.01, smc_structure_direction=-1),
+            "1h": row(previous_low=1.35, atr=0.02, smc_structure_direction=-1),
             "15m": row(smc_structure_direction=-1),
         },
         observations=(),
