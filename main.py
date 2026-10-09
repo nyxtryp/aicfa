@@ -137,9 +137,13 @@ def main() -> None:
         market = state.result.markets[0]
         diagnostics = market.diagnostics
         status = diagnostics.status if diagnostics is not None else "completed"
+        duration_ms = diagnostics.total_duration_ms if diagnostics is not None else 0.0
+        error = diagnostics.error if diagnostics is not None else ""
+        suffix = f" error={error[:240]}" if error else ""
         print(
             f"AICFA scan #{state.scan_number}: {market.asset} "
-            f"status={status} setups={len(market.setups)}",
+            f"status={status} duration={duration_ms:.0f}ms "
+            f"setups={len(market.setups)}{suffix}",
             flush=True,
         )
 
