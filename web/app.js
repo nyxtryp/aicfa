@@ -49,7 +49,17 @@ function registryItems(records){
   const wrapper=r.setup||{},base=wrapper.candidate||wrapper,candidate={...base,chart:wrapper.chart||base.chart};
   latestById.set(key,{asset:r.asset,market_type:r.market_type||"futures",mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||"active",status:"ACTIVE",key,seenAt,lastConfirmedAt,setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
  }
- return [...latestById.values()].sort((a,b)=>Math.max(b.lastConfirmedAt,b.seenAt)-Math.max(a.lastConfirmedAt,a.seenAt));
+ const semantic=new Map();
+ for(const item of latestById.values()){
+  const s=item.setup||{},entry=(s.entry_zone||[]).map(v=>Number(v.value).toFixed(4)).sort().join(",");
+  const stop=Number(s.invalidation_level?.value);
+  // Different source labels or TP lists do not make a second trade when
+  // asset, mode, scenario, side, entry zone and invalidation are identical.
+  const identity=[item.asset,item.market_type,item.mode,s.scenario,dir(s),entry,Number.isFinite(stop)?stop.toFixed(4):"—"].join("|");
+  const old=semantic.get(identity);
+  if(!old||Math.max(item.lastConfirmedAt,item.seenAt)>Math.max(old.lastConfirmedAt,old.seenAt))semantic.set(identity,item);
+ }
+ return [...semantic.values()].sort((a,b)=>Math.max(b.lastConfirmedAt,b.seenAt)-Math.max(a.lastConfirmedAt,a.seenAt));
 }
 function syncRegistry(records){
  const items=registryItems(records),previous=ui.selected,oldKeys=new Set(ui.history.map(x=>x.key));
