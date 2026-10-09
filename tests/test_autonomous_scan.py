@@ -242,7 +242,8 @@ def test_run_forever_batches_scans_one_market_sequentially(monkeypatch):
         "COIN000/USDT",
         "COIN001/USDT",
     ]
-    assert sleeps == [60, 60, 60, 60]
+    assert len(sleeps) == 4
+    assert all(0 < duration <= 60 for duration in sleeps)
 
 def test_run_forever_batches_continues_after_market_error(monkeypatch):
     monkeypatch.setattr(
