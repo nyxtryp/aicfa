@@ -306,6 +306,35 @@ def test_setup_rationale_uses_structural_state_not_event_direction():
     assert "1h structure=short" not in rationale
 
 
+def test_tp1_prefers_nearest_valid_objective_over_distant_liquidity_pool():
+    from aicfa.setup_analysis import MultiTimeframeContext, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("1d", "4h", "1h"),
+        mode="swing",
+        latest_rows={
+            "1d": row(active_sell_liquidity_price=1800.0, previous_low=2200.0, smc_structure_direction=-1),
+            "4h": row(active_sell_liquidity_price=1810.0, previous_low=2420.0, smc_structure_direction=-1),
+            "1h": row(smc_structure_direction=-1),
+        },
+        observations=(),
+        structure_direction="short",
+        structure_timeframe="4h",
+        context_timeframe="1d",
+        execution_timeframe="1h",
+    )
+    targets = _target_levels(
+        context, "short", current_price=2500.0,
+        preferred_timeframes=("4h", "1d"), entry_zone=(),
+    )
+    assert targets
+    assert targets[0].value == 2420.0
+    assert targets[0].source == "previous low"
+
+
 def test_primary_mode_hierarchies_are_independent():
     from aicfa.data_requirements import mode_timeframe_profile
 
@@ -366,3 +395,69 @@ def test_continuation_blocks_counter_direction_bos_but_reversal_does_not():
     assert _event_direction_conflict(
         context, scenario="reversal", direction="long", observations=observations
     ) is None
+
+def test_tp1_rejects_distant_historical_low_when_nearer_valid_low_exists():
+    from aicfa.setup_analysis import MultiTimeframeContext, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("4h", "1h", "15m"),
+        mode="intraday",
+        latest_rows={
+            "4h": row(previous_low=0.98775, atr=0.04, smc_structure_direction=-1),
+            "1h": row(previous_low=1.35, atr=0.01, smc_structure_direction=-1),
+            "15m": row(smc_structure_direction=-1),
+        },
+        observations=(),
+        structure_direction="short",
+        structure_timeframe="1h",
+        context_timeframe="4h",
+        execution_timeframe="15m",
+    )
+
+    targets = _target_levels(
+        context,
+        "short",
+        current_price=1.392,
+        preferred_timeframes=("1h", "4h"),
+        entry_timeframe="1h",
+        entry_zone=(),
+    )
+
+    assert targets
+    assert targets[0].value == 1.35
+
+
+def test_tp1_is_withheld_when_only_objective_exceeds_mode_atr_envelope():
+    from aicfa.setup_analysis import MultiTimeframeContext, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("4h", "1h", "15m"),
+        mode="intraday",
+        latest_rows={
+            "4h": row(previous_low=0.98775, atr=0.04, smc_structure_direction=-1),
+            "1h": row(atr=0.01, smc_structure_direction=-1),
+            "15m": row(smc_structure_direction=-1),
+        },
+        observations=(),
+        structure_direction="short",
+        structure_timeframe="1h",
+        context_timeframe="4h",
+        execution_timeframe="15m",
+    )
+
+    targets = _target_levels(
+        context,
+        "short",
+        current_price=1.392,
+        preferred_timeframes=("1h", "4h"),
+        entry_timeframe="1h",
+        entry_zone=(),
+    )
+
+    assert targets == ()

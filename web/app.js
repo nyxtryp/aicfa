@@ -5,7 +5,7 @@ const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?"—":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const pick=(o,...k)=>{for(const x of k)if(o&&o[x]!=null)return o[x]};
 const dir=s=>String(pick(s,"direction","side","signal")||"").toUpperCase();
-const hor=s=>String(pick(s,"horizon","mode","profile")||"—").toUpperCase();
+const hor=s=>String((typeof s==="string"?s:pick(s,"horizon","mode","profile"))||"—").toUpperCase();
 const life=s=>String(pick(s,"lifecycle","status")||"").toUpperCase();
 const tm=ms=>ms?new Date(Number(ms)).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"—";
 function scans(){return state.events.filter(e=>e.event_type==="scan").sort((a,b)=>Number(b.timestamp_ms||0)-Number(a.timestamp_ms||0))}
@@ -49,7 +49,17 @@ function registryItems(records){
   const wrapper=r.setup||{},base=wrapper.candidate||wrapper,candidate={...base,chart:wrapper.chart||base.chart};
   latestById.set(key,{asset:r.asset,market_type:r.market_type||"futures",mode:r.mode,setup:candidate,lifecycle:r.lifecycle_status||"active",status:"ACTIVE",key,seenAt,lastConfirmedAt,setupTimeframe:r.structural_timeframe||"",evidence_concepts:wrapper.evidence_concepts||[],decision_action:wrapper.decision_action||""});
  }
- return [...latestById.values()].sort((a,b)=>Math.max(b.lastConfirmedAt,b.seenAt)-Math.max(a.lastConfirmedAt,a.seenAt));
+ const semantic=new Map();
+ for(const item of latestById.values()){
+  const s=item.setup||{},entry=(s.entry_zone||[]).map(v=>Number(v.value).toFixed(4)).sort().join(",");
+  const stop=Number(s.invalidation_level?.value);
+  // Different source labels or TP lists do not make a second trade when
+  // asset, mode, scenario, side, entry zone and invalidation are identical.
+  const identity=[item.asset,item.market_type,item.mode,s.scenario,dir(s),entry,Number.isFinite(stop)?stop.toFixed(4):"—"].join("|");
+  const old=semantic.get(identity);
+  if(!old||Math.max(item.lastConfirmedAt,item.seenAt)>Math.max(old.lastConfirmedAt,old.seenAt))semantic.set(identity,item);
+ }
+ return [...semantic.values()].sort((a,b)=>Math.max(b.lastConfirmedAt,b.seenAt)-Math.max(a.lastConfirmedAt,a.seenAt));
 }
 function syncRegistry(records){
  const items=registryItems(records),previous=ui.selected,oldKeys=new Set(ui.history.map(x=>x.key));
@@ -231,7 +241,7 @@ async function hydrateCharts(){
  await Promise.all(nodes.map(async node=>{try{const q=new URLSearchParams({symbol:node.dataset.symbol,market_type:node.dataset.marketType||"futures",timeframe:node.dataset.timeframe,limit:"200"});const response=await fetch(API_BASE+"/chart?"+q.toString()+"&t="+Date.now(),{cache:"no-store"});const data=response.ok?await response.json():null;renderCandleChart(node,data?.candles||[],JSON.parse(node.dataset.setup||"{}"))}catch(_){node.innerHTML='<div class="chart-empty">CHART UNAVAILABLE</div>'}}));
 }
 function setupCard(x){
- const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>v.value).join(" — "):"—";
+ const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>String(v.value)+" ("+(v.timeframe||"?")+" · "+(v.source||"unknown source")+")").join(" — "):"—";
  const fullChart=mergeVisualCharts(x.suppressMarketVisual?null:marketVisual(x.asset,x.mode),s.chart);
  const low=entry.length?Math.min(...entry.map(v=>Number(v.value))):NaN,high=entry.length?Math.max(...entry.map(v=>Number(v.value))):NaN,stop=Number(s.invalidation_level?.value),take=targets.length?Number(targets[0]?.value):NaN;
  const geometryValid=Number.isFinite(low)&&Number.isFinite(high)&&low>0&&high>0&&Number.isFinite(stop)&&stop>0&&Number.isFinite(take)&&take>0;

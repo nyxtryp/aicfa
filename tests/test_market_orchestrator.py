@@ -88,7 +88,7 @@ def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAI
     )
 
 
-def test_one_market_runs_all_three_primary_horizons(monkeypatch):
+def test_one_market_runs_all_four_primary_horizons_including_scalping(monkeypatch):
     calls = []
 
     def fake_find_setup(request, **kwargs):
@@ -117,10 +117,10 @@ def test_multiple_markets_keep_results_independent(monkeypatch):
     result = scan_markets(["BTC/USDT", "ETH/USDT"], provider=_provider(), now_ms=1000)
 
     assert [market.asset for market in result.markets] == ["BTC/USDT", "ETH/USDT"]
-    assert len(result.setups) == 6
+    assert len(result.setups) == 8
     assert [item[0] for item in result.setups] == [
-        "BTC/USDT", "BTC/USDT", "BTC/USDT",
-        "ETH/USDT", "ETH/USDT", "ETH/USDT",
+        "BTC/USDT", "BTC/USDT", "BTC/USDT", "BTC/USDT",
+        "ETH/USDT", "ETH/USDT", "ETH/USDT", "ETH/USDT",
     ]
 
 
@@ -133,7 +133,7 @@ def test_waiting_horizon_does_not_force_a_signal(monkeypatch):
     result = analyze_market_horizons("BTC/USDT", now_ms=1000)
 
     assert result.setups == ()
-    assert [item.decision for item in result.results] == ["WAIT", "WAIT", "WAIT"]
+    assert [item.decision for item in result.results] == ["WAIT", "WAIT", "WAIT", "WAIT"]
 
 def test_waiting_decision_preserves_candidate_for_watch_panel(monkeypatch):
     candidate = _candidate()
@@ -145,7 +145,7 @@ def test_waiting_decision_preserves_candidate_for_watch_panel(monkeypatch):
 
     result = analyze_market_horizons("BTC/USDT", now_ms=1000)
 
-    assert len(result.setups) == 3
+    assert len(result.setups) == 4
     assert all(item.decision_action == "wait" for item in result.setups)
     assert all(item.candidate.entry_zone[0].value == 100.0 for item in result.setups)
 
@@ -162,9 +162,9 @@ def test_distinct_concurrent_horizon_setups_are_preserved(monkeypatch):
 
     result = analyze_market_horizons("SOL/USDT", provider=_provider(), now_ms=1000)
 
-    assert len(result.setups) == 3
-    assert [item.candidate.direction for item in result.setups] == ["long", "long", "short"]
-    assert [item.description.direction for item in result.setups] == ["long", "long", "short"]
+    assert len(result.setups) == 4
+    assert [item.candidate.direction for item in result.setups] == ["long", "long", "long", "short"]
+    assert [item.description.direction for item in result.setups] == ["long", "long", "long", "short"]
 
 
 def test_primary_orchestrator_supports_scalping(monkeypatch):
@@ -207,6 +207,8 @@ def test_configured_market_universe_controls_assets_and_market_type(monkeypatch)
         ("BTC/USDT", "spot"),
         ("BTC/USDT", "spot"),
         ("BTC/USDT", "spot"),
+        ("BTC/USDT", "spot"),
+        ("ETH/USDT", "futures"),
         ("ETH/USDT", "futures"),
         ("ETH/USDT", "futures"),
         ("ETH/USDT", "futures"),
@@ -224,15 +226,15 @@ def test_orchestrator_updates_existing_lifecycle_without_duplicate(monkeypatch):
     first = analyze_market_horizons("BTC/USDT", provider=_provider(), now_ms=1_000, lifecycle=lifecycle)
     second = analyze_market_horizons("BTC/USDT", now_ms=2_000, lifecycle=lifecycle)
 
-    assert len(first.setups) == 3
-    assert len(second.setups) == 3
+    assert len(first.setups) == 4
+    assert len(second.setups) == 4
     assert all(item.identity is not None for item in second.setups)
     assert all(
         item.lifecycle_result is not None
         and item.lifecycle_result.status is SetupLifecycleStatus.ACTIVE
         for item in second.setups
     )
-    assert len(lifecycle.active_setups(symbol="BTC/USDT")) == 3
+    assert len(lifecycle.active_setups(symbol="BTC/USDT")) == 4
 
 
 def test_orchestrator_keeps_two_same_horizon_geometries_independent(monkeypatch):
@@ -259,7 +261,8 @@ def test_orchestrator_keeps_two_same_horizon_geometries_independent(monkeypatch)
 
     result = analyze_market_horizons("BTC/USDT", provider=_provider(), now_ms=1_000, lifecycle=lifecycle)
 
-    assert len(result.lifecycle_results) == 3
+    assert len(result.lifecycle_results) == 4
+    assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="scalping")) == 1
     assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 1
     assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="swing")) == 1
     assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="position")) == 1
@@ -277,7 +280,7 @@ def test_one_market_acquires_full_primary_snapshot_once(monkeypatch):
 
     result = analyze_market_horizons("BTC/USDT", provider=provider, now_ms=10_000_000_000)
 
-    assert len(result.results) == 3
+    assert len(result.results) == 4
     assert all(keys == ("1w", "1d", "4h", "1h", "15m", "5m") for _, keys in calls)
     assert len(provider.providers[0].ohlcv_calls) == 6
 
@@ -297,13 +300,13 @@ def test_market_diagnostics_expose_snapshot_and_horizon_timings(monkeypatch):
     assert result.diagnostics.snapshot_duration_ms >= 0
     assert [item.timeframe for item in result.diagnostics.snapshot_metrics] == ["1w", "1d", "4h", "1h", "15m", "5m"]
     assert [item.rows for item in result.diagnostics.snapshot_metrics] == [1] * 6
-    assert len(result.diagnostics.horizon_timings) == 3
+    assert len(result.diagnostics.horizon_timings) == 4
     assert all(item.duration_ms >= 0 for item in result.diagnostics.horizon_timings)
     assert all(item.setup_count == 0 for item in result.diagnostics.horizon_timings)
     assert result.diagnostics.refetched_between_horizons is False
     assert result.diagnostics.status == "completed"
     assert result.diagnostics.error == ""
-    assert len(result.diagnostics.block_timings) == 12
+    assert len(result.diagnostics.block_timings) == 16
     assert result.diagnostics.feature_duration_ms >= 0
     assert result.diagnostics.evidence_duration_ms >= 0
     assert result.diagnostics.setup_duration_ms >= 0
