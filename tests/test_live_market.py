@@ -62,15 +62,19 @@ def test_checkpoint_survives_restart(tmp_path):
     assert second.get(key) == 12345
 
 
-def test_cache_prefers_local_window_after_seed(tmp_path):
+def test_cache_prefers_local_window_after_seed(tmp_path, monkeypatch):
     provider = Provider()
     store = PersistentCandleStore(tmp_path / "raw")
     cache = LiveMarketDataCache(provider, store)
     key = MarketKey("binance", "BTC/USDT", "spot", "5m")
 
-    now_ms = int(time.time() * 1000)
     duration_ms = 5 * 60_000
+    now_ms = int(time.time() * 1000)
     current_open = (now_ms // duration_ms) * duration_ms
+    # Freeze time safely inside the current candle so the test cannot race a
+    # 5-minute boundary while the cache checks freshness.
+    fixed_now_ms = current_open + 60_000
+    monkeypatch.setattr("aicfa.live_market.time.time", lambda: fixed_now_ms / 1000)
     cache.seed(key, _frame(start=current_open - 20 * duration_ms, count=20))
     result = cache.fetch_ohlcv(
         symbol="BTC/USDT",
