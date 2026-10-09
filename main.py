@@ -139,11 +139,23 @@ def main() -> None:
         status = diagnostics.status if diagnostics is not None else "completed"
         duration_ms = diagnostics.total_duration_ms if diagnostics is not None else 0.0
         error = diagnostics.error if diagnostics is not None else ""
+        analyses = tuple(getattr(market, "results", ()) or ())
+        candidate_count = sum(
+            len(getattr(getattr(item, "setup_assessment", None), "candidates", ()) or ())
+            for item in analyses
+        )
+        decisions = ",".join(
+            f"{getattr(getattr(item, 'mode', None), 'value', getattr(item, 'mode', 'unknown'))}:"
+            f"{str(getattr(item, 'decision', 'unknown')).lower()}:"
+            f"{len(getattr(getattr(item, 'setup_assessment', None), 'candidates', ()) or ())}"
+            for item in analyses
+        ) or "none"
         suffix = f" error={error[:240]}" if error else ""
         print(
             f"AICFA scan #{state.scan_number}: {market.asset} "
             f"status={status} duration={duration_ms:.0f}ms "
-            f"setups={len(market.setups)}{suffix}",
+            f"candidates={candidate_count} active_setups={len(market.setups)} "
+            f"modes=[{decisions}]{suffix}",
             flush=True,
         )
 
