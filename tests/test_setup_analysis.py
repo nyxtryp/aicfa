@@ -395,3 +395,69 @@ def test_continuation_blocks_counter_direction_bos_but_reversal_does_not():
     assert _event_direction_conflict(
         context, scenario="reversal", direction="long", observations=observations
     ) is None
+
+def test_tp1_rejects_distant_historical_low_when_nearer_valid_low_exists():
+    from aicfa.setup_analysis import MultiTimeframeContext, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("4h", "1h", "15m"),
+        mode="intraday",
+        latest_rows={
+            "4h": row(previous_low=0.98775, atr=0.04, smc_structure_direction=-1),
+            "1h": row(previous_low=1.35, atr=0.01, smc_structure_direction=-1),
+            "15m": row(smc_structure_direction=-1),
+        },
+        observations=(),
+        structure_direction="short",
+        structure_timeframe="1h",
+        context_timeframe="4h",
+        execution_timeframe="15m",
+    )
+
+    targets = _target_levels(
+        context,
+        "short",
+        current_price=1.392,
+        preferred_timeframes=("1h", "4h"),
+        entry_timeframe="1h",
+        entry_zone=(),
+    )
+
+    assert targets
+    assert targets[0].value == 1.35
+
+
+def test_tp1_is_withheld_when_only_objective_exceeds_mode_atr_envelope():
+    from aicfa.setup_analysis import MultiTimeframeContext, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("4h", "1h", "15m"),
+        mode="intraday",
+        latest_rows={
+            "4h": row(previous_low=0.98775, atr=0.04, smc_structure_direction=-1),
+            "1h": row(atr=0.01, smc_structure_direction=-1),
+            "15m": row(smc_structure_direction=-1),
+        },
+        observations=(),
+        structure_direction="short",
+        structure_timeframe="1h",
+        context_timeframe="4h",
+        execution_timeframe="15m",
+    )
+
+    targets = _target_levels(
+        context,
+        "short",
+        current_price=1.392,
+        preferred_timeframes=("1h", "4h"),
+        entry_timeframe="1h",
+        entry_zone=(),
+    )
+
+    assert targets == ()
