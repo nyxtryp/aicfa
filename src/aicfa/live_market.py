@@ -48,6 +48,9 @@ class CandleEvent:
     key: MarketKey
     timestamp_ms: int
     observed_at_ms: int
+    high: float | None = None
+    low: float | None = None
+    close: float | None = None
 
 
 class PersistentCandleStore:
@@ -448,7 +451,15 @@ class LiveMarketCoordinator:
         if last is not None and timestamp <= last:
             return
         self.cache.update(key, observation.data)
-        event = CandleEvent(key=key, timestamp_ms=timestamp, observed_at_ms=observation.observed_at_ms)
+        candle = observation.data.iloc[-1]
+        event = CandleEvent(
+            key=key,
+            timestamp_ms=timestamp,
+            observed_at_ms=observation.observed_at_ms,
+            high=float(candle["high"]),
+            low=float(candle["low"]),
+            close=float(candle["close"]),
+        )
         self.on_candle(event)
         # Advance the durable checkpoint only after the candle was accepted by
         # the analysis pipeline. A failed analysis is replayed after restart.
