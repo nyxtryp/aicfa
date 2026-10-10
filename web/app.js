@@ -1,6 +1,6 @@
 const API_BASE="/api";
 const state={events:[],registry:[],markets:[],prices:{},filter:"ALL"};
-const ui={history:[],manualItems:[],manualView:null,selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
+const ui={history:[],manualItems:[],autoWatchItems:[],manualView:null,selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?"—":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const pick=(o,...k)=>{for(const x of k)if(o&&o[x]!=null)return o[x]};
@@ -20,7 +20,7 @@ function latest(rows){
  return [...m.values()];
 }
 function setupKey(x){return String(x.key||[x.asset,hor(x.mode),(x.setup?.scenario||""),dir(x.setup||""),x.setupTimeframe||""].join("|"))}
-function allHistory(){return [...ui.manualItems,...ui.history.filter(x=>!ui.manualItems.some(m=>m.key===x.key))]}
+function allHistory(){const used=new Set(ui.manualItems.map(x=>x.key));const automatic=ui.autoWatchItems.filter(x=>!used.has(x.key));for(const x of automatic)used.add(x.key);return [...ui.manualItems,...automatic,...ui.history.filter(x=>!used.has(x.key))]}
 function active(ms){
  const out=[],seen=new Set();
  for(const m of ms)for(const s of m.setups||[]){
@@ -31,6 +31,27 @@ function active(ms){
   }
  }
  return out;
+}
+function automaticWatchItems(markets){
+ const out=[],seen=new Set();
+ for(const m of markets||[])for(const item of m.setups||[]){
+  const c=item.candidate||item,d=dir(c),mode=hor(item.mode);
+  if(d!=="LONG"&&d!=="SHORT")continue;
+  const status=life(item.lifecycle_result);
+  if(["ACTIVE","TP1_HIT","INVALIDATED","COMPLETED","EXPIRED"].includes(status))continue;
+  if(String(item.decision_action||"wait").trim().toUpperCase()!==d)continue;
+  const entry=(c.entry_zone||[]).map(v=>Number(v.value));
+  const stop=Number(c.invalidation_level?.value),target=Number(c.target_levels?.[0]?.value);
+  if(entry.length<2||entry.some(v=>!Number.isFinite(v)||v<=0)||!Number.isFinite(stop)||!Number.isFinite(target))continue;
+  const low=Math.min(...entry),high=Math.max(...entry);
+  const valid=d==="LONG"?(stop<low&&target>high):(stop>high&&target<low);
+  if(!valid)continue;
+  const key="auto-watch|"+[m.asset,mode,c.scenario,d,entry.map(v=>v.toPrecision(10)).sort().join(","),stop.toPrecision(10)].join("|");
+  if(seen.has(key))continue;
+  seen.add(key);
+  out.push({asset:m.asset,mode,setup:c,lifecycle:"WATCH",status:"WATCH",key,seenAt:Number(m.timestamp_ms||Date.now()),market_type:m.market_type||"futures",evidence_concepts:item.evidence_concepts||[],decision_action:item.decision_action||"",suppressMarketVisual:false});
+ }
+ return out.sort((a,b)=>Number(b.seenAt||0)-Number(a.seenAt||0));
 }
 function registryItems(records){
  const latestById=new Map();
@@ -344,7 +365,10 @@ function renderCenter(){
 }
 function renderHistory(){
  const visible=allHistory().filter(x=>state.filter==="ALL"||hor(x.mode)===state.filter);
- if(visible.length&&!visible.some(x=>x.key===ui.selected))ui.selected=visible[0].key;
+ if(visible.length&&!visible.some(x=>x.key===ui.selected)){
+  ui.selected=visible[0].key;
+  if(!ui.manualView&&!ui.centerEmpty&&ui.centerKey===null)ui.centerKey=visible[0].key;
+ }
  $("#historyCount").textContent=visible.length;
  $("#setupHistory").innerHTML=visible.length?visible.map(historyCard).join(""):'<div class="rail-empty">NO SETUPS YET</div>';
 }
@@ -357,6 +381,10 @@ function renderRails(ms,rows){
 }
 function render(rows,registry){
  const p=rows[0]?.payload||{},ms=latest(rows),u=Number(p.universe_size||0),pos=Number(p.queue_position||0),pct=u?Math.min(100,pos/u*100):0;
+ // Keep directional, risk-valid candidates from autonomous scans visible as
+ // WATCH items even before lifecycle activation. They must never masquerade
+ // as ACTIVE registry setups.
+ ui.autoWatchItems=automaticWatchItems(ms);
  syncRegistry(registry);
  renderMarkets();
  $("#universe").textContent=u||"—";$("#scanned").textContent=u?pos+"/"+u:"—";$("#rotation").textContent=p.rotation_id?"#"+p.rotation_id:"—";$("#currentMarket").textContent=p.markets?.[0]?.asset||"—";
