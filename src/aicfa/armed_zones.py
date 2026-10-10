@@ -153,4 +153,27 @@ def candle_intersects_armed_zone(
     return any(high >= zone.low and low <= zone.high for zone in zones)
 
 
-__all__ = ["ArmedZone", "extract_active_smc_zones", "merge_refreshed_zones", "zones_for_trigger_timeframe", "candle_intersects_armed_zone"]
+def should_skip_zone_scan(
+    *,
+    timeframe: str,
+    ready: bool,
+    scan_in_progress: bool,
+    candle_low: float,
+    candle_high: float,
+    zones: Sequence[ArmedZone],
+) -> bool:
+    """Skip only a lower-TF candle with a valid, non-empty POI cache.
+
+    Empty/stale caches and concurrent zone refreshes fail open: missing POIs
+    must never silently suppress the canonical setup pipeline.
+    """
+    if timeframe not in {"1m", "5m"} or not ready or scan_in_progress or not zones:
+        return False
+    return not candle_intersects_armed_zone(candle_low, candle_high, zones)
+
+
+__all__ = [
+    "ArmedZone", "extract_active_smc_zones", "merge_refreshed_zones",
+    "zones_for_trigger_timeframe", "candle_intersects_armed_zone",
+    "should_skip_zone_scan",
+]
