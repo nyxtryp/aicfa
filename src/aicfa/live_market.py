@@ -398,10 +398,76 @@ class LiveMarketCoordinator:
         # the analysis pipeline. A failed analysis is replayed after restart.
         self.checkpoint.mark(key, timestamp)
 
+    @staticmethod
+    def _latest_closed_open(timeframe: str, now_ms: int) -> int:
+        if timeframe == "1w":
+            now = pd.Timestamp(now_ms, unit="ms", tz="UTC")
+            current_week_open = now.normalize() - pd.Timedelta(days=now.weekday())
+            return int((current_week_open - pd.Timedelta(days=7)).timestamp() * 1000)
+        duration_ms = timeframe_ms(timeframe)
+        return (int(now_ms) // duration_ms) * duration_ms - duration_ms
+
+    def _recover_missed_candles(self, keys: tuple[MarketKey, ...]) -> None:
+        """Fetch actual closed candles after each durable checkpoint, in order."""
+        now_ms = int(time.time() * 1000)
+        for key in keys:
+            if self._stopped.is_set():
+                return
+            last = self.checkpoint.get(key)
+            if last is None:
+                # On first startup the REST history seed supplies context; do
+                # not replay hundreds of historical candles as live events.
+                continue
+            duration_ms = timeframe_ms(key.timeframe)
+            latest_closed_open = self._latest_closed_open(key.timeframe, now_ms)
+            if last >= latest_closed_open:
+                continue
+            cursor = last + duration_ms
+            pages = 0
+            while cursor <= latest_closed_open and pages < 20 and not self._stopped.is_set():
+                try:
+                    frame = self.cache.upstream.fetch_ohlcv(
+                        symbol=key.symbol,
+                        market_type=key.market_type,
+                        timeframe=key.timeframe,
+                        since_ms=cursor,
+                        limit=500,
+                    )
+                    frame = validate_ohlcv(frame)
+                    frame = LiveMarketDataCache._closed_only(frame, key.timeframe)
+                    frame = frame.loc[frame["timestamp"] >= cursor].sort_values("timestamp")
+                except Exception as exc:
+                    print(
+                        f"AICFA candle recovery failed: {key.symbol} {key.timeframe}: "
+                        f"{type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+                    break
+                if frame.empty:
+                    break
+                newest_timestamp = cursor - duration_ms
+                for _, row in frame.iterrows():
+                    timestamp = int(row["timestamp"])
+                    if timestamp > latest_closed_open:
+                        break
+                    observation = WebSocketObservation(
+                        key=key,
+                        data=pd.DataFrame([row]).reset_index(drop=True),
+                        observed_at_ms=timestamp + duration_ms - 1,
+                    )
+                    self._submit_observation(observation)
+                    newest_timestamp = max(newest_timestamp, timestamp)
+                next_cursor = newest_timestamp + duration_ms
+                if next_cursor <= cursor:
+                    break
+                cursor = next_cursor
+                pages += 1
+
     def _stream(self, keys: tuple[MarketKey, ...]) -> None:
         # The exchange may close a stream session after a fixed lifetime. Keep
         # the worker alive and let the transport perform bounded reconnects;
-        # if that budget is exhausted, create a fresh transport session.
+        # if that budget is exhausted, repair the candle gap from REST before
+        # opening another WebSocket session.
         while not self._stopped.is_set():
             transport = BinanceWebSocketMarketDataTransport(
                 keys=keys,
@@ -415,7 +481,12 @@ class LiveMarketCoordinator:
                     if self._stopped.is_set():
                         return
                     self._submit_observation(observation)
-            except Exception:
+            except Exception as exc:
+                print(
+                    f"AICFA WebSocket stream interrupted: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                self._recover_missed_candles(keys)
                 if self._stopped.wait(2.0):
                     return
 
