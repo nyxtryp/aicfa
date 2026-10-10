@@ -276,6 +276,10 @@ class LiveMarketCoordinator:
         self.on_candle = on_candle
         self.max_workers = max_workers
         self._stopped = threading.Event()
+        # The fallback rotation is permitted only when the live candle feed
+        # has gone quiet. Seed the clock at startup so a failed initial
+        # connection eventually activates the safety net.
+        self._last_observation_received_at_ms = int(time.time() * 1000)
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="aicfa-live")
         self._threads: list[threading.Thread] = []
         self._seed_thread: threading.Thread | None = None
@@ -348,8 +352,19 @@ class LiveMarketCoordinator:
                 self._scheduled_keys.discard(key)
             raise
 
+    @property
+    def last_observation_received_at_ms(self) -> int:
+        return self._last_observation_received_at_ms
+
+    def websocket_is_stale(self, *, max_age_seconds: float = 180.0, now_ms: int | None = None) -> bool:
+        if max_age_seconds <= 0:
+            raise ValueError("max_age_seconds must be positive")
+        current = int(time.time() * 1000) if now_ms is None else int(now_ms)
+        return current - self._last_observation_received_at_ms > int(max_age_seconds * 1000)
+
     def _submit_observation(self, observation: WebSocketObservation) -> None:
         key = observation.key
+        self._last_observation_received_at_ms = int(time.time() * 1000)
         with self._dispatch_lock:
             if key in self._scheduled_keys:
                 # Per-key FIFO preserves all confirmed candles when analysis is
