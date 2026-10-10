@@ -14,23 +14,59 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: armed-zone-replay-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  read-only-vds-replay:
+  replay:
     if: github.event.pull_request.user.login == 'nyxtryp'
-    runs-on: self-hosted
-    timeout-minutes: 8
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: Replay recent persisted OHLCV candles without touching production service
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install replay dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Fetch public OHLCV fixtures from Binance
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ccxt
+          import pandas as pd
+          import time
+
+          root = Path("artifacts/replay-data/raw")
+          exchange = ccxt.binance({"enableRateLimit": True, "timeout": 20000})
+          symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT",
+                     "BNB/USDT", "DOGE/USDT", "ADA/USDT", "LINK/USDT"]
+          timeframes = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"]
+          exchange.load_markets()
+          for symbol in symbols:
+              if symbol not in exchange.markets:
+                  print(f"skip unavailable market: {symbol}")
+                  continue
+              directory = root / symbol.replace("/", "_")
+              directory.mkdir(parents=True, exist_ok=True)
+              for timeframe in timeframes:
+                  try:
+                      rows = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=500)
+                      if rows:
+                          pd.DataFrame(rows, columns=[
+                              "timestamp", "open", "high", "low", "close", "volume"
+                          ]).to_csv(directory / f"{timeframe}.csv", index=False)
+                      time.sleep(exchange.rateLimit / 1000)
+                  except Exception as exc:
+                      print(f"fetch failed {symbol} {timeframe}: {exc}")
+          PY
+      - name: Replay zone gate on isolated GitHub-hosted runner
         env:
-          AICFA_DATA_DIR: /srv/frostdeploy/aicfa/shared/data
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
           set -euo pipefail
-          test -x /srv/frostdeploy/aicfa/current/.venv/bin/python
-          timeout --signal=TERM --kill-after=10s 300s nice -n 19 \
-            /srv/frostdeploy/aicfa/current/.venv/bin/python \
-            scripts/replay_armed_zone_gate.py \
-            --data-dir "$AICFA_DATA_DIR" \
+          python scripts/replay_armed_zone_gate.py \
+            --data-dir artifacts/replay-data \
             --max-symbols 8 \
             --candles 60
