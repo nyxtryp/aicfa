@@ -22,7 +22,6 @@ from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarket
 from .find_setup import FindSetupRequest, FindSetupResult, find_setup
 from .market_data import completed_ohlcv
 from .features import build_features
-from .derivatives_market_data import FallbackDerivativesProvider
 from .market_universe import MarketUniverse
 from .setup_lifecycle import SetupIdentity, SetupLifecycle, SetupLifecycleResult
 from .trade_description import TradeDescription, build_trade_description
@@ -252,9 +251,8 @@ def analyze_market_horizons(
         if not analysis.empty:
             prefetched_analyses[timeframe] = analysis
     shared_feature_elapsed = (time.perf_counter() - feature_started) * 1000.0
-    shared_derivatives_provider = derivatives_provider
-    if market_type == "futures" and shared_derivatives_provider is None:
-        shared_derivatives_provider = FallbackDerivativesProvider()
+    # MVP SMC is based on OHLCV only. Derivatives remain an optional future
+    # experiment and are deliberately not requested by the live scanner.
 
     results: list[FindSetupResult] = []
     horizon_timings: list[HorizonTiming] = []
@@ -274,8 +272,9 @@ def analyze_market_horizons(
             resolver=resolved,
             prefetched_frames=prefetched_frames,
             prefetched_analyses=prefetched_analyses,
-            derivatives_provider=shared_derivatives_provider,
-            derivatives_venue_symbols=venue_symbols,
+            derivatives_provider=None,
+            derivatives_venue_symbols=(),
+            ohlcv_only=True,
         )
         results.append(result)
         pipeline_diagnostics = getattr(result, "diagnostics", None)
