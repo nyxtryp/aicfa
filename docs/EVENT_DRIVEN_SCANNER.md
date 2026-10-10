@@ -10,10 +10,11 @@
 - The continuous ticker stream remains separate for active setup SL/TP lifecycle checks.
 - Confirmed 15m, 1h, 4h, 1d, and 1w feature frames are cached by the full OHLCV snapshot. A 1m/5m event can reuse unchanged higher-timeframe SMC features.
 - The live SMC scan now explicitly disables derivatives, trades, and order-book collection; its input evidence is OHLCV only.
+- A bounded in-process zone cache retains active OB/FVG bounds from completed 5m+ feature frames. 1m candle events outside all cached zones are acknowledged without running the full setup pipeline; events that overlap a zone run the canonical Scalping analysis.
 
 ## Remaining architectural work
 
-- The scanner does not yet skip every unarmed symbol on 1m/5m. Higher-timeframe feature reuse is implemented, but the canonical setup pipeline still runs for each configured trigger event.
+- The 1m gate is based on the latest active OB/FVG bounds exposed by the cached feature frames. Its skip rate and false-negative behavior must be measured against historical replay before production rollout.
 - A pending setup with an explicit maximum acceptable entry and a visible `missed by price` lifecycle status is not yet implemented. Current lifecycle activation requires the execution candle to touch the entry zone.
 - Notifications are intentionally out of scope for this implementation; the priority is correct event-driven OHLCV analysis and lifecycle state.
 - Latency targets (1–3 seconds) must be measured on the production VDS under live load; they are not inferred from the design alone.
