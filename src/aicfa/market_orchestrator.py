@@ -38,7 +38,7 @@ PRIMARY_TRADING_MODES: tuple[TradingMode, ...] = (
 # Premium/Discount and OTE) do not change on every 1m/5m candle. Keep a bounded
 # process-local cache keyed by the full completed OHLCV snapshot so lower-TF
 # events reuse the last confirmed higher-TF analysis.
-_FEATURE_CACHE_TIMEFRAMES = frozenset({"15m", "1h", "4h", "1d", "1w"})
+_FEATURE_CACHE_TIMEFRAMES = frozenset({"5m", "15m", "1h", "4h", "1d", "1w"})
 _FEATURE_CACHE_MAXSIZE = 512
 _FEATURE_CACHE_LOCK = threading.RLock()
 _FEATURE_FRAME_CACHE: OrderedDict[tuple, object] = OrderedDict()
