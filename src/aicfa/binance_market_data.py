@@ -129,13 +129,17 @@ class BinanceMarketDataProvider:
 
     @staticmethod
     def _validate_limit(limit: int) -> int:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         if limit <= 0:
             raise ValueError("limit must be positive")
         if limit > _MAX_KLINE_TOTAL:
             raise ValueError(
                 f"Binance kline limit must be between 1 and {_MAX_KLINE_TOTAL}"
             )
-        return int(limit)
+        return limit
 
     @staticmethod
     def _endpoint(market_type: str) -> str:
@@ -254,6 +258,10 @@ class BinanceMarketDataProvider:
         return self._request_json(request)
 
     def fetch_trades(self, *, symbol: str, market_type: str, limit: int) -> pd.DataFrame:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         if limit <= 0 or limit > 1000:
             raise ValueError("Binance trade limit must be between 1 and 1000")
         payload = self._public_json(
@@ -303,6 +311,10 @@ class BinanceMarketDataProvider:
             rows = list(executor.map(collect, range(count)))
         return pd.DataFrame(rows, columns=_BOOK_COLUMNS)
     def fetch_order_book(self, *, symbol: str, market_type: str, limit: int = 1) -> pd.DataFrame:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         if limit <= 0 or limit > 5000:
             raise ValueError("Binance order-book limit must be between 1 and 5000")
         payload = self._public_json(
