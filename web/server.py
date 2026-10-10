@@ -86,7 +86,7 @@ def _journal_payload(path: str, query: dict[str, list[str]]) -> bytes:
     elif path == "/api/journal/trade-monitor":
         from aicfa.setup_registry import REGISTRY_REVISION
         registry = SetupRegistry.from_env()
-        records = registry.read() if registry is not None else {}
+        records = registry._current_revision_records() if registry is not None else {}
         # STALE means evidence went quiet, not that a TP/SL outcome was reached.
         setups = [
             record for record in records.values()
