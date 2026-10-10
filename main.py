@@ -73,6 +73,10 @@ def main() -> None:
         # Do not activate the gate if the scan did not expose completed feature
         # frames; fail open rather than risk dropping a valid confirmation.
         if not analyses:
+            # Stale zone geometry must never suppress a valid candle event.
+            with armed_zone_lock:
+                armed_zone_cache.pop((key.market_type, key.symbol), None)
+                armed_zone_ready.discard((key.market_type, key.symbol))
             return
         zones = extract_active_smc_zones(analyses)
         cache_key = (key.market_type, key.symbol)
