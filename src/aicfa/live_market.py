@@ -693,7 +693,9 @@ class LiveMarketCoordinator:
         REST requests are scheduled only at the close cadence of each timeframe.
         This is a candle-event fallback, not a per-symbol analysis rotation.
         """
-        trigger_timeframes = tuple(LIVE_CANDLE_MODE_TRIGGERS)
+        # Poll context timeframes too: daily/weekly closes refresh SMC zones even
+        # though only the five trigger timeframes launch a trading profile.
+        trigger_timeframes = tuple(self.monitored_timeframes)
         last_polled_bucket: dict[str, int] = {}
         while not self._stopped.is_set():
             now_ms = int(time.time() * 1000)
