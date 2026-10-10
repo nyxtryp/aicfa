@@ -46,6 +46,17 @@ def test_parse_binance_websocket_accepts_only_closed_kline():
     assert observation.observed_at_ms == 1700000059999
 
 
+def test_parse_binance_futures_symbol_strips_ccxt_settlement_suffix():
+    key = MarketKey("binance", "1000PEPE/USDT:USDT", "futures", "1m")
+
+    observation = parse_binance_kline_message(
+        _message(symbol="1000PEPEUSDT"), key
+    )
+
+    assert observation is not None
+    assert observation.key == key
+
+
 def test_parse_binance_websocket_rejects_invalid_payload():
     key = MarketKey("binance", "BTC/USDT", "spot", "1m")
 
