@@ -78,6 +78,17 @@ def extract_active_smc_zones(
     return tuple(unique.values())
 
 
+def merge_refreshed_zones(
+    existing: Sequence[ArmedZone],
+    refreshed: Sequence[ArmedZone],
+    refreshed_timeframes: Sequence[str],
+) -> tuple[ArmedZone, ...]:
+    """Replace only the timeframes present in a new analysis snapshot."""
+    refreshed_set = set(refreshed_timeframes)
+    retained = tuple(zone for zone in existing if zone.timeframe not in refreshed_set)
+    return retained + tuple(refreshed)
+
+
 def zones_for_trigger_timeframe(
     zones: Sequence[ArmedZone],
     trigger_timeframe: str,
@@ -100,4 +111,4 @@ def candle_intersects_armed_zone(
     return any(high >= zone.low and low <= zone.high for zone in zones)
 
 
-__all__ = ["ArmedZone", "extract_active_smc_zones", "zones_for_trigger_timeframe", "candle_intersects_armed_zone"]
+__all__ = ["ArmedZone", "extract_active_smc_zones", "merge_refreshed_zones", "zones_for_trigger_timeframe", "candle_intersects_armed_zone"]
