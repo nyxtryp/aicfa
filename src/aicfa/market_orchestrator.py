@@ -136,7 +136,7 @@ def _acquire_primary_snapshot(
             register(asset, venue_symbols, market_type=market_type)
     symbol = str(shared.resolve_symbol(asset, market_type=market_type))
     limits = _primary_snapshot_limits(modes)
-    primary_timeframes = ("1w", "1d", "4h", "1h", "15m", "5m")
+    primary_timeframes = ("1w", "1d", "4h", "1h", "15m", "5m", "1m")
     timeframes = tuple(timeframe for timeframe in primary_timeframes if timeframe in limits)
     snapshot = shared.fetch_ohlcv_snapshot(
         symbol=symbol,
