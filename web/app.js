@@ -48,6 +48,11 @@ function automaticWatchItems(markets){
   const low=Math.min(...entry),high=Math.max(...entry);
   const valid=d==="LONG"?(stop<low&&target>high):(stop>high&&target<low);
   if(!valid)continue;
+  const risk=d==="LONG"?low-stop:stop-high;
+  const reward=d==="LONG"?target-high:low-target;
+  // A candidate with no actionable first-target RR is analysis-only, not a
+  // setup worth surfacing in the live queue.
+  if(risk<=0||reward<=0||reward/risk<2.0)continue;
   // Entry coordinates can move a few ticks as the same OB/FVG is refreshed.
   // They are not a new signal identity; update the latest candidate in place.
   const key="auto-watch|"+[m.asset,mode,c.scenario,d].join("|");
