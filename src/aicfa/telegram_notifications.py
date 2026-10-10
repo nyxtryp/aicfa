@@ -191,7 +191,7 @@ class TelegramSetupNotifier:
             except Exception as exc:
                 print(
                     f"AICFA Telegram delivery failed; durable retry queued: "
-                    f"{type(exc).__name__}: {exc}",
+                    f"{type(exc).__name__} (details redacted)",
                     flush=True,
                 )
                 time.sleep(2.0)

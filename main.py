@@ -106,6 +106,10 @@ def main() -> None:
         market = state.result.markets[0]
         diagnostics = market.diagnostics
         status = str(diagnostics.status if diagnostics else "completed").lower()
+        engine.last_automatic_scan_at_ms = int(state.scanned_at_ms)
+        engine.last_automatic_scan_asset = market.asset
+        engine.last_automatic_scan_status = status
+        engine.last_automatic_scan_error = diagnostics.error if diagnostics else ""
         print(
             f"AICFA live candle: {market.asset} {key.timeframe} "
             f"status={status} setups={len(market.setups)}",
