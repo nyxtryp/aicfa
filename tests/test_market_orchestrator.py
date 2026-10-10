@@ -281,7 +281,7 @@ def test_one_market_acquires_full_primary_snapshot_once(monkeypatch):
     result = analyze_market_horizons("BTC/USDT", provider=provider, now_ms=10_000_000_000)
 
     assert len(result.results) == 4
-    assert all(keys == ("1w", "1d", "4h", "1h", "15m", "5m") for _, keys in calls)
+    assert all(keys == ("1w", "1d", "4h", "1h", "15m", "5m", "1m") for _, keys in calls)
     assert len(provider.providers[0].ohlcv_calls) == 7
 
 
@@ -347,4 +347,4 @@ def test_one_market_computes_primary_features_once(monkeypatch):
 
     analyze_market_horizons("BTC/USDT", provider=provider, now_ms=1000)
 
-    assert len(calls) == 6
+    assert len(calls) == 7
