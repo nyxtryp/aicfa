@@ -3,8 +3,6 @@ name: AICFA VDS Control
 on:
   issue_comment:
     types: [created]
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -12,14 +10,14 @@ permissions:
 
 jobs:
   control:
-    if: ${{ (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.comment.author_association == 'OWNER' && github.event.comment.body != '/aicfa tests') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[seed-candles]')) }}
+    if: github.event.issue.pull_request == null && github.event.comment.author_association == 'OWNER' && github.event.comment.body != '/aicfa tests'
     runs-on: self-hosted
     steps:
       - name: Run allowed command and report result
         env:
-          COMMAND: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[seed-candles]') && '/aicfa seed-candles' || github.event.comment.body }}
+          COMMAND: ${{ github.event.comment.body }}
           GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event_name == 'push' && '2' || github.event.issue.number }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
           REPO: ${{ github.repository }}
         run: |
           set +e
