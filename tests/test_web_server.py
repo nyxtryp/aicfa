@@ -169,6 +169,28 @@ def test_trade_monitor_api_returns_all_current_revision_lifecycles_and_keeps_mod
             "closed_at_ms": 300,
             "setup": {"candidate": {"direction": "short", "entry_zone": [], "target_levels": []}},
         },
+        "SOL|INTRADAY": {
+            "strategy_revision": REGISTRY_REVISION,
+            "setup_id": "SOL|INTRADAY",
+            "asset": "SOL/USDT",
+            "mode": "intraday",
+            "direction": "LONG",
+            "status": "ACTIVE",
+            "created_at_ms": 80,
+            "last_seen_at_ms": 250,
+            "setup": {"candidate": {"direction": "long", "entry_zone": [], "target_levels": []}},
+        },
+        "DOGE|SWING": {
+            "strategy_revision": REGISTRY_REVISION,
+            "setup_id": "DOGE|SWING",
+            "asset": "DOGE/USDT",
+            "mode": "swing",
+            "direction": "SHORT",
+            "status": "INVALIDATED",
+            "created_at_ms": 60,
+            "closed_at_ms": 280,
+            "setup": {"candidate": {"direction": "short", "entry_zone": [], "target_levels": []}},
+        },
         "STALE|SWING": {
             "strategy_revision": REGISTRY_REVISION,
             "setup_id": "STALE|SWING",
@@ -192,6 +214,6 @@ def test_trade_monitor_api_returns_all_current_revision_lifecycles_and_keeps_mod
     payload = json.loads(server._journal_payload("/api/journal/trade-monitor", {}))
     records = payload["setups"]
 
-    assert {item["mode"] for item in records} == {"scalping", "position"}
-    assert {item["status"] for item in records} == {"ACTIVE", "COMPLETED"}
+    assert {item["mode"] for item in records} == {"scalping", "intraday", "swing", "position"}
+    assert {item["status"] for item in records} == {"ACTIVE", "COMPLETED", "INVALIDATED"}
     assert next(item for item in records if item["status"] == "COMPLETED")["closed_at_ms"] == 300
