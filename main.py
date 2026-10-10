@@ -26,7 +26,8 @@ from aicfa.data_requirements import TradingMode
 from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS
 from aicfa.market_universe import load_market_universe
 from aicfa.market_control import serve_control
-from aicfa.market_data import MarketKey
+from aicfa.market_data import MarketKey, completed_ohlcv
+from aicfa.market_orchestrator import _cached_build_features
 from aicfa.public_market_data import build_public_market_data_provider
 
 
@@ -63,6 +64,7 @@ def main() -> None:
     armed_zone_cache: dict[tuple[str, str], tuple[object, ...]] = {}
     armed_zone_ready: set[tuple[str, str]] = set()
     zone_scan_counts: dict[tuple[str, str], int] = {}
+    zone_refresh_counts: dict[tuple[str, str], int] = {}
 
     def _refresh_armed_zones(market, key) -> None:
         analyses = {}
@@ -92,6 +94,65 @@ def main() -> None:
             )
             armed_zone_ready.add(cache_key)
 
+    def _refresh_closed_timeframe_zone(key) -> None:
+        """Refresh the just-closed TF's POIs even when its setup scan is gated.
+
+        Without this step, a 5m candle that fails the 15m+ zone gate could
+        never publish a newly formed 5m FVG/OB for the following 1m events.
+        The feature cache is shared with the canonical scan, so a candle that
+        subsequently passes the gate does not pay for a second feature build.
+        """
+        if key.timeframe not in {"5m", "15m", "1h", "4h", "1d", "1w"}:
+            return
+        cache_key = (key.market_type, key.symbol)
+        with armed_zone_lock:
+            zone_refresh_counts[cache_key] = zone_refresh_counts.get(cache_key, 0) + 1
+        try:
+            coordinator = coordinator_holder.get("coordinator")
+            if coordinator is None:
+                return
+            frame = coordinator.cache.frame(key)
+            if frame is None or frame.empty:
+                return
+            completed = completed_ohlcv(
+                frame,
+                timeframe=key.timeframe,
+                now_ms=int(time.time() * 1000),
+            )
+            if completed.empty:
+                return
+            analysis = _cached_build_features(
+                key.symbol, key.market_type, key.timeframe, completed
+            )
+            refreshed = extract_active_smc_zones(
+                {key.timeframe: analysis},
+                source_timeframes=(key.timeframe,),
+            )
+            with armed_zone_lock:
+                armed_zone_cache[cache_key] = merge_refreshed_zones(
+                    armed_zone_cache.get(cache_key, ()),
+                    refreshed,
+                    (key.timeframe,),
+                )
+                armed_zone_ready.add(cache_key)
+        except Exception as exc:
+            # A failed lightweight refresh must never let stale zones suppress
+            # a valid confirmation. Fail open until a successful full scan.
+            with armed_zone_lock:
+                armed_zone_ready.discard(cache_key)
+            print(
+                f"AICFA zone refresh failed: {key.symbol} {key.timeframe}: "
+                f"{type(exc).__name__}: {exc}; scan gate disabled",
+                flush=True,
+            )
+        finally:
+            with armed_zone_lock:
+                remaining = zone_refresh_counts.get(cache_key, 1) - 1
+                if remaining <= 0:
+                    zone_refresh_counts.pop(cache_key, None)
+                else:
+                    zone_refresh_counts[cache_key] = remaining
+
     def _on_candle(event) -> None:
         engine = engine_holder["engine"]
         key = event.key
@@ -99,10 +160,17 @@ def main() -> None:
         if not modes:
             return
         cache_key = (key.market_type, key.symbol)
+        # Update this candle's own timeframe POIs before considering a skip.
+        # Concurrent events for the same symbol fail open while the cache is
+        # being refreshed, so a stale snapshot cannot hide a valid signal.
+        _refresh_closed_timeframe_zone(key)
         with armed_zone_lock:
             ready = cache_key in armed_zone_ready
             zones = armed_zone_cache.get(cache_key, ())
-            scan_in_progress = zone_scan_counts.get(cache_key, 0) > 0
+            scan_in_progress = (
+                zone_scan_counts.get(cache_key, 0) > 0
+                or zone_refresh_counts.get(cache_key, 0) > 0
+            )
             gate_zones = zones_for_trigger_timeframe(zones, key.timeframe)
             should_skip = (
                 key.timeframe in {"1m", "5m"}
