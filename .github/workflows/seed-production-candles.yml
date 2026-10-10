@@ -1,0 +1,90 @@
+name: AICFA Production Candle Seed
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  seed:
+    if: ${{ contains(github.event.head_commit.message, '[seed-candles]') }}
+    runs-on: self-hosted
+    timeout-minutes: 75
+    steps:
+      - name: Wait for deployment, seed the production cache, and report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set +e
+          OUTPUT=$(mktemp)
+          trap 'rm -f "$OUTPUT"' EXIT
+          RC=0
+          {
+            echo "=== wait for FrostDeploy to activate the release ==="
+            for attempt in $(seq 1 60); do
+              if [ -f /srv/frostdeploy/aicfa/current/scripts/seed_live_candle_store.py ]; then
+                break
+              fi
+              sleep 10
+            done
+
+            if [ ! -f /srv/frostdeploy/aicfa/current/scripts/seed_live_candle_store.py ]; then
+              echo "Seed script did not appear in FrostDeploy current within 10 minutes."
+              echo "The live service was not stopped."
+              RC=91
+            else
+              cd /srv/frostdeploy/aicfa/current
+              export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+              export AICFA_DATA_DIR="${AICFA_DATA_DIR:-/srv/frostdeploy/aicfa/shared/data}"
+              echo "release: $(readlink -f /srv/frostdeploy/aicfa/current)"
+              echo "data_dir: $AICFA_DATA_DIR"
+
+              systemctl stop fd-aicfa
+              STOP_RC=$?
+              if [ "$STOP_RC" -eq 0 ]; then
+                timeout --signal=TERM --kill-after=30s 3600s .venv/bin/python scripts/seed_live_candle_store.py --workers 4
+                SEED_RC=$?
+              else
+                SEED_RC=90
+                echo "Could not stop fd-aicfa safely; refusing concurrent writes."
+              fi
+
+              systemctl start fd-aicfa
+              START_RC=$?
+              echo "seed_exit_code: $SEED_RC"
+              echo "service_start_exit_code: $START_RC"
+              systemctl is-active fd-aicfa || true
+              if [ "$SEED_RC" -ne 0 ]; then RC=$SEED_RC; fi
+              if [ "$START_RC" -ne 0 ]; then RC=92; fi
+            fi
+            echo "overall_exit_code: $RC"
+          } >"$OUTPUT" 2>&1
+
+          python3 - "$OUTPUT" "$REPO" "$GH_TOKEN" <<'PY'
+          import json, sys, urllib.request
+          path, repo, token = sys.argv[1:]
+          with open(path, encoding="utf-8", errors="replace") as handle:
+              output = handle.read()
+          if len(output) > 6000:
+              output = output[-6000:]
+          body = "### AICFA production candle seed result\n\n" + chr(96)*3 + "text\n" + output.replace(chr(96)*3, "'''") + "\n" + chr(96)*3
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/issues/2/comments",
+              data=json.dumps({"body": body}).encode(),
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "Content-Type": "application/json",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=20) as response:
+              response.read()
+          PY
+
+          exit "$RC"
