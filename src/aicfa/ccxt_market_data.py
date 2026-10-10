@@ -19,7 +19,13 @@ _TRADE_COLUMNS = ("timestamp", "price", "volume", "side")
 _BOOK_COLUMNS = ("timestamp", "bid_price", "bid_size", "ask_price", "ask_size")
 
 
-_LOT_MULTIPLIER_PREFIXES = ("1000000", "100000", "10000", "1000")
+_LOT_MULTIPLIER_PREFIXES = ("1000000", "100000", "10000", "1000", "1M")
+_BASE_SYMBOL_ALIASES = {
+    # Common exchange ticker differences after asset migrations/rebrands.
+    "BTC": ("XBT",),
+    "POL": ("MATIC",),
+    "RENDER": ("RNDR",),
+}
 
 
 def _is_lot_multiplier_alias(market_base: str, canonical_base: str) -> bool:
@@ -136,8 +142,10 @@ class CcxtMarketDataProvider:
             # contract symbol. Exact base matches always win over multipliers.
             if market_base == base_asset:
                 candidates.append((0, market))
-            elif market_type == "futures" and _is_lot_multiplier_alias(market_base, base_asset):
+            elif market_base in _BASE_SYMBOL_ALIASES.get(base_asset, ()):
                 candidates.append((1, market))
+            elif market_type == "futures" and _is_lot_multiplier_alias(market_base, base_asset):
+                candidates.append((2, market))
         if not candidates:
             normalized = f"{base_asset}{quote}"
             raise ValueError(
