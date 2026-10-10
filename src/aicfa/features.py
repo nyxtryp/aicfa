@@ -133,8 +133,10 @@ def build_features(
     fvg=build_fvg(x)
     out = _merge_columns(out, fvg, ["fvg_bullish","fvg_bearish","fvg","fvg_size","fvg_size_pct",
                     "fvg_displacement_bullish","fvg_displacement_bearish","fvg_mitigated",
-                    "fvg_filled","fvg_invalidated","fvg_active","fvg_bullish_low",
-                    "fvg_bullish_high","fvg_bearish_low","fvg_bearish_high"])
+                    "fvg_filled","fvg_invalidated","fvg_active",
+                    "fvg_active_bullish_count","fvg_active_bearish_count",
+                    "fvg_bullish_state","fvg_bearish_state",
+                    "fvg_bullish_low","fvg_bullish_high","fvg_bearish_low","fvg_bearish_high"])
 
     from .order_blocks import build_order_blocks
     order_blocks=build_order_blocks(x)
