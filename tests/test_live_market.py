@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS, WINDOWS
+from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS, WINDOWS, BINANCE_WS_MAX_STREAMS, BINANCE_WS_ROTATE_SECONDS, chunk_market_keys
 from aicfa.market_data import MarketKey
 from aicfa.websocket_market_data import WebSocketObservation
 
@@ -233,3 +233,60 @@ def test_failed_candle_processing_is_retried_without_losing_event(tmp_path, monk
     assert recovered.wait(3)
     coordinator.stop()
     assert attempts == [1, 1]
+
+
+
+def test_binance_market_keys_are_split_into_groups_of_at_most_200():
+    keys = tuple(
+        MarketKey("binance", f"COIN{i}/USDT", "spot", "1m")
+        for i in range(405)
+    )
+    chunks = chunk_market_keys(keys)
+    assert [len(chunk) for chunk in chunks] == [200, 200, 5]
+    assert tuple(key for chunk in chunks for key in chunk) == keys
+    assert max(map(len, chunks)) <= BINANCE_WS_MAX_STREAMS
+    assert BINANCE_WS_ROTATE_SECONDS == 23 * 60 * 60
+
+
+def test_binance_market_key_chunking_deduplicates_and_validates_size():
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    assert chunk_market_keys((key, key)) == ((key,),)
+    import pytest
+    with pytest.raises(ValueError, match="max_streams"):
+        chunk_market_keys((key,), max_streams=0)
+
+
+
+def test_live_coordinator_does_not_mark_failed_rest_gap_recovery_complete(tmp_path, monkeypatch):
+    class BrokenRecoveryProvider(Provider):
+        def fetch_ohlcv(self, *, symbol, market_type, timeframe, since_ms, limit):
+            raise ConnectionError("REST unavailable")
+
+    coordinator = LiveMarketCoordinator(
+        SimpleNamespace(markets=()),
+        provider=BrokenRecoveryProvider(),
+        data_dir=tmp_path / "data",
+        on_candle=lambda event: None,
+    )
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    monkeypatch.setattr(coordinator.checkpoint, "get", lambda _key: 1)
+
+    assert coordinator._recover_missed_candles((key,)) is False
+    coordinator.stop()
+
+
+def test_live_coordinator_accepts_recovery_when_checkpoint_is_current(tmp_path, monkeypatch):
+    coordinator = LiveMarketCoordinator(
+        SimpleNamespace(markets=()),
+        provider=Provider(),
+        data_dir=tmp_path / "data",
+        on_candle=lambda event: None,
+    )
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    fixed_now_ms = int(time.time() * 1000)
+    monkeypatch.setattr("aicfa.live_market.time.time", lambda: fixed_now_ms / 1000)
+    latest = coordinator._latest_closed_open(key.timeframe, fixed_now_ms)
+    monkeypatch.setattr(coordinator.checkpoint, "get", lambda _key: latest)
+
+    assert coordinator._recover_missed_candles((key,)) is True
+    coordinator.stop()

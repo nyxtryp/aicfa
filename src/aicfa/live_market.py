@@ -32,6 +32,20 @@ LIVE_CANDLE_MODE_TRIGGERS: dict[str, tuple[TradingMode, ...]] = {
 }
 
 
+BINANCE_WS_MAX_STREAMS = 200
+BINANCE_WS_ROTATE_SECONDS = 23 * 60 * 60
+
+
+def chunk_market_keys(keys: Sequence[MarketKey], *, max_streams: int = BINANCE_WS_MAX_STREAMS) -> tuple[tuple[MarketKey, ...], ...]:
+    """Split unique market keys into Binance-safe connection-sized groups."""
+    if max_streams <= 0:
+        raise ValueError("max_streams must be positive")
+    # Repeated setups can reference the same symbol/timeframe. Subscribe once;
+    # the durable candle checkpoint handles duplicate events across sockets.
+    values = tuple(dict.fromkeys(keys))
+    return tuple(values[offset:offset + max_streams] for offset in range(0, len(values), max_streams))
+
+
 WINDOWS: dict[str, int] = {
     "1m": 500,
     "5m": 500,
@@ -487,12 +501,17 @@ class LiveMarketCoordinator:
         duration_ms = timeframe_ms(timeframe)
         return (int(now_ms) // duration_ms) * duration_ms - duration_ms
 
-    def _recover_missed_candles(self, keys: tuple[MarketKey, ...]) -> None:
-        """Fetch actual closed candles after each durable checkpoint, in order."""
+    def _recover_missed_candles(self, keys: tuple[MarketKey, ...]) -> bool:
+        """Fetch actual closed candles after each durable checkpoint, in order.
+
+        Return False on any incomplete gap; the caller must not resume WebSocket
+        delivery until REST recovery succeeds, or the next candle could advance
+        the checkpoint past missing history.
+        """
         now_ms = int(time.time() * 1000)
         for key in keys:
             if self._stopped.is_set():
-                return
+                return False
             last = self.checkpoint.get(key)
             if last is None:
                 # On first startup the REST history seed supplies context; do
@@ -504,7 +523,7 @@ class LiveMarketCoordinator:
                 continue
             cursor = last + duration_ms
             pages = 0
-            while cursor <= latest_closed_open and pages < 20 and not self._stopped.is_set():
+            while cursor <= latest_closed_open and not self._stopped.is_set():
                 try:
                     frame = self.cache.upstream.fetch_ohlcv(
                         symbol=key.symbol,
@@ -522,9 +541,9 @@ class LiveMarketCoordinator:
                         f"{type(exc).__name__}: {exc}",
                         flush=True,
                     )
-                    break
+                    return False
                 if frame.empty:
-                    break
+                    return False
                 newest_timestamp = cursor - duration_ms
                 for _, row in frame.iterrows():
                     timestamp = int(row["timestamp"])
@@ -539,22 +558,25 @@ class LiveMarketCoordinator:
                     newest_timestamp = max(newest_timestamp, timestamp)
                 next_cursor = newest_timestamp + duration_ms
                 if next_cursor <= cursor:
-                    break
+                    return False
                 cursor = next_cursor
                 pages += 1
+        return True
 
     def _stream(self, keys: tuple[MarketKey, ...]) -> None:
-        # The exchange may close a stream session after a fixed lifetime. Keep
-        # the worker alive and let the transport perform bounded reconnects;
-        # if that budget is exhausted, repair the candle gap from REST before
-        # opening another WebSocket session.
+        # The exchange may close a stream session after a fixed lifetime. The
+        # transport deliberately surfaces disconnects and 23-hour rotations;
+        # repair the candle gap from REST before opening the next WebSocket.
         while not self._stopped.is_set():
             transport = BinanceWebSocketMarketDataTransport(
                 keys=keys,
                 state_store=None,
                 timeout_seconds=10.0,
-                max_reconnects=20,
+                # Surface disconnects and planned rotation so REST repairs the
+                # candle gap before a new session starts.
+                max_reconnects=0,
                 reconnect_backoff_seconds=1.0,
+                connection_max_age_seconds=BINANCE_WS_ROTATE_SECONDS,
             )
             try:
                 for observation in transport.stream():
@@ -566,8 +588,15 @@ class LiveMarketCoordinator:
                     f"AICFA WebSocket stream interrupted: {type(exc).__name__}: {exc}",
                     flush=True,
                 )
-                self._recover_missed_candles(keys)
-                if self._stopped.wait(2.0):
+                # Do not reconnect to live candles while a historical gap is
+                # still unresolved: otherwise the next event could advance the
+                # durable checkpoint beyond missing candles.
+                while not self._stopped.is_set():
+                    if self._recover_missed_candles(keys):
+                        break
+                    if self._stopped.wait(2.0):
+                        return
+                if self._stopped.is_set() or self._stopped.wait(2.0):
                     return
 
     def start(self) -> None:
@@ -640,17 +669,14 @@ class LiveMarketCoordinator:
 
         self._resolved_market_keys = tuple(resolved_pairs)
 
-        # Six candle timeframes per market => 900 streams at 150 markets.
-        # Keep each connection below Binance's 1024-stream ceiling and open a
-        # second connection automatically as the configured universe grows.
-        chunk_size = 900
+        # Keep each socket at or below 200 subscriptions. Candle intervals count
+        # as separate streams; split spot and futures independently.
         for market_type, keys in by_market_type.items():
-            for offset in range(0, len(keys), chunk_size):
-                chunk = tuple(keys[offset:offset + chunk_size])
+            for chunk_index, chunk in enumerate(chunk_market_keys(keys), start=1):
                 thread = threading.Thread(
                     target=self._stream,
                     args=(chunk,),
-                    name=f"aicfa-ws-{market_type}-{offset // chunk_size + 1}",
+                    name=f"aicfa-ws-{market_type}-{chunk_index}",
                     daemon=True,
                 )
                 self._threads.append(thread)
@@ -693,13 +719,21 @@ class BinancePriceMonitor:
             connection = None
             try:
                 connection = default_websocket_connector(self._url(keys[0]), timeout=10.0)
+                connected_at = time.monotonic()
                 connection.send(json.dumps({
                     "method": "SUBSCRIBE",
                     "params": [self._stream_name(key) for key in keys],
                     "id": 2,
                 }))
                 while not self._stopped.is_set():
+                    if time.monotonic() - connected_at >= BINANCE_WS_ROTATE_SECONDS:
+                        # Tickers are current-state observations; rotate proactively.
+                        break
                     payload = json.loads(connection.recv())
+                    if isinstance(payload, dict) and payload.get("code") is not None:
+                        raise RuntimeError(
+                            f"Binance price-stream subscription error: {payload.get('code')}: {payload.get('msg', '')}"
+                        )
                     if isinstance(payload, dict) and "data" in payload:
                         payload = payload["data"]
                     if not isinstance(payload, dict) or payload.get("e") != "24hrMiniTicker":
@@ -730,14 +764,15 @@ class BinancePriceMonitor:
         for key in self.keys:
             by_market_type.setdefault(key.market_type, []).append(key)
         for market_type, keys in by_market_type.items():
-            thread = threading.Thread(
-                target=self._run,
-                args=(tuple(keys),),
-                name=f"aicfa-price-{market_type}",
-                daemon=True,
-            )
-            self._threads.append(thread)
-            thread.start()
+            for chunk_index, chunk in enumerate(chunk_market_keys(keys), start=1):
+                thread = threading.Thread(
+                    target=self._run,
+                    args=(chunk,),
+                    name=f"aicfa-price-{market_type}-{chunk_index}",
+                    daemon=True,
+                )
+                self._threads.append(thread)
+                thread.start()
 
     def stop(self) -> None:
         self._stopped.set()
@@ -745,6 +780,9 @@ class BinancePriceMonitor:
 
 __all__ = [
     "WINDOWS",
+    "BINANCE_WS_MAX_STREAMS",
+    "BINANCE_WS_ROTATE_SECONDS",
+    "chunk_market_keys",
     "CandleEvent",
     "PersistentCandleStore",
     "LiveMarketDataCache",
