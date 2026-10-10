@@ -156,14 +156,15 @@ def main() -> None:
     def _on_candle(event) -> None:
         engine = engine_holder["engine"]
         key = event.key
+        # Structural context must refresh on daily/weekly closes too, even
+        # though those candles do not independently trigger a trading profile.
+        _refresh_closed_timeframe_zone(key)
         modes = LIVE_CANDLE_MODE_TRIGGERS.get(key.timeframe, ())
         if not modes:
             return
         cache_key = (key.market_type, key.symbol)
-        # Update this candle's own timeframe POIs before considering a skip.
         # Concurrent events for the same symbol fail open while the cache is
         # being refreshed, so a stale snapshot cannot hide a valid signal.
-        _refresh_closed_timeframe_zone(key)
         with armed_zone_lock:
             ready = cache_key in armed_zone_ready
             zones = armed_zone_cache.get(cache_key, ())
