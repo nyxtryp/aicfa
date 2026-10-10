@@ -34,7 +34,7 @@ jobs:
           from datetime import datetime, timezone
 
           base = os.environ["BASE_URL"].rstrip("/")
-          paths = ("/api/health", "/api/journal/scans?limit=5", "/api/journal/registry")
+          paths = ("/api/health", "/api/journal/scans?limit=5", "/api/journal/registry", "/api/markets")
           payloads = {}
           for path in paths:
               req = urllib.request.Request(base + path, headers={"User-Agent": "AICFA-live-probe/1.0", "Accept": "application/json"})
@@ -81,6 +81,52 @@ jobs:
           print("=== SETUP REGISTRY ===")
           print(f"registry_setups={len(setups)}")
           print(json.dumps(setups[-20:], ensure_ascii=False, indent=2)[:10000])
+          print("=== TARGETED MANUAL SCAN OF TOP GAINER ===")
+          try:
+              markets_payload = payloads.get("/api/markets", {})
+              configured = markets_payload.get("markets", []) if isinstance(markets_payload, dict) else []
+              tick_req = urllib.request.Request("https://fapi.binance.com/fapi/v1/ticker/24hr", headers={"User-Agent": "AICFA-live-probe/1.0"})
+              with urllib.request.urlopen(tick_req, timeout=10) as response:
+                  tickers = json.loads(response.read(5_000_000))
+              by_symbol = {str(item.get("symbol", "")).upper(): item for item in tickers if isinstance(item, dict)}
+              candidates = []
+              for market in configured:
+                  if not isinstance(market, dict) or market.get("market_type") != "futures":
+                      continue
+                  symbol = str(market.get("asset", "")).replace("/", "").replace(":", "").upper()
+                  ticker = by_symbol.get(symbol)
+                  if ticker is None:
+                      continue
+                  try:
+                      change = float(ticker.get("priceChangePercent"))
+                  except (TypeError, ValueError):
+                      continue
+                  candidates.append((change, market, ticker))
+              if not candidates:
+                  print("No configured market matched Binance 24h ticker symbols.")
+              else:
+                  change, selected, ticker = max(candidates, key=lambda item: item[0])
+                  idx = selected.get("index")
+                  print("selected_market=" + json.dumps({"index": idx, "asset": selected.get("asset"), "change_24h_pct": change, "lastPrice": ticker.get("lastPrice")}, ensure_ascii=False))
+                  req = urllib.request.Request(
+                      base + "/api/market-scan",
+                      data=json.dumps({"market_index": int(idx)}).encode(),
+                      headers={"User-Agent": "AICFA-live-probe/1.0", "Content-Type": "application/json", "Accept": "application/json"},
+                      method="POST",
+                  )
+                  try:
+                      with urllib.request.urlopen(req, timeout=40) as response:
+                          result = json.loads(response.read(2_000_000))
+                          setups = result.get("setups", []) if isinstance(result, dict) else []
+                          watches = result.get("watch_candidates", []) if isinstance(result, dict) else []
+                          print("manual_scan_http=" + str(response.status))
+                          print("manual_scan_summary=" + json.dumps({"keys": list(result.keys()) if isinstance(result, dict) else [], "asset": selected.get("asset"), "setups_count": len(setups), "watch_candidates_count": len(watches), "scan_number": result.get("scan_number") if isinstance(result, dict) else None, "error": result.get("error") if isinstance(result, dict) else None, "detail": result.get("detail") if isinstance(result, dict) else None}, ensure_ascii=False))
+                          print("manual_scan_setups=" + json.dumps(setups[:3], ensure_ascii=False)[:4000])
+                          print("manual_scan_watch_candidates=" + json.dumps(watches[:3], ensure_ascii=False)[:5000])
+                  except Exception as exc:
+                      print("manual_scan_error=" + type(exc).__name__ + ": " + str(exc))
+          except Exception as exc:
+              print("top_gainer_probe_error=" + type(exc).__name__ + ": " + str(exc))
           print("probe_finished_utc=" + datetime.now(timezone.utc).isoformat())
           PY
 
