@@ -32,6 +32,10 @@ class FakeExchange:
                 "symbol": "1000BONK/USDT:USDT", "base": "1000BONK", "quote": "USDT",
                 "spot": False, "contract": True, "swap": True, "future": False,
             },
+            "MATIC/USDT:USDT": {
+                "symbol": "MATIC/USDT:USDT", "base": "MATIC", "quote": "USDT",
+                "spot": False, "contract": True, "swap": True, "future": False,
+            },
         }
         return self.markets
 
@@ -60,6 +64,7 @@ def test_ccxt_adapter_resolves_spot_and_futures_and_reuses_loaded_markets():
     assert provider.resolve_symbol("TON/USDT", market_type="futures") == "TON/USDT:USDT"
     assert provider.resolve_symbol("PEPE/USDT", market_type="futures") == "1000PEPE/USDT:USDT"
     assert provider.resolve_symbol("BONK/USDT", market_type="futures") == "1000BONK/USDT:USDT"
+    assert provider.resolve_symbol("POL/USDT", market_type="futures") == "MATIC/USDT:USDT"
 
 
 def test_ccxt_adapter_normalizes_public_market_data():
