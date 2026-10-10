@@ -53,8 +53,19 @@ def _cached_build_features(
     if timeframe not in _FEATURE_CACHE_TIMEFRAMES:
         return build_features(completed)
     columns = [name for name in ("timestamp", "open", "high", "low", "close", "volume") if name in completed.columns]
-    raw_hashes = pd.util.hash_pandas_object(completed[columns], index=False).values.tobytes()
-    fingerprint = hashlib.blake2b(raw_hashes, digest_size=8).digest()
+    cache_version = completed.attrs.get("aicfa_cache_version")
+    if cache_version is not None:
+        # LiveMarketDataCache increments this generation whenever its rolling
+        # OHLCV snapshot changes. Include slice boundaries as a guard against
+        # two different requested windows sharing a generation.
+        first_ts = int(completed["timestamp"].iloc[0]) if len(completed) and "timestamp" in completed else None
+        last_ts = int(completed["timestamp"].iloc[-1]) if len(completed) and "timestamp" in completed else None
+        fingerprint = ("generation", int(cache_version), first_ts, last_ts)
+    else:
+        # Keep exact content-addressing for offline providers and test frames
+        # which do not originate from the versioned live cache.
+        raw_hashes = pd.util.hash_pandas_object(completed[columns], index=False).values.tobytes()
+        fingerprint = ("content", hashlib.blake2b(raw_hashes, digest_size=8).digest())
     key = (market_type, symbol, timeframe, len(completed), fingerprint)
     with _FEATURE_CACHE_LOCK:
         cached = _FEATURE_FRAME_CACHE.get(key)
