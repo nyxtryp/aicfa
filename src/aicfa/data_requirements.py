@@ -124,8 +124,8 @@ _MODE_PROFILES = {
     ),
     TradingMode.INTRADAY: ModeTimeframeProfile(
         TradingMode.INTRADAY,
-        ("4h", "1h", "5m", "15m"),
-        (("4h", TimeframeRole.BROADER_CONTEXT), ("1h", TimeframeRole.HIGHER_STRUCTURE), ("5m", TimeframeRole.LOWER_CONFIRMATION), ("15m", TimeframeRole.EXECUTION)),
+        ("4h", "1h", "15m", "5m"),
+        (("4h", TimeframeRole.BROADER_CONTEXT), ("1h", TimeframeRole.HIGHER_STRUCTURE), ("15m", TimeframeRole.LOWER_CONFIRMATION), ("5m", TimeframeRole.EXECUTION)),
     ),
     TradingMode.SWING: ModeTimeframeProfile(
         TradingMode.SWING,
