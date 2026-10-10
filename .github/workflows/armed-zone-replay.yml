@@ -1,0 +1,36 @@
+name: AICFA Armed-Zone Replay
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/aicfa/armed_zones.py"
+      - "src/aicfa/features.py"
+      - "src/aicfa/market_orchestrator.py"
+      - "src/aicfa/setup_lifecycle.py"
+      - "scripts/replay_armed_zone_gate.py"
+      - ".github/workflows/armed-zone-replay.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-vds-replay:
+    if: github.event.pull_request.user.login == 'nyxtryp'
+    runs-on: self-hosted
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replay recent persisted OHLCV candles without touching production service
+        env:
+          AICFA_DATA_DIR: /srv/frostdeploy/aicfa/shared/data
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          set -euo pipefail
+          test -x /srv/frostdeploy/aicfa/current/.venv/bin/python
+          timeout --signal=TERM --kill-after=10s 300s nice -n 19 \
+            /srv/frostdeploy/aicfa/current/.venv/bin/python \
+            scripts/replay_armed_zone_gate.py \
+            --data-dir "$AICFA_DATA_DIR" \
+            --max-symbols 4 \
+            --candles 30
