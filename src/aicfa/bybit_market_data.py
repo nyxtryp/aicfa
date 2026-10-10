@@ -93,13 +93,17 @@ class BybitMarketDataProvider:
 
     @staticmethod
     def _validate_limit(limit: int) -> int:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         if limit <= 0:
             raise ValueError("limit must be positive")
         if limit > _MAX_KLINE_TOTAL:
             raise ValueError(
                 f"Bybit kline limit must be between 1 and {_MAX_KLINE_TOTAL}"
             )
-        return int(limit)
+        return limit
 
     def _get(self, path: str, params: dict[str, object]) -> dict:
         request = Request(
@@ -192,6 +196,10 @@ class BybitMarketDataProvider:
         raise ValueError(f"no Bybit {quote_asset.upper()} market found for asset: {normalized}")
 
     def fetch_trades(self, *, symbol: str, market_type: str, limit: int) -> pd.DataFrame:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         max_limit = 60 if market_type == "spot" else 1000
         if limit <= 0 or limit > max_limit:
             raise ValueError(f"Bybit trade limit must be between 1 and {max_limit}")
@@ -248,6 +256,10 @@ class BybitMarketDataProvider:
             rows = list(executor.map(collect, range(count)))
         return pd.DataFrame(rows, columns=_BOOK_COLUMNS)
     def fetch_order_book(self, *, symbol: str, market_type: str, limit: int = 1) -> pd.DataFrame:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         max_limit = 50 if market_type == "spot" else 200
         if limit <= 0 or limit > max_limit:
             raise ValueError(f"Bybit order-book limit must be between 1 and {max_limit}")
