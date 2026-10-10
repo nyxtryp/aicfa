@@ -586,12 +586,12 @@ def test_superseded_opposite_bos_does_not_block_current_structure_direction():
     # permanently veto a continuation setup in the current direction.
     analyses = {
         "4h": pd.DataFrame({
-            "timestamp": [1_000_000, 2_000_000],
+            "timestamp": [1_700_000_000_000, 1_700_000_060_000],
             "smc_structure_direction": [-1, 1],
         }),
-        "1h": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
-        "15m": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
-        "5m": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+        "1h": pd.DataFrame({"timestamp": [1_700_000_060_000], "smc_structure_direction": [1]}),
+        "15m": pd.DataFrame({"timestamp": [1_700_000_060_000], "smc_structure_direction": [1]}),
+        "5m": pd.DataFrame({"timestamp": [1_700_000_060_000], "smc_structure_direction": [1]}),
     }
     observations = (
         MarketObservation(
@@ -599,7 +599,7 @@ def test_superseded_opposite_bos_does_not_block_current_structure_direction():
             timeframe="4h",
             state="observed",
             confidence=1.0,
-            evidence=("bos_down=1", "event_timestamp_ms=1000000"),
+            evidence=("bos_down=1", "event_timestamp_ms=1700000000000"),
             direction="short",
         ),
     )
@@ -623,10 +623,10 @@ def test_opposite_bos_on_latest_structure_candle_still_blocks_continuation():
     from aicfa.setup_analysis import build_multi_timeframe_context, _event_direction_conflict
 
     analyses = {
-        "4h": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
-        "1h": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
-        "15m": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
-        "5m": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+        "4h": pd.DataFrame({"timestamp": [1_700_000_060_000], "smc_structure_direction": [1]}),
+        "1h": pd.DataFrame({"timestamp": [1_700_000_060_000], "smc_structure_direction": [1]}),
+        "15m": pd.DataFrame({"timestamp": [1_700_000_060_000], "smc_structure_direction": [1]}),
+        "5m": pd.DataFrame({"timestamp": [1_700_000_060_000], "smc_structure_direction": [1]}),
     }
     observations = (
         MarketObservation(
@@ -634,7 +634,7 @@ def test_opposite_bos_on_latest_structure_candle_still_blocks_continuation():
             timeframe="4h",
             state="observed",
             confidence=1.0,
-            evidence=("bos_down=1", "event_timestamp_ms=2000000"),
+            evidence=("bos_down=1", "event_timestamp_ms=1700000060000"),
             direction="short",
         ),
     )
