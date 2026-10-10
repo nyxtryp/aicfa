@@ -47,7 +47,7 @@ def main() -> int:
     requested = {asset.upper() for asset in args.assets or []}
     markets = [
         market for market in universe.markets
-        if not requested or market.asset.upper() in requested
+        if market.asset_class == "crypto" and (not requested or market.asset.upper() in requested)
     ]
     if not markets:
         raise SystemExit("No configured markets matched --assets")
