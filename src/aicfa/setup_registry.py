@@ -179,9 +179,13 @@ class SetupRegistry:
                 # engine has actually activated it at the POI. A structural
                 # hypothesis still waiting for price to reach its entry zone
                 # must not enter the terminal setup queue.
-                if lifecycle_status not in {"active", "tp1_hit"}:
+                if lifecycle_status not in {"active", "tp1_hit", "missed_by_price"}:
                     continue
-                status = "TP1_HIT" if lifecycle_status == "tp1_hit" else "ACTIVE"
+                status = (
+                    "TP1_HIT" if lifecycle_status == "tp1_hit"
+                    else "MISSED_BY_PRICE" if lifecycle_status == "missed_by_price"
+                    else "ACTIVE"
+                )
                 payload = _jsonable(setup)
                 result = next((item for item in getattr(market, "results", ()) if getattr(item, "mode", None) == getattr(setup, "mode", None)), None)
                 if result is not None:
@@ -217,10 +221,10 @@ class SetupRegistry:
                 status = getattr(getattr(lifecycle, "status", None), "value", None)
                 record = records[key]
                 record["last_checked_at_ms"] = now_ms
-                if status in {"invalidated", "completed", "expired"}:
+                if status in {"invalidated", "completed", "expired", "missed_by_price"}:
                     record["status"] = status.upper()
                     record["lifecycle_status"] = status
-                elif status in {"active", "tp1_hit"} and record.get("status") not in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
+                elif status in {"active", "tp1_hit"} and record.get("status") not in {"INVALIDATED", "COMPLETED", "EXPIRED", "MISSED_BY_PRICE"}:
                     # Keep TP1_HIT distinct from ACTIVE: the original entry is
                     # no longer actionable once price has reached TP1, even
                     # though the setup may remain alive toward later targets.
@@ -235,7 +239,7 @@ class SetupRegistry:
                 for key, record in records.items():
                     if str(record.get("asset", "")) != str(asset):
                         continue
-                    if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
+                    if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED", "MISSED_BY_PRICE"}:
                         continue
                     if key not in market_keys and key not in active_lifecycle_keys:
                         record["status"] = "STALE"
