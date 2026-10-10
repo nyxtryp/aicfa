@@ -199,7 +199,6 @@ class BinanceWebSocketMarketDataTransport:
                     _url_for(self.keys[0]), timeout=self.timeout_seconds
                 )
                 self._subscribe(connection)
-                reconnects = 0
                 started_at = self._clock()
                 idle_deadline = (
                     started_at + self._idle_timeout_seconds
@@ -249,6 +248,12 @@ class BinanceWebSocketMarketDataTransport:
                             f"{envelope.get('code')}: {envelope.get('msg', '')}"
                         )
 
+                    # Reset the reconnect budget only after real valid traffic,
+                    # not merely after a TCP/WebSocket handshake. Otherwise a
+                    # server that accepts and immediately drops the socket can
+                    # reconnect forever without ever triggering REST recovery.
+                    reconnects = 0
+
                     # Any successfully received stream message proves that the
                     # connection is active. Open kline updates are deliberately
                     # ignored as market observations, but they still reset the
@@ -295,7 +300,7 @@ class BinanceWebSocketMarketDataTransport:
                         "Binance WebSocket reconnect budget exhausted"
                     ) from exc
                 self._sleeper(
-                    self.reconnect_backoff_seconds * (2**reconnects)
+                    min(self.reconnect_backoff_seconds * (2**reconnects), 10.0)
                 )
                 reconnects += 1
             finally:
