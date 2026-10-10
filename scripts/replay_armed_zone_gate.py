@@ -45,6 +45,20 @@ CONFIRMATION_COLUMNS = (
     "smc_sweep_low_reclaim",
     "smc_sweep_high_reclaim",
 )
+SETUP_CANDIDATE_COLUMNS = (
+    "setup_liquidity_reversal_up",
+    "setup_liquidity_reversal_down",
+    "setup_structure_continuation_up",
+    "setup_structure_continuation_down",
+    "setup_breakout_retest_up",
+    "setup_breakout_retest_down",
+    "setup_failed_breakout_up",
+    "setup_failed_breakout_down",
+    "setup_wyckoff_spring",
+    "setup_wyckoff_upthrust",
+    "setup_expansion_up",
+    "setup_expansion_down",
+)
 
 
 def _load_frames(directory: Path) -> dict[str, pd.DataFrame]:
@@ -78,15 +92,23 @@ def _latest_completed(analysis: pd.DataFrame, timeframe: str, event_close_ms: in
     return eligible.tail(1).copy()
 
 
-def _has_confirmation(row: pd.Series) -> bool:
-    for column in CONFIRMATION_COLUMNS:
+def _has_flag(row: pd.Series, columns: tuple[str, ...]) -> bool:
+    for column in columns:
         value = row.get(column, 0)
         try:
-            if float(value) > 0:
+            if float(value) != 0:
                 return True
         except (TypeError, ValueError):
             continue
     return False
+
+
+def _has_confirmation(row: pd.Series) -> bool:
+    return _has_flag(row, CONFIRMATION_COLUMNS)
+
+
+def _has_setup_candidate(row: pd.Series) -> bool:
+    return _has_flag(row, SETUP_CANDIDATE_COLUMNS)
 
 
 def replay_symbol(directory: Path, *, candles: int) -> dict | None:
@@ -100,10 +122,14 @@ def replay_symbol(directory: Path, *, candles: int) -> dict | None:
         "skipped_1m": 0,
         "confirmations_1m": 0,
         "skipped_confirmations_1m": 0,
+        "setup_candidates_1m": 0,
+        "skipped_setup_candidates_1m": 0,
         "checked_5m": 0,
         "skipped_5m": 0,
         "confirmations_5m": 0,
         "skipped_confirmations_5m": 0,
+        "setup_candidates_5m": 0,
+        "skipped_setup_candidates_5m": 0,
     }
 
     for trigger_timeframe, htf_timeframes in (
@@ -129,13 +155,18 @@ def replay_symbol(directory: Path, *, candles: int) -> dict | None:
                 float(candle["low"]), float(candle["high"]), gate_zones
             )
             confirmation = _has_confirmation(candle)
+            setup_candidate = _has_setup_candidate(candle)
             summary[f"checked_{trigger_timeframe}"] += 1
             if confirmation:
                 summary[f"confirmations_{trigger_timeframe}"] += 1
+            if setup_candidate:
+                summary[f"setup_candidates_{trigger_timeframe}"] += 1
             if not intersects:
                 summary[f"skipped_{trigger_timeframe}"] += 1
                 if confirmation:
                     summary[f"skipped_confirmations_{trigger_timeframe}"] += 1
+                if setup_candidate:
+                    summary[f"skipped_setup_candidates_{trigger_timeframe}"] += 1
 
     return summary
 
@@ -171,7 +202,9 @@ def main() -> int:
         key: sum(item[key] for item in summaries)
         for key in (
             "checked_1m", "skipped_1m", "confirmations_1m", "skipped_confirmations_1m",
+            "setup_candidates_1m", "skipped_setup_candidates_1m",
             "checked_5m", "skipped_5m", "confirmations_5m", "skipped_confirmations_5m",
+            "setup_candidates_5m", "skipped_setup_candidates_5m",
         )
     }
     for trigger in ("1m", "5m"):
