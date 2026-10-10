@@ -295,3 +295,13 @@ def test_transport_rejects_mixed_spot_and_futures_on_one_socket():
     )
     with pytest.raises(ValueError, match="same market_type"):
         BinanceWebSocketMarketDataTransport(keys=keys)
+
+
+
+def test_transport_rejects_more_than_200_subscriptions():
+    keys = tuple(
+        MarketKey("binance", f"COIN{i}/USDT", "spot", "1m")
+        for i in range(201)
+    )
+    with pytest.raises(ValueError, match="at most 200"):
+        BinanceWebSocketMarketDataTransport(keys=keys)
