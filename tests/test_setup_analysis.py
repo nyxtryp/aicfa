@@ -651,3 +651,40 @@ def test_opposite_bos_on_latest_structure_candle_still_blocks_continuation():
         direction="long",
         observations=observations,
     ) is not None
+
+
+
+def test_tp1_skips_objective_with_negligible_reward_to_risk():
+    from aicfa.setup_analysis import MultiTimeframeContext, SetupLevel, _target_levels
+
+    def row(**values):
+        return pd.Series(values)
+
+    context = MultiTimeframeContext(
+        timeframes=("4h", "1h", "15m", "5m"),
+        mode="intraday",
+        latest_rows={
+            "4h": row(atr=10.0, active_buy_liquidity_price=101.1, previous_high=112.0),
+            "1h": row(atr=10.0, active_buy_liquidity_price=101.1, previous_high=112.0),
+            "15m": row(active_buy_liquidity_price=101.1, previous_high=112.0),
+            "5m": row(active_buy_liquidity_price=101.1, previous_high=112.0),
+        },
+        observations=(),
+        structure_direction="long",
+        structure_timeframe="1h",
+        context_timeframe="4h",
+        execution_timeframe="5m",
+    )
+    entry = (SetupLevel(100.0, "15m", "OB low"), SetupLevel(101.0, "15m", "OB high"))
+    stop = SetupLevel(95.0, "15m", "protected structural low")
+
+    targets = _target_levels(
+        context, "long", current_price=100.5,
+        preferred_timeframes=("1h", "4h", "15m"),
+        entry_timeframe="15m", entry_zone=entry,
+        invalidation_level=stop,
+    )
+
+    assert targets
+    assert targets[0].value == 112.0
+    assert (targets[0].value - 101.0) / (100.0 - 95.0) >= 2.0

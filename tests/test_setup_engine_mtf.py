@@ -313,7 +313,7 @@ def test_setup_engine_uses_scenario_specific_zone_family():
     assert by_scenario["reversal"].entry_zone[0].source.startswith("active bullish FVG")
 
 
-def test_setup_engine_prefers_nearer_structural_extreme_over_farther_liquidity():
+def test_setup_engine_skips_nearer_structural_extreme_when_rr_is_unusable():
     frames = _frames(structure_4h=1, structure_15m=1, structure_1h=1)
     for tf, frame in frames.items():
         frame.loc[0, "active_buy_liquidity_price"] = float("nan")
@@ -325,8 +325,8 @@ def test_setup_engine_prefers_nearer_structural_extreme_over_farther_liquidity()
 
     result = _pipeline(frames)
     candidate = result.candidates[0]
-    assert candidate.target_levels[0].value == 106.0
-    assert candidate.target_levels[0].source == "previous high"
+    assert candidate.target_levels[0].value == 108.0
+    assert candidate.target_levels[0].source == "active buy-side liquidity"
 
 
 def test_setup_engine_can_return_second_distinct_target_after_primary_draw():

@@ -33,12 +33,14 @@ function active(ms){
  return out;
 }
 function automaticWatchItems(markets){
- const out=[],seen=new Set();
+ const latestByKey=new Map();
  for(const m of markets||[])for(const item of m.setups||[]){
   const c=item.candidate||item,d=dir(c),mode=hor(item.mode);
   if(d!=="LONG"&&d!=="SHORT")continue;
   const status=life(item.lifecycle_result);
-  if(["ACTIVE","TP1_HIT","INVALIDATED","COMPLETED","EXPIRED"].includes(status))continue;
+  // A setup that has already missed its POI or gone stale is terminal for
+  // the watch queue. It must not be resurrected as a fresh WATCH on every scan.
+  if(["ACTIVE","TP1_HIT","INVALIDATED","COMPLETED","EXPIRED","MISSED_BY_PRICE","MISSED_ENTRY","STALE"].includes(status))continue;
   if(String(item.decision_action||"wait").trim().toUpperCase()!==d)continue;
   const entry=(c.entry_zone||[]).map(v=>Number(v.value));
   const stop=Number(c.invalidation_level?.value),target=Number(c.target_levels?.[0]?.value);
@@ -46,12 +48,20 @@ function automaticWatchItems(markets){
   const low=Math.min(...entry),high=Math.max(...entry);
   const valid=d==="LONG"?(stop<low&&target>high):(stop>high&&target<low);
   if(!valid)continue;
-  const key="auto-watch|"+[m.asset,mode,c.scenario,d,entry.map(v=>v.toPrecision(10)).sort().join(","),stop.toPrecision(10)].join("|");
-  if(seen.has(key))continue;
-  seen.add(key);
-  out.push({asset:m.asset,mode,setup:c,lifecycle:"WATCH",status:"WATCH",key,seenAt:Number(m.timestamp_ms||Date.now()),market_type:m.market_type||"futures",evidence_concepts:item.evidence_concepts||[],decision_action:item.decision_action||"",suppressMarketVisual:false});
+  const risk=d==="LONG"?low-stop:stop-high;
+  const reward=d==="LONG"?target-high:low-target;
+  // A candidate with no actionable first-target RR is analysis-only, not a
+  // setup worth surfacing in the live queue.
+  if(risk<=0||reward<=0||reward/risk<2.0)continue;
+  // Entry coordinates can move a few ticks as the same OB/FVG is refreshed.
+  // They are not a new signal identity; update the latest candidate in place.
+  const key="auto-watch|"+[m.asset,mode,c.scenario,d].join("|");
+  const seenAt=Number(m.timestamp_ms||0);
+  const existing=latestByKey.get(key);
+  if(existing&&Number(existing.seenAt||0)>seenAt)continue;
+  latestByKey.set(key,{asset:m.asset,mode,setup:c,lifecycle:"WATCH",status:"WATCH",key,seenAt,market_type:m.market_type||"futures",evidence_concepts:item.evidence_concepts||[],decision_action:item.decision_action||"",suppressMarketVisual:false});
  }
- return out.sort((a,b)=>Number(b.seenAt||0)-Number(a.seenAt||0));
+ return [...latestByKey.values()].sort((a,b)=>Number(b.seenAt||0)-Number(a.seenAt||0));
 }
 function registryItems(records){
  const latestById=new Map();
