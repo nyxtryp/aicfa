@@ -264,7 +264,7 @@ class SetupRegistry:
             for key, record in records.items():
                 if str(record.get("asset", "")) in scanned_assets:
                     continue
-                if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED"}:
+                if str(record.get("status", "")).upper() in {"INVALIDATED", "COMPLETED", "EXPIRED", "MISSED_BY_PRICE"}:
                     continue
                 record["status"] = "STALE"
                 record["lifecycle_status"] = "stale"
@@ -287,7 +287,7 @@ class SetupRegistry:
             record = records[key]
             record["last_checked_at_ms"] = int(now_ms)
             record["last_lifecycle_at_ms"] = int(now_ms)
-            if status in {"active", "tp1_hit", "invalidated", "completed", "expired"}:
+            if status in {"active", "tp1_hit", "invalidated", "completed", "expired", "missed_by_price"}:
                 record["lifecycle_status"] = status
                 record["status"] = "TP1_HIT" if status == "tp1_hit" else status.upper()
                 changed = True
