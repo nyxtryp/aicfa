@@ -21,7 +21,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from aicfa.autonomous_scan import AutonomousScanEngine
-from aicfa.armed_zones import candle_intersects_armed_zone, extract_active_smc_zones
+from aicfa.armed_zones import candle_intersects_armed_zone, extract_active_smc_zones, zones_for_trigger_timeframe
 from aicfa.data_requirements import TradingMode
 from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS
 from aicfa.market_universe import load_market_universe
@@ -86,18 +86,20 @@ def main() -> None:
         if not modes:
             return
         cache_key = (key.market_type, key.symbol)
-        if key.timeframe == "1m":
+        if key.timeframe in {"1m", "5m"}:
             with armed_zone_lock:
                 ready = cache_key in armed_zone_ready
                 zones = armed_zone_cache.get(cache_key, ())
+            gate_zones = zones_for_trigger_timeframe(zones, key.timeframe)
             if ready and not candle_intersects_armed_zone(
                 event.low if event.low is not None else float("nan"),
                 event.high if event.high is not None else float("nan"),
-                zones,
+                gate_zones,
             ):
-                # A closed 1m candle outside all cached active OB/FVG zones
-                # needs no expensive setup analysis. The candle checkpoint is
-                # still acknowledged normally after this callback returns.
+                # On 1m, check active 5m+ OB/FVG zones. On 5m, only higher-TF
+                # zones can arm the full setup pipeline. The 15m refresh scan
+                # still updates the zone cache from its latest 5m/15m/HTF frames.
+                # A skipped closed candle is still checkpointed by the coordinator.
                 return
         market_index = next(
             (
