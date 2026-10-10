@@ -22,7 +22,7 @@ class MonitoredMarket:
     """
 
     asset: str
-    market_type: str = "spot"
+    market_type: str = "futures"
     asset_class: str = "crypto"
     category: str = "crypto"
     instrument_type: str | None = None
@@ -87,7 +87,7 @@ class MarketUniverse:
         cls,
         assets: Iterable[str],
         *,
-        market_type: str = "spot",
+        market_type: str = "futures",
     ) -> "MarketUniverse":
         markets = tuple(
             MonitoredMarket(asset=asset, market_type=market_type)
@@ -127,7 +127,7 @@ def load_market_universe(path: str | Path) -> MarketUniverse:
         markets.append(
             MonitoredMarket(
                 asset=str(item["asset"]),
-                market_type=str(item.get("market_type", "spot")),
+                market_type=str(item.get("market_type", "futures")),
                 asset_class=str(item.get("asset_class", "crypto")),
                 category=str(item.get("category", "crypto")),
                 instrument_type=(
