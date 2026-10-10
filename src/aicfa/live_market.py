@@ -675,7 +675,7 @@ class BinancePriceMonitor:
 
     @staticmethod
     def _stream_name(key: MarketKey) -> str:
-        symbol = key.symbol.replace("/", "").replace("-", "").lower()
+        symbol = key.symbol.split(":", 1)[0].replace("/", "").replace("-", "").replace("_", "").lower()
         return f"{symbol}@miniTicker"
 
     @staticmethod
@@ -711,7 +711,7 @@ class BinancePriceMonitor:
                     except (KeyError, TypeError, ValueError):
                         continue
                     for key in keys:
-                        expected = key.symbol.replace("/", "").replace("-", "").upper()
+                        expected = key.symbol.split(":", 1)[0].replace("/", "").replace("-", "").replace("_", "").upper()
                         if expected == symbol:
                             self.on_price(key, price, event_ms)
                             break
