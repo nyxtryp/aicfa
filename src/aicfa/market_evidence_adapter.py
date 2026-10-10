@@ -88,6 +88,21 @@ def _observation(
         if column and active
     )
     evidence = tuple(f"{column}={row[column]!r}" for column in active_columns)
+    # Preserve the event candle timestamp so setup reasoning can distinguish
+    # a still-current opposing break from one superseded by later structure.
+    event_timestamp = row.get("timestamp")
+    try:
+        if isinstance(event_timestamp, pd.Timestamp):
+            event_timestamp_ms = int(event_timestamp.value // 1_000_000)
+        else:
+            numeric_timestamp = float(event_timestamp)
+            event_timestamp_ms = int(
+                numeric_timestamp if abs(numeric_timestamp) >= 1e11
+                else numeric_timestamp * 1000
+            )
+        evidence += (f"event_timestamp_ms={event_timestamp_ms}",)
+    except (TypeError, ValueError, OverflowError):
+        pass
 
     return MarketObservation(
         concept_id=concept_id,

@@ -220,6 +220,42 @@ def _event_direction_conflict(
     def wrong(item: MarketObservation) -> str | None:
         if item.direction not in {"long", "short"} or item.direction == direction:
             return None
+
+        # The adapter records when a causal event occurred. If a later candle
+        # has already established the requested structural direction on that
+        # same timeframe, an older opposite BOS/CHoCH/MSS is historical context,
+        # not a live contradiction. Keep strict behavior for legacy observations
+        # without timestamps and for events on the latest structural candle.
+        structural_events = {
+            "market_structure.bos",
+            "market_structure.choch",
+            "market_structure.mss",
+        }
+        if item.concept_id in structural_events:
+            event_timestamp = next(
+                (
+                    value.split("=", 1)[1]
+                    for value in item.evidence
+                    if value.startswith("event_timestamp_ms=")
+                ),
+                None,
+            )
+            row = context.latest_rows.get(item.timeframe)
+            current_timestamp = _row_timestamp_ms(row) if row is not None else None
+            current_direction = _structure_direction(row) if row is not None else 0
+            try:
+                event_timestamp_ms = int(float(event_timestamp)) if event_timestamp is not None else None
+            except (TypeError, ValueError, OverflowError):
+                event_timestamp_ms = None
+            desired_state = 1 if direction == "long" else -1
+            if (
+                event_timestamp_ms is not None
+                and current_timestamp is not None
+                and current_timestamp > event_timestamp_ms
+                and current_direction == desired_state
+            ):
+                return None
+
         return (
             f"{item.timeframe} {item.concept_id}={item.direction} "
             f"conflicts with {direction} {scenario}"
