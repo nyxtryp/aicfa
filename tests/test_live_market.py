@@ -1,9 +1,12 @@
 import time
+import threading
+from types import SimpleNamespace
 
 import pandas as pd
 
-from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, WINDOWS
+from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, LiveMarketCoordinator, WINDOWS
 from aicfa.market_data import MarketKey
+from aicfa.websocket_market_data import WebSocketObservation
 
 
 def _frame(start=0, count=3):
@@ -109,3 +112,54 @@ def test_cache_refreshes_when_a_full_window_is_stale(tmp_path):
     )
 
     assert provider.calls == [("BTC/USDT", "spot", "5m", 11)]
+
+
+
+def test_live_dispatch_preserves_all_queued_closed_candles_in_order(tmp_path, monkeypatch):
+    coordinator = LiveMarketCoordinator(
+        SimpleNamespace(markets=()),
+        provider=Provider(),
+        data_dir=tmp_path / "data",
+        on_candle=lambda event: None,
+        max_workers=1,
+    )
+    first_started = threading.Event()
+    release_first = threading.Event()
+    all_processed = threading.Event()
+    processed = []
+
+    def slow_handle(observation):
+        timestamp = int(observation.data["timestamp"].iloc[0])
+        if timestamp == 1:
+            first_started.set()
+            assert release_first.wait(2)
+        processed.append(timestamp)
+        if len(processed) == 3:
+            all_processed.set()
+
+    monkeypatch.setattr(coordinator, "_handle", slow_handle)
+
+    def observation(timestamp):
+        frame = pd.DataFrame({
+            "timestamp": [timestamp],
+            "open": [100.0],
+            "high": [101.0],
+            "low": [99.0],
+            "close": [100.5],
+            "volume": [10.0],
+        })
+        return WebSocketObservation(
+            key=MarketKey("binance", "BTC/USDT", "spot", "1m"),
+            data=frame,
+            observed_at_ms=timestamp + 60_000,
+        )
+
+    coordinator._submit_observation(observation(1))
+    assert first_started.wait(1)
+    coordinator._submit_observation(observation(2))
+    coordinator._submit_observation(observation(3))
+    release_first.set()
+
+    assert all_processed.wait(2)
+    coordinator.stop()
+    assert processed == [1, 2, 3]
