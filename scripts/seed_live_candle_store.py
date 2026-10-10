@@ -45,9 +45,12 @@ def main() -> int:
     provider = build_public_market_data_provider(timeout_seconds=10.0)
     universe = load_market_universe(Path("config/market_universe.json"))
     requested = {asset.upper() for asset in args.assets or []}
+    # Seed the complete configured universe, not just crypto. The live
+    # scanner also monitors configured TradFi synthetic perpetuals via mapped
+    # venue symbols.
     markets = [
         market for market in universe.markets
-        if market.asset_class == "crypto" and (not requested or market.asset.upper() in requested)
+        if not requested or market.asset.upper() in requested
     ]
     if not markets:
         raise SystemExit("No configured markets matched --assets")
