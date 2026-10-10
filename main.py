@@ -11,6 +11,7 @@ from pathlib import Path
 import signal
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
 # Keep the source-layout package importable when FrostDeploy starts main.py
@@ -235,7 +236,8 @@ def main() -> None:
             engine.last_automatic_scan_error = diagnostics.error if diagnostics else ""
             print(
                 f"AICFA live candle: {market.asset} {key.timeframe} "
-                f"status={status} setups={len(market.setups)}",
+                f"status={status} setups={len(market.setups)} "
+                f"modes=[{_mode_diagnostics(market)}]",
                 flush=True,
             )
             # The coordinator advances the durable checkpoint only when this
@@ -335,9 +337,94 @@ def main() -> None:
             flush=True,
         )
 
-    # SIGALRM only works in Python's main thread. Run the market rotation
-    # here (rather than in a daemon worker) so a pathological market cannot
-    # block the queue for minutes. Live candle/WebSocket startup stays separate.
+    def _mode_diagnostics(market) -> str:
+        """Expose why each trading horizon did or did not produce a setup."""
+        parts = []
+        for result in getattr(market, "results", ()) or ():
+            mode = getattr(getattr(result, "mode", None), "value", getattr(result, "mode", "unknown"))
+            assessment = getattr(result, "setup_assessment", None)
+            candidates = tuple(getattr(assessment, "candidates", ()) or ())
+            reasons = tuple(getattr(assessment, "reasons", ()) or ())
+            missing = tuple(getattr(assessment, "missing_context", ()) or ())
+            decision = str(getattr(result, "decision", "unknown")).lower()
+            detail = f"{mode}:{decision}:candidates={len(candidates)}"
+            if reasons:
+                detail += f":reason={str(reasons[0])[:120]}"
+            if missing:
+                detail += f":missing={str(missing[0])[:100]}"
+            parts.append(detail)
+        return " | ".join(parts) or "no-horizon-results"
+
+    def _run_startup_scan() -> None:
+        """Analyze every configured market once on boot; don't wait for a candle."""
+        markets = tuple(universe.markets)
+        print(
+            f"AICFA startup scan: beginning one pass over {len(markets)} markets "
+            "with all four modes; live candle events remain enabled.",
+            flush=True,
+        )
+        completed = 0
+        errors = 0
+        # Keep the initial REST workload bounded so the 1m/5m event workers
+        # remain responsive. Per-market locks serialize a boot scan against a
+        # simultaneous live candle for the same symbol.
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="aicfa-startup-scan") as pool:
+            futures = {
+                pool.submit(
+                    engine.scan_market,
+                    index,
+                    rotation_id=0,
+                    queue_position=0,
+                    enforce_timeout=False,
+                    journal=True,
+                ): (index, market)
+                for index, market in enumerate(markets)
+            }
+            for future in as_completed(futures):
+                index, configured_market = futures[future]
+                try:
+                    state = future.result()
+                    market = state.result.markets[0]
+                    diagnostics = market.diagnostics
+                    status = str(diagnostics.status if diagnostics else "completed").lower()
+                    duration_ms = diagnostics.total_duration_ms if diagnostics else 0.0
+                    setup_count = len(market.setups)
+                    candidate_count = sum(
+                        len(getattr(getattr(item, "setup_assessment", None), "candidates", ()) or ())
+                        for item in (getattr(market, "results", ()) or ())
+                    )
+                    if status in {"error", "timeout"}:
+                        errors += 1
+                    else:
+                        completed += 1
+                    engine.last_automatic_scan_at_ms = int(state.scanned_at_ms)
+                    engine.last_automatic_scan_asset = market.asset
+                    engine.last_automatic_scan_status = status
+                    engine.last_automatic_scan_error = diagnostics.error if diagnostics else ""
+                    print(
+                        f"AICFA startup scan: {market.asset} ({index + 1}/{len(markets)}) "
+                        f"status={status} duration={duration_ms:.0f}ms "
+                        f"candidates={candidate_count} active_setups={setup_count} "
+                        f"modes=[{_mode_diagnostics(market)}]"
+                        + (f" error={diagnostics.error[:200]}" if diagnostics and diagnostics.error else ""),
+                        flush=True,
+                    )
+                except Exception as exc:
+                    errors += 1
+                    print(
+                        f"AICFA startup scan error: {configured_market.asset}: "
+                        f"{type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+        print(
+            f"AICFA startup scan finished: markets={len(markets)} "
+            f"completed={completed} errors={errors}. "
+            "Use the per-mode reason/missing fields above to diagnose withheld setups.",
+            flush=True,
+        )
+
+    # Startup REST analysis is a one-time baseline, not a timed rotation.
+    # Thereafter new analysis is triggered by confirmed closed candles.
     price_monitor_holder: dict[str, BinancePriceMonitor] = {}
 
     def _start_live_services() -> None:
@@ -366,6 +453,13 @@ def main() -> None:
                 monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
                 price_monitor_holder["monitor"] = monitor
                 monitor.start()
+
+            if not stop_event.is_set():
+                threading.Thread(
+                    target=_run_startup_scan,
+                    name="aicfa-startup-scan",
+                    daemon=True,
+                ).start()
         except Exception as exc:
             print(
                 f"AICFA live services startup error: {type(exc).__name__}: {exc}",
