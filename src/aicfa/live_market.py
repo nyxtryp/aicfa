@@ -32,6 +32,20 @@ LIVE_CANDLE_MODE_TRIGGERS: dict[str, tuple[TradingMode, ...]] = {
 }
 
 
+BINANCE_WS_MAX_STREAMS = 200
+BINANCE_WS_ROTATE_SECONDS = 23 * 60 * 60
+
+
+def chunk_market_keys(keys: Sequence[MarketKey], *, max_streams: int = BINANCE_WS_MAX_STREAMS) -> tuple[tuple[MarketKey, ...], ...]:
+    """Split unique market keys into Binance-safe connection-sized groups."""
+    if max_streams <= 0:
+        raise ValueError("max_streams must be positive")
+    values = tuple(keys)
+    if len(set(values)) != len(values):
+        raise ValueError("market keys contain duplicates")
+    return tuple(values[offset:offset + max_streams] for offset in range(0, len(values), max_streams))
+
+
 WINDOWS: dict[str, int] = {
     "1m": 500,
     "5m": 500,
@@ -553,8 +567,11 @@ class LiveMarketCoordinator:
                 keys=keys,
                 state_store=None,
                 timeout_seconds=10.0,
-                max_reconnects=20,
+                # Surface disconnects and planned rotation so REST repairs the
+                # candle gap before a new session starts.
+                max_reconnects=0,
                 reconnect_backoff_seconds=1.0,
+                connection_max_age_seconds=BINANCE_WS_ROTATE_SECONDS,
             )
             try:
                 for observation in transport.stream():
@@ -640,17 +657,14 @@ class LiveMarketCoordinator:
 
         self._resolved_market_keys = tuple(resolved_pairs)
 
-        # Six candle timeframes per market => 900 streams at 150 markets.
-        # Keep each connection below Binance's 1024-stream ceiling and open a
-        # second connection automatically as the configured universe grows.
-        chunk_size = 900
+        # Keep each socket at or below 200 subscriptions. Candle intervals count
+        # as separate streams; split spot and futures independently.
         for market_type, keys in by_market_type.items():
-            for offset in range(0, len(keys), chunk_size):
-                chunk = tuple(keys[offset:offset + chunk_size])
+            for chunk_index, chunk in enumerate(chunk_market_keys(keys), start=1):
                 thread = threading.Thread(
                     target=self._stream,
                     args=(chunk,),
-                    name=f"aicfa-ws-{market_type}-{offset // chunk_size + 1}",
+                    name=f"aicfa-ws-{market_type}-{chunk_index}",
                     daemon=True,
                 )
                 self._threads.append(thread)
@@ -693,13 +707,21 @@ class BinancePriceMonitor:
             connection = None
             try:
                 connection = default_websocket_connector(self._url(keys[0]), timeout=10.0)
+                connected_at = time.monotonic()
                 connection.send(json.dumps({
                     "method": "SUBSCRIBE",
                     "params": [self._stream_name(key) for key in keys],
                     "id": 2,
                 }))
                 while not self._stopped.is_set():
+                    if time.monotonic() - connected_at >= BINANCE_WS_ROTATE_SECONDS:
+                        # Tickers are current-state observations; rotate proactively.
+                        break
                     payload = json.loads(connection.recv())
+                    if isinstance(payload, dict) and payload.get("code") is not None:
+                        raise RuntimeError(
+                            f"Binance price-stream subscription error: {payload.get('code')}: {payload.get('msg', '')}"
+                        )
                     if isinstance(payload, dict) and "data" in payload:
                         payload = payload["data"]
                     if not isinstance(payload, dict) or payload.get("e") != "24hrMiniTicker":
@@ -730,14 +752,15 @@ class BinancePriceMonitor:
         for key in self.keys:
             by_market_type.setdefault(key.market_type, []).append(key)
         for market_type, keys in by_market_type.items():
-            thread = threading.Thread(
-                target=self._run,
-                args=(tuple(keys),),
-                name=f"aicfa-price-{market_type}",
-                daemon=True,
-            )
-            self._threads.append(thread)
-            thread.start()
+            for chunk_index, chunk in enumerate(chunk_market_keys(keys), start=1):
+                thread = threading.Thread(
+                    target=self._run,
+                    args=(chunk,),
+                    name=f"aicfa-price-{market_type}-{chunk_index}",
+                    daemon=True,
+                )
+                self._threads.append(thread)
+                thread.start()
 
     def stop(self) -> None:
         self._stopped.set()
@@ -745,6 +768,9 @@ class BinancePriceMonitor:
 
 __all__ = [
     "WINDOWS",
+    "BINANCE_WS_MAX_STREAMS",
+    "BINANCE_WS_ROTATE_SECONDS",
+    "chunk_market_keys",
     "CandleEvent",
     "PersistentCandleStore",
     "LiveMarketDataCache",
