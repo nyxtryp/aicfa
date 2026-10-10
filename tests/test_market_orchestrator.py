@@ -282,7 +282,7 @@ def test_one_market_acquires_full_primary_snapshot_once(monkeypatch):
 
     assert len(result.results) == 4
     assert all(keys == ("1w", "1d", "4h", "1h", "15m", "5m") for _, keys in calls)
-    assert len(provider.providers[0].ohlcv_calls) == 6
+    assert len(provider.providers[0].ohlcv_calls) == 7
 
 
 def test_market_diagnostics_expose_snapshot_and_horizon_timings(monkeypatch):
@@ -298,8 +298,8 @@ def test_market_diagnostics_expose_snapshot_and_horizon_timings(monkeypatch):
     assert result.diagnostics is not None
     assert result.diagnostics.total_duration_ms >= 0
     assert result.diagnostics.snapshot_duration_ms >= 0
-    assert [item.timeframe for item in result.diagnostics.snapshot_metrics] == ["1w", "1d", "4h", "1h", "15m", "5m"]
-    assert [item.rows for item in result.diagnostics.snapshot_metrics] == [1] * 6
+    assert [item.timeframe for item in result.diagnostics.snapshot_metrics] == ["1w", "1d", "4h", "1h", "15m", "5m", "1m"]
+    assert [item.rows for item in result.diagnostics.snapshot_metrics] == [1] * 7
     assert len(result.diagnostics.horizon_timings) == 4
     assert all(item.duration_ms >= 0 for item in result.diagnostics.horizon_timings)
     assert all(item.setup_count == 0 for item in result.diagnostics.horizon_timings)
