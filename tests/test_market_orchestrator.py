@@ -434,3 +434,38 @@ def test_five_minute_feature_cache_reuses_closed_frame_across_one_minute_events(
     assert first is second
     assert calls == [2]
     orchestrator._FEATURE_FRAME_CACHE.clear()
+
+
+def test_versioned_live_snapshot_avoids_content_hash_and_invalidates_on_generation(monkeypatch):
+    import aicfa.market_orchestrator as orchestrator
+
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+    calls = []
+
+    def fake_build_features(frame):
+        calls.append(len(frame))
+        return frame.assign(test_feature=len(calls))
+
+    monkeypatch.setattr(orchestrator, "build_features", fake_build_features)
+    frame = pd.DataFrame({
+        "timestamp": [60_000, 120_000],
+        "open": [100.0, 101.0],
+        "high": [102.0, 103.0],
+        "low": [99.0, 100.0],
+        "close": [101.0, 102.0],
+        "volume": [10.0, 12.0],
+    })
+    frame.attrs["aicfa_cache_version"] = 7
+
+    first = orchestrator._cached_build_features("BTC/USDT", "spot", "1h", frame)
+    second = orchestrator._cached_build_features("BTC/USDT", "spot", "1h", frame.copy())
+    assert first is second
+    assert calls == [2]
+
+    refreshed = frame.copy()
+    refreshed.loc[1, "close"] = 102.5
+    refreshed.attrs["aicfa_cache_version"] = 8
+    third = orchestrator._cached_build_features("BTC/USDT", "spot", "1h", refreshed)
+    assert third is not first
+    assert calls == [2, 2]
+    orchestrator._FEATURE_FRAME_CACHE.clear()
