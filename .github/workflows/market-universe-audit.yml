@@ -1,0 +1,49 @@
+name: AICFA Live Market-Universe Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - architecture/event-driven-candle-processing
+    paths:
+      - "scripts/audit_market_universe.py"
+      - "config/market_universe.json"
+      - ".github/workflows/market-universe-audit.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aicfa-market-universe-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install CCXT
+        run: python -m pip install --upgrade pip && python -m pip install ccxt
+      - name: Audit configured instruments against live exchange metadata
+        run: python scripts/audit_market_universe.py
+      - name: Publish audit summary
+        if: always()
+        run: |
+          if [ -f artifacts/market-audit/summary.md ]; then
+            cat artifacts/market-audit/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload complete audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aicfa-live-market-audit
+          path: artifacts/market-audit/
+          if-no-files-found: warn
+          retention-days: 14
