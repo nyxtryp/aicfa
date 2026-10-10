@@ -56,6 +56,12 @@ def test_bybit_rejects_invalid_kline_limit(limit):
         )
 
 
+def test_bybit_normalizes_numeric_string_kline_limit():
+    assert BybitMarketDataProvider._validate_limit("1000") == 1000
+    with pytest.raises(ValueError, match="limit must be an integer"):
+        BybitMarketDataProvider._validate_limit("not-a-number")
+
+
 def test_bybit_resolves_bare_asset_to_usdt(monkeypatch):
     provider = BybitMarketDataProvider(opener=lambda request, timeout: JsonResponse({
         "retCode": 0,
