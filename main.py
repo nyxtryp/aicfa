@@ -220,6 +220,8 @@ def main() -> None:
                     raise RuntimeError(f"closed candle has no configured market mapping: {key.symbol}")
             state = engine.scan_market(
                 market_index,
+                rotation_id=getattr(engine, "current_rotation_id", 0),
+                queue_position=getattr(engine, "current_rotation_queue_position", 0),
                 modes=modes,
                 enforce_timeout=False,
                 journal=True,
@@ -268,6 +270,10 @@ def main() -> None:
     engine.last_automatic_scan_asset = ""
     engine.last_automatic_scan_status = "not_started"
     engine.last_automatic_scan_error = ""
+    # Event-driven scans must inherit the current rotation metadata so their
+    # journal entries cannot reset the terminal's progress to 0/0.
+    engine.current_rotation_id = 1
+    engine.current_rotation_queue_position = 1
     engine_holder["engine"] = engine
 
     # Start the control plane before any live-market initialization. Manual
@@ -408,6 +414,8 @@ def main() -> None:
                     "websocket_fallback" if websocket_stale else "rotation"
                 )
                 market_index = rotation_index % len(universe.markets)
+                engine.current_rotation_id = rotation_id
+                engine.current_rotation_queue_position = market_index + 1
                 # Keep the per-market deadline enabled. A stalled provider must
                 # not freeze the whole-universe queue indefinitely.
                 state = engine.scan_market(
