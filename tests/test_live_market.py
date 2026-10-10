@@ -283,7 +283,9 @@ def test_live_coordinator_accepts_recovery_when_checkpoint_is_current(tmp_path, 
         on_candle=lambda event: None,
     )
     key = MarketKey("binance", "BTC/USDT", "spot", "1m")
-    latest = coordinator._latest_closed_open(key.timeframe, int(time.time() * 1000))
+    fixed_now_ms = int(time.time() * 1000)
+    monkeypatch.setattr("aicfa.live_market.time.time", lambda: fixed_now_ms / 1000)
+    latest = coordinator._latest_closed_open(key.timeframe, fixed_now_ms)
     monkeypatch.setattr(coordinator.checkpoint, "get", lambda _key: latest)
 
     assert coordinator._recover_missed_candles((key,)) is True
