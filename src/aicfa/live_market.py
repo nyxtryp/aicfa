@@ -24,6 +24,7 @@ from .websocket_market_data import BinanceWebSocketMarketDataTransport, WebSocke
 
 
 WINDOWS: dict[str, int] = {
+    "1m": 500,
     "5m": 500,
     "15m": 500,
     "1h": 500,
