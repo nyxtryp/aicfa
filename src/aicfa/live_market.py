@@ -726,12 +726,22 @@ class LiveMarketCoordinator:
                             )
                             closed = self.cache._closed_only(frame, timeframe)
                             if not closed.empty:
-                                last_timestamp = int(closed["timestamp"].iloc[-1])
                                 checkpoint = self.checkpoint.get(key)
-                                if checkpoint is None or last_timestamp > checkpoint:
+                                if checkpoint is None:
+                                    # First observation establishes the live
+                                    # baseline; do not replay historical rows.
+                                    rows_to_emit = closed.tail(1)
+                                else:
+                                    # If REST polling was delayed by an outage,
+                                    # replay every newly closed candle in order
+                                    # instead of jumping straight to the newest.
+                                    rows_to_emit = closed.loc[
+                                        closed["timestamp"] > checkpoint
+                                    ].sort_values("timestamp")
+                                for _, row in rows_to_emit.iterrows():
                                     observation = WebSocketObservation(
                                         key=key,
-                                        data=closed.tail(1).reset_index(drop=True),
+                                        data=pd.DataFrame([row]).reset_index(drop=True),
                                         observed_at_ms=now_ms,
                                     )
                                     self._submit_observation(observation)
