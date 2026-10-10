@@ -4,6 +4,7 @@ from aicfa.armed_zones import (
     ArmedZone,
     candle_intersects_armed_zone,
     extract_active_smc_zones,
+    zones_for_trigger_timeframe,
 )
 
 
@@ -64,3 +65,17 @@ def test_extract_active_smc_zones_ignores_missing_or_inactive_bounds():
         }])
     })
     assert zones == ()
+
+
+def test_five_minute_gate_uses_only_higher_timeframe_zones():
+    zones = (
+        ArmedZone("5m", "FVG", "bullish", 99.0, 100.0),
+        ArmedZone("15m", "OB", "bullish", 98.0, 99.0),
+        ArmedZone("1h", "FVG", "bearish", 102.0, 103.0),
+    )
+
+    five_minute = zones_for_trigger_timeframe(zones, "5m")
+    one_minute = zones_for_trigger_timeframe(zones, "1m")
+
+    assert [zone.timeframe for zone in five_minute] == ["15m", "1h"]
+    assert one_minute == zones
