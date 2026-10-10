@@ -5,6 +5,7 @@ from aicfa.armed_zones import (
     candle_intersects_armed_zone,
     extract_active_smc_zones,
     merge_refreshed_zones,
+    should_skip_zone_scan,
     zones_for_trigger_timeframe,
 )
 
@@ -152,3 +153,36 @@ def test_structural_levels_arm_bos_and_sweep_candles():
     assert ArmedZone("1h", "STRUCTURE", "sweep_low_level", 95.5, 95.5) in zones
     assert candle_intersects_armed_zone(100.8, 101.4, zones)
     assert candle_intersects_armed_zone(95.0, 95.6, zones)
+
+
+def test_zone_gate_fails_open_when_poi_cache_is_empty_or_unready():
+    assert not should_skip_zone_scan(
+        timeframe="1m", ready=True, scan_in_progress=False,
+        candle_low=10.0, candle_high=11.0, zones=(),
+    )
+    assert not should_skip_zone_scan(
+        timeframe="1m", ready=False, scan_in_progress=False,
+        candle_low=10.0, candle_high=11.0,
+        zones=(ArmedZone("1h", "FVG", "bullish", 20.0, 21.0),),
+    )
+    assert not should_skip_zone_scan(
+        timeframe="1m", ready=True, scan_in_progress=True,
+        candle_low=10.0, candle_high=11.0,
+        zones=(ArmedZone("1h", "FVG", "bullish", 20.0, 21.0),),
+    )
+
+
+def test_zone_gate_skips_only_when_ready_pois_do_not_intersect():
+    zones = (ArmedZone("1h", "FVG", "bullish", 20.0, 21.0),)
+    assert should_skip_zone_scan(
+        timeframe="1m", ready=True, scan_in_progress=False,
+        candle_low=10.0, candle_high=11.0, zones=zones,
+    )
+    assert not should_skip_zone_scan(
+        timeframe="1m", ready=True, scan_in_progress=False,
+        candle_low=20.5, candle_high=21.5, zones=zones,
+    )
+    assert not should_skip_zone_scan(
+        timeframe="15m", ready=True, scan_in_progress=False,
+        candle_low=10.0, candle_high=11.0, zones=zones,
+    )
