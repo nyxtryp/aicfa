@@ -414,7 +414,13 @@ function renderTradeMonitor(){
  const activeKeys=new Set(activeRows.map(r=>[r.asset,hor(r.mode),String(r.scenario||r.setup?.candidate?.scenario||""),String(r.direction||"")].join("|")));
  const watchRows=pendingRows.filter(r=>!activeKeys.has([r.asset,hor(r.mode),String(r.setup?.candidate?.scenario||""),String(r.direction||"")].join("|")));
  const monitoringRows=[...activeRows,...watchRows].sort((a,b)=>Number(b.last_seen_at_ms||b.created_at_ms||0)-Number(a.last_seen_at_ms||a.created_at_ms||0));
- const completedRows=modeRows.filter(r=>["COMPLETED","INVALIDATED","EXPIRED"].includes(String(r.status||"").toUpperCase()));
+ // COMPLETED means a scanner-owned trade that was actually activated at its entry.
+ // Legacy terminal rows without activation provenance are intentionally excluded.
+ const completedRows=modeRows.filter(r=>
+  ["COMPLETED","INVALIDATED","EXPIRED"].includes(String(r.status||"").toUpperCase()) &&
+  String(r.source||"").toLowerCase()==="autonomous_scanner" &&
+  Number(r.activated_at_ms)>0
+ );
  const missedRows=modeRows.filter(r=>String(r.status||"").toUpperCase()==="MISSED_BY_PRICE");
  $("#monitorCount").textContent=String(modeRows.length+watchRows.length);
  $("#monitorActiveCount").textContent=String(monitoringRows.length);
