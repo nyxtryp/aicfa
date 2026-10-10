@@ -1,0 +1,91 @@
+name: AICFA Live Site Probe
+
+on:
+  push:
+    branches:
+      - "diagnostics/**"
+    paths:
+      - ".github/workflows/aicfa-live-site-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Probe production health and recent scan journal
+        env:
+          BASE_URL: https://aicfa.aicfa.ru
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timezone
+
+          base = os.environ["BASE_URL"].rstrip("/")
+          paths = ("/api/health", "/api/journal/scans?limit=500", "/api/journal/registry")
+          payloads = {}
+          for path in paths:
+              req = urllib.request.Request(base + path, headers={"User-Agent": "AICFA-live-probe/1.0", "Accept": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=12) as response:
+                      raw = response.read(2_000_000)
+                      print(f"HTTP {response.status} {path} bytes={len(raw)}")
+                      try:
+                          payloads[path] = json.loads(raw)
+                      except Exception as exc:
+                          print(f"INVALID_JSON {path}: {exc}; body={raw[:500]!r}")
+              except urllib.error.HTTPError as exc:
+                  body = exc.read(1000).decode("utf-8", "replace")
+                  print(f"HTTP_ERROR {exc.code} {path}: {body}")
+              except Exception as exc:
+                  print(f"REQUEST_ERROR {path}: {type(exc).__name__}: {exc}")
+
+          health = payloads.get("/api/health")
+          if health is not None:
+              print("=== HEALTH ===")
+              print(json.dumps(health, ensure_ascii=False, indent=2))
+
+          scan_data = payloads.get("/api/journal/scans?limit=500", {})
+          events = scan_data.get("events", []) if isinstance(scan_data, dict) else []
+          print("=== RECENT SCANS ===")
+          print(f"scan_events_returned={len(events)}")
+          if events:
+              print("newest_event=" + json.dumps(events[0], ensure_ascii=False)[:6000])
+              print("oldest_event=" + json.dumps(events[-1], ensure_ascii=False)[:3000])
+              market_count = 0
+              setup_count = 0
+              assets = set()
+              statuses = {}
+              errors = {}
+              for event in events:
+                  p = event.get("payload", {}) if isinstance(event, dict) else {}
+                  markets = p.get("markets", []) if isinstance(p, dict) else []
+                  market_count += len(markets)
+                  for market in markets:
+                      if isinstance(market, dict):
+                          if market.get("asset"):
+                              assets.add(market["asset"])
+                          setups = market.get("setups", [])
+                          setup_count += len(setups) if isinstance(setups, list) else 0
+                          status = str(market.get("status", market.get("decision", "unknown")))
+                          statuses[status] = statuses.get(status, 0) + 1
+                          err = market.get("error") or market.get("last_scan_error")
+                          if err:
+                              key = str(err)[:180]
+                              errors[key] = errors.get(key, 0) + 1
+              print(f"markets_in_events={market_count} distinct_assets={len(assets)} setups_embedded={setup_count}")
+              print("market_status_counts=" + json.dumps(statuses, ensure_ascii=False))
+              print("market_errors=" + json.dumps(errors, ensure_ascii=False))
+          registry = payloads.get("/api/journal/registry", {})
+          setups = registry.get("setups", []) if isinstance(registry, dict) else []
+          print("=== SETUP REGISTRY ===")
+          print(f"registry_setups={len(setups)}")
+          print(json.dumps(setups[-20:], ensure_ascii=False, indent=2)[:10000])
+          print("probe_finished_utc=" + datetime.now(timezone.utc).isoformat())
+          PY
