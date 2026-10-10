@@ -62,6 +62,7 @@ def main() -> None:
     armed_zone_lock = threading.RLock()
     armed_zone_cache: dict[tuple[str, str], tuple[object, ...]] = {}
     armed_zone_ready: set[tuple[str, str]] = set()
+    zone_scan_counts: dict[tuple[str, str], int] = {}
 
     def _refresh_armed_zones(market, key) -> None:
         analyses = {}
@@ -86,68 +87,81 @@ def main() -> None:
         if not modes:
             return
         cache_key = (key.market_type, key.symbol)
-        if key.timeframe in {"1m", "5m"}:
-            with armed_zone_lock:
-                ready = cache_key in armed_zone_ready
-                zones = armed_zone_cache.get(cache_key, ())
+        with armed_zone_lock:
+            ready = cache_key in armed_zone_ready
+            zones = armed_zone_cache.get(cache_key, ())
+            scan_in_progress = zone_scan_counts.get(cache_key, 0) > 0
             gate_zones = zones_for_trigger_timeframe(zones, key.timeframe)
-            if ready and not candle_intersects_armed_zone(
-                event.low if event.low is not None else float("nan"),
-                event.high if event.high is not None else float("nan"),
-                gate_zones,
-            ):
-                # On 1m, check active 5m+ OB/FVG zones. On 5m, only higher-TF
-                # zones can arm the full setup pipeline. The 15m refresh scan
-                # still updates the zone cache from its latest 5m/15m/HTF frames.
-                # A skipped closed candle is still checkpointed by the coordinator.
-                return
-        market_index = next(
-            (
-                index for index, market in enumerate(universe.markets)
-                if market.market_type == key.market_type
-                and engine._live_symbol_map.get((key.market_type, key.symbol)) == index
-            ),
-            None,
-        )
-        if market_index is None:
-            # The WebSocket threads can deliver immediately after start()
-            # launches them, before the startup thread has copied the resolved
-            # symbol map onto the engine. Resolve from the coordinator's map
-            # instead of acknowledging a candle without analyzing it.
-            coordinator = coordinator_holder.get("coordinator")
-            if coordinator is not None:
-                for resolved_index, resolved_key in coordinator._resolved_market_keys:
-                    engine._live_symbol_map[(resolved_key.market_type, resolved_key.symbol)] = resolved_index
-                market_index = engine._live_symbol_map.get((key.market_type, key.symbol))
-            if market_index is None:
-                raise RuntimeError(f"closed candle has no configured market mapping: {key.symbol}")
-        state = engine.scan_market(
-            market_index,
-            modes=modes,
-            enforce_timeout=False,
-            journal=True,
-        )
-        market = state.result.markets[0]
-        diagnostics = market.diagnostics
-        status = str(diagnostics.status if diagnostics else "completed").lower()
-        engine.last_automatic_scan_at_ms = int(state.scanned_at_ms)
-        engine.last_automatic_scan_asset = market.asset
-        engine.last_automatic_scan_status = status
-        engine.last_automatic_scan_error = diagnostics.error if diagnostics else ""
-        print(
-            f"AICFA live candle: {market.asset} {key.timeframe} "
-            f"status={status} setups={len(market.setups)}",
-            flush=True,
-        )
-        # The coordinator advances its durable candle checkpoint only when
-        # this callback succeeds. Do not acknowledge a failed/timeout scan,
-        # otherwise a broken analysis would be permanently skipped after
-        # restart and the live stream could silently move past it.
-        if status in {"error", "timeout"}:
-            raise RuntimeError(
-                diagnostics.error or f"live scan returned {status}"
+            should_skip = (
+                key.timeframe in {"1m", "5m"}
+                and ready
+                and not scan_in_progress
+                and not candle_intersects_armed_zone(
+                    event.low if event.low is not None else float("nan"),
+                    event.high if event.high is not None else float("nan"),
+                    gate_zones,
+                )
             )
-        _refresh_armed_zones(market, key)
+            if should_skip:
+                return
+            # If another timeframe for this symbol is updating SMC zones, fail
+            # open and analyze this candle. This avoids dropping a valid close
+            # because it raced the zone-cache refresh.
+            zone_scan_counts[cache_key] = zone_scan_counts.get(cache_key, 0) + 1
+
+        try:
+            market_index = next(
+                (
+                    index for index, market in enumerate(universe.markets)
+                    if market.market_type == key.market_type
+                    and engine._live_symbol_map.get((key.market_type, key.symbol)) == index
+                ),
+                None,
+            )
+            if market_index is None:
+                # The WebSocket threads can deliver immediately after start()
+                # launches them, before the startup thread has copied the resolved
+                # symbol map onto the engine. Resolve from the coordinator's map
+                # instead of acknowledging a candle without analyzing it.
+                coordinator = coordinator_holder.get("coordinator")
+                if coordinator is not None:
+                    for resolved_index, resolved_key in coordinator._resolved_market_keys:
+                        engine._live_symbol_map[(resolved_key.market_type, resolved_key.symbol)] = resolved_index
+                    market_index = engine._live_symbol_map.get((key.market_type, key.symbol))
+                if market_index is None:
+                    raise RuntimeError(f"closed candle has no configured market mapping: {key.symbol}")
+            state = engine.scan_market(
+                market_index,
+                modes=modes,
+                enforce_timeout=False,
+                journal=True,
+            )
+            market = state.result.markets[0]
+            diagnostics = market.diagnostics
+            status = str(diagnostics.status if diagnostics else "completed").lower()
+            engine.last_automatic_scan_at_ms = int(state.scanned_at_ms)
+            engine.last_automatic_scan_asset = market.asset
+            engine.last_automatic_scan_status = status
+            engine.last_automatic_scan_error = diagnostics.error if diagnostics else ""
+            print(
+                f"AICFA live candle: {market.asset} {key.timeframe} "
+                f"status={status} setups={len(market.setups)}",
+                flush=True,
+            )
+            # The coordinator advances the durable checkpoint only when this
+            # callback succeeds; a failed analysis must be replayed.
+            if status in {"error", "timeout"}:
+                raise RuntimeError(
+                    diagnostics.error or f"live scan returned {status}"
+                )
+            _refresh_armed_zones(market, key)
+        finally:
+            with armed_zone_lock:
+                remaining = zone_scan_counts.get(cache_key, 1) - 1
+                if remaining <= 0:
+                    zone_scan_counts.pop(cache_key, None)
+                else:
+                    zone_scan_counts[cache_key] = remaining
 
     coordinator = LiveMarketCoordinator(
         universe,
