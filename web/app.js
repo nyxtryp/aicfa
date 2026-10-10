@@ -416,7 +416,8 @@ function renderTradeMonitor(){
  const all=state.monitorRecords||[],mode=ui.monitorMode;
  const modeRows=all.filter(r=>hor(r.mode)===mode);
  const activeRows=modeRows.filter(r=>["ACTIVE","TP1_HIT"].includes(String(r.status||"").toUpperCase()));
- const completedRows=modeRows.filter(r=>["COMPLETED","INVALIDATED","EXPIRED","MISSED_BY_PRICE"].includes(String(r.status||"").toUpperCase()));
+ // Only lifecycle-closed setups belong in Completed. MISSED_BY_PRICE can be emitted before activation and is not a trade outcome.
+ const completedRows=modeRows.filter(r=>["COMPLETED","INVALIDATED","EXPIRED"].includes(String(r.status||"").toUpperCase())&&(r.was_active!==false));
  $("#monitorCount").textContent=String(modeRows.length);
  $("#monitorActiveCount").textContent=String(activeRows.length);
  $("#monitorCompletedCount").textContent=String(completedRows.length);
