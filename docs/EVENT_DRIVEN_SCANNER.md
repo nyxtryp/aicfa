@@ -10,7 +10,7 @@
 - The continuous ticker stream remains separate for active setup SL/TP lifecycle checks.
 - Confirmed 15m, 1h, 4h, 1d, and 1w feature frames are cached by the full OHLCV snapshot. A 1m/5m event can reuse unchanged higher-timeframe SMC features.
 - The live SMC scan now explicitly disables derivatives, trades, and order-book collection; its input evidence is OHLCV only.
-- A bounded in-process zone cache retains active OB/FVG bounds from completed 5m+ feature frames. 1m candle events outside all cached zones are acknowledged without running the full setup pipeline; events that overlap a zone run the canonical Scalping analysis.
+- A bounded in-process zone cache retains active OB/FVG bounds from completed 5m+ feature frames. 1m events outside all cached zones are acknowledged without full setup analysis. 5m events are gated by 15m+ zones, while 15m closes refresh the cache using the latest 5m and higher-timeframe frames.
 
 ## Remaining architectural work
 
