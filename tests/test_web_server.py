@@ -138,3 +138,60 @@ def test_market_prices_are_cached_across_concurrent_poll_intervals(monkeypatch):
     assert first == second == b'{"prices":{"0":100}}'
     assert len(calls) == 1
     server._MARKET_PRICES_CACHE = None
+
+
+
+def test_trade_monitor_api_returns_all_current_revision_lifecycles_and_keeps_mode(tmp_path, monkeypatch):
+    from aicfa.setup_registry import SetupRegistry, REGISTRY_REVISION
+
+    data_dir = tmp_path / "data"
+    registry = SetupRegistry(data_dir / "journal" / "setup_registry.json")
+    registry._write({
+        "BTC|SCALPING": {
+            "strategy_revision": REGISTRY_REVISION,
+            "setup_id": "BTC|SCALPING",
+            "asset": "BTC/USDT",
+            "mode": "scalping",
+            "direction": "LONG",
+            "status": "ACTIVE",
+            "created_at_ms": 100,
+            "last_seen_at_ms": 200,
+            "setup": {"candidate": {"direction": "long", "entry_zone": [], "target_levels": []}},
+        },
+        "ETH|POSITION": {
+            "strategy_revision": REGISTRY_REVISION,
+            "setup_id": "ETH|POSITION",
+            "asset": "ETH/USDT",
+            "mode": "position",
+            "direction": "SHORT",
+            "status": "COMPLETED",
+            "created_at_ms": 50,
+            "closed_at_ms": 300,
+            "setup": {"candidate": {"direction": "short", "entry_zone": [], "target_levels": []}},
+        },
+        "STALE|SWING": {
+            "strategy_revision": REGISTRY_REVISION,
+            "setup_id": "STALE|SWING",
+            "asset": "XRP/USDT",
+            "mode": "swing",
+            "status": "STALE",
+            "setup": {},
+        },
+        "OLD|INTRADAY": {
+            "strategy_revision": 1,
+            "setup_id": "OLD|INTRADAY",
+            "asset": "OLD/USDT",
+            "mode": "intraday",
+            "status": "ACTIVE",
+            "setup": {},
+        },
+    })
+    monkeypatch.setattr(server, "DATA_DIR", data_dir)
+    monkeypatch.setenv("AICFA_DATA_DIR", str(data_dir))
+
+    payload = json.loads(server._journal_payload("/api/journal/trade-monitor", {}))
+    records = payload["setups"]
+
+    assert {item["mode"] for item in records} == {"scalping", "position"}
+    assert {item["status"] for item in records} == {"ACTIVE", "COMPLETED"}
+    assert next(item for item in records if item["status"] == "COMPLETED")["closed_at_ms"] == 300
