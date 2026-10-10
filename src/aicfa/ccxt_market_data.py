@@ -164,6 +164,10 @@ class CcxtMarketDataProvider:
         limit: int,
     ) -> pd.DataFrame:
         self._validate_market_type(market_type)
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         if limit <= 0:
             raise ValueError("limit must be positive")
         rows = self._exchange.fetch_ohlcv(
@@ -181,6 +185,10 @@ class CcxtMarketDataProvider:
         self, *, symbol: str, market_type: str, limit: int
     ) -> pd.DataFrame:
         self._validate_market_type(market_type)
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         if limit <= 0:
             raise ValueError("limit must be positive")
         rows = self._exchange.fetch_trades(symbol, limit=int(limit))

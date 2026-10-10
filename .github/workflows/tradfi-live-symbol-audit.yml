@@ -1,0 +1,44 @@
+name: TradFi live symbol audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/tradfi-brent-symbols
+    paths:
+      - "config/market_universe.json"
+      - "config/tradfi_targets.json"
+      - "scripts/audit_market_universe.py"
+      - "scripts/verify_tradfi_targets.py"
+      - ".github/workflows/tradfi-live-symbol-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  live-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install audit dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+      - name: Verify approved TradFi targets against live CCXT markets
+        run: python scripts/verify_tradfi_targets.py | tee tradfi-target-verification.txt
+      - name: Audit all configured markets and report alternative TradFi symbols
+        run: python scripts/audit_market_universe.py | tee market-audit-run.txt
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tradfi-live-symbol-audit
+          path: |
+            tradfi-target-verification.txt
+            market-audit-run.txt
+            artifacts/market-audit/
+          if-no-files-found: warn
+          retention-days: 14

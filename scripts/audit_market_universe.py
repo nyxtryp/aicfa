@@ -102,12 +102,67 @@ def main() -> int:
                 exact = next((m for m in markets.values() if str(m.get("symbol", "")) == explicit), None)
                 if exact and eligible(exact, market_type):
                     status, symbol, reason = "MATCH", explicit, "configured exact venue symbol exists"
+                    candidates = []
                 else:
-                    status, symbol, reason = "MISSING_CONFIGURED_SYMBOL", explicit, "configured symbol absent or wrong market type"
+                    status, symbol = "MISSING_CONFIGURED_SYMBOL", explicit
+                    base_aliases = {
+                        "XAU": {"GOLD", "XAUT"},
+                        "XAG": {"SILVER"},
+                        "XCU": {"COPPER"},
+                        "XPT": {"PLATINUM"},
+                        "BRENT": {"XBRU", "BZ", "UKOIL", "BRENTOIL"},
+                        "NATGAS": {"NG", "NGAS", "NATURALGAS"},
+                        "NIKKEI": {"JP225", "JPN225", "NIKKEI225"},
+                        "QQQ": {"QQQSTOCK"},
+                        "AAPL": {"AAPLSTOCK"},
+                        "NVDA": {"NVIDIA", "NVIDIASTOCK"},
+                        "AMZN": {"AMZNSTOCK"},
+                        "GOOGL": {"GOOGLSTOCK"},
+                        "META": {"METASTOCK"},
+                        "TSLA": {"TESLA", "TESLASTOCK"},
+                        "AVGO": {"AVGOSTOCK"},
+                        "AMD": {"AMDSTOCK"},
+                        "TSM": {"TSMC", "TSMCSTOCK"},
+                        "ASML": {"ASMLSTOCK"},
+                        "ORCL": {"ORCLSTOCK"},
+                        "NFLX": {"NFLXSTOCK"},
+                        "COIN": {"COINBASE", "COINSTOCK"},
+                        "SP500": {"US500", "SPX500", "SP500"},
+                        "NASDAQ100": {"US100", "NAS100", "NASDAQ100"},
+                    }
+                    base = asset.split("/", 1)[0].upper()
+                    accepted_bases = {base, *base_aliases.get(base, set())}
+                    candidates = []
+                    for market in markets.values():
+                        if not eligible(market, market_type):
+                            continue
+                        market_base = str(market.get("base", "")).upper()
+                        market_id = str(market.get("id", "")).upper()
+                        info = market.get("info") or {}
+                        display = " ".join(str(info.get(key, "")) for key in (
+                            "displayName", "displayNameEn", "baseCoinName", "symbol"
+                        )).upper()
+                        if market_base in accepted_bases or market_id in accepted_bases:
+                            candidates.append(market)
+                        elif any(alias and alias in display for alias in accepted_bases):
+                            candidates.append(market)
+                    candidates.sort(key=lambda m: (
+                        0 if str(m.get("base", "")).upper() == base else 1,
+                        0 if m.get("active") is True else 1,
+                        str(m.get("symbol", "")),
+                    ))
+                    suggestion_text = ", ".join(
+                        f"{m.get('symbol')} [id={m.get('id')}, base={m.get('base')}, active={m.get('active')}]"
+                        for m in candidates[:8]
+                    )
+                    reason = "configured symbol absent or wrong market type"
+                    if suggestion_text:
+                        reason += "; live candidates: " + suggestion_text
                 records.append({
                     "asset": asset, "asset_class": asset_class, "market_type": market_type,
                     "exchange": exchange_id, "status": status,
                     "matched_symbol": symbol, "reason": reason,
+                    "candidate_symbols": [str(m.get("symbol", "")) for m in candidates[:8]],
                 })
                 continue
 
