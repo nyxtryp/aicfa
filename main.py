@@ -176,6 +176,7 @@ def main() -> None:
             should_skip = (
                 key.timeframe in {"1m", "5m"}
                 and ready
+                and bool(gate_zones)
                 and not scan_in_progress
                 and not candle_intersects_armed_zone(
                     event.low if event.low is not None else float("nan"),
