@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS, WINDOWS
+from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS, WINDOWS, BINANCE_WS_MAX_STREAMS, BINANCE_WS_ROTATE_SECONDS, chunk_market_keys
 from aicfa.market_data import MarketKey
 from aicfa.websocket_market_data import WebSocketObservation
 
@@ -233,3 +233,25 @@ def test_failed_candle_processing_is_retried_without_losing_event(tmp_path, monk
     assert recovered.wait(3)
     coordinator.stop()
     assert attempts == [1, 1]
+
+
+
+def test_binance_market_keys_are_split_into_groups_of_at_most_200():
+    keys = tuple(
+        MarketKey("binance", f"COIN{i}/USDT", "spot", "1m")
+        for i in range(405)
+    )
+    chunks = chunk_market_keys(keys)
+    assert [len(chunk) for chunk in chunks] == [200, 200, 5]
+    assert tuple(key for chunk in chunks for key in chunk) == keys
+    assert max(map(len, chunks)) <= BINANCE_WS_MAX_STREAMS
+    assert BINANCE_WS_ROTATE_SECONDS == 23 * 60 * 60
+
+
+def test_binance_market_key_chunking_rejects_duplicates_and_invalid_size():
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    import pytest
+    with pytest.raises(ValueError, match="duplicates"):
+        chunk_market_keys((key, key))
+    with pytest.raises(ValueError, match="max_streams"):
+        chunk_market_keys((key,), max_streams=0)
