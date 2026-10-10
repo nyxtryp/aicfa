@@ -357,9 +357,43 @@ class LiveMarketCoordinator:
                         # finished; a new event arriving during _handle must queue.
                         self._pending_observations[key] = []
         except Exception:
+            # Keep the failed event at the head of the queue. The durable
+            # checkpoint has not advanced, so retrying is idempotent and
+            # prevents a transient analysis/persistence error from losing it.
             with self._dispatch_lock:
+                pending = self._pending_observations.setdefault(key, [])
+                pending.insert(0, current)
                 self._scheduled_keys.discard(key)
             raise
+
+    def _retry_pending_key(self, key: MarketKey) -> None:
+        if self._stopped.is_set():
+            return
+        with self._dispatch_lock:
+            pending = self._pending_observations.get(key)
+            if key in self._scheduled_keys or not pending:
+                return
+            current = pending.pop(0)
+            if not pending:
+                self._pending_observations[key] = []
+            self._scheduled_keys.add(key)
+        future = self._pool.submit(self._dispatch, current)
+
+        def report_retry_failure(done) -> None:
+            try:
+                done.result()
+            except Exception as exc:
+                print(
+                    f"AICFA live candle retry failed: {key.symbol} {key.timeframe}: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                if not self._stopped.is_set():
+                    timer = threading.Timer(1.0, self._retry_pending_key, args=(key,))
+                    timer.daemon = True
+                    timer.start()
+
+        future.add_done_callback(report_retry_failure)
 
     @property
     def last_observation_received_at_ms(self) -> int:
@@ -389,9 +423,13 @@ class LiveMarketCoordinator:
             except Exception as exc:
                 print(
                     f"AICFA live candle dispatch error: {key.symbol} {key.timeframe}: "
-                    f"{type(exc).__name__}: {exc}",
+                    f"{type(exc).__name__}: {exc}; retrying in 1s",
                     flush=True,
                 )
+                if not self._stopped.is_set():
+                    timer = threading.Timer(1.0, self._retry_pending_key, args=(key,))
+                    timer.daemon = True
+                    timer.start()
         future.add_done_callback(_report_failure)
 
     def _handle(self, observation: WebSocketObservation) -> None:
