@@ -16,6 +16,7 @@ class SetupLifecycleStatus(str, Enum):
     COMPLETED = "completed"
     INVALIDATED = "invalidated"
     EXPIRED = "expired"
+    MISSED_BY_PRICE = "missed_by_price"
 
 
 @dataclass(frozen=True)
@@ -440,10 +441,34 @@ class SetupLifecycle:
                 candle_high = current_high if current_high is not None else current_price
                 candle_low = current_low if current_low is not None else current_price
                 zone_touched = candle_low <= entry_high and candle_high >= entry_low
+                target_price = current_high if candidate.direction == "long" and current_high is not None else current_low if candidate.direction == "short" and current_low is not None else current_price
                 if not zone_touched:
+                    # Once the complete execution candle has moved beyond the
+                    # entry zone in the trade direction, this candidate is no
+                    # longer actionable at its original POI. Report the exact
+                    # limit instead of publishing a stale/chasing entry.
+                    missed = (
+                        candidate.direction == "long" and candle_low > entry_high
+                    ) or (
+                        candidate.direction == "short" and candle_high < entry_low
+                    )
+                    if missed:
+                        limit_label = "maximum acceptable entry price" if candidate.direction == "long" else "minimum acceptable entry price"
+                        limit_value = entry_high if candidate.direction == "long" else entry_low
+                        results.append(SetupLifecycleResult(
+                            SetupLifecycleStatus.MISSED_BY_PRICE,
+                            candidate,
+                            "WAIT",
+                            f"missed by price: execution candle moved beyond the entry zone; {limit_label} {limit_value:.10g}",
+                            self.identity(
+                                symbol=symbol,
+                                market_type=market_type,
+                                horizon=normalized,
+                                candidate=candidate,
+                            ),
+                        ))
                     continue
                 invalidation_price = current_low if candidate.direction == "long" and current_low is not None else current_high if candidate.direction == "short" and current_high is not None else current_price
-                target_price = current_high if candidate.direction == "long" and current_high is not None else current_low if candidate.direction == "short" and current_low is not None else current_price
                 setup_id = self.identity(
                     symbol=symbol,
                     market_type=market_type,
