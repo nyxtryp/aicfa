@@ -60,6 +60,14 @@ def main() -> None:
     data_dir = Path(os.environ.get("AICFA_DATA_DIR", str(ROOT / "data")))
     engine_holder: dict[str, AutonomousScanEngine] = {}
     coordinator_holder: dict[str, LiveMarketCoordinator] = {}
+    armed_zone_gate_enabled = os.environ.get(
+        "AICFA_ARMED_ZONE_GATE_ENABLED", "false"
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    print(
+        "AICFA armed-zone scan gate: "
+        + ("enabled" if armed_zone_gate_enabled else "disabled (safe default pending replay validation)"),
+        flush=True,
+    )
     armed_zone_lock = threading.RLock()
     armed_zone_cache: dict[tuple[str, str], tuple[object, ...]] = {}
     armed_zone_ready: set[tuple[str, str]] = set()
@@ -158,7 +166,8 @@ def main() -> None:
         key = event.key
         # Structural context must refresh on daily/weekly closes too, even
         # though those candles do not independently trigger a trading profile.
-        _refresh_closed_timeframe_zone(key)
+        if armed_zone_gate_enabled:
+            _refresh_closed_timeframe_zone(key)
         modes = LIVE_CANDLE_MODE_TRIGGERS.get(key.timeframe, ())
         if not modes:
             return
@@ -173,7 +182,7 @@ def main() -> None:
                 or zone_refresh_counts.get(cache_key, 0) > 0
             )
             gate_zones = zones_for_trigger_timeframe(zones, key.timeframe)
-            should_skip = should_skip_zone_scan(
+            should_skip = armed_zone_gate_enabled and should_skip_zone_scan(
                 timeframe=key.timeframe,
                 ready=ready,
                 scan_in_progress=scan_in_progress,
@@ -233,7 +242,8 @@ def main() -> None:
                 raise RuntimeError(
                     diagnostics.error or f"live scan returned {status}"
                 )
-            _refresh_armed_zones(market, key)
+            if armed_zone_gate_enabled:
+                _refresh_armed_zones(market, key)
         finally:
             with armed_zone_lock:
                 remaining = zone_scan_counts.get(cache_key, 1) - 1
