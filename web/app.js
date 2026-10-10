@@ -416,7 +416,7 @@ function renderTradeMonitor(){
  const monitoringRows=[...activeRows,...watchRows].sort((a,b)=>Number(b.last_seen_at_ms||b.created_at_ms||0)-Number(a.last_seen_at_ms||a.created_at_ms||0));
  const completedRows=modeRows.filter(r=>["COMPLETED","INVALIDATED","EXPIRED"].includes(String(r.status||"").toUpperCase()));
  const missedRows=modeRows.filter(r=>String(r.status||"").toUpperCase()==="MISSED_BY_PRICE");
- $("#monitorCount").textContent=String(modeRows.length);
+ $("#monitorCount").textContent=String(modeRows.length+watchRows.length);
  $("#monitorActiveCount").textContent=String(monitoringRows.length);
  $("#monitorCompletedCount").textContent=String(completedRows.length);
  $("#monitorMissedCount").textContent=String(missedRows.length);
