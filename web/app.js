@@ -351,7 +351,7 @@ function renderCenter(){
   root.innerHTML='<div class="workspace-empty"><b>NO ACTIVE SETUP</b><span>This market was analyzed by the same AICFA scanner pipeline. No actionable setup was found.</span></div>';
   return;
  }
- const x=[...ui.manualItems,...ui.history].find(h=>h.key===ui.centerKey);
+ const x=allHistory().find(h=>h.key===ui.centerKey);
  if(!x){
   root.dataset.signature="";
   $("#workspaceTitle").textContent="Waiting for setup";
