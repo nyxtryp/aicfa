@@ -389,6 +389,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "/api/journal/scans",
                 "/api/journal/setups",
                 "/api/journal/registry",
+                "/api/journal/trade-monitor",
             }:
                 try:
                     self._json(200, _journal_payload(parsed.path, parse_qs(parsed.query)))
