@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   probe:
@@ -19,8 +20,12 @@ jobs:
       - name: Probe production health and recent scan journal
         env:
           BASE_URL: https://aicfa.aicfa.ru
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: '2'
+          REPO: ${{ github.repository }}
         run: |
-          python - <<'PY'
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee /tmp/aicfa-live-probe.txt
           import json
           import os
           import urllib.error
@@ -88,4 +93,21 @@ jobs:
           print(f"registry_setups={len(setups)}")
           print(json.dumps(setups[-20:], ensure_ascii=False, indent=2)[:10000])
           print("probe_finished_utc=" + datetime.now(timezone.utc).isoformat())
+          PY
+
+          python - <<'PY'
+          import json, os, urllib.request
+          from pathlib import Path
+          report = Path("/tmp/aicfa-live-probe.txt").read_text(encoding="utf-8", errors="replace")
+          if len(report) > 60000:
+              report = report[:30000] + "\n... truncated ...\n" + report[-30000:]
+          body = "## AICFA live site probe\n\n\u0060\u0060\u0060text\n" + report + "\n\u0060\u0060\u0060"
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['ISSUE_NUMBER']}/comments",
+              data=json.dumps({"body": body}).encode(),
+              headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}", "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=15) as response:
+              print("Posted live probe report to issue comment:", response.status)
           PY
