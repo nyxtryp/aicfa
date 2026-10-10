@@ -15,13 +15,13 @@ from .data_requirements import TradingMode, mode_timeframe_profile, normalize_tr
 from .persistent_journal import _jsonable, _visual_geometry
 
 
-REGISTRY_REVISION = 5
+REGISTRY_REVISION = 6
 
 # Revision 3 introduced the lifecycle-owned setup queue. Those ACTIVE/TP1_HIT
 # records are real trade lifecycles and must survive a code deploy. Older
 # revisions may contain analytical candidates that were never lifecycle-
 # activated, so they are intentionally not migrated.
-_MIGRATABLE_PREVIOUS_REVISIONS = {3, 4}
+_MIGRATABLE_PREVIOUS_REVISIONS = {3, 4, 5}
 _MIGRATABLE_LIFECYCLE_STATUSES = {"active", "tp1_hit"}
 
 
@@ -52,30 +52,24 @@ class SetupRegistry:
         profile = mode_timeframe_profile(normalized)
         scenario = str(getattr(candidate, "scenario", "")).strip().lower()
         direction = str(getattr(candidate, "direction", "")).strip().lower()
-        zone = tuple(
-            (float(getattr(level, "value")), str(getattr(level, "timeframe")), str(getattr(level, "source")))
-            for level in getattr(candidate, "entry_zone", ())
-        )
+        # Entry-zone coordinates change as analysis refreshes. They describe
+        # geometry, not identity; including them created a journal row on each
+        # small price-level update.
         return "|".join((
             str(asset), str(market_type), normalized.value, scenario, direction,
-            profile.structure_timeframe, json.dumps(zone, separators=(",", ":")),
+            profile.structure_timeframe,
         ))
 
     @staticmethod
     def _key_from_identity(identity: Any) -> str | None:
         if identity is None:
             return None
-        zone = tuple(
-            (float(item[0]), str(item[1]), str(item[2]))
-            for item in getattr(identity, "entry_zone", ())
-        )
         return "|".join((
             str(identity.symbol), str(identity.market_type),
             normalize_trading_mode(identity.horizon).value,
             str(getattr(identity, "scenario", "")).strip().lower(),
             str(identity.direction).strip().lower(),
             mode_timeframe_profile(normalize_trading_mode(identity.horizon)).structure_timeframe,
-            json.dumps(zone, separators=(",", ":")),
         ))
 
     def read(self) -> dict[str, dict[str, Any]]:
@@ -106,15 +100,19 @@ class SetupRegistry:
             except (TypeError, ValueError):
                 revision = 0
             lifecycle_status = str(record.get("lifecycle_status", "")).lower()
-            if revision not in _MIGRATABLE_PREVIOUS_REVISIONS or lifecycle_status not in _MIGRATABLE_LIFECYCLE_STATUSES:
+            if revision not in _MIGRATABLE_PREVIOUS_REVISIONS:
+                continue
+            # Revisions 3/4 only persisted lifecycle-owned active records.
+            # Revision 5 also accumulated terminal entries; retain them as
+            # historical outcomes, but separate MISSED_BY_PRICE in the UI.
+            if revision in {3, 4} and lifecycle_status not in _MIGRATABLE_LIFECYCLE_STATUSES:
+                continue
+            if revision == 5 and str(record.get("status", "")).upper() not in {
+                "ACTIVE", "TP1_HIT", "COMPLETED", "INVALIDATED", "EXPIRED", "MISSED_BY_PRICE"
+            }:
                 continue
             setup = record.get("setup", {})
             candidate = setup.get("candidate", {}) if isinstance(setup, dict) else {}
-            zone = tuple(
-                (float(item.get("value")), str(item.get("timeframe")), str(item.get("source")))
-                for item in candidate.get("entry_zone", ())
-                if isinstance(item, dict)
-            )
             new_key = "|".join((
                 str(record.get("asset", "")),
                 str(record.get("market_type", "spot")),
@@ -122,10 +120,17 @@ class SetupRegistry:
                 str(record.get("scenario", "")).strip().lower(),
                 str(record.get("direction", "")).strip().lower(),
                 str(record.get("structural_timeframe", "")),
-                json.dumps(zone, separators=(",", ":")),
-            )) if zone else old_key
+            ))
             record["strategy_revision"] = REGISTRY_REVISION
             record["setup_id"] = new_key
+            previous = records.get(new_key)
+            if previous is not None and previous is not record:
+                previous_time = int(previous.get("closed_at_ms") or previous.get("last_seen_at_ms") or previous.get("created_at_ms") or 0)
+                current_time = int(record.get("closed_at_ms") or record.get("last_seen_at_ms") or record.get("created_at_ms") or 0)
+                if current_time < previous_time:
+                    records.pop(old_key, None)
+                    changed = True
+                    continue
             records[new_key] = record
             if new_key != old_key:
                 records.pop(old_key, None)
