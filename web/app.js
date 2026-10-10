@@ -270,7 +270,7 @@ function waitCards(ms){
   const pendingModes=new Set();
   for(const s of m.setups||[]){
    const c=s.candidate||s,lifeStatus=life(s.lifecycle_result);
-   if(!["LONG","SHORT"].includes(dir(c))||["ACTIVE","TP1_HIT"].includes(lifeStatus))continue;
+   if(!["LONG","SHORT"].includes(dir(c))||["ACTIVE","TP1_HIT","INVALIDATED","COMPLETED","EXPIRED"].includes(lifeStatus))continue;
    const mode=hor(s.mode),entry=(c.entry_zone||[]).map(x=>Number(x.value)).filter(Number.isFinite);
    const sl=Number(c.invalidation_level?.value??c.stop_loss);
    const tp=Number(c.target_levels?.[0]?.value??c.take_profit);
