@@ -43,15 +43,25 @@ def test_verified_venue_mapping_selects_native_symbol_before_generic_resolution(
     assert float(result.iloc[-1]["close"]) == 1.0
 
 
-def test_production_universe_contains_only_crypto_usdt_futures() -> None:
+def test_production_universe_restores_crypto_and_tradfi_futures() -> None:
     path = Path(__file__).parents[1] / "config" / "market_universe.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     markets = payload["markets"]
 
-    assert len(markets) == 85
-    assert all(item.get("asset_class", "crypto") == "crypto" for item in markets)
+    crypto = [item for item in markets if item.get("asset_class", "crypto") == "crypto"]
+    tradfi = [item for item in markets if item.get("asset_class") == "tradfi"]
+
+    assert len(markets) == 108
+    assert len(crypto) == 85
+    assert len(tradfi) == 23
     assert all(item["market_type"] == "futures" for item in markets)
     assert all(item["asset"].endswith("/USDT") for item in markets)
+    assert {item["asset"] for item in tradfi} >= {
+        "AAPL/USDT", "NVDA/USDT", "TSLA/USDT", "SP500/USDT",
+        "NASDAQ100/USDT", "XAU/USDT", "XAG/USDT", "BRENT/USDT",
+    }
+    assert all(item["instrument_type"] == "perpetual" for item in tradfi)
+    assert all(item["venue_symbols"] for item in tradfi)
 
 def test_explicit_mapping_never_falls_back_to_unmapped_generic_venue() -> None:
     binance = _Provider("binance", "XAGUSDT", "XAGUSDT")
@@ -94,3 +104,10 @@ def test_explicit_mapping_can_fallback_between_mapped_venues_only() -> None:
         limit=10,
     )
     assert float(result.iloc[-1]["close"]) == 1.0
+
+def test_scanner_does_not_run_a_competing_30_second_rotation() -> None:
+    main_path = Path(__file__).parents[1] / "main.py"
+    source = main_path.read_text(encoding="utf-8")
+    assert "30.0 - (now - last_rotation_scan_monotonic)" not in source
+    assert "Every 30s" not in source
+    assert "completed candles" in source
