@@ -362,3 +362,25 @@ def test_find_setup_reuses_order_book_history_snapshot_for_futures():
     assert provider.history_calls == [("BTC/USDT", "futures", 8, 0.25)]
     assert getattr(provider, "book_calls", []) == []
 
+
+
+def test_ohlcv_only_futures_scan_never_requests_auxiliary_market_data():
+    provider = FakeProvider()
+    result = find_setup(
+        FindSetupRequest("BTC/USDT", market_type="futures", mode="scalping"),
+        provider=provider,
+        resolver=lambda asset, market_type: asset,
+        now_ms=120 * 60_000,
+        limit=120,
+        ohlcv_only=True,
+    )
+
+    assert result.timeframes == ("1h", "15m", "5m", "1m")
+    assert len(provider.calls) == 4
+    assert not getattr(provider, "trade_calls", [])
+    assert not getattr(provider, "book_calls", [])
+    assert not getattr(provider, "history_calls", [])
+    assert not any(
+        getattr(item, "block", "").startswith(("derivatives", "funding", "open_interest", "mark_price", "liquidations", "trades", "order_book"))
+        for item in result.diagnostics.block_timings
+    )
