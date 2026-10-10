@@ -143,6 +143,7 @@ class BinanceWebSocketMarketDataTransport:
         state_store: LocalMarketStateStore | None = None,
         idle_timeout_seconds: float | None = None,
         observation_timeout_seconds: float | None = None,
+        connection_max_age_seconds: float | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         if not keys:
@@ -160,6 +161,8 @@ class BinanceWebSocketMarketDataTransport:
             and observation_timeout_seconds <= 0
         ):
             raise ValueError("observation_timeout_seconds must be positive")
+        if connection_max_age_seconds is not None and connection_max_age_seconds <= 0:
+            raise ValueError("connection_max_age_seconds must be positive")
         self.keys = tuple(keys)
         self.timeout_seconds = float(timeout_seconds)
         self.max_reconnects = int(max_reconnects)
@@ -168,6 +171,11 @@ class BinanceWebSocketMarketDataTransport:
         self._sleeper = sleeper
         self._state_store = state_store
         self._clock = clock
+        self._connection_max_age_seconds = (
+            None if connection_max_age_seconds is None else float(connection_max_age_seconds)
+        )
+        if len({key.market_type for key in self.keys}) != 1:
+            raise ValueError("all keys on one WebSocket connection must use the same market_type")
         if idle_timeout_seconds is None:
             fixed_durations = [
                 timeframe_ms(key.timeframe) / 1000.0
@@ -221,6 +229,14 @@ class BinanceWebSocketMarketDataTransport:
                     else None
                 )
                 while max_observations is None or observations < max_observations:
+                    if (
+                        self._connection_max_age_seconds is not None
+                        and self._clock() - started_at >= self._connection_max_age_seconds
+                    ):
+                        # Let the supervisor recover candles over REST before it
+                        # opens a fresh socket. This avoids treating planned rotation
+                        # as an invisible, lossless reconnect.
+                        raise ConnectionError("Binance WebSocket planned rotation deadline reached")
                     try:
                         raw = connection.recv()
                     except (TimeoutError, WebSocketTimeoutException) as exc:
@@ -283,7 +299,7 @@ class BinanceWebSocketMarketDataTransport:
                     )
                     for key in self.keys:
                         expected = (
-                            key.symbol.replace("/", "").replace("-", "").upper(),
+                            _binance_symbol(key.symbol),
                             key.timeframe.lower(),
                         )
                         if identity != expected:
