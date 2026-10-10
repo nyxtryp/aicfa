@@ -40,7 +40,7 @@ def _active_count(row: pd.Series, key: str) -> bool:
 def extract_active_smc_zones(
     analyses: Mapping[str, pd.DataFrame],
     *,
-    source_timeframes: Sequence[str] = ("5m", "15m", "1h", "4h", "1d"),
+    source_timeframes: Sequence[str] = ("5m", "15m", "1h", "4h", "1d", "1w"),
 ) -> tuple[ArmedZone, ...]:
     """Extract only live, finite FVG/OB bounds from the latest closed row.
 
