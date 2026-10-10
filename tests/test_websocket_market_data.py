@@ -46,6 +46,17 @@ def test_parse_binance_websocket_accepts_only_closed_kline():
     assert observation.observed_at_ms == 1700000059999
 
 
+def test_parse_binance_futures_symbol_strips_ccxt_settlement_suffix():
+    key = MarketKey("binance", "1000PEPE/USDT:USDT", "futures", "1m")
+
+    observation = parse_binance_kline_message(
+        _message(symbol="1000PEPEUSDT"), key
+    )
+
+    assert observation is not None
+    assert observation.key == key
+
+
 def test_parse_binance_websocket_rejects_invalid_payload():
     key = MarketKey("binance", "BTC/USDT", "spot", "1m")
 
@@ -234,3 +245,25 @@ def test_transport_exhausts_reconnect_budget_without_fabricating_data():
 
     with pytest.raises(WebSocketTransportError):
         next(transport.stream(max_observations=1))
+
+
+
+def test_transport_does_not_reset_reconnect_budget_on_handshake_only():
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    sockets = [FakeSocket([]), FakeSocket([])]
+    connections = []
+
+    def connector(url, *, timeout):
+        connections.append(url)
+        return sockets.pop(0)
+
+    transport = BinanceWebSocketMarketDataTransport(
+        keys=(key,),
+        connector=connector,
+        max_reconnects=1,
+        reconnect_backoff_seconds=0,
+        sleeper=lambda _: None,
+    )
+    with pytest.raises(WebSocketTransportError):
+        next(transport.stream(max_observations=1))
+    assert len(connections) == 2

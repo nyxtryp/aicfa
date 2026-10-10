@@ -275,9 +275,15 @@ def find_setup(
     derivatives_venue_symbols: tuple[tuple[str, str], ...] = (),
     prefetched_frames: dict[str, pd.DataFrame] | None = None,
     prefetched_analyses: dict[str, pd.DataFrame] | None = None,
+    ohlcv_only: bool = False,
 ) -> FindSetupResult:
-    """Resolve the asset, collect knowledge-required context, and run AICFA."""
-    use_live_derivatives = provider is None
+    """Resolve the asset, collect context, and run AICFA.
+
+    When ohlcv_only is true, the canonical SMC pipeline is strictly candle
+    based: no derivatives, trades, order-book or order-book-history requests
+    are made, even for futures instruments.
+    """
+    use_live_derivatives = provider is None and not ohlcv_only
     # Futures are derivative instruments: collect the existing causal
     # derivatives evidence layer automatically for live FindSetup requests.
     # Spot/TradFi requests do not pay this cost unless explicitly requested.
@@ -410,7 +416,7 @@ def find_setup(
     derivatives_frame = pd.DataFrame()
     derivatives_analysis = pd.DataFrame()
     derivatives_source = ""
-    if requirements.requires(DataKind.FUNDING) or derivatives_provider is not None:
+    if not ohlcv_only and (requirements.requires(DataKind.FUNDING) or derivatives_provider is not None):
         derivatives_started = time.perf_counter()
         try:
             derivatives_source_provider = derivatives_provider or FallbackDerivativesProvider()
@@ -510,7 +516,7 @@ def find_setup(
     # Collect auxiliary market feeds only when the active knowledge plan
     # explicitly requires them. Core chart/SMC analysis does not pay the
     # collection/storage cost for feeds it does not need.
-    if request.market_type == "futures" or requirements.requires(DataKind.TRADES):
+    if not ohlcv_only and (request.market_type == "futures" or requirements.requires(DataKind.TRADES)):
         trade_started = time.perf_counter()
         trade_fetch = getattr(provider, "fetch_trades_with_source", None)
         trade_limit = 60
@@ -569,7 +575,7 @@ def find_setup(
                 pd.DataFrame({"timestamp": [latest_trade_timestamp]}), trade_work
             )
 
-    if request.market_type == "futures" or requirements.requires(DataKind.ORDER_BOOK):
+    if not ohlcv_only and (request.market_type == "futures" or requirements.requires(DataKind.ORDER_BOOK)):
         order_book_started = time.perf_counter()
         history_fetch = getattr(provider, "fetch_order_book_history_with_source", None)
         if history_fetch is not None:

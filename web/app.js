@@ -242,6 +242,8 @@ async function hydrateCharts(){
 }
 function setupCard(x){
  const s=x.setup||{},entry=s.entry_zone||[],targets=s.target_levels||[],ev=entry.length?entry.map(v=>v.value).join(" — "):"—",sl=s.invalidation_level?.value??"—",tp=targets.length?targets.map(v=>String(v.value)+" ("+(v.timeframe||"?")+" · "+(v.source||"unknown source")+")").join(" — "):"—";
+ const lifecycleStatus=String(x.status||x.lifecycle||"").toUpperCase(),missed=lifecycleStatus==="MISSED BY PRICE"||lifecycleStatus==="MISSED_BY_PRICE";
+ const entryValues=entry.map(v=>Number(v.value)).filter(Number.isFinite),entryLimit=entryValues.length?(dir(s)==="LONG"?Math.max(...entryValues):Math.min(...entryValues)):NaN;
  const fullChart=mergeVisualCharts(x.suppressMarketVisual?null:marketVisual(x.asset,x.mode),s.chart);
  const low=entry.length?Math.min(...entry.map(v=>Number(v.value))):NaN,high=entry.length?Math.max(...entry.map(v=>Number(v.value))):NaN,stop=Number(s.invalidation_level?.value),take=targets.length?Number(targets[0]?.value):NaN;
  const geometryValid=Number.isFinite(low)&&Number.isFinite(high)&&low>0&&high>0&&Number.isFinite(stop)&&stop>0&&Number.isFinite(take)&&take>0;
@@ -255,8 +257,8 @@ function setupCard(x){
  const hierarchy=[...(s.rationale||[])].filter(v=>v.startsWith("MTF hierarchy:")).map(v=>v.replace(/^MTF hierarchy:\s*/,"")).filter((v,i,a)=>a.indexOf(v)===i).join(" · ");
  const side=dir(s),tf=chartTf(x.mode,s);
  return '<article class="setup '+side.toLowerCase()+'">'+
- '<header class="setup-head"><div class="symbol-block"><b>'+esc(x.asset)+'</b><span>'+esc(hor(x.mode))+' / '+esc(s.scenario||"SETUP")+'</span></div><div class="signal"><i></i><strong>'+esc(side)+'</strong></div></header>'+
- '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-market-type="'+esc(x.market_type||"futures")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:fullChart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span><span>SL <b>'+esc(sl)+'</b></span><span>TP1 <b>'+esc(tp)+'</b></span><span>RR / FRESHNESS <b>'+esc(rrText+" · "+freshness)+'</b></span></div></section>'+
+ '<header class="setup-head"><div class="symbol-block"><b>'+esc(x.asset)+'</b><span>'+esc(hor(x.mode))+' / '+esc(s.scenario||"SETUP")+'</span></div><div class="signal"><i></i><strong>'+esc(missed?"MISSED BY PRICE":side)+'</strong></div></header>'+
+ '<div class="setup-grid"><section class="chart-panel"><div class="panel-kicker">MARKET STRUCTURE · '+esc(tf.toUpperCase())+'</div><div class="market-chart" data-symbol="'+esc(x.asset||"")+'" data-market-type="'+esc(x.market_type||"futures")+'" data-timeframe="'+tf+'" data-setup="'+esc(JSON.stringify({entry_zone:entry,invalidation_level:s.invalidation_level,target_levels:targets,zones:s.zones,order_blocks:s.order_blocks,fvgs:s.fvgs,bos:s.bos,choch:s.choch,mss:s.mss,chart:fullChart}))+'"></div><div class="chart-meta"><span>ENTRY <b>'+esc(ev)+'</b></span>'+(missed?'<span>'+(dir(s)==="LONG"?"MAX ENTRY":"MIN ENTRY")+' <b>'+esc(Number.isFinite(entryLimit)?String(Number(entryLimit.toPrecision(8))):"—")+'</b></span>':'')+'<span>SL <b>'+esc(sl)+'</b></span><span>TP1 <b>'+esc(tp)+'</b></span><span>RR / FRESHNESS <b>'+esc(rrText+" · "+freshness)+'</b></span></div></section>'+
  '<aside class="setup-side"><div class="scenario"><span class="panel-kicker">SCENARIO</span><p>'+esc(scenarioText(s))+'</p></div><div class="evidence"><span class="panel-kicker">EVIDENCE</span>'+evidence(s,x)+'</div><div class="decision"><span class="panel-kicker">WHY '+esc(side)+'</span><p>'+esc(why.length?why.join(" · "):"Current structural evidence supports this setup.")+'</p><small>'+esc(hierarchy)+'</small></div></aside></div></article>';
 }
 function marketVisualCard(asset,mode,visual,marketType="futures"){
@@ -270,12 +272,15 @@ function waitCards(ms){
   const pendingModes=new Set();
   for(const s of m.setups||[]){
    const c=s.candidate||s,lifeStatus=life(s.lifecycle_result);
-   if(!["LONG","SHORT"].includes(dir(c))||["ACTIVE","TP1_HIT"].includes(lifeStatus))continue;
+   if(!["LONG","SHORT"].includes(dir(c))||["ACTIVE","TP1_HIT","INVALIDATED","COMPLETED","EXPIRED"].includes(lifeStatus))continue;
    const mode=hor(s.mode),entry=(c.entry_zone||[]).map(x=>Number(x.value)).filter(Number.isFinite);
    const sl=Number(c.invalidation_level?.value??c.stop_loss);
    const tp=Number(c.target_levels?.[0]?.value??c.take_profit);
    const fmt=v=>Number.isFinite(v)?String(Number(v.toPrecision(8))):"—";
-   out.push({asset:m.asset,mode,action:"WATCH",checks:[],why:(c.rationale||c.invalidation||["Waiting for price to reach the entry zone"])[0],details:"ENTRY "+(entry.length?entry.map(fmt).join("–"):"—")+" · SL "+fmt(sl)+" · TP1 "+fmt(tp)});
+   const missed=lifeStatus==="MISSED_BY_PRICE";
+   const entryLimit=entry.length?(dir(c)==="LONG"?Math.max(...entry):Math.min(...entry)):NaN;
+   const lifecycleReason=s.lifecycle_result?.reason||s.lifecycle_result?.message||"";
+   out.push({asset:m.asset,mode,action:missed?"MISSED BY PRICE":"WATCH",checks:[],why:missed?(lifecycleReason||"Price moved beyond the permitted entry zone"):(c.rationale||c.invalidation||["Waiting for price to reach the entry zone"])[0],details:(missed?(dir(c)==="LONG"?"MAX ENTRY ":"MIN ENTRY ")+fmt(entryLimit)+" · ":"")+"ENTRY "+(entry.length?entry.map(fmt).join("–"):"—")+" · SL "+fmt(sl)+" · TP1 "+fmt(tp)});
    pendingModes.add(mode);
   }
   for(const h of m.horizons||[]){
@@ -419,7 +424,7 @@ async function scanMarket(index){
   }else{
    const pendingItems=(data.watch_candidates||[]).map((pending,index)=>{
     const candidate=pending.candidate||{},mode=hor(pending.mode),asset=pending.asset||market.asset;
-    return {asset,mode,setup:candidate,lifecycle:"WATCH",status:"WATCH",key:"watch|"+asset+"|"+mode+"|"+String(candidate.scenario||"")+"|"+String(candidate.direction||"")+"|"+index,seenAt:Number(data.scanned_at_ms||Date.now()),market_type:market.market_type||"futures",suppressMarketVisual:true};
+    const lifeStatus=String(pending.lifecycle_status||"").toLowerCase();const missed=lifeStatus==="missed_by_price";return {asset,mode,setup:candidate,lifecycle:missed?"MISSED_BY_PRICE":"WATCH",status:missed?"MISSED BY PRICE":"WATCH",key:"watch|"+asset+"|"+mode+"|"+String(candidate.scenario||"")+"|"+String(candidate.direction||"")+"|"+index,seenAt:Number(data.scanned_at_ms||Date.now()),market_type:market.market_type||"futures",suppressMarketVisual:true};
    });
    ui.manualItems=pendingItems;
    ui.manualView={state:"result",asset:market.asset,scanNumber:data.scan_number,items:pendingItems,visual:data.market_visual||{zones:[],events:[],liquidity:[]},mode:"INTRADAY",marketType:market.market_type||"futures"};

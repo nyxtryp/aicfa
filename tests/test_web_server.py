@@ -123,3 +123,18 @@ def test_web_health_does_not_report_live_when_scanner_worker_is_stopped(tmp_path
     assert health["automatic_worker_running"] is False
     assert health["scanner_ok"] is False
     assert health["ok"] is False
+
+
+
+def test_market_prices_are_cached_across_concurrent_poll_intervals(monkeypatch):
+    calls = []
+    server._MARKET_PRICES_CACHE = None
+    monkeypatch.setattr(server, "_market_prices_uncached", lambda: calls.append(1) or b'{"prices":{"0":100}}')
+    monkeypatch.setattr(server, "_MARKET_PRICES_CACHE_TTL_SECONDS", 10.0)
+
+    first = server._market_prices()
+    second = server._market_prices()
+
+    assert first == second == b'{"prices":{"0":100}}'
+    assert len(calls) == 1
+    server._MARKET_PRICES_CACHE = None

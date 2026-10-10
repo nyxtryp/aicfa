@@ -205,10 +205,12 @@ def test_multiple_distinct_candidates_activate_and_remain_independent():
         now_ms=1_000,
     )
 
-    # Only the candidate whose POI is actually touched by the execution
-    # candle may become actionable. The second zone is still below price.
-    assert len(results) == 1
+    # The touched POI activates; the zone already passed by price is explicitly
+    # marked missed rather than silently discarded.
+    assert len(results) == 2
     assert results[0].status is SetupLifecycleStatus.ACTIVE
+    missed = next(item for item in results if item.status is SetupLifecycleStatus.MISSED_BY_PRICE)
+    assert "maximum acceptable entry price 98" in missed.reason
     assert len(lifecycle.active_setups(symbol="BTC/USDT", horizon="intraday")) == 1
 
 
@@ -250,7 +252,7 @@ def test_same_market_can_hold_independent_horizons():
     assert len(lifecycle.active_setups(symbol="BTC/USDT")) == 3
 
 
-def test_new_short_setup_is_not_activated_after_price_passed_entry_and_tp1():
+def test_new_short_setup_is_marked_missed_after_price_passed_entry_and_tp1():
     lifecycle = SetupLifecycle()
     candidate = SetupCandidate(
         **{**_candidate().__dict__,
@@ -281,7 +283,8 @@ def test_new_short_setup_is_not_activated_after_price_passed_entry_and_tp1():
         now_ms=1_000,
     )
 
-    assert result.status is None
+    assert result.status is SetupLifecycleStatus.MISSED_BY_PRICE
+    assert "minimum acceptable entry price 757.63" in result.reason
     assert result.action == "WAIT"
     assert lifecycle.active(symbol="BNB/USDT") is None
 
@@ -349,7 +352,7 @@ def test_active_long_is_invalidated_by_candle_low_even_if_close_recovers_above_s
     assert lifecycle.active(symbol="GRT/USDT") is None
 
 
-def test_new_long_setup_stays_unpublished_until_price_reaches_entry_zone():
+def test_new_long_setup_is_marked_missed_when_price_is_above_entry_zone():
     lifecycle = SetupLifecycle()
     result = lifecycle.evaluate(
         symbol="GRT/USDT",
@@ -360,7 +363,8 @@ def test_new_long_setup_stays_unpublished_until_price_reaches_entry_zone():
         current_low=109.0,
         now_ms=1_000,
     )
-    assert result.status is None
+    assert result.status is SetupLifecycleStatus.MISSED_BY_PRICE
+    assert "maximum acceptable entry price 102" in result.reason
     assert result.action == "WAIT"
     assert lifecycle.active(symbol="GRT/USDT") is None
 
@@ -447,3 +451,40 @@ def test_active_setup_is_removed_when_fresh_analysis_has_no_valid_tp1():
     assert result.status is SetupLifecycleStatus.INVALIDATED
     assert "no geometrically valid TP1" in result.reason
     assert lifecycle.active(symbol="BTC/USDT", horizon="intraday") is None
+
+
+def test_new_short_setup_is_marked_missed_when_price_is_below_entry_zone():
+    lifecycle = SetupLifecycle()
+    long_candidate = _candidate()
+    short_candidate = SetupCandidate(
+        **{**long_candidate.__dict__,
+           "direction": "short",
+           "entry_zone": (
+               SetupLevel(100.0, "15m", "active bearish FVG low"),
+               SetupLevel(102.0, "15m", "active bearish FVG high"),
+           ),
+           "invalidation_level": SetupLevel(108.0, "5m", "structural stop"),
+           "target_levels": (
+               SetupLevel(90.0, "4h", "previous low"),
+               SetupLevel(85.0, "1d", "previous low"),
+           )}
+    )
+    assessment = SetupAssessment(
+        decision=SetupDecision.READY,
+        candidates=(short_candidate,),
+        missing_context=(),
+        conflicts=(),
+        reasons=("setup ready",),
+    )
+    lifecycle = SetupLifecycle()
+    result = lifecycle.evaluate(
+        symbol="GRT/USDT",
+        market_type="spot",
+        assessment=assessment,
+        current_price=90.0,
+        current_high=91.0,
+        current_low=89.0,
+        now_ms=1_000,
+    )
+    assert result.status is SetupLifecycleStatus.MISSED_BY_PRICE
+    assert "minimum acceptable entry price 100" in result.reason

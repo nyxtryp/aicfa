@@ -6,8 +6,13 @@ preserves independent setup candidates across horizons and markets.
 """
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
+import hashlib
+import threading
 import time
+
+import pandas as pd
 from typing import Callable, Sequence
 
 from .analysis_depth import resolve_analysis_depth
@@ -17,7 +22,6 @@ from .market_data_router import FallbackMarketDataProvider, SharedSnapshotMarket
 from .find_setup import FindSetupRequest, FindSetupResult, find_setup
 from .market_data import completed_ohlcv
 from .features import build_features
-from .derivatives_market_data import FallbackDerivativesProvider
 from .market_universe import MarketUniverse
 from .setup_lifecycle import SetupIdentity, SetupLifecycle, SetupLifecycleResult
 from .trade_description import TradeDescription, build_trade_description
@@ -29,6 +33,60 @@ PRIMARY_TRADING_MODES: tuple[TradingMode, ...] = (
     TradingMode.SWING,
     TradingMode.POSITION,
 )
+
+# Higher-timeframe structural features (swing/BOS/CHoCH, liquidity, OB/FVG,
+# Premium/Discount and OTE) do not change on every 1m/5m candle. Keep a bounded
+# process-local cache keyed by the full completed OHLCV snapshot so lower-TF
+# events reuse the last confirmed higher-TF analysis.
+_FEATURE_CACHE_TIMEFRAMES = frozenset({"5m", "15m", "1h", "4h", "1d", "1w"})
+# Keep only the latest feature snapshot for each market/timeframe. Keying
+# every candle generation separately retained obsolete DataFrames until the
+# global LRU filled, creating avoidable RAM growth on a large market universe.
+_FEATURE_CACHE_MAXSIZE = 128
+_FEATURE_CACHE_LOCK = threading.RLock()
+_FEATURE_FRAME_CACHE: OrderedDict[tuple, object] = OrderedDict()
+
+
+def _cached_build_features(
+    symbol: str,
+    market_type: str,
+    timeframe: str,
+    completed: pd.DataFrame,
+):
+    if timeframe not in _FEATURE_CACHE_TIMEFRAMES:
+        return build_features(completed)
+    columns = [name for name in ("timestamp", "open", "high", "low", "close", "volume") if name in completed.columns]
+    cache_version = completed.attrs.get("aicfa_cache_version")
+    if cache_version is not None:
+        # LiveMarketDataCache increments this generation whenever its rolling
+        # OHLCV snapshot changes. Include slice boundaries as a guard against
+        # two different requested windows sharing a generation.
+        first_ts = int(completed["timestamp"].iloc[0]) if len(completed) and "timestamp" in completed else None
+        last_ts = int(completed["timestamp"].iloc[-1]) if len(completed) and "timestamp" in completed else None
+        fingerprint = ("generation", int(cache_version), first_ts, last_ts)
+    else:
+        # Keep exact content-addressing for offline providers and test frames
+        # which do not originate from the versioned live cache.
+        raw_hashes = pd.util.hash_pandas_object(completed[columns], index=False).values.tobytes()
+        fingerprint = ("content", hashlib.blake2b(raw_hashes, digest_size=8).digest())
+    # A stable per-market/timeframe key replaces the previous generation
+    # instead of retaining every obsolete DataFrame in the LRU. The stored
+    # fingerprint still prevents stale reuse when the completed snapshot changes.
+    key = (market_type, symbol, timeframe)
+    with _FEATURE_CACHE_LOCK:
+        cached = _FEATURE_FRAME_CACHE.get(key)
+        if cached is not None:
+            cached_fingerprint, cached_analysis = cached
+            if cached_fingerprint == (len(completed), fingerprint):
+                _FEATURE_FRAME_CACHE.move_to_end(key)
+                return cached_analysis
+    analysis = build_features(completed)
+    with _FEATURE_CACHE_LOCK:
+        _FEATURE_FRAME_CACHE[key] = ((len(completed), fingerprint), analysis)
+        _FEATURE_FRAME_CACHE.move_to_end(key)
+        while len(_FEATURE_FRAME_CACHE) > _FEATURE_CACHE_MAXSIZE:
+            _FEATURE_FRAME_CACHE.popitem(last=False)
+    return analysis
 
 
 @dataclass(frozen=True)
@@ -208,13 +266,12 @@ def analyze_market_horizons(
         completed = completed_ohlcv(frame, timeframe=timeframe, now_ms=now_ms)
         if completed.empty:
             continue
-        analysis = build_features(completed)
+        analysis = _cached_build_features(symbol, market_type, timeframe, completed)
         if not analysis.empty:
             prefetched_analyses[timeframe] = analysis
     shared_feature_elapsed = (time.perf_counter() - feature_started) * 1000.0
-    shared_derivatives_provider = derivatives_provider
-    if market_type == "futures" and shared_derivatives_provider is None:
-        shared_derivatives_provider = FallbackDerivativesProvider()
+    # MVP SMC is based on OHLCV only. Derivatives remain an optional future
+    # experiment and are deliberately not requested by the live scanner.
 
     results: list[FindSetupResult] = []
     horizon_timings: list[HorizonTiming] = []
@@ -234,8 +291,9 @@ def analyze_market_horizons(
             resolver=resolved,
             prefetched_frames=prefetched_frames,
             prefetched_analyses=prefetched_analyses,
-            derivatives_provider=shared_derivatives_provider,
-            derivatives_venue_symbols=venue_symbols,
+            derivatives_provider=None,
+            derivatives_venue_symbols=(),
+            ohlcv_only=True,
         )
         results.append(result)
         pipeline_diagnostics = getattr(result, "diagnostics", None)

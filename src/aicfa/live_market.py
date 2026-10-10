@@ -23,6 +23,15 @@ from .market_data import MarketKey, merge_ohlcv, timeframe_ms, validate_ohlcv
 from .websocket_market_data import BinanceWebSocketMarketDataTransport, WebSocketObservation
 
 
+LIVE_CANDLE_MODE_TRIGGERS: dict[str, tuple[TradingMode, ...]] = {
+    "1m": (TradingMode.SCALPING,),
+    "5m": (TradingMode.SCALPING,),
+    "15m": (TradingMode.INTRADAY,),
+    "1h": (TradingMode.SWING,),
+    "4h": (TradingMode.POSITION,),
+}
+
+
 WINDOWS: dict[str, int] = {
     "1m": 500,
     "5m": 500,
@@ -39,6 +48,9 @@ class CandleEvent:
     key: MarketKey
     timestamp_ms: int
     observed_at_ms: int
+    high: float | None = None
+    low: float | None = None
+    close: float | None = None
 
 
 class PersistentCandleStore:
@@ -97,7 +109,13 @@ class LiveMarketDataCache:
         self.upstream = upstream
         self.store = store
         self._frames: dict[MarketKey, pd.DataFrame] = {}
+        self._versions: dict[MarketKey, int] = {}
         self._lock = threading.RLock()
+
+    def _versioned_copy(self, key: MarketKey, frame: pd.DataFrame) -> pd.DataFrame:
+        result = frame.copy()
+        result.attrs["aicfa_cache_version"] = self._versions.get(key, 0)
+        return result
 
     def register_market_symbols(self, asset, venue_symbols, *, market_type="spot"):
         register = getattr(self.upstream, "register_market_symbols", None)
@@ -111,18 +129,20 @@ class LiveMarketDataCache:
         with self._lock:
             stored = self.store.seed(key, frame)
             self._frames[key] = stored
-            return stored.copy()
+            self._versions[key] = self._versions.get(key, 0) + 1
+            return self._versioned_copy(key, stored)
 
     def frame(self, key: MarketKey) -> pd.DataFrame | None:
         with self._lock:
             value = self._frames.get(key)
-            return None if value is None else value.copy()
+            return None if value is None else self._versioned_copy(key, value)
 
     def update(self, key: MarketKey, frame: pd.DataFrame) -> pd.DataFrame:
         with self._lock:
             updated = self.store.append(key, frame)
             self._frames[key] = updated
-            return updated.copy()
+            self._versions[key] = self._versions.get(key, 0) + 1
+            return self._versioned_copy(key, updated)
 
     @staticmethod
     def _candle_is_closed(timestamp_ms: int, timeframe: str, now_ms: int | None = None) -> bool:
@@ -178,8 +198,10 @@ class LiveMarketDataCache:
                     expected_latest_open = (now_ms // duration_ms) * duration_ms - duration_ms
                 latest_cached_open = int(closed["timestamp"].iloc[-1])
                 if latest_cached_open >= expected_latest_open:
-                    # Never hand the analysis pipeline an open candle.
-                    return closed.tail(limit).copy()
+                    # Never hand the analysis pipeline an open candle. Attach
+                    # the cache generation so feature caching need not hash
+                    # every OHLCV row on each lower-timeframe event.
+                    return self._versioned_copy(key, closed.tail(limit))
             needs_refresh = True
 
         # Refresh whenever the cache does not contain enough *closed* candles.
@@ -197,7 +219,10 @@ class LiveMarketDataCache:
                     self.store.windows.get(timeframe, max(int(limit), 500))
                 ).reset_index(drop=True)
                 self._frames[key] = merged
+                self._versions[key] = self._versions.get(key, 0) + 1
                 self.store.append(key, incoming)
+                closed = self._closed_only(merged, timeframe)
+                return self._versioned_copy(key, closed.tail(limit))
         return closed.tail(limit).copy()
 
     def fetch_trades(self, *, symbol, market_type, limit):
@@ -276,13 +301,17 @@ class LiveMarketCoordinator:
         self.on_candle = on_candle
         self.max_workers = max_workers
         self._stopped = threading.Event()
+        # The fallback rotation is permitted only when the live candle feed
+        # has gone quiet. Seed the clock at startup so a failed initial
+        # connection eventually activates the safety net.
+        self._last_observation_received_at_ms = int(time.time() * 1000)
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="aicfa-live")
         self._threads: list[threading.Thread] = []
         self._seed_thread: threading.Thread | None = None
         self._seed_done = threading.Event()
         self._dispatch_lock = threading.RLock()
         self._scheduled_keys: set[MarketKey] = set()
-        self._pending_observations: dict[MarketKey, WebSocketObservation] = {}
+        self._pending_observations: dict[MarketKey, list[WebSocketObservation]] = {}
         self._resolved_market_keys: tuple[tuple[int, MarketKey], ...] = ()
 
     @property
@@ -329,24 +358,88 @@ class LiveMarketCoordinator:
             while not self._stopped.is_set():
                 self._handle(current)
                 with self._dispatch_lock:
-                    pending = self._pending_observations.pop(key, None)
-                    if pending is None:
+                    pending = self._pending_observations.get(key)
+                    if not pending:
+                        self._pending_observations.pop(key, None)
                         self._scheduled_keys.discard(key)
                         return
-                current = pending
+                    # Preserve every closed candle in arrival order. Replacing
+                    # this queue with only the newest observation loses events
+                    # whenever analysis takes longer than the exchange cadence.
+                    current = pending.pop(0)
+                    if not pending:
+                        self._pending_observations.pop(key, None)
+                        # Keep the key scheduled until the just-popped event has
+                        # finished; a new event arriving during _handle must queue.
+                        self._pending_observations[key] = []
         except Exception:
+            # Keep the failed event at the head of the queue. The durable
+            # checkpoint has not advanced, so retrying is idempotent and
+            # prevents a transient analysis/persistence error from losing it.
             with self._dispatch_lock:
+                pending = self._pending_observations.setdefault(key, [])
+                pending.insert(0, current)
                 self._scheduled_keys.discard(key)
             raise
 
+    def _retry_pending_key(self, key: MarketKey) -> None:
+        if self._stopped.is_set():
+            return
+        with self._dispatch_lock:
+            pending = self._pending_observations.get(key)
+            if key in self._scheduled_keys or not pending:
+                return
+            current = pending.pop(0)
+            if not pending:
+                self._pending_observations[key] = []
+            self._scheduled_keys.add(key)
+        future = self._pool.submit(self._dispatch, current)
+
+        def report_retry_failure(done) -> None:
+            try:
+                done.result()
+            except Exception as exc:
+                print(
+                    f"AICFA live candle retry failed: {key.symbol} {key.timeframe}: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                if not self._stopped.is_set():
+                    timer = threading.Timer(1.0, self._retry_pending_key, args=(key,))
+                    timer.daemon = True
+                    timer.start()
+
+        future.add_done_callback(report_retry_failure)
+
+    @property
+    def last_observation_received_at_ms(self) -> int:
+        return self._last_observation_received_at_ms
+
+    def websocket_is_stale(self, *, max_age_seconds: float = 180.0, now_ms: int | None = None) -> bool:
+        if max_age_seconds <= 0:
+            raise ValueError("max_age_seconds must be positive")
+        current = int(time.time() * 1000) if now_ms is None else int(now_ms)
+        return current - self._last_observation_received_at_ms > int(max_age_seconds * 1000)
+
     def _submit_observation(self, observation: WebSocketObservation) -> None:
         key = observation.key
+        self._last_observation_received_at_ms = int(time.time() * 1000)
         with self._dispatch_lock:
+            pending = self._pending_observations.get(key)
             if key in self._scheduled_keys:
-                # Keep only the newest candle for this market/timeframe. A slow
-                # analysis must never build an unbounded queue of stale candles.
-                self._pending_observations[key] = observation
+                # Per-key FIFO preserves all confirmed candles when analysis is
+                # slower than the feed. The dispatcher serializes this key while
+                # other symbols/timeframes continue on the worker pool.
+                self._pending_observations.setdefault(key, []).append(observation)
                 return
+            if pending:
+                # A failed event may be waiting for its scheduled retry. If a
+                # new candle arrives first, resume the oldest queued event,
+                # never jump ahead of it.
+                pending.append(observation)
+                observation = pending.pop(0)
+                if not pending:
+                    self._pending_observations[key] = []
             self._scheduled_keys.add(key)
         future = self._pool.submit(self._dispatch, observation)
         def _report_failure(done) -> None:
@@ -355,9 +448,13 @@ class LiveMarketCoordinator:
             except Exception as exc:
                 print(
                     f"AICFA live candle dispatch error: {key.symbol} {key.timeframe}: "
-                    f"{type(exc).__name__}: {exc}",
+                    f"{type(exc).__name__}: {exc}; retrying in 1s",
                     flush=True,
                 )
+                if not self._stopped.is_set():
+                    timer = threading.Timer(1.0, self._retry_pending_key, args=(key,))
+                    timer.daemon = True
+                    timer.start()
         future.add_done_callback(_report_failure)
 
     def _handle(self, observation: WebSocketObservation) -> None:
@@ -367,16 +464,90 @@ class LiveMarketCoordinator:
         if last is not None and timestamp <= last:
             return
         self.cache.update(key, observation.data)
-        event = CandleEvent(key=key, timestamp_ms=timestamp, observed_at_ms=observation.observed_at_ms)
+        candle = observation.data.iloc[-1]
+        event = CandleEvent(
+            key=key,
+            timestamp_ms=timestamp,
+            observed_at_ms=observation.observed_at_ms,
+            high=float(candle["high"]),
+            low=float(candle["low"]),
+            close=float(candle["close"]),
+        )
         self.on_candle(event)
         # Advance the durable checkpoint only after the candle was accepted by
         # the analysis pipeline. A failed analysis is replayed after restart.
         self.checkpoint.mark(key, timestamp)
 
+    @staticmethod
+    def _latest_closed_open(timeframe: str, now_ms: int) -> int:
+        if timeframe == "1w":
+            now = pd.Timestamp(now_ms, unit="ms", tz="UTC")
+            current_week_open = now.normalize() - pd.Timedelta(days=now.weekday())
+            return int((current_week_open - pd.Timedelta(days=7)).timestamp() * 1000)
+        duration_ms = timeframe_ms(timeframe)
+        return (int(now_ms) // duration_ms) * duration_ms - duration_ms
+
+    def _recover_missed_candles(self, keys: tuple[MarketKey, ...]) -> None:
+        """Fetch actual closed candles after each durable checkpoint, in order."""
+        now_ms = int(time.time() * 1000)
+        for key in keys:
+            if self._stopped.is_set():
+                return
+            last = self.checkpoint.get(key)
+            if last is None:
+                # On first startup the REST history seed supplies context; do
+                # not replay hundreds of historical candles as live events.
+                continue
+            duration_ms = timeframe_ms(key.timeframe)
+            latest_closed_open = self._latest_closed_open(key.timeframe, now_ms)
+            if last >= latest_closed_open:
+                continue
+            cursor = last + duration_ms
+            pages = 0
+            while cursor <= latest_closed_open and pages < 20 and not self._stopped.is_set():
+                try:
+                    frame = self.cache.upstream.fetch_ohlcv(
+                        symbol=key.symbol,
+                        market_type=key.market_type,
+                        timeframe=key.timeframe,
+                        since_ms=cursor,
+                        limit=500,
+                    )
+                    frame = validate_ohlcv(frame)
+                    frame = LiveMarketDataCache._closed_only(frame, key.timeframe)
+                    frame = frame.loc[frame["timestamp"] >= cursor].sort_values("timestamp")
+                except Exception as exc:
+                    print(
+                        f"AICFA candle recovery failed: {key.symbol} {key.timeframe}: "
+                        f"{type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+                    break
+                if frame.empty:
+                    break
+                newest_timestamp = cursor - duration_ms
+                for _, row in frame.iterrows():
+                    timestamp = int(row["timestamp"])
+                    if timestamp > latest_closed_open:
+                        break
+                    observation = WebSocketObservation(
+                        key=key,
+                        data=pd.DataFrame([row]).reset_index(drop=True),
+                        observed_at_ms=timestamp + duration_ms - 1,
+                    )
+                    self._submit_observation(observation)
+                    newest_timestamp = max(newest_timestamp, timestamp)
+                next_cursor = newest_timestamp + duration_ms
+                if next_cursor <= cursor:
+                    break
+                cursor = next_cursor
+                pages += 1
+
     def _stream(self, keys: tuple[MarketKey, ...]) -> None:
         # The exchange may close a stream session after a fixed lifetime. Keep
         # the worker alive and let the transport perform bounded reconnects;
-        # if that budget is exhausted, create a fresh transport session.
+        # if that budget is exhausted, repair the candle gap from REST before
+        # opening another WebSocket session.
         while not self._stopped.is_set():
             transport = BinanceWebSocketMarketDataTransport(
                 keys=keys,
@@ -390,7 +561,12 @@ class LiveMarketCoordinator:
                     if self._stopped.is_set():
                         return
                     self._submit_observation(observation)
-            except Exception:
+            except Exception as exc:
+                print(
+                    f"AICFA WebSocket stream interrupted: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                self._recover_missed_candles(keys)
                 if self._stopped.wait(2.0):
                     return
 
@@ -499,7 +675,7 @@ class BinancePriceMonitor:
 
     @staticmethod
     def _stream_name(key: MarketKey) -> str:
-        symbol = key.symbol.replace("/", "").replace("-", "").lower()
+        symbol = key.symbol.split(":", 1)[0].replace("/", "").replace("-", "").replace("_", "").lower()
         return f"{symbol}@miniTicker"
 
     @staticmethod
@@ -535,7 +711,7 @@ class BinancePriceMonitor:
                     except (KeyError, TypeError, ValueError):
                         continue
                     for key in keys:
-                        expected = key.symbol.replace("/", "").replace("-", "").upper()
+                        expected = key.symbol.split(":", 1)[0].replace("/", "").replace("-", "").replace("_", "").upper()
                         if expected == symbol:
                             self.on_price(key, price, event_ms)
                             break

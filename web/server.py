@@ -10,6 +10,8 @@ import csv
 import json
 import os
 import sys
+import threading
+import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -207,7 +209,7 @@ def _ticker_symbol_candidates(item: dict[str, object]) -> tuple[str, ...]:
     return tuple(candidates)
 
 
-def _market_prices() -> bytes:
+def _market_prices_uncached() -> bytes:
     universe_path = ROOT.parent / "config" / "market_universe.json"
     payload = json.loads(universe_path.read_text(encoding="utf-8"))
     markets = payload.get("markets", [])
@@ -267,6 +269,27 @@ def _market_prices() -> bytes:
         if price is not None:
             prices[str(index)] = price
     return json.dumps({"prices": prices}, separators=(",", ":")).encode("utf-8")
+
+
+# Browser polls prices every few seconds. Share one bounded-staleness snapshot
+# across concurrent requests instead of downloading three entire ticker lists
+# for every open terminal tab.
+_MARKET_PRICES_CACHE_TTL_SECONDS = 10.0
+_MARKET_PRICES_CACHE_LOCK = threading.Lock()
+_MARKET_PRICES_CACHE: tuple[float, bytes] | None = None
+
+
+def _market_prices() -> bytes:
+    global _MARKET_PRICES_CACHE
+    with _MARKET_PRICES_CACHE_LOCK:
+        now = time.monotonic()
+        if _MARKET_PRICES_CACHE is not None:
+            cached_at, payload = _MARKET_PRICES_CACHE
+            if now - cached_at < _MARKET_PRICES_CACHE_TTL_SECONDS:
+                return payload
+        payload = _market_prices_uncached()
+        _MARKET_PRICES_CACHE = (time.monotonic(), payload)
+        return payload
 
 
 class Handler(SimpleHTTPRequestHandler):

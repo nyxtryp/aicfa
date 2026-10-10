@@ -60,8 +60,18 @@ _SPOT_WS_URL = "wss://stream.binance.com:9443/ws"
 _FUTURES_WS_URL = "wss://fstream.binance.com/ws"
 
 
+def _binance_symbol(symbol: str) -> str:
+    """Convert a CCXT unified symbol to Binance's native stream ID.
+
+    CCXT futures symbols commonly look like BTC/USDT:USDT; Binance's native
+    stream ID is BTCUSDT. Keep the original unified symbol on MarketKey for
+    REST routing and persistence, but strip the settlement suffix for WS.
+    """
+    return symbol.split(":", 1)[0].replace("/", "").replace("-", "").replace("_", "").upper()
+
+
 def _stream_name(key: MarketKey) -> str:
-    symbol = key.symbol.replace("/", "").replace("-", "").lower()
+    symbol = _binance_symbol(key.symbol).lower()
     return f"{symbol}@kline_{key.timeframe}"
 
 
@@ -95,7 +105,7 @@ def parse_binance_kline_message(
     if any(field not in kline for field in identity_fields):
         raise WebSocketTransportError("Incomplete Binance kline identity")
 
-    expected_symbol = key.symbol.replace("/", "").replace("-", "").upper()
+    expected_symbol = _binance_symbol(key.symbol)
     if str(kline["s"]).upper() != expected_symbol:
         return None
     if str(kline["i"]).lower() != key.timeframe.lower():
@@ -199,7 +209,6 @@ class BinanceWebSocketMarketDataTransport:
                     _url_for(self.keys[0]), timeout=self.timeout_seconds
                 )
                 self._subscribe(connection)
-                reconnects = 0
                 started_at = self._clock()
                 idle_deadline = (
                     started_at + self._idle_timeout_seconds
@@ -249,6 +258,12 @@ class BinanceWebSocketMarketDataTransport:
                             f"{envelope.get('code')}: {envelope.get('msg', '')}"
                         )
 
+                    # Reset the reconnect budget only after real valid traffic,
+                    # not merely after a TCP/WebSocket handshake. Otherwise a
+                    # server that accepts and immediately drops the socket can
+                    # reconnect forever without ever triggering REST recovery.
+                    reconnects = 0
+
                     # Any successfully received stream message proves that the
                     # connection is active. Open kline updates are deliberately
                     # ignored as market observations, but they still reset the
@@ -295,7 +310,7 @@ class BinanceWebSocketMarketDataTransport:
                         "Binance WebSocket reconnect budget exhausted"
                     ) from exc
                 self._sleeper(
-                    self.reconnect_backoff_seconds * (2**reconnects)
+                    min(self.reconnect_backoff_seconds * (2**reconnects), 10.0)
                 )
                 reconnects += 1
             finally:

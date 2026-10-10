@@ -327,3 +327,48 @@ def test_failed_partial_scan_does_not_stale_existing_setup(tmp_path):
     record = next(iter(registry.read().values()))
     assert record["status"] == "ACTIVE"
     assert record["lifecycle_status"] == "active"
+
+
+def test_registry_persists_missed_by_price_as_terminal_not_active(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Candidate:
+        scenario = "continuation"
+        direction = "long"
+        entry_zone = ()
+
+    class Lifecycle:
+        status = type("Status", (), {"value": "missed_by_price"})()
+        reason = "missed by price: maximum acceptable entry price 102"
+
+    class Setup:
+        mode = "scalping"
+        candidate = Candidate()
+        identity = None
+        lifecycle_result = Lifecycle()
+        evidence_concepts = ()
+        decision_action = "wait"
+
+    class Market:
+        asset = "BTC/USDT"
+        setups = (Setup(),)
+        lifecycle_results = ()
+
+    class State:
+        scanned_at_ms = 1_000
+        scan_number = 1
+        result = type("Result", (), {"markets": (Market(),)})()
+
+    registry.record_scan(State())
+    records = registry.read()
+    assert len(records) == 1
+    record = next(iter(records.values()))
+    assert record["status"] == "MISSED_BY_PRICE"
+    assert record["lifecycle_status"] == "missed_by_price"
+    assert registry.current() == ()
+
+    State.scanned_at_ms = 2_000
+    State.scan_number = 2
+    Market.setups = ()
+    registry.record_scan(State())
+    assert next(iter(registry.read().values()))["status"] == "MISSED_BY_PRICE"

@@ -79,3 +79,13 @@ def test_month_timeframe_uses_calendar_completion_and_cursor():
     assert next_since_ms(frame.iloc[[0]], timeframe="1M") == int(
         pd.Timestamp("2026-02-01", tz="UTC").timestamp() * 1000
     )
+
+
+def test_completed_ohlcv_preserves_live_cache_generation():
+    frame = candles([0, 60_000, 120_000])
+    frame.attrs["aicfa_cache_version"] = 17
+
+    completed = completed_ohlcv(frame, timeframe="1m", now_ms=180_000)
+
+    assert completed.attrs["aicfa_cache_version"] == 17
+    assert len(completed) == 3

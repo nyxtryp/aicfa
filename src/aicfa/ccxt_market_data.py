@@ -19,6 +19,23 @@ _TRADE_COLUMNS = ("timestamp", "price", "volume", "side")
 _BOOK_COLUMNS = ("timestamp", "bid_price", "bid_size", "ask_price", "ask_size")
 
 
+_LOT_MULTIPLIER_PREFIXES = ("1000000", "100000", "10000", "1000", "1M")
+_BASE_SYMBOL_ALIASES = {
+    # Common exchange ticker differences after asset migrations/rebrands.
+    "BTC": ("XBT",),
+    "POL": ("MATIC",),
+    "RENDER": ("RNDR",),
+}
+
+
+def _is_lot_multiplier_alias(market_base: str, canonical_base: str) -> bool:
+    """Return whether a futures contract represents a scaled token lot."""
+    return any(
+        market_base.startswith(prefix) and market_base[len(prefix):] == canonical_base
+        for prefix in _LOT_MULTIPLIER_PREFIXES
+    )
+
+
 class CcxtMarketDataProvider:
     """Public CCXT adapter for a single exchange venue."""
 
@@ -95,28 +112,47 @@ class CcxtMarketDataProvider:
         market_type: str = "spot",
     ) -> str:
         self._validate_market_type(market_type)
-        normalized = asset.strip().upper().replace("/", "").replace("-", "").replace("_", "")
-        if not normalized:
-            raise ValueError("asset must not be empty")
-        quote = quote_asset.strip().upper()
+        raw_asset = asset.strip().upper().replace("-", "/").replace("_", "/")
+        if "/" in raw_asset:
+            base_asset, asset_quote = (part.strip() for part in raw_asset.split("/", 1))
+            quote = asset_quote or quote_asset.strip().upper()
+        else:
+            quote = quote_asset.strip().upper()
+            base_asset = raw_asset.removesuffix(quote)
+        if not base_asset or not quote:
+            raise ValueError("asset must contain a base and quote")
         markets = self._load_markets()
         candidates = []
         for market in markets.values():
-            if str(market.get("quote", "")).upper() != quote:
+            market_quote = str(market.get("quote", "")).upper()
+            market_base = str(market.get("base", "")).upper()
+            if market_quote != quote:
                 continue
-            if str(market.get("base", "")).upper() + quote != normalized:
+            if market_type == "spot":
+                eligible = market.get("spot") is True
+            else:
+                eligible = bool(market.get("contract")) and bool(
+                    market.get("swap") or market.get("future")
+                )
+            if not eligible:
                 continue
-            if market_type == "spot" and market.get("spot") is True:
-                candidates.append(market)
-            elif market_type == "futures" and market.get("contract") and (
-                market.get("swap") or market.get("future")
-            ):
-                candidates.append(market)
+            # Some futures venues list meme coins in lots of 1,000/10,000/
+            # 1,000,000 tokens (e.g. 1000PEPE/USDT:USDT). AICFA keeps the
+            # canonical asset name, but must resolve it to the venue's actual
+            # contract symbol. Exact base matches always win over multipliers.
+            if market_base == base_asset:
+                candidates.append((0, market))
+            elif market_base in _BASE_SYMBOL_ALIASES.get(base_asset, ()):
+                candidates.append((1, market))
+            elif market_type == "futures" and _is_lot_multiplier_alias(market_base, base_asset):
+                candidates.append((2, market))
         if not candidates:
+            normalized = f"{base_asset}{quote}"
             raise ValueError(
                 f"no {self.exchange} {market_type} market found for asset: {normalized}"
             )
-        return str(candidates[0]["symbol"])
+        candidates.sort(key=lambda item: item[0])
+        return str(candidates[0][1]["symbol"])
 
     def fetch_ohlcv(
         self,

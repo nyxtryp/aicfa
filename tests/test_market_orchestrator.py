@@ -348,3 +348,126 @@ def test_one_market_computes_primary_features_once(monkeypatch):
     analyze_market_horizons("BTC/USDT", provider=provider, now_ms=1000)
 
     assert len(calls) == 7
+
+
+
+def test_higher_timeframe_feature_cache_reuses_unchanged_closed_ohlcv(monkeypatch):
+    import aicfa.market_orchestrator as orchestrator
+
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+    calls = []
+
+    def fake_build_features(frame):
+        calls.append(len(frame))
+        return frame.assign(test_feature=1)
+
+    monkeypatch.setattr(orchestrator, "build_features", fake_build_features)
+    frame = pd.DataFrame({
+        "timestamp": [60_000, 120_000],
+        "open": [100.0, 101.0],
+        "high": [102.0, 103.0],
+        "low": [99.0, 100.0],
+        "close": [101.0, 102.0],
+        "volume": [10.0, 12.0],
+    })
+
+    first = orchestrator._cached_build_features("BTC/USDT", "futures", "1h", frame)
+    second = orchestrator._cached_build_features("BTC/USDT", "futures", "1h", frame.copy())
+    assert first is second
+    assert calls == [2]
+
+    changed = frame.copy()
+    changed.loc[1, "close"] = 102.5
+    third = orchestrator._cached_build_features("BTC/USDT", "futures", "1h", changed)
+    assert third is not first
+    assert calls == [2, 2]
+    # A new live generation replaces the old frame rather than retaining both.
+    assert len(orchestrator._FEATURE_FRAME_CACHE) == 1
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+
+
+def test_lower_timeframe_feature_frames_are_not_cached(monkeypatch):
+    import aicfa.market_orchestrator as orchestrator
+
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+    calls = []
+
+    def fake_build_features(frame):
+        calls.append(len(frame))
+        return frame.assign(test_feature=1)
+
+    monkeypatch.setattr(orchestrator, "build_features", fake_build_features)
+    frame = pd.DataFrame({
+        "timestamp": [60_000],
+        "open": [100.0],
+        "high": [102.0],
+        "low": [99.0],
+        "close": [101.0],
+        "volume": [10.0],
+    })
+    orchestrator._cached_build_features("BTC/USDT", "futures", "1m", frame)
+    orchestrator._cached_build_features("BTC/USDT", "futures", "1m", frame)
+    assert calls == [1, 1]
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+
+
+def test_five_minute_feature_cache_reuses_closed_frame_across_one_minute_events(monkeypatch):
+    import aicfa.market_orchestrator as orchestrator
+
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+    calls = []
+
+    def fake_build_features(frame):
+        calls.append(len(frame))
+        return frame.assign(test_feature=1)
+
+    monkeypatch.setattr(orchestrator, "build_features", fake_build_features)
+    frame = pd.DataFrame({
+        "timestamp": [60_000, 360_000],
+        "open": [100.0, 101.0],
+        "high": [102.0, 103.0],
+        "low": [99.0, 100.0],
+        "close": [101.0, 102.0],
+        "volume": [10.0, 12.0],
+    })
+
+    first = orchestrator._cached_build_features("BTC/USDT", "futures", "5m", frame)
+    second = orchestrator._cached_build_features("BTC/USDT", "futures", "5m", frame.copy())
+    assert first is second
+    assert calls == [2]
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+
+
+def test_versioned_live_snapshot_avoids_content_hash_and_invalidates_on_generation(monkeypatch):
+    import aicfa.market_orchestrator as orchestrator
+
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+    calls = []
+
+    def fake_build_features(frame):
+        calls.append(len(frame))
+        return frame.assign(test_feature=len(calls))
+
+    monkeypatch.setattr(orchestrator, "build_features", fake_build_features)
+    frame = pd.DataFrame({
+        "timestamp": [60_000, 120_000],
+        "open": [100.0, 101.0],
+        "high": [102.0, 103.0],
+        "low": [99.0, 100.0],
+        "close": [101.0, 102.0],
+        "volume": [10.0, 12.0],
+    })
+    frame.attrs["aicfa_cache_version"] = 7
+
+    first = orchestrator._cached_build_features("BTC/USDT", "spot", "1h", frame)
+    second = orchestrator._cached_build_features("BTC/USDT", "spot", "1h", frame.copy())
+    assert first is second
+    assert calls == [2]
+
+    refreshed = frame.copy()
+    refreshed.loc[1, "close"] = 102.5
+    refreshed.attrs["aicfa_cache_version"] = 8
+    third = orchestrator._cached_build_features("BTC/USDT", "spot", "1h", refreshed)
+    assert third is not first
+    assert calls == [2, 2]
+    orchestrator._FEATURE_FRAME_CACHE.clear()
