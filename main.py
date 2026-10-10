@@ -59,14 +59,15 @@ def main() -> None:
     def _on_candle(event) -> None:
         engine = engine_holder["engine"]
         key = event.key
+        # A candle close triggers only the profile defined for that cadence.
+        # Scalping accepts both 1m and 5m confirmations; the other profiles have
+        # one unambiguous trigger timeframe each.
         mode_map = {
             "1m": (TradingMode.SCALPING,),
-            "5m": (TradingMode.SCALPING, TradingMode.INTRADAY),
+            "5m": (TradingMode.SCALPING,),
             "15m": (TradingMode.INTRADAY,),
-            "1h": (TradingMode.SCALPING, TradingMode.SWING),
-            "4h": (TradingMode.INTRADAY, TradingMode.POSITION),
-            "1d": (TradingMode.SWING, TradingMode.POSITION),
-            "1w": (TradingMode.POSITION,),
+            "1h": (TradingMode.SWING,),
+            "4h": (TradingMode.POSITION,),
         }
         modes = mode_map.get(key.timeframe, ())
         if not modes:
