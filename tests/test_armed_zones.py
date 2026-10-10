@@ -135,3 +135,20 @@ def test_active_liquidity_levels_and_ote_bands_arm_lower_timeframe_scans():
     assert ArmedZone("1h", "OTE", "bearish", 102.4, 105.8) in zones
     assert candle_intersects_armed_zone(100.5, 101.2, zones)
     assert candle_intersects_armed_zone(95.0, 95.5, zones)
+
+
+def test_structural_levels_arm_bos_and_sweep_candles():
+    zones = extract_active_smc_zones({
+        "1h": pd.DataFrame([{
+            "swing_high_price": 101.0,
+            "swing_low_price": 95.0,
+            "previous_high": 102.0,
+            "previous_low": 94.0,
+            "sweep_high_level": 100.5,
+            "sweep_low_level": 95.5,
+        }])
+    })
+    assert ArmedZone("1h", "STRUCTURE", "swing_high_price", 101.0, 101.0) in zones
+    assert ArmedZone("1h", "STRUCTURE", "sweep_low_level", 95.5, 95.5) in zones
+    assert candle_intersects_armed_zone(100.8, 101.4, zones)
+    assert candle_intersects_armed_zone(95.0, 95.6, zones)
