@@ -23,6 +23,15 @@ from .market_data import MarketKey, merge_ohlcv, timeframe_ms, validate_ohlcv
 from .websocket_market_data import BinanceWebSocketMarketDataTransport, WebSocketObservation
 
 
+LIVE_CANDLE_MODE_TRIGGERS: dict[str, tuple[TradingMode, ...]] = {
+    "1m": (TradingMode.SCALPING,),
+    "5m": (TradingMode.SCALPING,),
+    "15m": (TradingMode.INTRADAY,),
+    "1h": (TradingMode.SWING,),
+    "4h": (TradingMode.POSITION,),
+}
+
+
 WINDOWS: dict[str, int] = {
     "1m": 500,
     "5m": 500,
