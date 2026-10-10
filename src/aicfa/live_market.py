@@ -558,10 +558,9 @@ class LiveMarketCoordinator:
                 pages += 1
 
     def _stream(self, keys: tuple[MarketKey, ...]) -> None:
-        # The exchange may close a stream session after a fixed lifetime. Keep
-        # the worker alive and let the transport perform bounded reconnects;
-        # if that budget is exhausted, repair the candle gap from REST before
-        # opening another WebSocket session.
+        # The exchange may close a stream session after a fixed lifetime. The
+        # transport deliberately surfaces disconnects and 23-hour rotations;
+        # repair the candle gap from REST before opening the next WebSocket.
         while not self._stopped.is_set():
             transport = BinanceWebSocketMarketDataTransport(
                 keys=keys,
