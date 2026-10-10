@@ -189,7 +189,7 @@ def test_registry_migrates_only_lifecycle_owned_revision_three_setup(tmp_path):
 
     assert len(current) == 1
     assert current[0]["asset"] == "BTC/USDT"
-    assert current[0]["strategy_revision"] == 5
+    assert current[0]["strategy_revision"] == 6
     records = registry.read()
     assert records["BTC/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 6
     assert records["ETH/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 2
