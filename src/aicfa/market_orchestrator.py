@@ -199,7 +199,7 @@ def analyze_market_horizons(
     snapshot_elapsed = sum(getattr(item, "duration_ms", 0.0) for item in snapshot_metrics)
     resolution_elapsed = max(0.0, acquisition_elapsed - snapshot_elapsed)
     resolved = lambda _asset, _market_type: symbol
-    # The six primary MTF frames are shared by all three horizons. Compute
+    # The seven primary MTF frames are shared by all four horizons. Compute
     # their deterministic features once and reuse them instead of rebuilding
     # the same overlapping context for each horizon.
     feature_started = time.perf_counter()
