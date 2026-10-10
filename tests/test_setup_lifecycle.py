@@ -252,7 +252,7 @@ def test_same_market_can_hold_independent_horizons():
     assert len(lifecycle.active_setups(symbol="BTC/USDT")) == 3
 
 
-def test_new_short_setup_is_not_activated_after_price_passed_entry_and_tp1():
+def test_new_short_setup_is_marked_missed_after_price_passed_entry_and_tp1():
     lifecycle = SetupLifecycle()
     candidate = SetupCandidate(
         **{**_candidate().__dict__,
@@ -283,7 +283,8 @@ def test_new_short_setup_is_not_activated_after_price_passed_entry_and_tp1():
         now_ms=1_000,
     )
 
-    assert result.status is None
+    assert result.status is SetupLifecycleStatus.MISSED_BY_PRICE
+    assert "minimum acceptable entry price 757.63" in result.reason
     assert result.action == "WAIT"
     assert lifecycle.active(symbol="BNB/USDT") is None
 
