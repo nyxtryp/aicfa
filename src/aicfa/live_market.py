@@ -109,7 +109,13 @@ class LiveMarketDataCache:
         self.upstream = upstream
         self.store = store
         self._frames: dict[MarketKey, pd.DataFrame] = {}
+        self._versions: dict[MarketKey, int] = {}
         self._lock = threading.RLock()
+
+    def _versioned_copy(self, key: MarketKey, frame: pd.DataFrame) -> pd.DataFrame:
+        result = frame.copy()
+        result.attrs["aicfa_cache_version"] = self._versions.get(key, 0)
+        return result
 
     def register_market_symbols(self, asset, venue_symbols, *, market_type="spot"):
         register = getattr(self.upstream, "register_market_symbols", None)
@@ -123,18 +129,20 @@ class LiveMarketDataCache:
         with self._lock:
             stored = self.store.seed(key, frame)
             self._frames[key] = stored
-            return stored.copy()
+            self._versions[key] = self._versions.get(key, 0) + 1
+            return self._versioned_copy(key, stored)
 
     def frame(self, key: MarketKey) -> pd.DataFrame | None:
         with self._lock:
             value = self._frames.get(key)
-            return None if value is None else value.copy()
+            return None if value is None else self._versioned_copy(key, value)
 
     def update(self, key: MarketKey, frame: pd.DataFrame) -> pd.DataFrame:
         with self._lock:
             updated = self.store.append(key, frame)
             self._frames[key] = updated
-            return updated.copy()
+            self._versions[key] = self._versions.get(key, 0) + 1
+            return self._versioned_copy(key, updated)
 
     @staticmethod
     def _candle_is_closed(timestamp_ms: int, timeframe: str, now_ms: int | None = None) -> bool:
@@ -190,8 +198,10 @@ class LiveMarketDataCache:
                     expected_latest_open = (now_ms // duration_ms) * duration_ms - duration_ms
                 latest_cached_open = int(closed["timestamp"].iloc[-1])
                 if latest_cached_open >= expected_latest_open:
-                    # Never hand the analysis pipeline an open candle.
-                    return closed.tail(limit).copy()
+                    # Never hand the analysis pipeline an open candle. Attach
+                    # the cache generation so feature caching need not hash
+                    # every OHLCV row on each lower-timeframe event.
+                    return self._versioned_copy(key, closed.tail(limit))
             needs_refresh = True
 
         # Refresh whenever the cache does not contain enough *closed* candles.
@@ -209,7 +219,10 @@ class LiveMarketDataCache:
                     self.store.windows.get(timeframe, max(int(limit), 500))
                 ).reset_index(drop=True)
                 self._frames[key] = merged
+                self._versions[key] = self._versions.get(key, 0) + 1
                 self.store.append(key, incoming)
+                closed = self._closed_only(merged, timeframe)
+                return self._versioned_copy(key, closed.tail(limit))
         return closed.tail(limit).copy()
 
     def fetch_trades(self, *, symbol, market_type, limit):
