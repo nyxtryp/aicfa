@@ -290,3 +290,34 @@ def test_live_coordinator_accepts_recovery_when_checkpoint_is_current(tmp_path, 
 
     assert coordinator._recover_missed_candles((key,)) is True
     coordinator.stop()
+
+
+
+def test_non_binance_candle_fallback_emits_closed_candle_event(tmp_path, monkeypatch):
+    coordinator = LiveMarketCoordinator(
+        SimpleNamespace(markets=()),
+        provider=Provider(),
+        data_dir=tmp_path / "data",
+        on_candle=lambda event: None,
+    )
+    # Place the clock just after a 5-minute boundary so 1m and 5m are due.
+    fixed_now_ms = 1_800_000_000_000
+    fixed_now_ms = (fixed_now_ms // 300_000) * 300_000 + 3_000
+    monkeypatch.setattr("aicfa.live_market.time.time", lambda: fixed_now_ms / 1000)
+    coordinator._rest_polled_markets = (
+        (0, "futures", "XAU/USDT:USDT", "bybit"),
+    )
+    submitted = []
+
+    def capture(observation):
+        submitted.append(observation)
+        coordinator._stopped.set()
+
+    monkeypatch.setattr(coordinator, "_submit_observation", capture)
+    coordinator._poll_non_binance_closed_candles()
+
+    assert submitted
+    assert submitted[0].key.symbol == "XAU/USDT:USDT"
+    assert submitted[0].key.timeframe == "1m"
+    assert len(submitted[0].data) == 1
+    coordinator.stop()
