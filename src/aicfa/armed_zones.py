@@ -101,6 +101,18 @@ def extract_active_smc_zones(
                 range_low + 0.79 * span,
             ))
 
+        # Recent confirmed swing and prior-period levels are structural
+        # trigger prices. BOS/CHoCH candles can cross these without touching an
+        # FVG/OB body, so retain these levels as arming points too.
+        for level_name in (
+            "swing_high_price", "swing_low_price",
+            "previous_high", "previous_low",
+            "sweep_high_level", "sweep_low_level",
+        ):
+            level = _number(row, level_name)
+            if level is not None:
+                zones.append(ArmedZone(timeframe, "STRUCTURE", level_name, level, level))
+
     # De-duplicate identical bounds that are surfaced by repeated feature views.
     unique: dict[tuple[str, str, float, float], ArmedZone] = {}
     for zone in zones:
