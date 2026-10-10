@@ -346,12 +346,20 @@ def main() -> None:
             candidates = tuple(getattr(assessment, "candidates", ()) or ())
             reasons = tuple(getattr(assessment, "reasons", ()) or ())
             missing = tuple(getattr(assessment, "missing_context", ()) or ())
-            decision = str(getattr(result, "decision", "unknown")).lower()
-            detail = f"{mode}:{decision}:candidates={len(candidates)}"
+            setup_state = str(getattr(getattr(assessment, "decision", None), "value", getattr(assessment, "decision", "unknown"))).lower()
+            final_decision = getattr(result, "decision_assessment", None)
+            action = str(getattr(getattr(final_decision, "action", None), "value", getattr(final_decision, "action", getattr(result, "decision", "unknown")))).lower()
+            final_reasons = tuple(getattr(final_decision, "reasons", ()) or ())
+            final_missing = tuple(getattr(final_decision, "missing_context", ()) or ())
+            detail = f"{mode}:setup={setup_state}:action={action}:candidates={len(candidates)}"
             if reasons:
-                detail += f":reason={str(reasons[0])[:120]}"
+                detail += f":setup_reason={str(reasons[0])[:100]}"
             if missing:
-                detail += f":missing={str(missing[0])[:100]}"
+                detail += f":setup_missing={str(missing[0])[:90]}"
+            if final_reasons:
+                detail += f":decision_reason={str(final_reasons[0])[:100]}"
+            if final_missing:
+                detail += f":decision_missing={str(final_missing[0])[:90]}"
             parts.append(detail)
         return " | ".join(parts) or "no-horizon-results"
 
