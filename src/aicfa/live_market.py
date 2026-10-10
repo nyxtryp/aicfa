@@ -696,23 +696,25 @@ class LiveMarketCoordinator:
         # Poll context timeframes too: daily/weekly closes refresh SMC zones even
         # though only the five trigger timeframes launch a trading profile.
         trigger_timeframes = tuple(self.monitored_timeframes)
-        last_polled_bucket: dict[str, int] = {}
+        last_polled_bucket: dict[tuple[str, str], int] = {}
         while not self._stopped.is_set():
             now_ms = int(time.time() * 1000)
             due = []
             for timeframe in trigger_timeframes:
                 duration = timeframe_ms(timeframe)
-                bucket = now_ms // duration
-                # Poll once shortly after the expected close so the venue has
-                # published the final OHLCV row; do not repeat within that window.
-                if now_ms % duration < 8_000 and last_polled_bucket.get(timeframe) != bucket:
+                # Only attempt polling during the short window after a candle close.
+                if now_ms % duration < 8_000:
                     due.append(timeframe)
-                    last_polled_bucket[timeframe] = bucket
             if due:
                 for _index, market_type, symbol, provider_name in self._rest_polled_markets:
                     for timeframe in due:
                         if self._stopped.is_set():
                             return
+                        duration = timeframe_ms(timeframe)
+                        bucket = now_ms // duration
+                        poll_key = (symbol, timeframe)
+                        if last_polled_bucket.get(poll_key) == bucket:
+                            continue
                         key = MarketKey("binance", symbol, market_type, timeframe)
                         try:
                             frame = self.cache.upstream.fetch_ohlcv(
@@ -723,18 +725,20 @@ class LiveMarketCoordinator:
                                 limit=3,
                             )
                             closed = self.cache._closed_only(frame, timeframe)
-                            if closed.empty:
-                                continue
-                            last_timestamp = int(closed["timestamp"].iloc[-1])
-                            checkpoint = self.checkpoint.get(key)
-                            if checkpoint is not None and last_timestamp <= checkpoint:
-                                continue
-                            observation = WebSocketObservation(
-                                key=key,
-                                data=closed.tail(1).reset_index(drop=True),
-                                observed_at_ms=now_ms,
-                            )
-                            self._submit_observation(observation)
+                            if not closed.empty:
+                                last_timestamp = int(closed["timestamp"].iloc[-1])
+                                checkpoint = self.checkpoint.get(key)
+                                if checkpoint is None or last_timestamp > checkpoint:
+                                    observation = WebSocketObservation(
+                                        key=key,
+                                        data=closed.tail(1).reset_index(drop=True),
+                                        observed_at_ms=now_ms,
+                                    )
+                                    self._submit_observation(observation)
+                            # Empty/no-new-candle is a successful poll. On an
+                            # exception leave the bucket unmarked so it retries
+                            # within this close window rather than missing a candle.
+                            last_polled_bucket[poll_key] = bucket
                         except Exception as exc:
                             print(
                                 f"AICFA REST candle fallback failed: {symbol} {timeframe} "
