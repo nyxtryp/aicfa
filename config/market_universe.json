@@ -563,7 +563,7 @@
       "category": "energy",
       "instrument_type": "perpetual",
       "venue_symbols": {
-        "bybit": "BZ/USDT:USDT",
+        "bybit": "XBRU/USDT:USDT",
         "okx": "BZ/USDT:USDT",
         "mexc": "UKOIL/USDT:USDT"
       }
