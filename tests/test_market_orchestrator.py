@@ -381,6 +381,8 @@ def test_higher_timeframe_feature_cache_reuses_unchanged_closed_ohlcv(monkeypatc
     third = orchestrator._cached_build_features("BTC/USDT", "futures", "1h", changed)
     assert third is not first
     assert calls == [2, 2]
+    # A new live generation replaces the old frame rather than retaining both.
+    assert len(orchestrator._FEATURE_FRAME_CACHE) == 1
     orchestrator._FEATURE_FRAME_CACHE.clear()
 
 
