@@ -21,6 +21,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from aicfa.autonomous_scan import AutonomousScanEngine
+from aicfa.armed_zones import candle_intersects_armed_zone, extract_active_smc_zones
 from aicfa.data_requirements import TradingMode
 from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS
 from aicfa.market_universe import load_market_universe
@@ -58,12 +59,46 @@ def main() -> None:
     data_dir = Path(os.environ.get("AICFA_DATA_DIR", str(ROOT / "data")))
     engine_holder: dict[str, AutonomousScanEngine] = {}
     coordinator_holder: dict[str, LiveMarketCoordinator] = {}
+    armed_zone_lock = threading.RLock()
+    armed_zone_cache: dict[tuple[str, str], tuple[object, ...]] = {}
+    armed_zone_ready: set[tuple[str, str]] = set()
+
+    def _refresh_armed_zones(market, key) -> None:
+        analyses = {}
+        for result in getattr(market, "results", ()) or ():
+            result_analyses = getattr(result, "analyses", {}) or {}
+            if isinstance(result_analyses, dict):
+                analyses.update(result_analyses)
+        # Do not activate the gate if the scan did not expose completed feature
+        # frames; fail open rather than risk dropping a valid confirmation.
+        if not analyses:
+            return
+        zones = extract_active_smc_zones(analyses)
+        cache_key = (key.market_type, key.symbol)
+        with armed_zone_lock:
+            armed_zone_cache[cache_key] = zones
+            armed_zone_ready.add(cache_key)
+
     def _on_candle(event) -> None:
         engine = engine_holder["engine"]
         key = event.key
         modes = LIVE_CANDLE_MODE_TRIGGERS.get(key.timeframe, ())
         if not modes:
             return
+        cache_key = (key.market_type, key.symbol)
+        if key.timeframe == "1m":
+            with armed_zone_lock:
+                ready = cache_key in armed_zone_ready
+                zones = armed_zone_cache.get(cache_key, ())
+            if ready and not candle_intersects_armed_zone(
+                event.low if event.low is not None else float("nan"),
+                event.high if event.high is not None else float("nan"),
+                zones,
+            ):
+                # A closed 1m candle outside all cached active OB/FVG zones
+                # needs no expensive setup analysis. The candle checkpoint is
+                # still acknowledged normally after this callback returns.
+                return
         market_index = next(
             (
                 index for index, market in enumerate(universe.markets)
@@ -110,6 +145,7 @@ def main() -> None:
             raise RuntimeError(
                 diagnostics.error or f"live scan returned {status}"
             )
+        _refresh_armed_zones(market, key)
 
     coordinator = LiveMarketCoordinator(
         universe,
