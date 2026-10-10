@@ -163,3 +163,17 @@ def test_live_dispatch_preserves_all_queued_closed_candles_in_order(tmp_path, mo
     assert all_processed.wait(2)
     coordinator.stop()
     assert processed == [1, 2, 3]
+
+
+
+def test_websocket_freshness_controls_fallback_window(tmp_path):
+    coordinator = LiveMarketCoordinator(
+        SimpleNamespace(markets=()),
+        provider=Provider(),
+        data_dir=tmp_path / "data",
+        on_candle=lambda event: None,
+    )
+    started_at = coordinator.last_observation_received_at_ms
+    assert not coordinator.websocket_is_stale(max_age_seconds=180, now_ms=started_at + 179_000)
+    assert coordinator.websocket_is_stale(max_age_seconds=180, now_ms=started_at + 181_000)
+    coordinator.stop()
