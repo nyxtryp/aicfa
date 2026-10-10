@@ -60,8 +60,18 @@ _SPOT_WS_URL = "wss://stream.binance.com:9443/ws"
 _FUTURES_WS_URL = "wss://fstream.binance.com/ws"
 
 
+def _binance_symbol(symbol: str) -> str:
+    """Convert a CCXT unified symbol to Binance's native stream ID.
+
+    CCXT futures symbols commonly look like BTC/USDT:USDT; Binance's native
+    stream ID is BTCUSDT. Keep the original unified symbol on MarketKey for
+    REST routing and persistence, but strip the settlement suffix for WS.
+    """
+    return symbol.split(":", 1)[0].replace("/", "").replace("-", "").replace("_", "").upper()
+
+
 def _stream_name(key: MarketKey) -> str:
-    symbol = key.symbol.replace("/", "").replace("-", "").lower()
+    symbol = _binance_symbol(key.symbol).lower()
     return f"{symbol}@kline_{key.timeframe}"
 
 
@@ -95,7 +105,7 @@ def parse_binance_kline_message(
     if any(field not in kline for field in identity_fields):
         raise WebSocketTransportError("Incomplete Binance kline identity")
 
-    expected_symbol = key.symbol.replace("/", "").replace("-", "").upper()
+    expected_symbol = _binance_symbol(key.symbol)
     if str(kline["s"]).upper() != expected_symbol:
         return None
     if str(kline["i"]).lower() != key.timeframe.lower():
