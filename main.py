@@ -22,7 +22,7 @@ if str(SRC) not in sys.path:
 
 from aicfa.autonomous_scan import AutonomousScanEngine
 from aicfa.data_requirements import TradingMode
-from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator
+from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS
 from aicfa.market_universe import load_market_universe
 from aicfa.market_control import serve_control
 from aicfa.market_data import MarketKey
@@ -56,21 +56,12 @@ def main() -> None:
     # setup engine, so scans never refetch the whole history from the exchange.
     upstream = build_public_market_data_provider(timeout_seconds=10.0)
     engine_holder: dict[str, AutonomousScanEngine] = {}
+    coordinator_holder: dict[str, LiveMarketCoordinator] = {}
 
     def _on_candle(event) -> None:
         engine = engine_holder["engine"]
         key = event.key
-        # A candle close triggers only the profile defined for that cadence.
-        # Scalping accepts both 1m and 5m confirmations; the other profiles have
-        # one unambiguous trigger timeframe each.
-        mode_map = {
-            "1m": (TradingMode.SCALPING,),
-            "5m": (TradingMode.SCALPING,),
-            "15m": (TradingMode.INTRADAY,),
-            "1h": (TradingMode.SWING,),
-            "4h": (TradingMode.POSITION,),
-        }
-        modes = mode_map.get(key.timeframe, ())
+        modes = LIVE_CANDLE_MODE_TRIGGERS.get(key.timeframe, ())
         if not modes:
             return
         market_index = next(
@@ -82,7 +73,17 @@ def main() -> None:
             None,
         )
         if market_index is None:
-            return
+            # The WebSocket threads can deliver immediately after start()
+            # launches them, before the startup thread has copied the resolved
+            # symbol map onto the engine. Resolve from the coordinator's map
+            # instead of acknowledging a candle without analyzing it.
+            coordinator = coordinator_holder.get("coordinator")
+            if coordinator is not None:
+                for resolved_index, resolved_key in coordinator._resolved_market_keys:
+                    engine._live_symbol_map[(resolved_key.market_type, resolved_key.symbol)] = resolved_index
+                market_index = engine._live_symbol_map.get((key.market_type, key.symbol))
+            if market_index is None:
+                raise RuntimeError(f"closed candle has no configured market mapping: {key.symbol}")
         state = engine.scan_market(
             market_index,
             modes=modes,
@@ -113,6 +114,7 @@ def main() -> None:
         on_candle=_on_candle,
         max_workers=max(1, min(4, (os.cpu_count() or 2))),
     )
+    coordinator_holder["coordinator"] = coordinator
     engine = AutonomousScanEngine(universe, provider=coordinator.cache)
     # Keep automatic-rotation health separate from last_state, which manual
     # scans can overwrite while the background queue is running.
