@@ -78,6 +78,16 @@ def extract_active_smc_zones(
     return tuple(unique.values())
 
 
+def zones_for_trigger_timeframe(
+    zones: Sequence[ArmedZone],
+    trigger_timeframe: str,
+) -> tuple[ArmedZone, ...]:
+    """Use cached higher-timeframe POIs to gate 5m; 1m may also use 5m zones."""
+    if trigger_timeframe == "5m":
+        return tuple(zone for zone in zones if zone.timeframe in {"15m", "1h", "4h", "1d", "1w"})
+    return tuple(zones)
+
+
 def candle_intersects_armed_zone(
     candle_low: float,
     candle_high: float,
@@ -90,4 +100,4 @@ def candle_intersects_armed_zone(
     return any(high >= zone.low and low <= zone.high for zone in zones)
 
 
-__all__ = ["ArmedZone", "extract_active_smc_zones", "candle_intersects_armed_zone"]
+__all__ = ["ArmedZone", "extract_active_smc_zones", "zones_for_trigger_timeframe", "candle_intersects_armed_zone"]
