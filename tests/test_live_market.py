@@ -254,3 +254,37 @@ def test_binance_market_key_chunking_deduplicates_and_validates_size():
     import pytest
     with pytest.raises(ValueError, match="max_streams"):
         chunk_market_keys((key,), max_streams=0)
+
+
+
+def test_live_coordinator_does_not_mark_failed_rest_gap_recovery_complete(tmp_path, monkeypatch):
+    class BrokenRecoveryProvider(Provider):
+        def fetch_ohlcv(self, *, symbol, market_type, timeframe, since_ms, limit):
+            raise ConnectionError("REST unavailable")
+
+    coordinator = LiveMarketCoordinator(
+        SimpleNamespace(markets=()),
+        provider=BrokenRecoveryProvider(),
+        data_dir=tmp_path / "data",
+        on_candle=lambda event: None,
+    )
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    monkeypatch.setattr(coordinator.checkpoint, "get", lambda _key: 1)
+
+    assert coordinator._recover_missed_candles((key,)) is False
+    coordinator.stop()
+
+
+def test_live_coordinator_accepts_recovery_when_checkpoint_is_current(tmp_path, monkeypatch):
+    coordinator = LiveMarketCoordinator(
+        SimpleNamespace(markets=()),
+        provider=Provider(),
+        data_dir=tmp_path / "data",
+        on_candle=lambda event: None,
+    )
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    latest = coordinator._latest_closed_open(key.timeframe, int(time.time() * 1000))
+    monkeypatch.setattr(coordinator.checkpoint, "get", lambda _key: latest)
+
+    assert coordinator._recover_missed_candles((key,)) is True
+    coordinator.stop()
