@@ -723,6 +723,8 @@ def _target_levels(
     preferred_timeframes: tuple[str, ...] = (),
     entry_timeframe: str | None = None,
     entry_zone: tuple[SetupLevel, ...] = (),
+    invalidation_level: SetupLevel | None = None,
+    minimum_rr: float = 2.0,
 ) -> tuple[SetupLevel, ...]:
     # A target is the next causal draw-on-liquidity/objective, not an arbitrary
     # number above/below price. The hierarchy follows the market-delivery logic:
@@ -812,6 +814,21 @@ def _target_levels(
                 and distance > max_target_distance
             ):
                 continue
+            # Never advertise a target that is technically beyond entry but
+            # offers negligible reward relative to the structural stop. The
+            # nearest such liquidity level caused cases like TP1 only a few
+            # ticks beyond the entry zone while price was already near TP2.
+            if entry_zone and invalidation_level is not None:
+                entry_low = min(level.value for level in entry_zone)
+                entry_high = max(level.value for level in entry_zone)
+                if direction == "long":
+                    risk = entry_low - invalidation_level.value
+                    reward = value - entry_high
+                else:
+                    risk = invalidation_level.value - entry_high
+                    reward = entry_low - value
+                if risk <= 0 or reward <= 0 or reward / risk < minimum_rr:
+                    continue
             candidates.append((
                 source_priority,
                 distance,
@@ -1063,6 +1080,7 @@ def analyze_setups(
                 source_tfs,
                 entry_timeframe,
                 entry_levels,
+                invalidation_level,
             )
             entry_conditions = _entry_confirmation_conditions(
                 hypothesis.scenario,
