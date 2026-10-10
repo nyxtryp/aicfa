@@ -372,3 +372,59 @@ def test_registry_persists_missed_by_price_as_terminal_not_active(tmp_path):
     Market.setups = ()
     registry.record_scan(State())
     assert next(iter(registry.read().values()))["status"] == "MISSED_BY_PRICE"
+
+
+def test_registry_identity_does_not_duplicate_when_entry_zone_moves(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Level:
+        def __init__(self, value):
+            self.value = value
+            self.timeframe = "5m"
+            self.source = "order_block"
+
+    class Candidate:
+        scenario = "continuation"
+        direction = "long"
+
+        def __init__(self, low, high):
+            self.entry_zone = (Level(low), Level(high))
+
+    first = registry.identity_key(
+        asset="LINK/USDT", market_type="spot", mode="scalping",
+        candidate=Candidate(10.0, 10.2),
+    )
+    updated = registry.identity_key(
+        asset="LINK/USDT", market_type="spot", mode="scalping",
+        candidate=Candidate(10.1, 10.3),
+    )
+
+    assert first == updated
+
+
+def test_registry_migrates_revision_five_zone_duplicates_to_one_family_record(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+    base = {
+        "strategy_revision": 5,
+        "asset": "LINK/USDT",
+        "market_type": "spot",
+        "mode": "scalping",
+        "scenario": "continuation",
+        "direction": "LONG",
+        "structural_timeframe": "5m",
+        "lifecycle_status": "missed_by_price",
+        "status": "MISSED_BY_PRICE",
+        "setup": {"candidate": {"entry_zone": [{"value": 10.0, "timeframe": "5m", "source": "ob"}]}},
+        "created_at_ms": 100,
+        "last_seen_at_ms": 200,
+        "closed_at_ms": 200,
+    }
+    other = {**base, "setup": {"candidate": {"entry_zone": [{"value": 10.1, "timeframe": "5m", "source": "ob"}]}}, "last_seen_at_ms": 300, "closed_at_ms": 300}
+    registry._write({"old-a": base, "old-b": other})
+
+    current = registry._current_revision_records()
+
+    assert len(current) == 1
+    record = next(iter(current.values()))
+    assert record["strategy_revision"] == 6
+    assert record["last_seen_at_ms"] == 300
