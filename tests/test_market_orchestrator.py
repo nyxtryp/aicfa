@@ -62,7 +62,7 @@ def _candidate(direction="long", scenario="continuation"):
 
 def _fake_result(asset: str, mode: TradingMode, *, candidate=None, decision="WAIT"):
     execution = {
-        TradingMode.SCALPING: "5m",
+        TradingMode.SCALPING: "1m",
         TradingMode.INTRADAY: "5m",
         TradingMode.SWING: "1h",
         TradingMode.POSITION: "4h",
