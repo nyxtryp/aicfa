@@ -1,6 +1,6 @@
 const API_BASE="/api";
-const state={events:[],registry:[],markets:[],prices:{},filter:"ALL"};
-const ui={history:[],manualItems:[],manualView:null,autoWatchItems:[],selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
+const state={events:[],registry:[],monitorRecords:[],markets:[],prices:{},filter:"ALL"};
+const ui={history:[],manualItems:[],manualView:null,autoWatchItems:[],selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:"",monitorMode:"SCALPING",monitorView:"ACTIVE"};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?"—":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const pick=(o,...k)=>{for(const x of k)if(o&&o[x]!=null)return o[x]};
@@ -398,18 +398,45 @@ async function getJson(path,fallback){
   return response.ok?data:fallback;
  }catch(_){return fallback}
 }
+function monitorStatusLabel(status){
+ const labels={ACTIVE:"ACTIVE",TP1_HIT:"TP1 HIT",COMPLETED:"TP2 HIT",INVALIDATED:"INVALIDATED",EXPIRED:"EXPIRED",MISSED_BY_PRICE:"MISSED ENTRY"};
+ return labels[String(status||"").toUpperCase()]||String(status||"").replaceAll("_"," ").toUpperCase();
+}
+function renderTradeMonitor(){
+ const all=state.monitorRecords||[],mode=ui.monitorMode;
+ const modeRows=all.filter(r=>hor(r.mode)===mode);
+ const activeRows=modeRows.filter(r=>["ACTIVE","TP1_HIT"].includes(String(r.status||"").toUpperCase()));
+ const completedRows=modeRows.filter(r=>["COMPLETED","INVALIDATED","EXPIRED","MISSED_BY_PRICE"].includes(String(r.status||"").toUpperCase()));
+ $("#monitorCount").textContent=String(modeRows.length);
+ $("#monitorActiveCount").textContent=String(activeRows.length);
+ $("#monitorCompletedCount").textContent=String(completedRows.length);
+ document.querySelectorAll("[data-monitor-mode]").forEach(b=>b.classList.toggle("active",b.dataset.monitorMode===ui.monitorMode));
+ document.querySelectorAll("[data-monitor-view]").forEach(b=>b.classList.toggle("active",b.dataset.monitorView===ui.monitorView));
+ const rows=ui.monitorView==="ACTIVE"?activeRows:completedRows;
+ const root=$("#tradeMonitor");
+ root.innerHTML=rows.length?rows.map(r=>{
+  const wrapper=r.setup||{},s=wrapper.candidate||wrapper,entry=(s.entry_zone||[]).map(x=>Number(x.value)).filter(Number.isFinite);
+  const entryText=entry.length?entry.map(v=>formatMarketPrice(v)).join(" – "):"—";
+  const stop=Number(s.invalidation_level?.value),targets=(s.target_levels||[]).map(x=>Number(x.value)).filter(Number.isFinite);
+  const terminal=String(r.status||"").toUpperCase();
+  const when=ui.monitorView==="ACTIVE"?(r.last_seen_at_ms||r.created_at_ms):(r.closed_at_ms||r.last_seen_at_ms);
+  const reason=r.outcome_reason||"";
+  return '<article class="monitor-item '+(terminal==="INVALIDATED"?"monitor-loss":terminal==="COMPLETED"?"monitor-win":"")+'"><div class="monitor-item-head"><b>'+esc(r.asset)+'</b><span>'+esc(monitorStatusLabel(terminal))+'</span></div><div class="monitor-meta"><b class="'+(String(r.direction||s.direction).toUpperCase()==="SHORT"?"short-text":"long-text")+'">'+esc(r.direction||s.direction||"—")+'</b><span>'+esc(String(s.scenario||"").replaceAll("_"," ").toUpperCase())+'</span><time>'+esc(tm(when))+'</time></div><div class="monitor-prices"><span>ENTRY <b>'+esc(entryText)+'</b></span><span>SL <b>'+esc(Number.isFinite(stop)?formatMarketPrice(stop):"—")+'</b></span><span>TP <b>'+esc(targets.length?targets.map(formatMarketPrice).join(" / "):"—")+'</b></span></div>'+(reason?'<p>'+esc(reason)+'</p>':"")+'</article>';
+ }).join(""):'<div class="rail-empty">'+(ui.monitorView==="ACTIVE"?"NO ACTIVE SETUPS FOR THIS STRATEGY":"NO COMPLETED SETUPS FOR THIS STRATEGY")+'</div>';
+}
 async function refresh(){
  if(refreshInFlight)return;refreshInFlight=true;
  try{
-  const [h,d,r,mk,prices]=await Promise.all([
+  const [h,d,r,tmr,mk,prices]=await Promise.all([
    getJson("/health",{}),
    getJson("/journal/scans?limit=500",{events:[]}),
    getJson("/journal/registry",{setups:[]}),
+   getJson("/journal/trade-monitor",{setups:[]}),
    getJson("/markets",{markets:[]}),
    getJson("/market-prices",{prices:{}})
   ]);
-  state.events=d.events||[];const registry=r.setups||[];state.registry=registry;state.markets=mk.markets||[];const previous=state.prices;state.prices=prices.prices||{};state.previousPrices=previous;const sig=JSON.stringify([state.events,registry,state.markets]);
-  if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}else{renderMarkets()}
+  state.events=d.events||[];const registry=r.setups||[];state.registry=registry;state.monitorRecords=tmr.setups||[];state.markets=mk.markets||[];const previous=state.prices;state.prices=prices.prices||{};state.previousPrices=previous;const sig=JSON.stringify([state.events,registry,state.markets]);
+  if(sig!==lastEventSignature){lastEventSignature=sig;render(scans(),registry)}else{renderMarkets()}renderTradeMonitor();
   $("#statusText").textContent=h.ok?"LIVE":(state.markets.length||state.events.length?"DEGRADED":"OFFLINE");$("#updated").textContent=tm(Date.now());
  }catch(e){$("#statusText").textContent="DEGRADED";$("#updated").textContent=tm(Date.now())}finally{refreshInFlight=false}
 }
@@ -473,5 +500,7 @@ async function scanMarket(index){
 $("#filters").addEventListener("click",e=>{const f=e.target.dataset.filter;if(!f)return;document.querySelectorAll("#filters button").forEach(b=>b.classList.remove("active"));e.target.classList.add("active");state.filter=f;render(scans(),state.registry)});
 $("#marketWatch").addEventListener("click",e=>{const b=e.target.closest("[data-market-index]");if(!b)return;scanMarket(Number(b.dataset.marketIndex))});
 $("#setupHistory").addEventListener("click",e=>{const b=e.target.closest("[data-setup-key]");if(!b)return;const key=b.dataset.setupKey;ui.selected=key;ui.centerKey=key;ui.manualView=null;ui.centerEmpty=false;ui.centerEmptyMarket="";renderHistory();renderCenter()});
+$("#monitorModes").addEventListener("click",e=>{const b=e.target.closest("[data-monitor-mode]");if(!b)return;ui.monitorMode=b.dataset.monitorMode;renderTradeMonitor()});
+$("#monitorViews").addEventListener("click",e=>{const b=e.target.closest("[data-monitor-view]");if(!b)return;ui.monitorView=b.dataset.monitorView;renderTradeMonitor()});
 $(".left-rail").addEventListener("click",e=>{const head=e.target.closest(".rail-head");if(!head)return;const panel=head.parentElement;if(!panel.matches(".market-watch,.rail-panel"))return;panel.classList.toggle("collapsed")});
 refresh();setInterval(refresh,3000);
