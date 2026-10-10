@@ -71,6 +71,36 @@ def extract_active_smc_zones(
             ):
                 zones.append(ArmedZone(timeframe, "OB", side, low, high))
 
+        # Active liquidity prices are OHLCV-derived pool levels. Treat the
+        # level itself as a zero-width POI; any candle wick that sweeps it arms
+        # the symbol for full structural confirmation analysis.
+        for pool_side, count_column, price_column in (
+            ("buy_side", "active_buy_liquidity_pools", "active_buy_liquidity_price"),
+            ("sell_side", "active_sell_liquidity_pools", "active_sell_liquidity_price"),
+        ):
+            if _active_count(row, count_column):
+                level = _number(row, price_column)
+                if level is not None:
+                    zones.append(ArmedZone(timeframe, "LIQUIDITY", pool_side, level, level))
+
+        # OTE bands are the 62%-79% retracement zones of the last confirmed
+        # dealing range. Keep both directional bands in the watch cache; the
+        # canonical setup pipeline resolves bias and direction before entry.
+        range_high = _number(row, "structural_dealing_range_high")
+        range_low = _number(row, "structural_dealing_range_low")
+        if range_high is not None and range_low is not None and range_high > range_low:
+            span = range_high - range_low
+            zones.append(ArmedZone(
+                timeframe, "OTE", "bullish",
+                range_low + 0.21 * span,
+                range_low + 0.38 * span,
+            ))
+            zones.append(ArmedZone(
+                timeframe, "OTE", "bearish",
+                range_low + 0.62 * span,
+                range_low + 0.79 * span,
+            ))
+
     # De-duplicate identical bounds that are surfaced by repeated feature views.
     unique: dict[tuple[str, str, float, float], ArmedZone] = {}
     for zone in zones:
