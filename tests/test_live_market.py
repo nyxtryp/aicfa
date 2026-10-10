@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, LiveMarketCoordinator, WINDOWS
+from aicfa.live_market import CandleCheckpoint, PersistentCandleStore, LiveMarketDataCache, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS, WINDOWS
 from aicfa.market_data import MarketKey
 from aicfa.websocket_market_data import WebSocketObservation
 
@@ -177,3 +177,54 @@ def test_websocket_freshness_controls_fallback_window(tmp_path):
     assert not coordinator.websocket_is_stale(max_age_seconds=180, now_ms=started_at + 179_000)
     assert coordinator.websocket_is_stale(max_age_seconds=180, now_ms=started_at + 181_000)
     coordinator.stop()
+
+
+
+def test_live_candle_trigger_map_matches_requested_profile_cadence():
+    from aicfa.data_requirements import TradingMode
+
+    assert LIVE_CANDLE_MODE_TRIGGERS == {
+        "1m": (TradingMode.SCALPING,),
+        "5m": (TradingMode.SCALPING,),
+        "15m": (TradingMode.INTRADAY,),
+        "1h": (TradingMode.SWING,),
+        "4h": (TradingMode.POSITION,),
+    }
+    assert "1d" not in LIVE_CANDLE_MODE_TRIGGERS
+    assert "1w" not in LIVE_CANDLE_MODE_TRIGGERS
+
+
+def test_failed_candle_processing_is_retried_without_losing_event(tmp_path, monkeypatch):
+    coordinator = LiveMarketCoordinator(
+        SimpleNamespace(markets=()),
+        provider=Provider(),
+        data_dir=tmp_path / "data",
+        on_candle=lambda event: None,
+        max_workers=1,
+    )
+    attempts = []
+    recovered = threading.Event()
+
+    def fail_once(observation):
+        attempts.append(int(observation.data["timestamp"].iloc[0]))
+        if len(attempts) == 1:
+            raise RuntimeError("transient test failure")
+        recovered.set()
+
+    monkeypatch.setattr(coordinator, "_handle", fail_once)
+    frame = pd.DataFrame({
+        "timestamp": [1],
+        "open": [100.0],
+        "high": [101.0],
+        "low": [99.0],
+        "close": [100.5],
+        "volume": [10.0],
+    })
+    coordinator._submit_observation(WebSocketObservation(
+        key=MarketKey("binance", "BTC/USDT", "spot", "1m"),
+        data=frame,
+        observed_at_ms=60_000,
+    ))
+    assert recovered.wait(3)
+    coordinator.stop()
+    assert attempts == [1, 1]
