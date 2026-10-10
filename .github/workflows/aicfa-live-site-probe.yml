@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "main"
+      - "diagnostics/**"
     paths:
       - ".github/workflows/aicfa-live-site-probe.yml"
   workflow_dispatch:
