@@ -136,7 +136,7 @@ def _acquire_primary_snapshot(
             register(asset, venue_symbols, market_type=market_type)
     symbol = str(shared.resolve_symbol(asset, market_type=market_type))
     limits = _primary_snapshot_limits(modes)
-    primary_timeframes = ("1w", "1d", "4h", "1h", "15m", "5m")
+    primary_timeframes = ("1w", "1d", "4h", "1h", "15m", "5m", "1m")
     timeframes = tuple(timeframe for timeframe in primary_timeframes if timeframe in limits)
     snapshot = shared.fetch_ohlcv_snapshot(
         symbol=symbol,
@@ -199,7 +199,7 @@ def analyze_market_horizons(
     snapshot_elapsed = sum(getattr(item, "duration_ms", 0.0) for item in snapshot_metrics)
     resolution_elapsed = max(0.0, acquisition_elapsed - snapshot_elapsed)
     resolved = lambda _asset, _market_type: symbol
-    # The six primary MTF frames are shared by all three horizons. Compute
+    # The seven primary MTF frames are shared by all four horizons. Compute
     # their deterministic features once and reuse them instead of rebuilding
     # the same overlapping context for each horizon.
     feature_started = time.perf_counter()

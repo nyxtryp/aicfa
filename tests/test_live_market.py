@@ -38,6 +38,10 @@ class Provider:
         raise AssertionError
 
 
+def test_one_minute_window_is_configured_for_live_scalping():
+    assert WINDOWS["1m"] == 500
+
+
 def test_rolling_store_keeps_configured_window(tmp_path):
     store = PersistentCandleStore(tmp_path / "raw")
     key = MarketKey("binance", "BTC/USDT", "spot", "5m")

@@ -130,7 +130,7 @@ def test_find_setup_fetches_only_selected_intraday_timeframes():
 
 
 @pytest.mark.parametrize("mode, expected", [
-    ("scalping", ("1h", "15m", "5m")),
+    ("scalping", ("1h", "15m", "5m", "1m")),
     ("intraday", ("4h", "1h", "15m", "5m")),
     ("swing", ("1d", "4h", "1h")),
     ("position", ("1w", "1d", "4h")),

@@ -24,6 +24,7 @@ from .websocket_market_data import BinanceWebSocketMarketDataTransport, WebSocke
 
 
 WINDOWS: dict[str, int] = {
+    "1m": 500,
     "5m": 500,
     "15m": 500,
     "1h": 500,
@@ -67,6 +68,17 @@ class PersistentCandleStore:
             merged = merge_ohlcv(self.load(key), frame)
             limit = self.windows.get(key.timeframe, 500)
             merged = merged.tail(limit).reset_index(drop=True)
+            path = self._path(key)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temp = path.with_suffix(".csv.tmp")
+            merged.to_csv(temp, index=False)
+            temp.replace(path)
+            return merged.copy()
+
+    def replace(self, key: MarketKey, frame: pd.DataFrame) -> pd.DataFrame:
+        """Atomically replace one rolling window with a verified candle batch."""
+        with self._lock:
+            merged = validate_ohlcv(frame).tail(self.windows.get(key.timeframe, 500)).reset_index(drop=True)
             path = self._path(key)
             path.parent.mkdir(parents=True, exist_ok=True)
             temp = path.with_suffix(".csv.tmp")

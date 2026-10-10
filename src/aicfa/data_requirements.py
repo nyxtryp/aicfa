@@ -119,8 +119,8 @@ class DataRequirementPlan:
 _MODE_PROFILES = {
     TradingMode.SCALPING: ModeTimeframeProfile(
         TradingMode.SCALPING,
-        ("1h", "15m", "5m"),
-        (("1h", TimeframeRole.BROADER_CONTEXT), ("15m", TimeframeRole.HIGHER_STRUCTURE), ("5m", TimeframeRole.EXECUTION)),
+        ("1h", "15m", "5m", "1m"),
+        (("1h", TimeframeRole.BROADER_CONTEXT), ("15m", TimeframeRole.HIGHER_STRUCTURE), ("5m", TimeframeRole.LOWER_CONFIRMATION), ("1m", TimeframeRole.EXECUTION)),
     ),
     TradingMode.INTRADAY: ModeTimeframeProfile(
         TradingMode.INTRADAY,
