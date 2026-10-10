@@ -384,7 +384,7 @@ def test_higher_timeframe_feature_cache_reuses_unchanged_closed_ohlcv(monkeypatc
     orchestrator._FEATURE_FRAME_CACHE.clear()
 
 
-def test_lower_timeframe_feature_frames_remain_incremental_not_cached(monkeypatch):
+def test_lower_timeframe_feature_frames_are_not_cached(monkeypatch):
     import aicfa.market_orchestrator as orchestrator
 
     orchestrator._FEATURE_FRAME_CACHE.clear()
