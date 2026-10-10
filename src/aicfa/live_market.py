@@ -694,15 +694,18 @@ class LiveMarketCoordinator:
         This is a candle-event fallback, not a per-symbol analysis rotation.
         """
         trigger_timeframes = tuple(LIVE_CANDLE_MODE_TRIGGERS)
+        last_polled_bucket: dict[str, int] = {}
         while not self._stopped.is_set():
             now_ms = int(time.time() * 1000)
             due = []
             for timeframe in trigger_timeframes:
                 duration = timeframe_ms(timeframe)
-                # Poll shortly after the expected close so the venue has
-                # published the final OHLCV row.
-                if now_ms % duration < 8_000:
+                bucket = now_ms // duration
+                # Poll once shortly after the expected close so the venue has
+                # published the final OHLCV row; do not repeat within that window.
+                if now_ms % duration < 8_000 and last_polled_bucket.get(timeframe) != bucket:
                     due.append(timeframe)
+                    last_polled_bucket[timeframe] = bucket
             if due:
                 for _index, market_type, symbol, provider_name in self._rest_polled_markets:
                     for timeframe in due:
