@@ -247,7 +247,7 @@ def main() -> None:
         engine.last_automatic_scan_status = "event_driven"
         while not stop_event.is_set():
             if not coordinator.websocket_is_stale(max_age_seconds=180.0):
-                engine.automatic_worker_running = False
+                engine.automatic_worker_running = True
                 stop_event.wait(1.0)
                 continue
 
