@@ -754,6 +754,7 @@ def _target_levels(
     ) + tuple(tf for tf in allowed if tf not in preferred_timeframes)
 
     candidates: list[tuple[int, float, int, str, str, float]] = []
+    rr_qualified_candidates: list[tuple[int, float, int, str, str, float]] = []
     # A structurally valid level can still be an unusable TP1 if it is far
     # outside the current mode's normal volatility envelope. Use the mode's
     # higher-structure ATR (falling back to broader context ATR); when ATR is
@@ -818,6 +819,15 @@ def _target_levels(
             # offers negligible reward relative to the structural stop. The
             # nearest such liquidity level caused cases like TP1 only a few
             # ticks beyond the entry zone while price was already near TP2.
+            candidate = (
+                source_priority,
+                distance,
+                -context.timeframes.index(timeframe),
+                timeframe,
+                source,
+                value,
+            )
+            candidates.append(candidate)
             if entry_zone and invalidation_level is not None:
                 entry_low = min(level.value for level in entry_zone)
                 entry_high = max(level.value for level in entry_zone)
@@ -827,19 +837,16 @@ def _target_levels(
                 else:
                     risk = invalidation_level.value - entry_high
                     reward = entry_low - value
-                if risk <= 0 or reward <= 0 or reward / risk < minimum_rr:
-                    continue
-            candidates.append((
-                source_priority,
-                distance,
-                -context.timeframes.index(timeframe),
-                timeframe,
-                source,
-                value,
-            ))
+                if risk > 0 and reward > 0 and reward / risk >= minimum_rr:
+                    rr_qualified_candidates.append(candidate)
 
     if not candidates:
         return ()
+    # Prefer only targets meeting the actionable RR floor whenever at least
+    # one exists. Preserve structural analysis output if none does; the
+    # lifecycle/queue must then keep it WATCH-only and never call it a trade.
+    if rr_qualified_candidates:
+        candidates = rr_qualified_candidates
 
     # First target = the nearest valid objective within the highest available
     # objective class. This prevents a random nearby swing from outranking an
