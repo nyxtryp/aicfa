@@ -40,9 +40,9 @@ def chunk_market_keys(keys: Sequence[MarketKey], *, max_streams: int = BINANCE_W
     """Split unique market keys into Binance-safe connection-sized groups."""
     if max_streams <= 0:
         raise ValueError("max_streams must be positive")
-    values = tuple(keys)
-    if len(set(values)) != len(values):
-        raise ValueError("market keys contain duplicates")
+    # Repeated setups can reference the same symbol/timeframe. Subscribe once;
+    # the durable candle checkpoint handles duplicate events across sockets.
+    values = tuple(dict.fromkeys(keys))
     return tuple(values[offset:offset + max_streams] for offset in range(0, len(values), max_streams))
 
 
