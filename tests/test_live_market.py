@@ -248,10 +248,9 @@ def test_binance_market_keys_are_split_into_groups_of_at_most_200():
     assert BINANCE_WS_ROTATE_SECONDS == 23 * 60 * 60
 
 
-def test_binance_market_key_chunking_rejects_duplicates_and_invalid_size():
+def test_binance_market_key_chunking_deduplicates_and_validates_size():
     key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    assert chunk_market_keys((key, key)) == ((key,),)
     import pytest
-    with pytest.raises(ValueError, match="duplicates"):
-        chunk_market_keys((key, key))
     with pytest.raises(ValueError, match="max_streams"):
         chunk_market_keys((key,), max_streams=0)
