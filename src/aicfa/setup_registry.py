@@ -196,8 +196,13 @@ class SetupRegistry:
                 if result is not None:
                     payload["chart"] = _visual_geometry(result, candidate)
                 market_keys.add(key)
+                activated_at_ms = previous.get("activated_at_ms")
+                if lifecycle_status in {"active", "tp1_hit"} and not activated_at_ms:
+                    activated_at_ms = now_ms
                 records[key] = {
                     **previous,
+                    "source": "autonomous_scanner",
+                    "activated_at_ms": activated_at_ms,
                     "strategy_revision": REGISTRY_REVISION,
                     "setup_id": key,
                     "asset": asset,
@@ -297,6 +302,9 @@ class SetupRegistry:
             record["last_checked_at_ms"] = int(now_ms)
             record["last_lifecycle_at_ms"] = int(now_ms)
             if status in {"active", "tp1_hit", "invalidated", "completed", "expired", "missed_by_price"}:
+                record["source"] = record.get("source") or "autonomous_scanner"
+                if status in {"active", "tp1_hit"} and not record.get("activated_at_ms"):
+                    record["activated_at_ms"] = int(now_ms)
                 record["lifecycle_status"] = status
                 record["status"] = "TP1_HIT" if status == "tp1_hit" else status.upper()
                 if status in {"invalidated", "completed", "expired", "missed_by_price"}:
