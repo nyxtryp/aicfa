@@ -27,7 +27,6 @@ from aicfa.market_universe import load_market_universe
 from aicfa.market_control import serve_control
 from aicfa.market_data import MarketKey
 from aicfa.public_market_data import build_public_market_data_provider
-from aicfa.telegram_notifications import TelegramSetupNotifier
 
 
 DEFAULT_UNIVERSE_PATH = ROOT / "config" / "market_universe.json"
@@ -59,18 +58,6 @@ def main() -> None:
     data_dir = Path(os.environ.get("AICFA_DATA_DIR", str(ROOT / "data")))
     engine_holder: dict[str, AutonomousScanEngine] = {}
     coordinator_holder: dict[str, LiveMarketCoordinator] = {}
-    notifier_holder: dict[str, TelegramSetupNotifier] = {}
-    notifier = TelegramSetupNotifier.from_env(data_dir=data_dir)
-    if notifier is not None:
-        notifier_holder["notifier"] = notifier
-        print("AICFA Telegram durable outbox enabled.", flush=True)
-    else:
-        print(
-            "AICFA Telegram notifications disabled: configure "
-            "AICFA_TELEGRAM_BOT_TOKEN and AICFA_TELEGRAM_CHAT_ID.",
-            flush=True,
-        )
-
     def _on_candle(event) -> None:
         engine = engine_holder["engine"]
         key = event.key
@@ -123,11 +110,6 @@ def main() -> None:
             raise RuntimeError(
                 diagnostics.error or f"live scan returned {status}"
             )
-        notifier = notifier_holder.get("notifier")
-        if notifier is not None:
-            # The scan/journal/registry is persisted before notification enqueue.
-            # The outbox sends asynchronously and deduplicates setup identities.
-            notifier.notify_state(state)
 
     coordinator = LiveMarketCoordinator(
         universe,
