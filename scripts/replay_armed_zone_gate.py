@@ -209,11 +209,30 @@ def main() -> int:
     }
     for trigger in ("1m", "5m"):
         checked = totals[f"checked_{trigger}"]
+        confirmations = totals[f"confirmations_{trigger}"]
+        candidates = totals[f"setup_candidates_{trigger}"]
         totals[f"skip_rate_{trigger}"] = round(totals[f"skipped_{trigger}"] / checked, 4) if checked else 0.0
+        totals[f"confirmation_skip_rate_{trigger}"] = (
+            round(totals[f"skipped_confirmations_{trigger}"] / confirmations, 4)
+            if confirmations else None
+        )
+        totals[f"setup_candidate_skip_rate_{trigger}"] = (
+            round(totals[f"skipped_setup_candidates_{trigger}"] / candidates, 4)
+            if candidates else None
+        )
 
+    # This replay is only a structural proxy. Even zero misses in this small
+    # sample is not proof that the production gate is safe to enable.
+    any_proxy_miss = any(
+        totals[f"skipped_{metric}_{trigger}"] > 0
+        for trigger in ("1m", "5m")
+        for metric in ("confirmations", "setup_candidates")
+    )
     print(json.dumps({
         "ok": True,
         "mode": "read-only OHLCV replay; structural confirmation proxy, not full setup equivalence",
+        "gate_recommendation": "keep_disabled" if any_proxy_miss else "manual_review_required",
+        "gate_can_be_enabled_from_this_result_alone": False,
         "symbols": len(summaries),
         "candles_per_trigger_max": args.candles,
         "totals": totals,
