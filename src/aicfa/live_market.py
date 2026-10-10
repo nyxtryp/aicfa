@@ -346,7 +346,7 @@ class LiveMarketCoordinator:
                 continue
             for timeframe in self.monitored_timeframes:
                 try:
-                    key = MarketKey("binance", symbol, market.market_type, timeframe)
+                    key = MarketKey("binance", symbol, "futures", timeframe)
                     existing = self.cache.store.load(key)
                     if existing.empty:
                         continue
