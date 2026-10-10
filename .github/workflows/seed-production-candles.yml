@@ -43,7 +43,7 @@ jobs:
               echo "release: $(readlink -f /srv/frostdeploy/aicfa/current)"
               echo "data_dir: $AICFA_DATA_DIR"
 
-              systemctl stop fd-aicfa
+              sudo -n systemctl stop fd-aicfa
               STOP_RC=$?
               if [ "$STOP_RC" -eq 0 ]; then
                 timeout --signal=TERM --kill-after=30s 3600s .venv/bin/python scripts/seed_live_candle_store.py --workers 4
@@ -53,11 +53,11 @@ jobs:
                 echo "Could not stop fd-aicfa safely; refusing concurrent writes."
               fi
 
-              systemctl start fd-aicfa
+              sudo -n systemctl start fd-aicfa
               START_RC=$?
               echo "seed_exit_code: $SEED_RC"
               echo "service_start_exit_code: $START_RC"
-              systemctl is-active fd-aicfa || true
+              sudo -n systemctl is-active fd-aicfa || true
               if [ "$SEED_RC" -ne 0 ]; then RC=$SEED_RC; fi
               if [ "$START_RC" -ne 0 ]; then RC=92; fi
             fi
