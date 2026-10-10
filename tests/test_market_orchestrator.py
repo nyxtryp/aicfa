@@ -407,3 +407,30 @@ def test_lower_timeframe_feature_frames_are_not_cached(monkeypatch):
     orchestrator._cached_build_features("BTC/USDT", "futures", "1m", frame)
     assert calls == [1, 1]
     orchestrator._FEATURE_FRAME_CACHE.clear()
+
+
+def test_five_minute_feature_cache_reuses_closed_frame_across_one_minute_events(monkeypatch):
+    import aicfa.market_orchestrator as orchestrator
+
+    orchestrator._FEATURE_FRAME_CACHE.clear()
+    calls = []
+
+    def fake_build_features(frame):
+        calls.append(len(frame))
+        return frame.assign(test_feature=1)
+
+    monkeypatch.setattr(orchestrator, "build_features", fake_build_features)
+    frame = pd.DataFrame({
+        "timestamp": [60_000, 360_000],
+        "open": [100.0, 101.0],
+        "high": [102.0, 103.0],
+        "low": [99.0, 100.0],
+        "close": [101.0, 102.0],
+        "volume": [10.0, 12.0],
+    })
+
+    first = orchestrator._cached_build_features("BTC/USDT", "futures", "5m", frame)
+    second = orchestrator._cached_build_features("BTC/USDT", "futures", "5m", frame.copy())
+    assert first is second
+    assert calls == [2]
+    orchestrator._FEATURE_FRAME_CACHE.clear()
