@@ -409,12 +409,21 @@ class LiveMarketCoordinator:
         key = observation.key
         self._last_observation_received_at_ms = int(time.time() * 1000)
         with self._dispatch_lock:
+            pending = self._pending_observations.get(key)
             if key in self._scheduled_keys:
                 # Per-key FIFO preserves all confirmed candles when analysis is
                 # slower than the feed. The dispatcher serializes this key while
                 # other symbols/timeframes continue on the worker pool.
                 self._pending_observations.setdefault(key, []).append(observation)
                 return
+            if pending:
+                # A failed event may be waiting for its scheduled retry. If a
+                # new candle arrives first, resume the oldest queued event,
+                # never jump ahead of it.
+                pending.append(observation)
+                observation = pending.pop(0)
+                if not pending:
+                    self._pending_observations[key] = []
             self._scheduled_keys.add(key)
         future = self._pool.submit(self._dispatch, observation)
         def _report_failure(done) -> None:
