@@ -313,12 +313,7 @@ function renderCenter(){
      hydrateCharts();
     }else{
      $("#workspaceTitle").textContent=view.asset+" · NO SETUP";
-     root.innerHTML=marketVisualCard(view.asset,view.mode||"INTRADAY",view.visual||{zones:[],events:[],liquidity:[]},view.marketType||"futures");
-     const note=document.createElement("div");
-     note.className="workspace-empty";
-     note.innerHTML="<b>NO ACTIONABLE SETUP</b><span>Текущее сканирование завершено. Старые зоны и сетапы не подмешиваются.</span>";
-     root.prepend(note);
-     hydrateCharts();
+     root.innerHTML='<div class="workspace-empty"><b>NO SETUP</b><span>За отведённое время подтверждённый сетап не найден.</span></div>';
     }
    }
    return;
