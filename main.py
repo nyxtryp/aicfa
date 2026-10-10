@@ -390,6 +390,7 @@ def main() -> None:
         # even while WebSocket candles are healthy. This is also the recovery
         # path when WebSocket delivery goes stale.
         rotation_index = 0
+        rotation_id = 1
         last_rotation_scan_monotonic = 0.0
         engine.last_automatic_scan_status = "rotation_starting"
         while not stop_event.is_set():
@@ -409,9 +410,16 @@ def main() -> None:
                 market_index = rotation_index % len(universe.markets)
                 # Keep the per-market deadline enabled. A stalled provider must
                 # not freeze the whole-universe queue indefinitely.
-                state = engine.scan_market(market_index, journal=True)
+                state = engine.scan_market(
+                    market_index,
+                    rotation_id=rotation_id,
+                    queue_position=market_index + 1,
+                    journal=True,
+                )
                 on_scan(state)
                 rotation_index = (market_index + 1) % len(universe.markets)
+                if rotation_index == 0:
+                    rotation_id += 1
                 last_rotation_scan_monotonic = time.monotonic()
             except Exception as exc:
                 engine.last_automatic_scan_status = "rotation_error"
@@ -422,6 +430,8 @@ def main() -> None:
                     flush=True,
                 )
                 rotation_index = (rotation_index + 1) % len(universe.markets)
+                if rotation_index == 0:
+                    rotation_id += 1
                 last_rotation_scan_monotonic = time.monotonic()
                 if stop_event.wait(1.0):
                     break
