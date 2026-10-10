@@ -575,3 +575,79 @@ def test_intraday_tp1_is_withheld_when_only_eth_style_macro_liquidity_exists():
     )
 
     assert targets == ()
+
+
+def test_superseded_opposite_bos_does_not_block_current_structure_direction():
+    from aicfa.market_evidence import MarketObservation
+    from aicfa.setup_analysis import build_multi_timeframe_context, _event_direction_conflict
+
+    # The bearish BOS happened first; a later completed candle on the same
+    # timeframe now confirms bullish structure. The historical event must not
+    # permanently veto a continuation setup in the current direction.
+    analyses = {
+        "4h": pd.DataFrame({
+            "timestamp": [1_000_000, 2_000_000],
+            "smc_structure_direction": [-1, 1],
+        }),
+        "1h": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+        "15m": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+        "5m": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+    }
+    observations = (
+        MarketObservation(
+            concept_id="market_structure.bos",
+            timeframe="4h",
+            state="observed",
+            confidence=1.0,
+            evidence=("bos_down=1", "event_timestamp_ms=1000000"),
+            direction="short",
+        ),
+    )
+    context = build_multi_timeframe_context(
+        observations,
+        analyses,
+        timeframes=("4h", "1h", "15m", "5m"),
+        mode="intraday",
+    )
+
+    assert _event_direction_conflict(
+        context,
+        scenario="continuation",
+        direction="long",
+        observations=observations,
+    ) is None
+
+
+def test_opposite_bos_on_latest_structure_candle_still_blocks_continuation():
+    from aicfa.market_evidence import MarketObservation
+    from aicfa.setup_analysis import build_multi_timeframe_context, _event_direction_conflict
+
+    analyses = {
+        "4h": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+        "1h": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+        "15m": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+        "5m": pd.DataFrame({"timestamp": [2_000_000], "smc_structure_direction": [1]}),
+    }
+    observations = (
+        MarketObservation(
+            concept_id="market_structure.bos",
+            timeframe="4h",
+            state="observed",
+            confidence=1.0,
+            evidence=("bos_down=1", "event_timestamp_ms=2000000"),
+            direction="short",
+        ),
+    )
+    context = build_multi_timeframe_context(
+        observations,
+        analyses,
+        timeframes=("4h", "1h", "15m", "5m"),
+        mode="intraday",
+    )
+
+    assert _event_direction_conflict(
+        context,
+        scenario="continuation",
+        direction="long",
+        observations=observations,
+    ) is not None
