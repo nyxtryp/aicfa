@@ -20,7 +20,7 @@ function latest(rows){
  return [...m.values()];
 }
 function setupKey(x){return String(x.key||[x.asset,hor(x.mode),(x.setup?.scenario||""),dir(x.setup||""),x.setupTimeframe||""].join("|"))}
-function allHistory(){const used=new Set(ui.manualItems.map(x=>x.key));const automatic=ui.autoWatchItems.filter(x=>!used.has(x.key));for(const x of automatic)used.add(x.key);return [...ui.manualItems,...automatic,...ui.history.filter(x=>!used.has(x.key))]}
+function allHistory(){return [...ui.manualItems,...ui.autoWatchItems.filter(x=>!ui.manualItems.some(m=>m.key===x.key)),...ui.history.filter(x=>!ui.manualItems.some(m=>m.key===x.key)&&!ui.autoWatchItems.some(w=>w.key===x.key))]}
 function active(ms){
  const out=[],seen=new Set();
  for(const m of ms)for(const s of m.setups||[]){
