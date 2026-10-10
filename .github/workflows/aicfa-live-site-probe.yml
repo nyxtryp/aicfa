@@ -1,0 +1,130 @@
+name: AICFA Live Site Probe
+
+on:
+  push:
+    branches:
+      - "main"
+      - "diagnostics/**"
+    paths:
+      - ".github/workflows/aicfa-live-site-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe production health and recent scan journal
+        env:
+          BASE_URL: https://aicfa.aicfa.ru
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: '2'
+          REPO: ${{ github.repository }}
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee /tmp/aicfa-live-probe.txt
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timezone
+
+          base = os.environ["BASE_URL"].rstrip("/")
+          paths = ("/api/health", "/api/journal/scans?limit=5", "/api/journal/registry", "/api/markets")
+          payloads = {}
+          for path in paths:
+              req = urllib.request.Request(base + path, headers={"User-Agent": "AICFA-live-probe/1.0", "Accept": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=12) as response:
+                      raw = response.read(8_000_000)
+                      print(f"HTTP {response.status} {path} bytes={len(raw)}")
+                      try:
+                          payloads[path] = json.loads(raw)
+                      except Exception as exc:
+                          print(f"INVALID_JSON {path}: {exc}; body={raw[:500]!r}")
+              except urllib.error.HTTPError as exc:
+                  body = exc.read(1000).decode("utf-8", "replace")
+                  print(f"HTTP_ERROR {exc.code} {path}: {body}")
+              except Exception as exc:
+                  print(f"REQUEST_ERROR {path}: {type(exc).__name__}: {exc}")
+
+          health = payloads.get("/api/health")
+          if health is not None:
+              print("=== HEALTH ===")
+              print(json.dumps(health, ensure_ascii=False, indent=2))
+
+          scan_data = payloads.get("/api/journal/scans?limit=5", {})
+          events = scan_data.get("events", []) if isinstance(scan_data, dict) else []
+          print("=== RECENT SCANS ===")
+          print(f"scan_events_returned={len(events)}")
+          if events:
+              print("event_count=" + str(len(events)))
+              for event in events:
+                  p = event.get("payload", {}) if isinstance(event, dict) else {}
+                  markets = p.get("markets", []) if isinstance(p, dict) else []
+                  print("SCAN " + json.dumps({"timestamp_ms": event.get("timestamp_ms"), "scan_number": p.get("scan_number"), "rotation_id": p.get("rotation_id"), "queue_position": p.get("queue_position"), "universe_size": p.get("universe_size"), "markets": len(markets)}, ensure_ascii=False))
+                  for market in markets:
+                      if not isinstance(market, dict):
+                          continue
+                      d = market.get("diagnostics", {}) or {}
+                      print("MARKET " + str(market.get("asset")) + " duration_ms=" + str(round(d.get("total_duration_ms", 0), 1)))
+                      print("HORIZON_TIMINGS=" + json.dumps(d.get("horizon_timings", []), ensure_ascii=False))
+                      for h in market.get("horizons", []):
+                          print("HORIZON=" + json.dumps({k: h.get(k) for k in ("mode", "decision", "reason", "setup_decision", "setup_reasons", "setup_missing_context", "setup_conflicts", "decision_action", "decision_reasons")}, ensure_ascii=False)[:1800])
+                      print("setups=" + json.dumps(market.get("setups", []), ensure_ascii=False)[:1000])
+          registry = payloads.get("/api/journal/registry", {})
+          setups = registry.get("setups", []) if isinstance(registry, dict) else []
+          print("=== SETUP REGISTRY ===")
+          print(f"registry_setups={len(setups)}")
+          print(json.dumps(setups[-20:], ensure_ascii=False, indent=2)[:10000])
+          print("=== TARGETED MANUAL SCANS: LINK AND XRP ===")
+          try:
+              markets_payload = payloads.get("/api/markets", {})
+              configured = markets_payload.get("markets", []) if isinstance(markets_payload, dict) else []
+              wanted = ("LINK/USDT", "XRP/USDT")
+              for asset in wanted:
+                  market = next((m for m in configured if isinstance(m, dict) and str(m.get("asset", "")).upper() == asset), None)
+                  if market is None:
+                      print("manual_scan_skipped=" + asset + ": not in configured universe")
+                      continue
+                  print("manual_scan_start=" + json.dumps({"asset": asset, "market_index": market.get("index")}, ensure_ascii=False))
+                  req = urllib.request.Request(
+                      base + "/api/market-scan",
+                      data=json.dumps({"market_index": int(market["index"])}).encode(),
+                      headers={"User-Agent": "AICFA-live-probe/1.0", "Content-Type": "application/json", "Accept": "application/json"},
+                      method="POST",
+                  )
+                  try:
+                      with urllib.request.urlopen(req, timeout=40) as response:
+                          result = json.loads(response.read(2_000_000))
+                          setups = result.get("setups", []) if isinstance(result, dict) else []
+                          watches = result.get("watch_candidates", []) if isinstance(result, dict) else []
+                          market_result = result.get("market", {}) if isinstance(result, dict) else {}
+                          print("manual_scan_result=" + json.dumps({"http": response.status, "asset": asset, "ok": result.get("ok") if isinstance(result, dict) else None, "scan_number": result.get("scan_number") if isinstance(result, dict) else None, "diagnostics": market_result.get("diagnostics", {}), "setups_count": len(setups), "watch_candidates_count": len(watches), "setups": setups[:2], "watch_candidates": watches[:2]}, ensure_ascii=False)[:7000])
+                  except Exception as exc:
+                      print("manual_scan_error=" + asset + ": " + type(exc).__name__ + ": " + str(exc))
+          except Exception as exc:
+              print("manual_scan_probe_error=" + type(exc).__name__ + ": " + str(exc))
+          print("probe_finished_utc=" + datetime.now(timezone.utc).isoformat())
+          PY
+
+          python - <<'PY'
+          import json, os, urllib.request
+          from pathlib import Path
+          report = Path("/tmp/aicfa-live-probe.txt").read_text(encoding="utf-8", errors="replace")
+          if len(report) > 60000:
+              report = report[:30000] + "\n... truncated ...\n" + report[-30000:]
+          body = "## AICFA live site probe\n\n\u0060\u0060\u0060text\n" + report + "\n\u0060\u0060\u0060"
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['ISSUE_NUMBER']}/comments",
+              data=json.dumps({"body": body}).encode(),
+              headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}", "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=15) as response:
+              print("Posted live probe report to issue comment:", response.status)
+          PY
