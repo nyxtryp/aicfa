@@ -189,9 +189,9 @@ def test_registry_migrates_only_lifecycle_owned_revision_three_setup(tmp_path):
 
     assert len(current) == 1
     assert current[0]["asset"] == "BTC/USDT"
-    assert current[0]["strategy_revision"] == 5
+    assert current[0]["strategy_revision"] == 6
     records = registry.read()
-    assert records["BTC/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 5
+    assert next(record for record in records.values() if record["asset"] == "BTC/USDT")["strategy_revision"] == 6
     assert records["ETH/USDT|spot|INTRADAY|continuation|long|1h"]["strategy_revision"] == 2
 
 
@@ -209,7 +209,7 @@ def test_registry_migrates_tp1_hit_but_keeps_it_out_of_actionable_queue(tmp_path
 
     assert registry.current() == ()
     record = next(iter(registry.read().values()))
-    assert record["strategy_revision"] == 5
+    assert record["strategy_revision"] == 6
     assert record["status"] == "TP1_HIT"
 
 
@@ -372,3 +372,146 @@ def test_registry_persists_missed_by_price_as_terminal_not_active(tmp_path):
     Market.setups = ()
     registry.record_scan(State())
     assert next(iter(registry.read().values()))["status"] == "MISSED_BY_PRICE"
+
+
+def test_registry_identity_does_not_duplicate_when_entry_zone_moves(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Level:
+        def __init__(self, value):
+            self.value = value
+            self.timeframe = "5m"
+            self.source = "order_block"
+
+    class Candidate:
+        scenario = "continuation"
+        direction = "long"
+
+        def __init__(self, low, high):
+            self.entry_zone = (Level(low), Level(high))
+
+    first = registry.identity_key(
+        asset="LINK/USDT", market_type="spot", mode="scalping",
+        candidate=Candidate(10.0, 10.2),
+    )
+    updated = registry.identity_key(
+        asset="LINK/USDT", market_type="spot", mode="scalping",
+        candidate=Candidate(10.1, 10.3),
+    )
+
+    assert first == updated
+
+
+def test_registry_migrates_revision_five_zone_duplicates_to_one_family_record(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+    base = {
+        "strategy_revision": 5,
+        "asset": "LINK/USDT",
+        "market_type": "spot",
+        "mode": "scalping",
+        "scenario": "continuation",
+        "direction": "LONG",
+        "structural_timeframe": "5m",
+        "lifecycle_status": "missed_by_price",
+        "status": "MISSED_BY_PRICE",
+        "setup": {"candidate": {"entry_zone": [{"value": 10.0, "timeframe": "5m", "source": "ob"}]}},
+        "created_at_ms": 100,
+        "last_seen_at_ms": 200,
+        "closed_at_ms": 200,
+    }
+    other = {**base, "setup": {"candidate": {"entry_zone": [{"value": 10.1, "timeframe": "5m", "source": "ob"}]}}, "last_seen_at_ms": 300, "closed_at_ms": 300}
+    registry._write({"old-a": base, "old-b": other})
+
+    current = registry._current_revision_records()
+
+    assert len(current) == 1
+    record = next(iter(current.values()))
+    assert record["strategy_revision"] == 6
+    assert record["last_seen_at_ms"] == 300
+
+
+
+def test_registry_records_activation_and_preserves_it_when_trade_completes(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Identity:
+        symbol = "BTC/USDT"
+        market_type = "futures"
+        horizon = "intraday"
+        scenario = "continuation"
+        direction = "long"
+
+    class Result:
+        identity = Identity()
+        status = type("Status", (), {"value": "active"})()
+        reason = ""
+
+    class Candidate:
+        scenario = "continuation"
+        direction = "long"
+
+    class Lifecycle:
+        status = type("Status", (), {"value": "active"})()
+
+    class Setup:
+        mode = "intraday"
+        candidate = Candidate()
+        identity = Identity()
+        lifecycle_result = Lifecycle()
+
+    class Market:
+        asset = "BTC/USDT"
+        setups = (Setup(),)
+        lifecycle_results = ()
+
+    class State:
+        scanned_at_ms = 1_000
+        scan_number = 1
+        result = type("Result", (), {"markets": (Market(),)})()
+
+    registry.record_scan(State())
+    record = next(iter(registry.read().values()))
+    assert record["source"] == "autonomous_scanner"
+    assert record["activated_at_ms"] == 1_000
+
+    Result.status = type("Status", (), {"value": "completed"})()
+    registry.record_lifecycle_results((Result(),), now_ms=2_000)
+    record = next(iter(registry.read().values()))
+    assert record["status"] == "COMPLETED"
+    assert record["activated_at_ms"] == 1_000
+    assert record["closed_at_ms"] == 2_000
+
+
+def test_missed_entry_never_receives_activation_timestamp(tmp_path):
+    registry = SetupRegistry(tmp_path / "journal" / "setup_registry.json")
+
+    class Candidate:
+        scenario = "reversal"
+        direction = "long"
+        entry_zone = ()
+
+    class Lifecycle:
+        status = type("Status", (), {"value": "missed_by_price"})()
+        reason = "missed by price"
+
+    class Setup:
+        mode = "intraday"
+        candidate = Candidate()
+        identity = None
+        lifecycle_result = Lifecycle()
+
+    class Market:
+        asset = "DYDX/USDT"
+        setups = (Setup(),)
+        lifecycle_results = ()
+
+    class State:
+        scanned_at_ms = 1_000
+        scan_number = 1
+        result = type("Result", (), {"markets": (Market(),)})()
+
+    registry.record_scan(State())
+    record = next(iter(registry.read().values()))
+    assert record["status"] == "MISSED_BY_PRICE"
+    assert record["source"] == "autonomous_scanner"
+    assert not record.get("activated_at_ms")
