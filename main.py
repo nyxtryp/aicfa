@@ -11,6 +11,7 @@ from pathlib import Path
 import signal
 import sys
 import threading
+import time
 
 # Keep the source-layout package importable when FrostDeploy starts main.py
 # directly from the repository root without an installed editable package.
@@ -236,31 +237,46 @@ def main() -> None:
     )
 
     try:
-        # Treat an unexpected rotation-level exception as recoverable. A
-        # long-running market worker must not silently exit after one bad
-        # provider, persistence, or callback event.
+        # Normal operation is candle-event driven. The legacy market rotation
+        # is only an emergency fallback when no confirmed candle arrives for
+        # three minutes (for example, a dead WebSocket connection).
+        fallback_index = 0
+        last_fallback_scan_monotonic = 0.0
+        engine.last_automatic_scan_status = "event_driven"
         while not stop_event.is_set():
+            if not coordinator.websocket_is_stale(max_age_seconds=180.0):
+                engine.automatic_worker_running = False
+                stop_event.wait(1.0)
+                continue
+
+            now = time.monotonic()
+            if now - last_fallback_scan_monotonic < 30.0:
+                engine.automatic_worker_running = True
+                stop_event.wait(1.0)
+                continue
+
             try:
                 engine.automatic_worker_running = True
-                engine.last_automatic_scan_status = "starting"
-                engine.run_forever_batches(
-                    interval_seconds=30.0,
-                    batch_size=1,
-                    on_scan=on_scan,
-                    on_error=on_error,
-                    should_stop=stop_event.is_set,
+                engine.last_automatic_scan_status = "websocket_fallback"
+                market_index = fallback_index % len(universe.markets)
+                state = engine.scan_market(
+                    market_index,
+                    enforce_timeout=False,
+                    journal=True,
                 )
-                break  # normal return means the stop event was requested
+                on_scan(state)
+                fallback_index = (market_index + 1) % len(universe.markets)
+                last_fallback_scan_monotonic = now
             except Exception as exc:
-                engine.automatic_worker_running = False
                 engine.last_automatic_scan_status = "restarting"
                 engine.last_automatic_scan_error = f"{type(exc).__name__}: {exc}"
                 print(
-                    f"AICFA automatic rotation crashed: {type(exc).__name__}: {exc}; "
-                    "retrying in 5s.",
+                    f"AICFA WebSocket fallback scan failed: {type(exc).__name__}: {exc}; "
+                    "retrying.",
                     flush=True,
                 )
-                if stop_event.wait(5.0):
+                last_fallback_scan_monotonic = now
+                if stop_event.wait(1.0):
                     break
     finally:
         engine.automatic_worker_running = False
