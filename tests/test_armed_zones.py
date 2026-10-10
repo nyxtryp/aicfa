@@ -186,3 +186,18 @@ def test_zone_gate_skips_only_when_ready_pois_do_not_intersect():
         timeframe="15m", ready=True, scan_in_progress=False,
         candle_low=10.0, candle_high=11.0, zones=zones,
     )
+
+
+def test_five_minute_gate_does_not_arm_on_its_own_unconfirmed_zone():
+    own_timeframe_zone = (ArmedZone("5m", "FVG", "bullish", 100.0, 101.0),)
+    assert should_skip_zone_scan(
+        timeframe="5m", ready=True, scan_in_progress=False,
+        candle_low=90.0, candle_high=91.0,
+        zones=zones_for_trigger_timeframe(own_timeframe_zone, "5m"),
+    )
+    higher_timeframe_zone = (ArmedZone("15m", "FVG", "bullish", 100.0, 101.0),)
+    assert should_skip_zone_scan(
+        timeframe="5m", ready=True, scan_in_progress=False,
+        candle_low=90.0, candle_high=91.0,
+        zones=zones_for_trigger_timeframe(higher_timeframe_zone, "5m"),
+    )
