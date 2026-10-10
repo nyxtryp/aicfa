@@ -399,22 +399,30 @@ async function getJson(path,fallback){
  }catch(_){return fallback}
 }
 function monitorStatusLabel(status){
- const labels={ACTIVE:"ACTIVE",TP1_HIT:"TP1 HIT",COMPLETED:"TP2 HIT",INVALIDATED:"INVALIDATED",EXPIRED:"EXPIRED",MISSED_BY_PRICE:"MISSED ENTRY"};
+ const labels={ACTIVE:"ACTIVE TRADE",TP1_HIT:"TP1 HIT",WATCH:"WATCH · WAITING ENTRY",COMPLETED:"TP2 HIT",INVALIDATED:"INVALIDATED",EXPIRED:"EXPIRED",MISSED_BY_PRICE:"MISSED ENTRY"};
  return labels[String(status||"").toUpperCase()]||String(status||"").replaceAll("_"," ").toUpperCase();
 }
 function renderTradeMonitor(){
  const all=state.monitorRecords||[],mode=ui.monitorMode;
  const modeRows=all.filter(r=>hor(r.mode)===mode);
  const activeRows=modeRows.filter(r=>["ACTIVE","TP1_HIT"].includes(String(r.status||"").toUpperCase()));
+ // WATCH candidates are live monitored hypotheses waiting for the entry POI.
+ // Show them in the monitor without claiming that a trade was entered.
+ const pendingRows=(ui.autoWatchItems||[])
+  .filter(item=>hor(item.mode)===mode)
+  .map(item=>({asset:item.asset,mode:item.mode,direction:dir(item.setup),status:"WATCH",setup:{candidate:item.setup},created_at_ms:item.seenAt,last_seen_at_ms:item.seenAt,setup_id:item.key,market_type:item.market_type}));
+ const activeKeys=new Set(activeRows.map(r=>[r.asset,hor(r.mode),String(r.scenario||r.setup?.candidate?.scenario||""),String(r.direction||"")].join("|")));
+ const watchRows=pendingRows.filter(r=>!activeKeys.has([r.asset,hor(r.mode),String(r.setup?.candidate?.scenario||""),String(r.direction||"")].join("|")));
+ const monitoringRows=[...activeRows,...watchRows].sort((a,b)=>Number(b.last_seen_at_ms||b.created_at_ms||0)-Number(a.last_seen_at_ms||a.created_at_ms||0));
  const completedRows=modeRows.filter(r=>["COMPLETED","INVALIDATED","EXPIRED"].includes(String(r.status||"").toUpperCase()));
  const missedRows=modeRows.filter(r=>String(r.status||"").toUpperCase()==="MISSED_BY_PRICE");
  $("#monitorCount").textContent=String(modeRows.length);
- $("#monitorActiveCount").textContent=String(activeRows.length);
+ $("#monitorActiveCount").textContent=String(monitoringRows.length);
  $("#monitorCompletedCount").textContent=String(completedRows.length);
  $("#monitorMissedCount").textContent=String(missedRows.length);
  document.querySelectorAll("[data-monitor-mode]").forEach(b=>b.classList.toggle("active",b.dataset.monitorMode===ui.monitorMode));
  document.querySelectorAll("[data-monitor-view]").forEach(b=>b.classList.toggle("active",b.dataset.monitorView===ui.monitorView));
- const rows=ui.monitorView==="ACTIVE"?activeRows:ui.monitorView==="MISSED"?missedRows:completedRows;
+ const rows=ui.monitorView==="ACTIVE"?monitoringRows:ui.monitorView==="MISSED"?missedRows:completedRows;
  const root=$("#tradeMonitor");
  root.innerHTML=rows.length?rows.map(r=>{
   const wrapper=r.setup||{},s=wrapper.candidate||wrapper,entry=(s.entry_zone||[]).map(x=>Number(x.value)).filter(Number.isFinite);
