@@ -3,7 +3,7 @@ name: AICFA Live Site Probe
 on:
   push:
     branches:
-      - "diagnostics/**"
+      - "main"
     paths:
       - ".github/workflows/aicfa-live-site-probe.yml"
   workflow_dispatch:
