@@ -623,27 +623,17 @@ class LiveMarketCoordinator:
             self.cache.register_market_symbols(
                 market.asset, market.venue_symbols, market_type="futures"
             )
-            # This transport is Binance-only. The fallback provider can
-            # resolve a market to Bybit/CCXT when Binance does not list it;
-            # feeding that symbol into a Binance SUBSCRIBE poisons the whole
-            # multi-stream connection. Keep only markets actually resolved to
-            # Binance in the candle transport.
             resolver = getattr(self.cache.upstream, "resolve_market", None)
             if resolver is None:
-                symbol = self.cache.resolve_symbol(
-                    market.asset, market_type="futures"
-                )
+                symbol = self.cache.resolve_symbol(market.asset, market_type="futures")
+                provider_name = "binance"
             else:
-                resolved = resolver(market.asset, market_type="futures")
-                if str(getattr(resolved, "provider", "")).strip().lower() != "binance":
-                    raise ValueError(
-                        f"market resolved to non-Binance provider: "
-                        f"{getattr(resolved, 'provider', 'unknown')}"
-                    )
-                symbol = str(resolved.symbol)
-            return index, "futures", symbol
+                resolved_market = resolver(market.asset, market_type="futures")
+                symbol = str(resolved_market.symbol)
+                provider_name = str(getattr(resolved_market, "provider", "unknown")).strip().lower()
+            return index, "futures", symbol, provider_name
 
-        resolved: list[tuple[int, str, str]] = []
+        resolved: list[tuple[int, str, str, str]] = []
         with ThreadPoolExecutor(max_workers=min(12, max(1, len(self.universe.markets)))) as pool:
             futures = [
                 pool.submit(resolve_market, (index, market))
@@ -661,17 +651,22 @@ class LiveMarketCoordinator:
 
         by_market_type: dict[str, list[MarketKey]] = {}
         resolved_pairs: list[tuple[int, MarketKey]] = []
-        for index, market_type, symbol in resolved:
-            for timeframe in self.monitored_timeframes:
-                key = MarketKey("binance", symbol, market_type, timeframe)
-                by_market_type.setdefault(market_type, []).append(key)
+        rest_polled: list[tuple[int, str, str, str]] = []
+        for index, market_type, symbol, provider_name in resolved:
+            # Keep the canonical key/provider mapping for every successfully
+            # resolved market. Binance markets use WebSocket; other venues use
+            # candle-close-aligned REST polling, not a competing scan rotation.
             resolved_pairs.append((index, MarketKey("binance", symbol, market_type, "5m")))
+            if provider_name == "binance":
+                for timeframe in self.monitored_timeframes:
+                    key = MarketKey("binance", symbol, market_type, timeframe)
+                    by_market_type.setdefault(market_type, []).append(key)
+            else:
+                rest_polled.append((index, market_type, symbol, provider_name))
 
         self._resolved_market_keys = tuple(resolved_pairs)
+        self._rest_polled_markets = tuple(rest_polled)
 
-        # AICFA trades Binance USDT perpetual futures only. Do not create Spot
-        # subscriptions even if a stale universe entry still says market_type=spot.
-        # Keep each socket at or below 200 candle streams.
         for market_type, keys in by_market_type.items():
             for chunk_index, chunk in enumerate(chunk_market_keys(keys), start=1):
                 thread = threading.Thread(
@@ -682,6 +677,88 @@ class LiveMarketCoordinator:
                 )
                 self._threads.append(thread)
                 thread.start()
+
+        if self._rest_polled_markets:
+            thread = threading.Thread(
+                target=self._poll_non_binance_closed_candles,
+                name="aicfa-rest-candle-events",
+                daemon=True,
+            )
+            self._threads.append(thread)
+            thread.start()
+
+    def _poll_non_binance_closed_candles(self) -> None:
+        """Emit candle-close events for mapped venues without Binance WS support.
+
+        REST requests are scheduled only at the close cadence of each timeframe.
+        This is a candle-event fallback, not a per-symbol analysis rotation.
+        """
+        # Poll context timeframes too: daily/weekly closes refresh SMC zones even
+        # though only the five trigger timeframes launch a trading profile.
+        trigger_timeframes = tuple(self.monitored_timeframes)
+        last_polled_bucket: dict[tuple[str, str], int] = {}
+        while not self._stopped.is_set():
+            now_ms = int(time.time() * 1000)
+            due = []
+            for timeframe in trigger_timeframes:
+                duration = timeframe_ms(timeframe)
+                # Only attempt polling during the short window after a candle close.
+                if now_ms % duration < 8_000:
+                    due.append(timeframe)
+            if due:
+                for _index, market_type, symbol, provider_name in self._rest_polled_markets:
+                    for timeframe in due:
+                        if self._stopped.is_set():
+                            return
+                        duration = timeframe_ms(timeframe)
+                        bucket = now_ms // duration
+                        poll_key = (symbol, timeframe)
+                        if last_polled_bucket.get(poll_key) == bucket:
+                            continue
+                        key = MarketKey("binance", symbol, market_type, timeframe)
+                        try:
+                            frame = self.cache.upstream.fetch_ohlcv(
+                                symbol=symbol,
+                                market_type=market_type,
+                                timeframe=timeframe,
+                                since_ms=None,
+                                limit=3,
+                            )
+                            closed = self.cache._closed_only(frame, timeframe)
+                            if not closed.empty:
+                                checkpoint = self.checkpoint.get(key)
+                                if checkpoint is None:
+                                    # First observation establishes the live
+                                    # baseline; do not replay historical rows.
+                                    rows_to_emit = closed.tail(1)
+                                else:
+                                    # If REST polling was delayed by an outage,
+                                    # replay every newly closed candle in order
+                                    # instead of jumping straight to the newest.
+                                    rows_to_emit = closed.loc[
+                                        closed["timestamp"] > checkpoint
+                                    ].sort_values("timestamp")
+                                for _, row in rows_to_emit.iterrows():
+                                    observation = WebSocketObservation(
+                                        key=key,
+                                        data=pd.DataFrame([row]).reset_index(drop=True),
+                                        observed_at_ms=now_ms,
+                                    )
+                                    self._submit_observation(observation)
+                            # Empty/no-new-candle is a successful poll. On an
+                            # exception leave the bucket unmarked so it retries
+                            # within this close window rather than missing a candle.
+                            last_polled_bucket[poll_key] = bucket
+                        except Exception as exc:
+                            print(
+                                f"AICFA REST candle fallback failed: {symbol} {timeframe} "
+                                f"venue={provider_name}: {type(exc).__name__}: {exc}",
+                                flush=True,
+                            )
+            # Alignment is checked every second; API calls occur only after a
+            # timeframe boundary and only for non-Binance markets.
+            if self._stopped.wait(1.0):
+                return
 
     def stop(self) -> None:
         self._stopped.set()
