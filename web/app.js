@@ -275,7 +275,10 @@ function waitCards(ms){
    const sl=Number(c.invalidation_level?.value??c.stop_loss);
    const tp=Number(c.target_levels?.[0]?.value??c.take_profit);
    const fmt=v=>Number.isFinite(v)?String(Number(v.toPrecision(8))):"—";
-   out.push({asset:m.asset,mode,action:"WATCH",checks:[],why:(c.rationale||c.invalidation||["Waiting for price to reach the entry zone"])[0],details:"ENTRY "+(entry.length?entry.map(fmt).join("–"):"—")+" · SL "+fmt(sl)+" · TP1 "+fmt(tp)});
+   const missed=lifeStatus==="MISSED_BY_PRICE";
+   const entryLimit=entry.length?(dir(c)==="LONG"?Math.max(...entry):Math.min(...entry)):NaN;
+   const lifecycleReason=s.lifecycle_result?.reason||s.lifecycle_result?.message||"";
+   out.push({asset:m.asset,mode,action:missed?"MISSED BY PRICE":"WATCH",checks:[],why:missed?(lifecycleReason||"Price moved beyond the permitted entry zone"):(c.rationale||c.invalidation||["Waiting for price to reach the entry zone"])[0],details:(missed?(dir(c)==="LONG"?"MAX ENTRY ":"MIN ENTRY ")+fmt(entryLimit)+" · ":"")+"ENTRY "+(entry.length?entry.map(fmt).join("–"):"—")+" · SL "+fmt(sl)+" · TP1 "+fmt(tp)});
    pendingModes.add(mode);
   }
   for(const h of m.horizons||[]){
