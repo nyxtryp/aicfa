@@ -37,6 +37,28 @@ jobs:
                 systemctl --no-pager --full status fd-aicfa || true
               } >"$OUTPUT" 2>&1
               ;;
+            "/aicfa seed-candles")
+              {
+                echo "=== seed persistent production candle cache ==="
+                export AICFA_DATA_DIR="${AICFA_DATA_DIR:-/srv/frostdeploy/aicfa/shared/data}"
+                echo "data_dir: $AICFA_DATA_DIR"
+                systemctl stop fd-aicfa
+                STOP_RC=$?
+                if [ "$STOP_RC" -eq 0 ]; then
+                  timeout --signal=TERM --kill-after=30s 3600s .venv/bin/python scripts/seed_live_candle_store.py --workers 4
+                  SEED_RC=$?
+                else
+                  SEED_RC=90
+                  echo "Could not stop fd-aicfa safely; refusing concurrent writes to candle files."
+                fi
+                systemctl start fd-aicfa
+                START_RC=$?
+                echo "seed_exit_code: $SEED_RC"
+                echo "service_start_exit_code: $START_RC"
+                systemctl is-active fd-aicfa || true
+                test "$SEED_RC" -eq 0 && test "$START_RC" -eq 0
+              } >"$OUTPUT" 2>&1
+              ;;
             "/aicfa lifecycle-tests")
               .venv/bin/pytest -q tests/test_setup_lifecycle.py tests/test_persistent_journal.py >"$OUTPUT" 2>&1
               ;;
@@ -113,7 +135,7 @@ PY
               } >"$OUTPUT" 2>&1
               ;;
             *)
-              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa lifecycle-tests, /aicfa features, /aicfa git, /aicfa inspect-grt, /aicfa deploy-diagnose" >"$OUTPUT"
+              echo "Unknown command. Allowed: /aicfa status, /aicfa tests, /aicfa seed-candles, /aicfa lifecycle-tests, /aicfa features, /aicfa git, /aicfa inspect-grt, /aicfa deploy-diagnose" >"$OUTPUT"
               ;;
           esac
 
