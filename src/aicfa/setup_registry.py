@@ -203,6 +203,8 @@ class SetupRegistry:
                     "structural_timeframe": mode_timeframe_profile(normalize_trading_mode(setup.mode)).structure_timeframe,
                     "status": status,
                     "lifecycle_status": lifecycle_status or "active",
+                    "closed_at_ms": now_ms if lifecycle_status == "missed_by_price" else previous.get("closed_at_ms"),
+                    "outcome_reason": str(getattr(lifecycle, "reason", "") or "") if lifecycle_status == "missed_by_price" else previous.get("outcome_reason", ""),
                     "created_at_ms": created_at,
                     "last_seen_at_ms": now_ms,
                     "last_confirmed_at_ms": now_ms,
@@ -224,6 +226,8 @@ class SetupRegistry:
                 if status in {"invalidated", "completed", "expired", "missed_by_price"}:
                     record["status"] = status.upper()
                     record["lifecycle_status"] = status
+                    record["closed_at_ms"] = now_ms
+                    record["outcome_reason"] = str(getattr(lifecycle, "reason", "") or "")
                 elif status in {"active", "tp1_hit"} and record.get("status") not in {"INVALIDATED", "COMPLETED", "EXPIRED", "MISSED_BY_PRICE"}:
                     # Keep TP1_HIT distinct from ACTIVE: the original entry is
                     # no longer actionable once price has reached TP1, even
@@ -290,6 +294,9 @@ class SetupRegistry:
             if status in {"active", "tp1_hit", "invalidated", "completed", "expired", "missed_by_price"}:
                 record["lifecycle_status"] = status
                 record["status"] = "TP1_HIT" if status == "tp1_hit" else status.upper()
+                if status in {"invalidated", "completed", "expired", "missed_by_price"}:
+                    record["closed_at_ms"] = int(now_ms)
+                    record["outcome_reason"] = str(getattr(result, "reason", "") or "")
                 changed = True
         if changed:
             self._write(records)

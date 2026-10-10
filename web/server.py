@@ -83,6 +83,21 @@ def _journal_payload(path: str, query: dict[str, list[str]]) -> bytes:
     elif path == "/api/journal/registry":
         registry = SetupRegistry.from_env()
         payload = {"setups": list(registry.current()) if registry is not None else []}
+    elif path == "/api/journal/trade-monitor":
+        from aicfa.setup_registry import REGISTRY_REVISION
+        registry = SetupRegistry.from_env()
+        records = registry._current_revision_records() if registry is not None else {}
+        # STALE means evidence went quiet, not that a TP/SL outcome was reached.
+        setups = [
+            record for record in records.values()
+            if int(record.get("strategy_revision", 0)) == REGISTRY_REVISION
+            and str(record.get("status", "")).upper() != "STALE"
+        ]
+        setups.sort(key=lambda item: -int(
+            item.get("closed_at_ms") or item.get("last_seen_at_ms")
+            or item.get("created_at_ms") or 0
+        ))
+        payload = {"setups": setups}
     else:
         raise KeyError(path)
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -374,6 +389,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "/api/journal/scans",
                 "/api/journal/setups",
                 "/api/journal/registry",
+                "/api/journal/trade-monitor",
             }:
                 try:
                     self._json(200, _journal_payload(parsed.path, parse_qs(parsed.query)))
