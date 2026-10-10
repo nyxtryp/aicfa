@@ -111,3 +111,27 @@ def test_weekly_order_block_is_available_to_lower_timeframe_gates():
     })
     assert zones == (ArmedZone("1w", "FVG", "bullish", 100.0, 105.0),)
     assert zones_for_trigger_timeframe(zones, "5m") == zones
+
+
+
+def test_active_liquidity_levels_and_ote_bands_arm_lower_timeframe_scans():
+    zones = extract_active_smc_zones({
+        "1h": pd.DataFrame([{
+            "fvg_active_bullish_count": 0,
+            "fvg_active_bearish_count": 0,
+            "order_block_active": 0,
+            "active_buy_liquidity_pools": 1,
+            "active_buy_liquidity_price": 101.0,
+            "active_sell_liquidity_pools": 1,
+            "active_sell_liquidity_price": 99.0,
+            "structural_dealing_range_high": 110.0,
+            "structural_dealing_range_low": 90.0,
+        }])
+    })
+
+    assert ArmedZone("1h", "LIQUIDITY", "buy_side", 101.0, 101.0) in zones
+    assert ArmedZone("1h", "LIQUIDITY", "sell_side", 99.0, 99.0) in zones
+    assert ArmedZone("1h", "OTE", "bullish", 94.2, 97.6) in zones
+    assert ArmedZone("1h", "OTE", "bearish", 102.4, 105.8) in zones
+    assert candle_intersects_armed_zone(100.5, 101.2, zones)
+    assert candle_intersects_armed_zone(95.0, 95.5, zones)
