@@ -15,6 +15,6 @@
 ## Remaining architectural work
 
 - The 1m gate is based on the latest active OB/FVG bounds exposed by the cached feature frames. Its skip rate and false-negative behavior must be measured against historical replay before production rollout.
-- A pending setup with an explicit maximum acceptable entry and a visible `missed by price` lifecycle status is not yet implemented. Current lifecycle activation requires the execution candle to touch the entry zone.
+- If a READY long candidate's entire execution candle is already above its entry zone, or a short candidate's entire candle is below its zone, the lifecycle emits `MISSED_BY_PRICE`, records the direction-specific entry limit, and persists the terminal status. The terminal watch card shows the limit rather than inviting a chase entry.
 - Notifications are intentionally out of scope for this implementation; the priority is correct event-driven OHLCV analysis and lifecycle state.
 - Latency targets (1–3 seconds) must be measured on the production VDS under live load; they are not inferred from the design alone.
