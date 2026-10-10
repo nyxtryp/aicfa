@@ -21,7 +21,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from aicfa.autonomous_scan import AutonomousScanEngine
-from aicfa.armed_zones import candle_intersects_armed_zone, extract_active_smc_zones, merge_refreshed_zones, zones_for_trigger_timeframe
+from aicfa.armed_zones import extract_active_smc_zones, merge_refreshed_zones, should_skip_zone_scan, zones_for_trigger_timeframe
 from aicfa.data_requirements import TradingMode
 from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS
 from aicfa.market_universe import load_market_universe
@@ -173,16 +173,13 @@ def main() -> None:
                 or zone_refresh_counts.get(cache_key, 0) > 0
             )
             gate_zones = zones_for_trigger_timeframe(zones, key.timeframe)
-            should_skip = (
-                key.timeframe in {"1m", "5m"}
-                and ready
-                and bool(gate_zones)
-                and not scan_in_progress
-                and not candle_intersects_armed_zone(
-                    event.low if event.low is not None else float("nan"),
-                    event.high if event.high is not None else float("nan"),
-                    gate_zones,
-                )
+            should_skip = should_skip_zone_scan(
+                timeframe=key.timeframe,
+                ready=ready,
+                scan_in_progress=scan_in_progress,
+                candle_low=event.low if event.low is not None else float("nan"),
+                candle_high=event.high if event.high is not None else float("nan"),
+                zones=gate_zones,
             )
             if should_skip:
                 return
