@@ -33,13 +33,13 @@ jobs:
           from datetime import datetime, timezone
 
           base = os.environ["BASE_URL"].rstrip("/")
-          paths = ("/api/health", "/api/journal/scans?limit=500", "/api/journal/registry")
+          paths = ("/api/health", "/api/journal/scans?limit=1", "/api/journal/registry")
           payloads = {}
           for path in paths:
               req = urllib.request.Request(base + path, headers={"User-Agent": "AICFA-live-probe/1.0", "Accept": "application/json"})
               try:
                   with urllib.request.urlopen(req, timeout=12) as response:
-                      raw = response.read(2_000_000)
+                      raw = response.read(8_000_000)
                       print(f"HTTP {response.status} {path} bytes={len(raw)}")
                       try:
                           payloads[path] = json.loads(raw)
@@ -56,7 +56,7 @@ jobs:
               print("=== HEALTH ===")
               print(json.dumps(health, ensure_ascii=False, indent=2))
 
-          scan_data = payloads.get("/api/journal/scans?limit=500", {})
+          scan_data = payloads.get("/api/journal/scans?limit=1", {})
           events = scan_data.get("events", []) if isinstance(scan_data, dict) else []
           print("=== RECENT SCANS ===")
           print(f"scan_events_returned={len(events)}")
