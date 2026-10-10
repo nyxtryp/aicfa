@@ -10,11 +10,11 @@
 - The continuous ticker stream remains separate for active setup SL/TP lifecycle checks.
 - Confirmed 15m, 1h, 4h, 1d, and 1w feature frames are cached by the full OHLCV snapshot. A 1m/5m event can reuse unchanged higher-timeframe SMC features.
 - The live SMC scan now explicitly disables derivatives, trades, and order-book collection; its input evidence is OHLCV only.
-- A bounded in-process POI cache retains active OB/FVG, liquidity-pool, OTE, confirmed swing, prior-period, and sweep levels from completed 5m+ feature frames. 1m events outside cached POIs may be acknowledged without full setup analysis; 5m events are gated by 15m+ POIs. Empty/unready caches and concurrent refreshes fail open, so missing context cannot suppress a scan. Each supported timeframe refreshes its own POIs when that candle closes.
+- The optional in-process POI gate can use active OB/FVG, liquidity-pool, OTE, confirmed swing, prior-period, and sweep levels from completed 5m+ feature frames. It is **disabled by default** with `AICFA_ARMED_ZONE_GATE_ENABLED=false`; only enable it after the read-only historical replay is available and setup-candidate false negatives are acceptable. Empty/unready caches and concurrent refreshes fail open.
 
 ## Remaining architectural work
 
-- The 1m/5m gate is based on causal OHLCV-derived POIs. Structural swing and sweep levels were added after replay showed that an OB/FVG-only gate skipped valid BOS/CHoCH/sweep confirmations. The expanded replay must verify setup-candidate false negatives before production rollout.
+- The 1m/5m gate is experimental and remains disabled until the self-hosted read-only VDS replay can run. An earlier OB/FVG-only replay skipped some raw structural confirmations, so structural swing, sweep, liquidity, and OTE levels were added. Do not enable the gate in production until replay reports setup-candidate miss rates for a meaningful sample.
 - If a READY long candidate's entire execution candle is already above its entry zone, or a short candidate's entire candle is below its zone, the lifecycle emits `MISSED_BY_PRICE`, records the direction-specific entry limit, and persists the terminal status. The terminal watch card shows the limit rather than inviting a chase entry.
 - Notifications are intentionally out of scope for this implementation; the priority is correct event-driven OHLCV analysis and lifecycle state.
 - Latency targets (1–3 seconds) must be measured on the production VDS under live load; they are not inferred from the design alone.
