@@ -519,7 +519,8 @@
       "venue_symbols": {
         "bybit": "XAU/USDT:USDT",
         "okx": "XAU/USDT:USDT",
-        "mexc": "XAU/USDT:USDT"
+        "mexc": "XAU/USDT:USDT",
+        "binance": "XAU/USDT:USDT"
       }
     },
     {
@@ -531,7 +532,8 @@
       "venue_symbols": {
         "bybit": "XAG/USDT:USDT",
         "okx": "XAG/USDT:USDT",
-        "mexc": "SILVER/USDT:USDT"
+        "mexc": "SILVER/USDT:USDT",
+        "binance": "XAG/USDT:USDT"
       }
     },
     {
@@ -542,7 +544,8 @@
       "instrument_type": "perpetual",
       "venue_symbols": {
         "okx": "XCU/USDT:USDT",
-        "mexc": "COPPER/USDT:USDT"
+        "mexc": "COPPER/USDT:USDT",
+        "binance": "COPPER/USDT:USDT"
       }
     },
     {
@@ -553,7 +556,8 @@
       "instrument_type": "perpetual",
       "venue_symbols": {
         "okx": "XPT/USDT:USDT",
-        "mexc": "XPT/USDT:USDT"
+        "mexc": "XPT/USDT:USDT",
+        "binance": "XPT/USDT:USDT"
       }
     },
     {
@@ -565,7 +569,8 @@
       "venue_symbols": {
         "bybit": "XBRU/USDT:USDT",
         "okx": "BZ/USDT:USDT",
-        "mexc": "UKOIL/USDT:USDT"
+        "mexc": "UKOIL/USDT:USDT",
+        "binance": "BZ/USDT:USDT"
       }
     },
     {
@@ -576,7 +581,8 @@
       "instrument_type": "perpetual",
       "venue_symbols": {
         "okx": "NG/USDT:USDT",
-        "mexc": "NGAS/USDT:USDT"
+        "mexc": "NGAS/USDT:USDT",
+        "binance": "NATGAS/USDT:USDT"
       }
     },
     {
@@ -599,7 +605,8 @@
       "venue_symbols": {
         "bybit": "QQQ/USDT:USDT",
         "okx": "QQQ/USDT:USDT",
-        "mexc": "QQQSTOCK/USDT:USDT"
+        "mexc": "QQQSTOCK/USDT:USDT",
+        "binance": "QQQ/USDT:USDT"
       }
     },
     {
@@ -611,7 +618,8 @@
       "venue_symbols": {
         "bybit": "AAPL/USDT:USDT",
         "okx": "AAPL/USDT:USDT",
-        "mexc": "AAPLSTOCK/USDT:USDT"
+        "mexc": "AAPLSTOCK/USDT:USDT",
+        "binance": "AAPL/USDT:USDT"
       }
     },
     {
@@ -623,7 +631,8 @@
       "venue_symbols": {
         "bybit": "NVDA/USDT:USDT",
         "okx": "NVDA/USDT:USDT",
-        "mexc": "NVIDIA/USDT:USDT"
+        "mexc": "NVIDIA/USDT:USDT",
+        "binance": "NVDA/USDT:USDT"
       }
     },
     {
@@ -635,7 +644,8 @@
       "venue_symbols": {
         "bybit": "AMZN/USDT:USDT",
         "okx": "AMZN/USDT:USDT",
-        "mexc": "AMZNSTOCK/USDT:USDT"
+        "mexc": "AMZNSTOCK/USDT:USDT",
+        "binance": "AMZN/USDT:USDT"
       }
     },
     {
@@ -647,7 +657,8 @@
       "venue_symbols": {
         "bybit": "GOOGL/USDT:USDT",
         "okx": "GOOGL/USDT:USDT",
-        "mexc": "GOOGLSTOCK/USDT:USDT"
+        "mexc": "GOOGLSTOCK/USDT:USDT",
+        "binance": "GOOGL/USDT:USDT"
       }
     },
     {
@@ -659,7 +670,8 @@
       "venue_symbols": {
         "bybit": "META/USDT:USDT",
         "okx": "META/USDT:USDT",
-        "mexc": "METASTOCK/USDT:USDT"
+        "mexc": "METASTOCK/USDT:USDT",
+        "binance": "META/USDT:USDT"
       }
     },
     {
@@ -671,7 +683,8 @@
       "venue_symbols": {
         "bybit": "TSLA/USDT:USDT",
         "okx": "TSLA/USDT:USDT",
-        "mexc": "TESLA/USDT:USDT"
+        "mexc": "TESLA/USDT:USDT",
+        "binance": "TSLA/USDT:USDT"
       }
     },
     {
@@ -683,7 +696,8 @@
       "venue_symbols": {
         "bybit": "AVGO/USDT:USDT",
         "okx": "AVGO/USDT:USDT",
-        "mexc": "AVGOSTOCK/USDT:USDT"
+        "mexc": "AVGOSTOCK/USDT:USDT",
+        "binance": "AVGO/USDT:USDT"
       }
     },
     {
@@ -694,7 +708,8 @@
       "instrument_type": "perpetual",
       "venue_symbols": {
         "okx": "AMD/USDT:USDT",
-        "mexc": "AMDSTOCK/USDT:USDT"
+        "mexc": "AMDSTOCK/USDT:USDT",
+        "binance": "AMD/USDT:USDT"
       }
     },
     {
@@ -706,7 +721,8 @@
       "venue_symbols": {
         "bybit": "TSM/USDT:USDT",
         "okx": "TSM/USDT:USDT",
-        "mexc": "TSMCSTOCK/USDT:USDT"
+        "mexc": "TSMCSTOCK/USDT:USDT",
+        "binance": "TSM/USDT:USDT"
       }
     },
     {
@@ -718,7 +734,8 @@
       "venue_symbols": {
         "bybit": "ASML/USDT:USDT",
         "okx": "ASML/USDT:USDT",
-        "mexc": "ASMLSTOCK/USDT:USDT"
+        "mexc": "ASMLSTOCK/USDT:USDT",
+        "binance": "ASML/USDT:USDT"
       }
     },
     {
@@ -730,7 +747,8 @@
       "venue_symbols": {
         "bybit": "ORCL/USDT:USDT",
         "okx": "ORCL/USDT:USDT",
-        "mexc": "ORCLSTOCK/USDT:USDT"
+        "mexc": "ORCLSTOCK/USDT:USDT",
+        "binance": "ORCL/USDT:USDT"
       }
     },
     {
@@ -742,7 +760,8 @@
       "venue_symbols": {
         "bybit": "NFLX/USDT:USDT",
         "okx": "NFLX/USDT:USDT",
-        "mexc": "NFLXSTOCK/USDT:USDT"
+        "mexc": "NFLXSTOCK/USDT:USDT",
+        "binance": "NFLX/USDT:USDT"
       }
     },
     {
@@ -754,7 +773,8 @@
       "venue_symbols": {
         "bybit": "COIN/USDT:USDT",
         "okx": "COIN/USDT:USDT",
-        "mexc": "COINBASE/USDT:USDT"
+        "mexc": "COINBASE/USDT:USDT",
+        "binance": "COIN/USDT:USDT"
       }
     },
     {
