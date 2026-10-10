@@ -60,6 +60,7 @@ def main() -> None:
         engine = engine_holder["engine"]
         key = event.key
         mode_map = {
+            "1m": (TradingMode.SCALPING,),
             "5m": (TradingMode.SCALPING, TradingMode.INTRADAY),
             "15m": (TradingMode.INTRADAY,),
             "1h": (TradingMode.SCALPING, TradingMode.SWING),
