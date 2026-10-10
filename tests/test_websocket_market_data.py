@@ -267,3 +267,31 @@ def test_transport_does_not_reset_reconnect_budget_on_handshake_only():
     with pytest.raises(WebSocketTransportError):
         next(transport.stream(max_observations=1))
     assert len(connections) == 2
+
+
+
+def test_transport_surfaces_planned_rotation_for_rest_gap_recovery():
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    socket = FakeSocket([])
+    now = iter((0.0, 23 * 60 * 60.0))
+    transport = BinanceWebSocketMarketDataTransport(
+        keys=(key,),
+        connector=lambda url, timeout: socket,
+        max_reconnects=0,
+        connection_max_age_seconds=23 * 60 * 60,
+        clock=lambda: next(now),
+    )
+
+    with pytest.raises(WebSocketTransportError, match="reconnect budget exhausted"):
+        next(transport.stream(max_observations=1))
+
+    assert socket.closed is True
+
+
+def test_transport_rejects_mixed_spot_and_futures_on_one_socket():
+    keys = (
+        MarketKey("binance", "BTC/USDT", "spot", "1m"),
+        MarketKey("binance", "ETH/USDT", "futures", "1m"),
+    )
+    with pytest.raises(ValueError, match="same market_type"):
+        BinanceWebSocketMarketDataTransport(keys=keys)
