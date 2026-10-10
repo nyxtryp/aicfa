@@ -97,3 +97,17 @@ def test_zone_refresh_replaces_only_timeframes_in_new_snapshot():
         old[1],
         refreshed[0],
     )
+
+
+
+def test_weekly_order_block_is_available_to_lower_timeframe_gates():
+    zones = extract_active_smc_zones({
+        "1w": pd.DataFrame([{
+            "fvg_active_bullish_count": 1,
+            "fvg_bullish_low": 100.0,
+            "fvg_bullish_high": 105.0,
+            "order_block_active": 0,
+        }])
+    })
+    assert zones == (ArmedZone("1w", "FVG", "bullish", 100.0, 105.0),)
+    assert zones_for_trigger_timeframe(zones, "5m") == zones
