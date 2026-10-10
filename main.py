@@ -11,7 +11,6 @@ from pathlib import Path
 import signal
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
 # Keep the source-layout package importable when FrostDeploy starts main.py
@@ -192,6 +191,12 @@ def main() -> None:
                 zones=gate_zones,
             )
             if should_skip:
+                print(
+                    f"AICFA candle skipped by armed-zone gate: {key.symbol} "
+                    f"{key.timeframe} low={event.low} high={event.high} "
+                    f"zones={len(gate_zones)} ready={ready} in_progress={scan_in_progress}",
+                    flush=True,
+                )
                 return
             # If another timeframe for this symbol is updating SMC zones, fail
             # open and analyze this candle. This avoids dropping a valid close
@@ -363,76 +368,6 @@ def main() -> None:
             parts.append(detail)
         return " | ".join(parts) or "no-horizon-results"
 
-    def _run_startup_scan() -> None:
-        """Analyze every configured market once on boot; don't wait for a candle."""
-        markets = tuple(universe.markets)
-        print(
-            f"AICFA startup scan: beginning one pass over {len(markets)} markets "
-            "with all four modes; live candle events remain enabled.",
-            flush=True,
-        )
-        completed = 0
-        errors = 0
-        # Keep the initial REST workload bounded so the 1m/5m event workers
-        # remain responsive. Per-market locks serialize a boot scan against a
-        # simultaneous live candle for the same symbol.
-        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="aicfa-startup-scan") as pool:
-            futures = {
-                pool.submit(
-                    engine.scan_market,
-                    index,
-                    rotation_id=0,
-                    queue_position=0,
-                    enforce_timeout=False,
-                    journal=True,
-                ): (index, market)
-                for index, market in enumerate(markets)
-            }
-            for future in as_completed(futures):
-                index, configured_market = futures[future]
-                try:
-                    state = future.result()
-                    market = state.result.markets[0]
-                    diagnostics = market.diagnostics
-                    status = str(diagnostics.status if diagnostics else "completed").lower()
-                    duration_ms = diagnostics.total_duration_ms if diagnostics else 0.0
-                    setup_count = len(market.setups)
-                    candidate_count = sum(
-                        len(getattr(getattr(item, "setup_assessment", None), "candidates", ()) or ())
-                        for item in (getattr(market, "results", ()) or ())
-                    )
-                    if status in {"error", "timeout"}:
-                        errors += 1
-                    else:
-                        completed += 1
-                    engine.last_automatic_scan_at_ms = int(state.scanned_at_ms)
-                    engine.last_automatic_scan_asset = market.asset
-                    engine.last_automatic_scan_status = status
-                    engine.last_automatic_scan_error = diagnostics.error if diagnostics else ""
-                    print(
-                        f"AICFA startup scan: {market.asset} ({index + 1}/{len(markets)}) "
-                        f"status={status} duration={duration_ms:.0f}ms "
-                        f"candidates={candidate_count} active_setups={setup_count} "
-                        f"modes=[{_mode_diagnostics(market)}]"
-                        + (f" error={diagnostics.error[:200]}" if diagnostics and diagnostics.error else ""),
-                        flush=True,
-                    )
-                except Exception as exc:
-                    errors += 1
-                    print(
-                        f"AICFA startup scan error: {configured_market.asset}: "
-                        f"{type(exc).__name__}: {exc}",
-                        flush=True,
-                    )
-        print(
-            f"AICFA startup scan finished: markets={len(markets)} "
-            f"completed={completed} errors={errors}. "
-            "Use the per-mode reason/missing fields above to diagnose withheld setups.",
-            flush=True,
-        )
-
-    # Startup REST analysis is a one-time baseline, not a timed rotation.
-    # Thereafter new analysis is triggered by confirmed closed candles.
     price_monitor_holder: dict[str, BinancePriceMonitor] = {}
 
     def _start_live_services() -> None:
@@ -462,12 +397,6 @@ def main() -> None:
                 price_monitor_holder["monitor"] = monitor
                 monitor.start()
 
-            if not stop_event.is_set():
-                threading.Thread(
-                    target=_run_startup_scan,
-                    name="aicfa-startup-scan",
-                    daemon=True,
-                ).start()
         except Exception as exc:
             print(
                 f"AICFA live services startup error: {type(exc).__name__}: {exc}",
