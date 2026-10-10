@@ -501,12 +501,17 @@ class LiveMarketCoordinator:
         duration_ms = timeframe_ms(timeframe)
         return (int(now_ms) // duration_ms) * duration_ms - duration_ms
 
-    def _recover_missed_candles(self, keys: tuple[MarketKey, ...]) -> None:
-        """Fetch actual closed candles after each durable checkpoint, in order."""
+    def _recover_missed_candles(self, keys: tuple[MarketKey, ...]) -> bool:
+        """Fetch actual closed candles after each durable checkpoint, in order.
+
+        Return False on any incomplete gap; the caller must not resume WebSocket
+        delivery until REST recovery succeeds, or the next candle could advance
+        the checkpoint past missing history.
+        """
         now_ms = int(time.time() * 1000)
         for key in keys:
             if self._stopped.is_set():
-                return
+                return False
             last = self.checkpoint.get(key)
             if last is None:
                 # On first startup the REST history seed supplies context; do
@@ -536,9 +541,9 @@ class LiveMarketCoordinator:
                         f"{type(exc).__name__}: {exc}",
                         flush=True,
                     )
-                    break
+                    return False
                 if frame.empty:
-                    break
+                    return False
                 newest_timestamp = cursor - duration_ms
                 for _, row in frame.iterrows():
                     timestamp = int(row["timestamp"])
@@ -553,9 +558,10 @@ class LiveMarketCoordinator:
                     newest_timestamp = max(newest_timestamp, timestamp)
                 next_cursor = newest_timestamp + duration_ms
                 if next_cursor <= cursor:
-                    break
+                    return False
                 cursor = next_cursor
                 pages += 1
+        return True
 
     def _stream(self, keys: tuple[MarketKey, ...]) -> None:
         # The exchange may close a stream session after a fixed lifetime. The
@@ -582,8 +588,15 @@ class LiveMarketCoordinator:
                     f"AICFA WebSocket stream interrupted: {type(exc).__name__}: {exc}",
                     flush=True,
                 )
-                self._recover_missed_candles(keys)
-                if self._stopped.wait(2.0):
+                # Do not reconnect to live candles while a historical gap is
+                # still unresolved: otherwise the next event could advance the
+                # durable checkpoint beyond missing candles.
+                while not self._stopped.is_set():
+                    if self._recover_missed_candles(keys):
+                        break
+                    if self._stopped.wait(2.0):
+                        return
+                if self._stopped.is_set() or self._stopped.wait(2.0):
                     return
 
     def start(self) -> None:
