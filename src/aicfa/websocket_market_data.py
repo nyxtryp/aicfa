@@ -58,6 +58,7 @@ class WebSocketObservation:
 
 _SPOT_WS_URL = "wss://stream.binance.com:9443/ws"
 _FUTURES_WS_URL = "wss://fstream.binance.com/ws"
+MAX_STREAMS_PER_CONNECTION = 200
 
 
 def _binance_symbol(symbol: str) -> str:
@@ -148,6 +149,10 @@ class BinanceWebSocketMarketDataTransport:
     ) -> None:
         if not keys:
             raise ValueError("keys must not be empty")
+        if len(keys) > MAX_STREAMS_PER_CONNECTION:
+            raise ValueError(
+                f"Binance WebSocket connection supports at most {MAX_STREAMS_PER_CONNECTION} subscriptions"
+            )
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
         if max_reconnects < 0:
