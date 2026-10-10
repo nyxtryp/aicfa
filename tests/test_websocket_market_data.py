@@ -234,3 +234,25 @@ def test_transport_exhausts_reconnect_budget_without_fabricating_data():
 
     with pytest.raises(WebSocketTransportError):
         next(transport.stream(max_observations=1))
+
+
+
+def test_transport_does_not_reset_reconnect_budget_on_handshake_only():
+    key = MarketKey("binance", "BTC/USDT", "spot", "1m")
+    sockets = [FakeSocket([]), FakeSocket([])]
+    connections = []
+
+    def connector(url, *, timeout):
+        connections.append(url)
+        return sockets.pop(0)
+
+    transport = BinanceWebSocketMarketDataTransport(
+        keys=(key,),
+        connector=connector,
+        max_reconnects=1,
+        reconnect_backoff_seconds=0,
+        sleeper=lambda _: None,
+    )
+    with pytest.raises(WebSocketTransportError):
+        next(transport.stream(max_observations=1))
+    assert len(connections) == 2
