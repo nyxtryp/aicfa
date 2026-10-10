@@ -80,8 +80,16 @@ def main() -> None:
             return
         zones = extract_active_smc_zones(analyses)
         cache_key = (key.market_type, key.symbol)
+        refreshed_timeframes = set(analyses)
         with armed_zone_lock:
-            armed_zone_cache[cache_key] = zones
+            # Each trigger profile analyzes a different timeframe subset.
+            # Replace zones only for frames present in this scan and retain the
+            # latest confirmed zones from other frames.
+            retained = tuple(
+                zone for zone in armed_zone_cache.get(cache_key, ())
+                if zone.timeframe not in refreshed_timeframes
+            )
+            armed_zone_cache[cache_key] = retained + tuple(zones)
             armed_zone_ready.add(cache_key)
 
     def _on_candle(event) -> None:
