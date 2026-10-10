@@ -389,60 +389,22 @@ def main() -> None:
         flush=True,
     )
 
+    # The scanner is event-driven: each completed candle is dispatched by
+    # LiveMarketCoordinator to _on_candle, which selects the relevant trading
+    # mode(s). Durable REST recovery replays missing closed candles; do not run
+    # a competing 30-second market queue.
+    engine.automatic_worker_running = True
+    engine.last_automatic_scan_status = "waiting_for_closed_candles"
+    print(
+        "AICFA scanner mode: event-driven; scans run on completed candles; "
+        "REST checkpoint recovery handles missed events. No timed market rotation.",
+        flush=True,
+    )
     try:
-        # The closed-candle callbacks provide fast, timeframe-specific updates,
-        # but they are not a substitute for the 24/7 universe rotation. Always
-        # run the canonical all-mode analysis for the next market every 30s,
-        # even while WebSocket candles are healthy. This is also the recovery
-        # path when WebSocket delivery goes stale.
-        rotation_index = 0
-        rotation_id = 1
-        last_rotation_scan_monotonic = 0.0
-        engine.last_automatic_scan_status = "rotation_starting"
-        while not stop_event.is_set():
-            now = time.monotonic()
-            remaining = 30.0 - (now - last_rotation_scan_monotonic)
-            if last_rotation_scan_monotonic and remaining > 0:
-                engine.automatic_worker_running = True
-                stop_event.wait(min(1.0, remaining))
-                continue
-
-            try:
-                engine.automatic_worker_running = True
-                websocket_stale = coordinator.websocket_is_stale(max_age_seconds=180.0)
-                engine.last_automatic_scan_status = (
-                    "websocket_fallback" if websocket_stale else "rotation"
-                )
-                market_index = rotation_index % len(universe.markets)
-                engine.current_rotation_id = rotation_id
-                engine.current_rotation_queue_position = market_index + 1
-                # Keep the per-market deadline enabled. A stalled provider must
-                # not freeze the whole-universe queue indefinitely.
-                state = engine.scan_market(
-                    market_index,
-                    rotation_id=rotation_id,
-                    queue_position=market_index + 1,
-                    journal=True,
-                )
-                on_scan(state)
-                rotation_index = (market_index + 1) % len(universe.markets)
-                if rotation_index == 0:
-                    rotation_id += 1
-                last_rotation_scan_monotonic = time.monotonic()
-            except Exception as exc:
-                engine.last_automatic_scan_status = "rotation_error"
-                engine.last_automatic_scan_error = f"{type(exc).__name__}: {exc}"
-                print(
-                    f"AICFA autonomous rotation failed: {type(exc).__name__}: {exc}; "
-                    "continuing queue.",
-                    flush=True,
-                )
-                rotation_index = (rotation_index + 1) % len(universe.markets)
-                if rotation_index == 0:
-                    rotation_id += 1
-                last_rotation_scan_monotonic = time.monotonic()
-                if stop_event.wait(1.0):
-                    break
+        while not stop_event.wait(1.0):
+            # Keep the process alive for WebSocket callbacks and recovery workers.
+            # This wait is only process supervision, not a scan interval.
+            pass
     finally:
         engine.automatic_worker_running = False
         stop_event.set()
