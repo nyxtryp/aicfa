@@ -177,19 +177,30 @@ def _verify_target(target: dict, markets: dict) -> tuple[str, str | None]:
 def main() -> None:
     targets = json.loads(TARGETS_PATH.read_text(encoding="utf-8"))["targets"]
     exchanges = {}
+    venue_errors = {}
 
     for venue in VENUES:
-        exchange = getattr(ccxt, venue)({"enableRateLimit": True})
         print(f"LOADING {venue} ...", flush=True)
-        markets = exchange.load_markets()
+        try:
+            exchange = getattr(ccxt, venue)({"enableRateLimit": True, "timeout": 15000})
+            markets = exchange.load_markets()
+        except Exception as exc:
+            exchanges[venue] = None
+            venue_errors[venue] = f"{type(exc).__name__}: {str(exc)[:240]}"
+            print(f"  UNAVAILABLE: {venue_errors[venue]}", flush=True)
+            continue
         exchanges[venue] = markets
         print(f"  markets={len(markets)}", flush=True)
 
-    accepted = review = absent = 0
+    accepted = review = absent = unavailable = 0
 
     for target in targets:
         per_venue = []
         for venue in VENUES:
+            if exchanges[venue] is None:
+                unavailable += 1
+                per_venue.append(f"{venue}=UNAVAILABLE ({venue_errors[venue]})")
+                continue
             status, candidate = _verify_target(target, exchanges[venue])
             if status == "ACCEPT":
                 accepted += 1
@@ -202,7 +213,10 @@ def main() -> None:
                 per_venue.append(f"{venue}=ABSENT")
         print(f"{target['asset']} | {target['name']} | " + " | ".join(per_venue))
 
-    print(f"\nSUMMARY accept={accepted} review={review} absent={absent}")
+    print(
+        f"\\nSUMMARY accept={accepted} review={review} absent={absent} "
+        f"unavailable={unavailable}"
+    )
 
 
 if __name__ == "__main__":
