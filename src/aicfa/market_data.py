@@ -137,13 +137,19 @@ def completed_ohlcv(
 ) -> pd.DataFrame:
     """Keep only candles whose full interval ended at or before now_ms."""
     out = validate_ohlcv(df)
+    inherited_attrs = dict(getattr(df, "attrs", {}))
     if timeframe == "1M":
         opened = pd.to_datetime(out["timestamp"], unit="ms", utc=True)
         closes = opened + pd.offsets.MonthBegin(1)
         completed = out.loc[closes.astype("int64") // 1_000_000 <= int(now_ms)]
-        return completed.reset_index(drop=True)
-    duration = timeframe_ms(timeframe)
-    return out.loc[out["timestamp"] + duration <= int(now_ms)].reset_index(drop=True)
+        result = completed.reset_index(drop=True)
+    else:
+        duration = timeframe_ms(timeframe)
+        result = out.loc[out["timestamp"] + duration <= int(now_ms)].reset_index(drop=True)
+    # The live feature cache uses this generation to avoid re-hashing every
+    # OHLCV row on each lower-timeframe trigger. Preserve it through filtering.
+    result.attrs.update(inherited_attrs)
+    return result
 
 
 def merge_ohlcv(
