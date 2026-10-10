@@ -282,7 +282,7 @@ class LiveMarketCoordinator:
         self._seed_done = threading.Event()
         self._dispatch_lock = threading.RLock()
         self._scheduled_keys: set[MarketKey] = set()
-        self._pending_observations: dict[MarketKey, WebSocketObservation] = {}
+        self._pending_observations: dict[MarketKey, list[WebSocketObservation]] = {}
         self._resolved_market_keys: tuple[tuple[int, MarketKey], ...] = ()
 
     @property
@@ -329,11 +329,20 @@ class LiveMarketCoordinator:
             while not self._stopped.is_set():
                 self._handle(current)
                 with self._dispatch_lock:
-                    pending = self._pending_observations.pop(key, None)
-                    if pending is None:
+                    pending = self._pending_observations.get(key)
+                    if not pending:
+                        self._pending_observations.pop(key, None)
                         self._scheduled_keys.discard(key)
                         return
-                current = pending
+                    # Preserve every closed candle in arrival order. Replacing
+                    # this queue with only the newest observation loses events
+                    # whenever analysis takes longer than the exchange cadence.
+                    current = pending.pop(0)
+                    if not pending:
+                        self._pending_observations.pop(key, None)
+                        # Keep the key scheduled until the just-popped event has
+                        # finished; a new event arriving during _handle must queue.
+                        self._pending_observations[key] = []
         except Exception:
             with self._dispatch_lock:
                 self._scheduled_keys.discard(key)
@@ -343,9 +352,10 @@ class LiveMarketCoordinator:
         key = observation.key
         with self._dispatch_lock:
             if key in self._scheduled_keys:
-                # Keep only the newest candle for this market/timeframe. A slow
-                # analysis must never build an unbounded queue of stale candles.
-                self._pending_observations[key] = observation
+                # Per-key FIFO preserves all confirmed candles when analysis is
+                # slower than the feed. The dispatcher serializes this key while
+                # other symbols/timeframes continue on the worker pool.
+                self._pending_observations.setdefault(key, []).append(observation)
                 return
             self._scheduled_keys.add(key)
         future = self._pool.submit(self._dispatch, observation)
