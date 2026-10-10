@@ -181,6 +181,14 @@ class SetupRegistry:
                 # must not enter the terminal setup queue.
                 if lifecycle_status not in {"active", "tp1_hit", "missed_by_price"}:
                     continue
+                # A missed entry is not a completed trade. Keep it in the
+                # monitor only when this exact setup was previously activated.
+                # Otherwise every scan can turn a never-active candidate into
+                # another permanent "completed" row.
+                previous_status = str(previous.get("status", "")).upper()
+                was_active = bool(previous.get("was_active")) or previous_status in {"ACTIVE", "TP1_HIT"}
+                if lifecycle_status == "missed_by_price" and not was_active:
+                    continue
                 status = (
                     "TP1_HIT" if lifecycle_status == "tp1_hit"
                     else "MISSED_BY_PRICE" if lifecycle_status == "missed_by_price"
@@ -202,6 +210,7 @@ class SetupRegistry:
                     "direction": str(getattr(candidate, "direction", "")).upper(),
                     "structural_timeframe": mode_timeframe_profile(normalize_trading_mode(setup.mode)).structure_timeframe,
                     "status": status,
+                    "was_active": was_active or lifecycle_status in {"active", "tp1_hit"},
                     "lifecycle_status": lifecycle_status or "active",
                     "closed_at_ms": now_ms if lifecycle_status == "missed_by_price" else previous.get("closed_at_ms"),
                     "outcome_reason": str(getattr(lifecycle, "reason", "") or "") if lifecycle_status == "missed_by_price" else previous.get("outcome_reason", ""),
@@ -224,6 +233,9 @@ class SetupRegistry:
                 record = records[key]
                 record["last_checked_at_ms"] = now_ms
                 if status in {"invalidated", "completed", "expired", "missed_by_price"}:
+                    # These transitions are only applied to an already
+                    # registered setup, which by construction was activated.
+                    record["was_active"] = True
                     record["status"] = status.upper()
                     record["lifecycle_status"] = status
                     record["closed_at_ms"] = now_ms
@@ -293,6 +305,8 @@ class SetupRegistry:
             record["last_lifecycle_at_ms"] = int(now_ms)
             if status in {"active", "tp1_hit", "invalidated", "completed", "expired", "missed_by_price"}:
                 record["lifecycle_status"] = status
+                if status in {"active", "tp1_hit"}:
+                    record["was_active"] = True
                 record["status"] = "TP1_HIT" if status == "tp1_hit" else status.upper()
                 if status in {"invalidated", "completed", "expired", "missed_by_price"}:
                     record["closed_at_ms"] = int(now_ms)

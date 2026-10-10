@@ -43,25 +43,15 @@ def test_verified_venue_mapping_selects_native_symbol_before_generic_resolution(
     assert float(result.iloc[-1]["close"]) == 1.0
 
 
-def test_production_universe_keeps_current_crypto_and_final_tradfi() -> None:
+def test_production_universe_contains_only_crypto_usdt_futures() -> None:
     path = Path(__file__).parents[1] / "config" / "market_universe.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     markets = payload["markets"]
 
-    crypto = [item for item in markets if item.get("asset_class", "crypto") == "crypto"]
-    tradfi = [item for item in markets if item.get("asset_class") == "tradfi"]
-
-    assert len(crypto) == 85
-    assert len(tradfi) == 23
-    assert all(item["market_type"] == "futures" for item in tradfi)
-    assert all(item["instrument_type"] == "perpetual" for item in tradfi)
-    assert all(item["venue_symbols"] for item in tradfi)
-    assert all(
-        "EUR/USDT:USDT" not in item["venue_symbols"].values()
-        and "GBP/USDT:USDT" not in item["venue_symbols"].values()
-        for item in tradfi
-    )
-
+    assert len(markets) == 85
+    assert all(item.get("asset_class", "crypto") == "crypto" for item in markets)
+    assert all(item["market_type"] == "futures" for item in markets)
+    assert all(item["asset"].endswith("/USDT") for item in markets)
 
 def test_explicit_mapping_never_falls_back_to_unmapped_generic_venue() -> None:
     binance = _Provider("binance", "XAGUSDT", "XAGUSDT")

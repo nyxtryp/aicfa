@@ -131,12 +131,12 @@ class LiveMarketDataCache:
         result.attrs["aicfa_cache_version"] = self._versions.get(key, 0)
         return result
 
-    def register_market_symbols(self, asset, venue_symbols, *, market_type="spot"):
+    def register_market_symbols(self, asset, venue_symbols, *, market_type="futures"):
         register = getattr(self.upstream, "register_market_symbols", None)
         if register is not None:
             register(asset, venue_symbols, market_type=market_type)
 
-    def resolve_symbol(self, asset, *, market_type="spot"):
+    def resolve_symbol(self, asset, *, market_type="futures"):
         return str(self.upstream.resolve_symbol(asset, market_type=market_type))
 
     def seed(self, key: MarketKey, frame: pd.DataFrame) -> pd.DataFrame:
@@ -338,15 +338,15 @@ class LiveMarketCoordinator:
         for market in self.universe.markets:
             try:
                 self.cache.register_market_symbols(
-                    market.asset, market.venue_symbols, market_type=market.market_type
+                    market.asset, market.venue_symbols, market_type="futures"
                 )
-                symbol = self.cache.resolve_symbol(market.asset, market_type=market.market_type)
+                symbol = self.cache.resolve_symbol(market.asset, market_type="futures")
             except Exception as exc:
                 failures.append(f"{market.asset}:symbol:{type(exc).__name__}:{exc}")
                 continue
             for timeframe in self.monitored_timeframes:
                 try:
-                    key = MarketKey("binance", symbol, market.market_type, timeframe)
+                    key = MarketKey("binance", symbol, "futures", timeframe)
                     existing = self.cache.store.load(key)
                     if existing.empty:
                         continue
@@ -621,7 +621,7 @@ class LiveMarketCoordinator:
         def resolve_market(item: tuple[int, object]):
             index, market = item
             self.cache.register_market_symbols(
-                market.asset, market.venue_symbols, market_type=market.market_type
+                market.asset, market.venue_symbols, market_type="futures"
             )
             # This transport is Binance-only. The fallback provider can
             # resolve a market to Bybit/CCXT when Binance does not list it;
@@ -631,17 +631,17 @@ class LiveMarketCoordinator:
             resolver = getattr(self.cache.upstream, "resolve_market", None)
             if resolver is None:
                 symbol = self.cache.resolve_symbol(
-                    market.asset, market_type=market.market_type
+                    market.asset, market_type="futures"
                 )
             else:
-                resolved = resolver(market.asset, market_type=market.market_type)
+                resolved = resolver(market.asset, market_type="futures")
                 if str(getattr(resolved, "provider", "")).strip().lower() != "binance":
                     raise ValueError(
                         f"market resolved to non-Binance provider: "
                         f"{getattr(resolved, 'provider', 'unknown')}"
                     )
                 symbol = str(resolved.symbol)
-            return index, market.market_type, symbol
+            return index, "futures", symbol
 
         resolved: list[tuple[int, str, str]] = []
         with ThreadPoolExecutor(max_workers=min(12, max(1, len(self.universe.markets)))) as pool:
@@ -669,8 +669,9 @@ class LiveMarketCoordinator:
 
         self._resolved_market_keys = tuple(resolved_pairs)
 
-        # Keep each socket at or below 200 subscriptions. Candle intervals count
-        # as separate streams; split spot and futures independently.
+        # AICFA trades Binance USDT perpetual futures only. Do not create Spot
+        # subscriptions even if a stale universe entry still says market_type=spot.
+        # Keep each socket at or below 200 candle streams.
         for market_type, keys in by_market_type.items():
             for chunk_index, chunk in enumerate(chunk_market_keys(keys), start=1):
                 thread = threading.Thread(
