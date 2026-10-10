@@ -39,7 +39,10 @@ PRIMARY_TRADING_MODES: tuple[TradingMode, ...] = (
 # process-local cache keyed by the full completed OHLCV snapshot so lower-TF
 # events reuse the last confirmed higher-TF analysis.
 _FEATURE_CACHE_TIMEFRAMES = frozenset({"5m", "15m", "1h", "4h", "1d", "1w"})
-_FEATURE_CACHE_MAXSIZE = 512
+# Keep only the latest feature snapshot for each market/timeframe. Keying
+# every candle generation separately retained obsolete DataFrames until the
+# global LRU filled, creating avoidable RAM growth on a large market universe.
+_FEATURE_CACHE_MAXSIZE = 128
 _FEATURE_CACHE_LOCK = threading.RLock()
 _FEATURE_FRAME_CACHE: OrderedDict[tuple, object] = OrderedDict()
 
@@ -66,15 +69,20 @@ def _cached_build_features(
         # which do not originate from the versioned live cache.
         raw_hashes = pd.util.hash_pandas_object(completed[columns], index=False).values.tobytes()
         fingerprint = ("content", hashlib.blake2b(raw_hashes, digest_size=8).digest())
-    key = (market_type, symbol, timeframe, len(completed), fingerprint)
+    # A stable per-market/timeframe key replaces the previous generation
+    # instead of retaining every obsolete DataFrame in the LRU. The stored
+    # fingerprint still prevents stale reuse when the completed snapshot changes.
+    key = (market_type, symbol, timeframe)
     with _FEATURE_CACHE_LOCK:
         cached = _FEATURE_FRAME_CACHE.get(key)
         if cached is not None:
-            _FEATURE_FRAME_CACHE.move_to_end(key)
-            return cached
+            cached_fingerprint, cached_analysis = cached
+            if cached_fingerprint == (len(completed), fingerprint):
+                _FEATURE_FRAME_CACHE.move_to_end(key)
+                return cached_analysis
     analysis = build_features(completed)
     with _FEATURE_CACHE_LOCK:
-        _FEATURE_FRAME_CACHE[key] = analysis
+        _FEATURE_FRAME_CACHE[key] = ((len(completed), fingerprint), analysis)
         _FEATURE_FRAME_CACHE.move_to_end(key)
         while len(_FEATURE_FRAME_CACHE) > _FEATURE_CACHE_MAXSIZE:
             _FEATURE_FRAME_CACHE.popitem(last=False)
