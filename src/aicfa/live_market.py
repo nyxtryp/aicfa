@@ -518,7 +518,7 @@ class LiveMarketCoordinator:
                 continue
             cursor = last + duration_ms
             pages = 0
-            while cursor <= latest_closed_open and pages < 20 and not self._stopped.is_set():
+            while cursor <= latest_closed_open and not self._stopped.is_set():
                 try:
                     frame = self.cache.upstream.fetch_ohlcv(
                         symbol=key.symbol,
