@@ -203,6 +203,8 @@ class SetupRegistry:
                     "structural_timeframe": mode_timeframe_profile(normalize_trading_mode(setup.mode)).structure_timeframe,
                     "status": status,
                     "lifecycle_status": lifecycle_status or "active",
+                    "closed_at_ms": now_ms if lifecycle_status == "missed_by_price" else previous.get("closed_at_ms"),
+                    "outcome_reason": str(getattr(lifecycle, "reason", "") or "") if lifecycle_status == "missed_by_price" else previous.get("outcome_reason", ""),
                     "created_at_ms": created_at,
                     "last_seen_at_ms": now_ms,
                     "last_confirmed_at_ms": now_ms,
