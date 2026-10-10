@@ -21,7 +21,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from aicfa.autonomous_scan import AutonomousScanEngine
-from aicfa.armed_zones import candle_intersects_armed_zone, extract_active_smc_zones, zones_for_trigger_timeframe
+from aicfa.armed_zones import candle_intersects_armed_zone, extract_active_smc_zones, merge_refreshed_zones, zones_for_trigger_timeframe
 from aicfa.data_requirements import TradingMode
 from aicfa.live_market import BinancePriceMonitor, LiveMarketCoordinator, LIVE_CANDLE_MODE_TRIGGERS
 from aicfa.market_universe import load_market_universe
@@ -85,11 +85,11 @@ def main() -> None:
             # Each trigger profile analyzes a different timeframe subset.
             # Replace zones only for frames present in this scan and retain the
             # latest confirmed zones from other frames.
-            retained = tuple(
-                zone for zone in armed_zone_cache.get(cache_key, ())
-                if zone.timeframe not in refreshed_timeframes
+            armed_zone_cache[cache_key] = merge_refreshed_zones(
+                armed_zone_cache.get(cache_key, ()),
+                zones,
+                refreshed_timeframes,
             )
-            armed_zone_cache[cache_key] = retained + tuple(zones)
             armed_zone_ready.add(cache_key)
 
     def _on_candle(event) -> None:
