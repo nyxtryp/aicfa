@@ -41,20 +41,35 @@ jobs:
               ;;
             "/aicfa seed-candles")
               {
-                echo "=== seed persistent production candle cache ==="
-                export AICFA_DATA_DIR="${AICFA_DATA_DIR:-/srv/frostdeploy/aicfa/shared/data}"
-                echo "data_dir: $AICFA_DATA_DIR"
-                systemctl stop fd-aicfa
-                STOP_RC=$?
-                if [ "$STOP_RC" -eq 0 ]; then
-                  timeout --signal=TERM --kill-after=30s 3600s .venv/bin/python scripts/seed_live_candle_store.py --workers 4
-                  SEED_RC=$?
+                echo "=== wait for the seeded release to reach FrostDeploy current ==="
+                for attempt in $(seq 1 60); do
+                  if [ -f /srv/frostdeploy/aicfa/current/scripts/seed_live_candle_store.py ]; then
+                    break
+                  fi
+                  sleep 10
+                done
+                if [ ! -f /srv/frostdeploy/aicfa/current/scripts/seed_live_candle_store.py ]; then
+                  echo "Seed script is not present in FrostDeploy current after 10 minutes; refusing to stop the live service."
+                  SEED_RC=91
+                  START_RC=0
                 else
-                  SEED_RC=90
-                  echo "Could not stop fd-aicfa safely; refusing concurrent writes to candle files."
+                  cd /srv/frostdeploy/aicfa/current
+                  export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
+                  export AICFA_DATA_DIR="${AICFA_DATA_DIR:-/srv/frostdeploy/aicfa/shared/data}"
+                  echo "data_dir: $AICFA_DATA_DIR"
+                  echo "release: $(readlink -f /srv/frostdeploy/aicfa/current)"
+                  systemctl stop fd-aicfa
+                  STOP_RC=$?
+                  if [ "$STOP_RC" -eq 0 ]; then
+                    timeout --signal=TERM --kill-after=30s 3600s .venv/bin/python scripts/seed_live_candle_store.py --workers 4
+                    SEED_RC=$?
+                  else
+                    SEED_RC=90
+                    echo "Could not stop fd-aicfa safely; refusing concurrent writes to candle files."
+                  fi
+                  systemctl start fd-aicfa
+                  START_RC=$?
                 fi
-                systemctl start fd-aicfa
-                START_RC=$?
                 echo "seed_exit_code: $SEED_RC"
                 echo "service_start_exit_code: $START_RC"
                 systemctl is-active fd-aicfa || true
