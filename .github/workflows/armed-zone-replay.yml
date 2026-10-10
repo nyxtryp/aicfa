@@ -32,5 +32,5 @@ jobs:
             /srv/frostdeploy/aicfa/current/.venv/bin/python \
             scripts/replay_armed_zone_gate.py \
             --data-dir "$AICFA_DATA_DIR" \
-            --max-symbols 4 \
-            --candles 30
+            --max-symbols 8 \
+            --candles 60
