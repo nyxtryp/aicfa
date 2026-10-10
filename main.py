@@ -191,6 +191,12 @@ def main() -> None:
                 zones=gate_zones,
             )
             if should_skip:
+                print(
+                    f"AICFA candle skipped by armed-zone gate: {key.symbol} "
+                    f"{key.timeframe} low={event.low} high={event.high} "
+                    f"zones={len(gate_zones)} ready={ready} in_progress={scan_in_progress}",
+                    flush=True,
+                )
                 return
             # If another timeframe for this symbol is updating SMC zones, fail
             # open and analyze this candle. This avoids dropping a valid close
@@ -235,7 +241,8 @@ def main() -> None:
             engine.last_automatic_scan_error = diagnostics.error if diagnostics else ""
             print(
                 f"AICFA live candle: {market.asset} {key.timeframe} "
-                f"status={status} setups={len(market.setups)}",
+                f"status={status} setups={len(market.setups)} "
+                f"modes=[{_mode_diagnostics(market)}]",
                 flush=True,
             )
             # The coordinator advances the durable checkpoint only when this
@@ -335,9 +342,32 @@ def main() -> None:
             flush=True,
         )
 
-    # SIGALRM only works in Python's main thread. Run the market rotation
-    # here (rather than in a daemon worker) so a pathological market cannot
-    # block the queue for minutes. Live candle/WebSocket startup stays separate.
+    def _mode_diagnostics(market) -> str:
+        """Expose why each trading horizon did or did not produce a setup."""
+        parts = []
+        for result in getattr(market, "results", ()) or ():
+            mode = getattr(getattr(result, "mode", None), "value", getattr(result, "mode", "unknown"))
+            assessment = getattr(result, "setup_assessment", None)
+            candidates = tuple(getattr(assessment, "candidates", ()) or ())
+            reasons = tuple(getattr(assessment, "reasons", ()) or ())
+            missing = tuple(getattr(assessment, "missing_context", ()) or ())
+            setup_state = str(getattr(getattr(assessment, "decision", None), "value", getattr(assessment, "decision", "unknown"))).lower()
+            final_decision = getattr(result, "decision_assessment", None)
+            action = str(getattr(getattr(final_decision, "action", None), "value", getattr(final_decision, "action", getattr(result, "decision", "unknown")))).lower()
+            final_reasons = tuple(getattr(final_decision, "reasons", ()) or ())
+            final_missing = tuple(getattr(final_decision, "missing_context", ()) or ())
+            detail = f"{mode}:setup={setup_state}:action={action}:candidates={len(candidates)}"
+            if reasons:
+                detail += f":setup_reason={str(reasons[0])[:100]}"
+            if missing:
+                detail += f":setup_missing={str(missing[0])[:90]}"
+            if final_reasons:
+                detail += f":decision_reason={str(final_reasons[0])[:100]}"
+            if final_missing:
+                detail += f":decision_missing={str(final_missing[0])[:90]}"
+            parts.append(detail)
+        return " | ".join(parts) or "no-horizon-results"
+
     price_monitor_holder: dict[str, BinancePriceMonitor] = {}
 
     def _start_live_services() -> None:
@@ -366,6 +396,7 @@ def main() -> None:
                 monitor = BinancePriceMonitor(price_keys, on_price=_on_price)
                 price_monitor_holder["monitor"] = monitor
                 monitor.start()
+
         except Exception as exc:
             print(
                 f"AICFA live services startup error: {type(exc).__name__}: {exc}",
