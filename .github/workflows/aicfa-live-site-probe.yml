@@ -34,7 +34,7 @@ jobs:
           from datetime import datetime, timezone
 
           base = os.environ["BASE_URL"].rstrip("/")
-          paths = ("/api/health", "/api/journal/scans?limit=1", "/api/journal/registry")
+          paths = ("/api/health", "/api/journal/scans?limit=5", "/api/journal/registry")
           payloads = {}
           for path in paths:
               req = urllib.request.Request(base + path, headers={"User-Agent": "AICFA-live-probe/1.0", "Accept": "application/json"})
@@ -57,28 +57,25 @@ jobs:
               print("=== HEALTH ===")
               print(json.dumps(health, ensure_ascii=False, indent=2))
 
-          scan_data = payloads.get("/api/journal/scans?limit=1", {})
+          scan_data = payloads.get("/api/journal/scans?limit=5", {})
           events = scan_data.get("events", []) if isinstance(scan_data, dict) else []
           print("=== RECENT SCANS ===")
           print(f"scan_events_returned={len(events)}")
           if events:
-              event = events[-1]
-              p = event.get("payload", {}) if isinstance(event, dict) else {}
-              markets = p.get("markets", []) if isinstance(p, dict) else []
-              print("event_meta=" + json.dumps({k: event.get(k) for k in ("event_type", "timestamp_ms")}, ensure_ascii=False))
-              print("scan_meta=" + json.dumps({k: p.get(k) for k in ("scan_number", "rotation_id", "queue_position", "universe_size")}, ensure_ascii=False))
-              print(f"markets_in_event={len(markets)}")
-              for market in markets:
-                  if not isinstance(market, dict):
-                      continue
-                  d = market.get("diagnostics", {}) or {}
-                  print("MARKET " + str(market.get("asset")))
-                  print("diagnostics=" + json.dumps({k: d.get(k) for k in ("total_duration_ms", "resolution_duration_ms", "snapshot_duration_ms", "snapshot_metrics")}, ensure_ascii=False)[:3000])
-                  print("horizon_timings=" + json.dumps(d.get("horizon_timings", []), ensure_ascii=False))
-                  for h in market.get("horizons", []):
-                      print("HORIZON=" + json.dumps({k: h.get(k) for k in ("mode", "decision", "reason", "supported_concepts", "possible_concepts", "missing_context", "conflicts", "setup_decision", "setup_reasons", "setup_missing_context", "setup_conflicts", "decision_action", "decision_reasons")}, ensure_ascii=False)[:3500])
-                  print("setups=" + json.dumps(market.get("setups", []), ensure_ascii=False)[:2000])
-                  print("lifecycle_results=" + json.dumps(market.get("lifecycle_results", []), ensure_ascii=False)[:1000])
+              print("event_count=" + str(len(events)))
+              for event in events:
+                  p = event.get("payload", {}) if isinstance(event, dict) else {}
+                  markets = p.get("markets", []) if isinstance(p, dict) else []
+                  print("SCAN " + json.dumps({"timestamp_ms": event.get("timestamp_ms"), "scan_number": p.get("scan_number"), "rotation_id": p.get("rotation_id"), "queue_position": p.get("queue_position"), "universe_size": p.get("universe_size"), "markets": len(markets)}, ensure_ascii=False))
+                  for market in markets:
+                      if not isinstance(market, dict):
+                          continue
+                      d = market.get("diagnostics", {}) or {}
+                      print("MARKET " + str(market.get("asset")) + " duration_ms=" + str(round(d.get("total_duration_ms", 0), 1)))
+                      print("HORIZON_TIMINGS=" + json.dumps(d.get("horizon_timings", []), ensure_ascii=False))
+                      for h in market.get("horizons", []):
+                          print("HORIZON=" + json.dumps({k: h.get(k) for k in ("mode", "decision", "reason", "setup_decision", "setup_reasons", "setup_missing_context", "setup_conflicts", "decision_action", "decision_reasons")}, ensure_ascii=False)[:1800])
+                      print("setups=" + json.dumps(market.get("setups", []), ensure_ascii=False)[:1000])
           registry = payloads.get("/api/journal/registry", {})
           setups = registry.get("setups", []) if isinstance(registry, dict) else []
           print("=== SETUP REGISTRY ===")
