@@ -93,6 +93,11 @@ def test_cache_prefers_local_window_after_seed(tmp_path, monkeypatch):
 
     assert len(result) == 10
     assert provider.calls == []
+    assert result.attrs["aicfa_cache_version"] == 1
+
+    cached = cache.frame(key)
+    assert cached is not None
+    assert cached.attrs["aicfa_cache_version"] == 1
 
 
 def test_cache_refreshes_when_a_full_window_is_stale(tmp_path):
