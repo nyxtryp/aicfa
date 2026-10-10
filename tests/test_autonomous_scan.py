@@ -46,7 +46,7 @@ def _candidate():
 
 def _result(asset, mode):
     execution = {
-        TradingMode.SCALPING: "5m",
+        TradingMode.SCALPING: "1m",
         TradingMode.INTRADAY: "5m",
         TradingMode.SWING: "1h",
         TradingMode.POSITION: "4h",
@@ -116,7 +116,7 @@ def test_distinct_geometries_remain_independent_across_scans(monkeypatch):
             request=SimpleNamespace(market_type="spot"),
             analysis=pd.DataFrame({"timestamp": [1_000 + calls["count"]]}),
             frames={
-                {TradingMode.SCALPING: "5m", TradingMode.INTRADAY: "5m", TradingMode.SWING: "1h", TradingMode.POSITION: "4h"}[request.mode]:
+                {TradingMode.SCALPING: "1m", TradingMode.INTRADAY: "5m", TradingMode.SWING: "1h", TradingMode.POSITION: "4h"}[request.mode]:
                 pd.DataFrame({"close": [101.0]})
             },
             decision="LONG",
