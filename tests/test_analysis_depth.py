@@ -11,7 +11,7 @@ from aicfa.data_requirements import (
 
 def test_depth_follows_mode_timeframe_roles_not_provider_limit():
     expected_by_mode = {
-        "scalping": {"1h": 500, "15m": 500, "5m": 500},
+        "scalping": {"1h": 500, "15m": 500, "5m": 500, "1m": 500},
         "intraday": {"4h": 500, "1h": 500, "15m": 500, "5m": 500},
         "swing": {"1d": 365, "4h": 500, "1h": 500},
         "position": {"1w": 200, "1d": 365, "4h": 500},
