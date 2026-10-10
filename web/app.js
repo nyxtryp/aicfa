@@ -1,6 +1,6 @@
 const API_BASE="/api";
 const state={events:[],registry:[],markets:[],prices:{},filter:"ALL"};
-const ui={history:[],manualItems:[],autoWatchItems:[],manualView:null,selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
+const ui={history:[],manualItems:[],manualView:null,autoWatchItems:[],selected:null,centerKey:null,centerEmpty:false,centerEmptyMarket:"",marketIndex:null,marketBusy:false,lastSelectedSignature:""};
 const $=s=>document.querySelector(s);
 const esc=v=>String(v==null?"—":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 const pick=(o,...k)=>{for(const x of k)if(o&&o[x]!=null)return o[x]};
