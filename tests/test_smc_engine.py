@@ -1,4 +1,5 @@
 import unittest
+from math import nan
 
 from app.smc.engine import analyze_smc
 
@@ -112,6 +113,31 @@ class SMCAnalysisTests(unittest.TestCase):
             analyze_smc(*mismatched, as_of_index=4)
         with self.assertRaises(ValueError):
             analyze_smc(*args, as_of_index=len(args[0]))
+
+    def test_rejects_duplicate_timestamps_and_non_finite_market_values(self):
+        args = self.candles()
+        duplicate_timestamps = list(args)
+        duplicate_timestamps[5] = list(args[5])
+        duplicate_timestamps[5][3] = duplicate_timestamps[5][2]
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            analyze_smc(*duplicate_timestamps)
+
+        non_finite_closes = list(args)
+        non_finite_closes[3] = list(args[3])
+        non_finite_closes[3][4] = nan
+        with self.assertRaisesRegex(ValueError, "finite"):
+            analyze_smc(*non_finite_closes)
+
+        negative_volume = list(args)
+        negative_volume[4] = list(args[4])
+        negative_volume[4][4] = -1.0
+        with self.assertRaisesRegex(ValueError, "volumes"):
+            analyze_smc(*negative_volume)
+
+    def test_invalid_zone_bounds_are_rejected_even_without_levels(self):
+        args = self.candles()
+        with self.assertRaisesRegex(ValueError, "zone_bounds"):
+            analyze_smc(*args, zone_bounds=(2.0, 1.0))
 
     def test_zone_filter_requires_atr_before_it_can_keep_levels(self):
         args = self.candles()
