@@ -654,3 +654,5 @@
 - **Коммиты:** код [25c7532](https://github.com/nyxtryp/aicfa/commit/25c7532461e24bbf32c7aed54935464dc7751f57), тест [18a150d](https://github.com/nyxtryp/aicfa/commit/18a150d8c0bcfde12d199b0342765e06b65d9a9e), исправление синтаксиса теста [d1f3339](https://github.com/nyxtryp/aicfa/commit/d1f33391a301c22dae7ee8db5bfb6b7a4fc348e8).
 - **CI:** после последних коммитов ожидается отдельный прогон; статус будет записан после завершения runner.
 - **Статус:** исправление внесено; production-проверки оставлены на 2026-10-14. Фаза 1 открыта, SMC не начинать.
+
+- **Поправка CI:** первый прогон свежести выявил ошибку теста, а не приложения: тест использовал `deque` без импорта (`NameError`). Импорт добавлен коммитом [9414455](https://github.com/nyxtryp/aicfa/commit/94144557004d46c66acaf5e6ceb6c04fb8b693bf); его CI [38287330318](https://github.com/nyxtryp/aicfa/actions/runs/38287330318) ожидает запуска. Ошибочные прогоны не считать успешными.
