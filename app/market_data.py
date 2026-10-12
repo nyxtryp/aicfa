@@ -6,6 +6,8 @@ import json
 import os
 import sqlite3
 import threading
+import urllib.error
+import email.utils
 from pathlib import Path
 from collections import deque
 import logging
@@ -47,6 +49,24 @@ WS_ROTATION_INTERVAL_SECONDS = 23 * 60 * 60
 WS_ROTATION_RETRY_SECONDS = 60
 WS_ROTATION_CONFIRM_SECONDS = 1
 REST_KLINES_URL = "https://fapi.binance.com/fapi/v1/klines"
+REST_MIN_INTERVAL_SECONDS = 0.25
+REST_MAX_RATE_LIMIT_RETRIES = 5
+REST_MAX_BACKOFF_SECONDS = 60.0
+_rest_request_lock = threading.Lock()
+_rest_next_request_at = 0.0
+
+
+def _retry_after_seconds(error: urllib.error.HTTPError) -> float | None:
+    raw = error.headers.get("Retry-After") if error.headers else None
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        try:
+            return max(0.0, email.utils.parsedate_to_datetime(raw).timestamp() - time.time())
+        except (TypeError, ValueError, OverflowError):
+            return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -318,6 +338,8 @@ class MarketDataManager:
 
     @staticmethod
     def _fetch_rest_klines(symbol: str, timeframe: str) -> list[Any]:
+        """Fetch klines with process-wide pacing and bounded rate-limit retries."""
+        global _rest_next_request_at
         query = urllib.parse.urlencode({
             "symbol": symbol,
             "interval": timeframe,
@@ -327,12 +349,35 @@ class MarketDataManager:
             f"{REST_KLINES_URL}?{query}",
             headers={"User-Agent": "AICFA/0.1"},
         )
-        with urllib.request.urlopen(request, timeout=20) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        if not isinstance(payload, list):
-            raise ValueError("Binance klines response is not a list")
-        return payload
-
+        # Share one lock across history, gap recovery, and hourly reconciliation.
+        with _rest_request_lock:
+            retries = 0
+            while True:
+                delay = _rest_next_request_at - time.monotonic()
+                if delay > 0:
+                    time.sleep(delay)
+                try:
+                    with urllib.request.urlopen(request, timeout=20) as response:
+                        payload = json.loads(response.read().decode("utf-8"))
+                    _rest_next_request_at = time.monotonic() + REST_MIN_INTERVAL_SECONDS
+                    if not isinstance(payload, list):
+                        raise ValueError("Binance klines response is not a list")
+                    return payload
+                except urllib.error.HTTPError as exc:
+                    if exc.code not in (418, 429) or retries >= REST_MAX_RATE_LIMIT_RETRIES:
+                        raise
+                    exponential = min(2.0 ** retries, REST_MAX_BACKOFF_SECONDS)
+                    server_delay = _retry_after_seconds(exc)
+                    wait_seconds = max(exponential, server_delay or 0.0)
+                    retries += 1
+                    logger.warning(
+                        "Binance REST rate limit for %s %s (HTTP %s); retry %s/%s in %.1fs",
+                        symbol, timeframe, exc.code, retries,
+                        REST_MAX_RATE_LIMIT_RETRIES, wait_seconds,
+                    )
+                    time.sleep(wait_seconds)
+                    # The server delay was honored; do not add a second pacing wait.
+                    _rest_next_request_at = time.monotonic()
     @staticmethod
     def _parse_rest_candle(symbol: str, timeframe: str, row: Any) -> ClosedCandle | None:
         if not isinstance(row, list) or len(row) < 7:
