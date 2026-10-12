@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Sequence
 
 from app.smc.structure import SwingPoint
@@ -181,3 +182,66 @@ def find_previous_day_extremes(
             ))
         start = end
     return tuple(sorted(levels, key=lambda level: (level.confirmation_index, level.kind)))
+
+
+
+def find_current_day_extremes(
+    timestamps_ms: Sequence[int],
+    highs: Sequence[float],
+    lows: Sequence[float],
+    *,
+    as_of_index: int,
+) -> tuple[LiquidityLevel, ...]:
+    """Return current UTC-day high/low known immediately before as_of_index.
+
+    The candle at as_of_index and all future candles are excluded. This allows
+    the current candle to sweep a previously observed intraday extreme without
+    leaking its own high/low into the level being tested.
+    """
+    if not (len(timestamps_ms) == len(highs) == len(lows)):
+        raise ValueError("timestamps, highs, and lows must have the same length")
+    if as_of_index < 0 or as_of_index >= len(highs):
+        raise ValueError("as_of_index is outside the supplied candles")
+    if as_of_index == 0:
+        return ()
+    if any(high < low for high, low in zip(highs, lows)):
+        raise ValueError("each high must be >= its low")
+
+    current_day = datetime.fromtimestamp(
+        timestamps_ms[as_of_index] / 1000, tz=timezone.utc
+    ).date()
+    prior_indices = [
+        i for i in range(as_of_index)
+        if datetime.fromtimestamp(timestamps_ms[i] / 1000, tz=timezone.utc).date() == current_day
+    ]
+    if not prior_indices:
+        return ()
+
+    day_high = max(highs[i] for i in prior_indices)
+    day_low = min(lows[i] for i in prior_indices)
+    high_sources = tuple(i for i in prior_indices if highs[i] == day_high)
+    low_sources = tuple(i for i in prior_indices if lows[i] == day_low)
+    confirmation = max(prior_indices)
+    return (
+        LiquidityLevel("high", float(day_high), high_sources, confirmation, False),
+        LiquidityLevel("low", float(day_low), low_sources, confirmation, False),
+    )
+
+
+def is_level_near_zone(
+    level_price: float,
+    zone_lower: float,
+    zone_upper: float,
+    atr_value: float,
+    *,
+    max_distance_atr: float,
+) -> bool:
+    """Return whether a liquidity level is inside/near a zone within ATR distance."""
+    if zone_lower > zone_upper:
+        raise ValueError("zone_lower must be <= zone_upper")
+    if atr_value <= 0 or max_distance_atr < 0:
+        raise ValueError("atr_value must be > 0 and max_distance_atr >= 0")
+    if zone_lower <= level_price <= zone_upper:
+        return True
+    distance = zone_lower - level_price if level_price < zone_lower else level_price - zone_upper
+    return distance <= atr_value * max_distance_atr
