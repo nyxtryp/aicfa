@@ -263,6 +263,42 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(manager.store.count(), 3)
             manager.store.close()
 
+    async def test_periodic_reconciliation_corrects_rest_candle_and_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = MarketDataManager()
+            manager.store = SQLiteCandleStore(Path(tmp) / "candles.sqlite3")
+            manager.store.initialize()
+            base = 1_700_000_000_000
+            stale = ClosedCandle(
+                symbol="BTCUSDT", timeframe="1m", open_time_ms=base,
+                close_time_ms=base + 59_999, open=Decimal("100"),
+                high=Decimal("105"), low=Decimal("99"), close=Decimal("103"),
+                volume=Decimal("12.5"),
+            )
+            corrected = ClosedCandle(
+                symbol="BTCUSDT", timeframe="1m", open_time_ms=base,
+                close_time_ms=base + 59_999, open=Decimal("100"),
+                high=Decimal("106"), low=Decimal("99"), close=Decimal("104"),
+                volume=Decimal("13.5"),
+            )
+            manager.candles[("BTCUSDT", "1m")] = __import__("collections").deque(
+                [stale], maxlen=CANDLES_PER_SERIES
+            )
+            manager.latest[("BTCUSDT", "1m")] = stale
+            manager.store.upsert_many((stale,))
+            manager._fetch_rest_klines = lambda symbol, timeframe: [[
+                corrected.open_time_ms, str(corrected.open), str(corrected.high),
+                str(corrected.low), str(corrected.close), str(corrected.volume),
+                corrected.close_time_ms,
+            ]]
+
+            checked = await manager._reconcile_series("BTCUSDT", "1m")
+
+            self.assertEqual(checked, 1)
+            self.assertEqual(manager.candle_window("BTCUSDT", "1m"), (corrected,))
+            self.assertEqual(manager.store.load_window("BTCUSDT", "1m"), (corrected,))
+            manager.store.close()
+
     def test_supported_timeframe_durations(self):
         manager = MarketDataManager()
         self.assertEqual(manager._timeframe_ms("1m"), 60_000)
