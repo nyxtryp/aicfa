@@ -69,10 +69,6 @@ class LiquidityTests(unittest.TestCase):
         self.assertTrue(is_level_near_zone(103, 100, 105, 2, max_distance_atr=0))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_previous_utc_day_extremes_are_not_visible_during_source_day(self):
         from datetime import datetime, timezone
         from app.smc.liquidity import find_previous_day_extremes
@@ -105,3 +101,7 @@ if __name__ == "__main__":
         from app.smc.liquidity import find_previous_day_extremes
         with self.assertRaises(ValueError):
             find_previous_day_extremes([2], [1, 0], [1000])
+
+
+if __name__ == "__main__":
+    unittest.main()
