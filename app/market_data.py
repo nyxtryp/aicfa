@@ -36,6 +36,7 @@ SYMBOL_SET = frozenset(ALL_SYMBOLS)
 TIMEFRAME_SET = frozenset(TIMEFRAMES)
 EXPECTED_STREAM_COUNT = len(ALL_SYMBOLS) * len(TIMEFRAMES)
 CANDLES_PER_SERIES = 500
+REST_KLINES_URL = "https://fapi.binance.com/fapi/v1/klines"
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +133,12 @@ class MarketDataManager:
         self._tasks: list[asyncio.Task[None]] = []
         self._stopping = False
         self._lock = asyncio.Lock()
+        self.history_status: dict[str, Any] = {
+            "status": "not_started",
+            "series_loaded": 0,
+            "candles_loaded": 0,
+            "errors": [],
+        }
 
     @staticmethod
     def _new_group(expected: int) -> dict[str, Any]:
@@ -151,6 +158,7 @@ class MarketDataManager:
         if self._tasks:
             return
         self._stopping = False
+        await self.load_history()
         self._tasks = [
             asyncio.create_task(self._run_group("tradfi", TRADFI_SYMBOLS), name="aicfa-ws-tradfi"),
             asyncio.create_task(self._run_group("crypto", CRYPTO_SYMBOLS), name="aicfa-ws-crypto"),
@@ -165,6 +173,105 @@ class MarketDataManager:
             await asyncio.gather(*tasks, return_exceptions=True)
         for state in self.groups.values():
             state["status"] = "stopped"
+
+    @staticmethod
+    def _fetch_rest_klines(symbol: str, timeframe: str) -> list[Any]:
+        query = urllib.parse.urlencode({
+            "symbol": symbol,
+            "interval": timeframe,
+            "limit": CANDLES_PER_SERIES,
+        })
+        request = urllib.request.Request(
+            f"{REST_KLINES_URL}?{query}",
+            headers={"User-Agent": "AICFA/0.1"},
+        )
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError("Binance klines response is not a list")
+        return payload
+
+    @staticmethod
+    def _parse_rest_candle(symbol: str, timeframe: str, row: Any) -> ClosedCandle | None:
+        if not isinstance(row, list) or len(row) < 7:
+            raise ValueError("invalid REST kline row")
+        try:
+            open_time_ms = int(row[0])
+            close_time_ms = int(row[6])
+        except (TypeError, ValueError, IndexError) as exc:
+            raise ValueError("invalid REST kline timestamp") from exc
+        if close_time_ms >= int(time.time() * 1000):
+            return None
+        candle = ClosedCandle(
+            symbol=symbol,
+            timeframe=timeframe,
+            open_time_ms=open_time_ms,
+            close_time_ms=close_time_ms,
+            open=_decimal(row[1], "open"),
+            high=_decimal(row[2], "high"),
+            low=_decimal(row[3], "low"),
+            close=_decimal(row[4], "close"),
+            volume=_decimal(row[5], "volume"),
+        )
+        if candle.high < max(candle.open, candle.close, candle.low):
+            raise ValueError("REST kline high is below another candle price")
+        if candle.low > min(candle.open, candle.close, candle.high):
+            raise ValueError("REST kline low is above another candle price")
+        if candle.volume < 0:
+            raise ValueError("REST kline volume must not be negative")
+        return candle
+
+    async def load_history(self) -> None:
+        """Warm each of the 250 series with its latest 500 closed REST candles."""
+        self.history_status = {
+            "status": "loading",
+            "series_loaded": 0,
+            "candles_loaded": 0,
+            "errors": [],
+        }
+        semaphore = asyncio.Semaphore(6)
+
+        async def load_series(symbol: str, timeframe: str) -> None:
+            async with semaphore:
+                try:
+                    rows = await asyncio.to_thread(self._fetch_rest_klines, symbol, timeframe)
+                    candles = []
+                    for row in rows:
+                        candle = self._parse_rest_candle(symbol, timeframe, row)
+                        if candle is not None:
+                            candles.append(candle)
+                    candles.sort(key=lambda item: item.open_time_ms)
+                    async with self._lock:
+                        series = self.candles.setdefault(
+                            (symbol, timeframe), deque(maxlen=CANDLES_PER_SERIES)
+                        )
+                        for candle in candles[-CANDLES_PER_SERIES:]:
+                            if not series or candle.open_time_ms > series[-1].open_time_ms:
+                                series.append(candle)
+                        if series:
+                            self.latest[(symbol, timeframe)] = series[-1]
+                    self.history_status["series_loaded"] += 1
+                    self.history_status["candles_loaded"] += len(candles[-CANDLES_PER_SERIES:])
+                except Exception as exc:
+                    self.history_status["errors"].append({
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "error": type(exc).__name__,
+                    })
+                    logger.warning(
+                        "REST history failed for %s %s (%s)",
+                        symbol, timeframe, type(exc).__name__,
+                    )
+
+        await asyncio.gather(*(
+            load_series(symbol, timeframe)
+            for symbol in ALL_SYMBOLS
+            for timeframe in TIMEFRAMES
+        ))
+        self.history_status["status"] = (
+            "complete" if self.history_status["series_loaded"] == EXPECTED_STREAM_COUNT
+            and not self.history_status["errors"] else "partial"
+        )
 
     async def _run_group(self, name: str, symbols: tuple[str, ...]) -> None:
         state = self.groups[name]
@@ -244,5 +351,6 @@ class MarketDataManager:
             "latest_series": len(self.latest),
             "stored_candles": sum(len(series) for series in self.candles.values()),
             "window_size": CANDLES_PER_SERIES,
+            "history": dict(self.history_status),
             "groups": {name: dict(state) for name, state in self.groups.items()},
         }
