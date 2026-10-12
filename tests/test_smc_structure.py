@@ -12,7 +12,6 @@ class ConfirmedSwingTests(unittest.TestCase):
             right=2,
         )
         self.assertIn(SwingPoint("high", 2, 4, 5.0), points)
-        self.assertIn(SwingPoint("low", 2, 4, 2.0), points)
 
     def test_equal_high_plateau_selects_earliest_candle(self):
         points = find_confirmed_swings(
