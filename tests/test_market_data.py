@@ -4,6 +4,8 @@ from decimal import Decimal
 from app.market_data import (
     ALL_SYMBOLS,
     CRYPTO_SYMBOLS,
+    CANDLES_PER_SERIES,
+    ClosedCandle,
     EXPECTED_STREAM_COUNT,
     TIMEFRAMES,
     TRADFI_SYMBOLS,
@@ -86,6 +88,51 @@ class MarketDataTests(unittest.TestCase):
         self.assertEqual(status["groups"]["tradfi"]["expected_streams"], 105)
         self.assertEqual(status["groups"]["crypto"]["expected_streams"], 145)
         self.assertEqual(status["latest_series"], 0)
+        self.assertEqual(status["stored_candles"], 0)
+        self.assertEqual(status["window_size"], 500)
+
+    def test_rolling_window_keeps_500_newest_closed_candles(self):
+        manager = MarketDataManager()
+        base_time = 1_791_000_000_000
+        for index in range(501):
+            candle = ClosedCandle(
+                symbol="BTCUSDT",
+                timeframe="1m",
+                open_time_ms=base_time + index * 60_000,
+                close_time_ms=base_time + index * 60_000 + 59_999,
+                open=Decimal("100"),
+                high=Decimal("105"),
+                low=Decimal("99"),
+                close=Decimal("103"),
+                volume=Decimal("12.5"),
+            )
+            self.assertTrue(manager.add_closed_candle(candle))
+
+        window = manager.candle_window("BTCUSDT", "1m")
+        self.assertEqual(len(window), CANDLES_PER_SERIES)
+        self.assertEqual(window[0].open_time_ms, base_time + 60_000)
+        self.assertEqual(window[-1].open_time_ms, base_time + 500 * 60_000)
+        self.assertEqual(manager.status()["stored_candles"], 500)
+
+    def test_rolling_window_rejects_duplicate_or_older_candles(self):
+        manager = MarketDataManager()
+        candle = parse_closed_kline(event())
+        assert candle is not None
+        self.assertTrue(manager.add_closed_candle(candle))
+        self.assertFalse(manager.add_closed_candle(candle))
+        older = ClosedCandle(
+            symbol=candle.symbol,
+            timeframe=candle.timeframe,
+            open_time_ms=candle.open_time_ms - 60_000,
+            close_time_ms=candle.close_time_ms - 60_000,
+            open=candle.open,
+            high=candle.high,
+            low=candle.low,
+            close=candle.close,
+            volume=candle.volume,
+        )
+        self.assertFalse(manager.add_closed_candle(older))
+        self.assertEqual(len(manager.candle_window("BTCUSDT", "1m")), 1)
 
     def test_invalid_price_range_raises(self):
         message = event()
