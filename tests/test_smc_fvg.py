@@ -1,6 +1,6 @@
 import unittest
 
-from app.smc.fvg import FairValueGap, find_fair_value_gaps
+from app.smc.fvg import FairValueGap, FairValueGapFill, find_fair_value_gaps, measure_fvg_fill
 
 
 class FairValueGapTests(unittest.TestCase):
@@ -27,6 +27,31 @@ class FairValueGapTests(unittest.TestCase):
             find_fair_value_gaps([1, 2], [0])
         with self.assertRaises(ValueError):
             find_fair_value_gaps([0], [1])
+
+
+    def test_bullish_gap_fill_progress_uses_only_post_confirmation_candles(self):
+        gap = FairValueGap("bullish", 0, 2, 10.0, 13.0)
+        highs = [10, 12, 14, 14, 12]
+        lows = [8, 11, 13, 12, 10]
+        self.assertEqual(
+            measure_fvg_fill(gap, highs, lows, as_of_index=3),
+            FairValueGapFill(gap, 3, 33.33333333, False),
+        )
+        self.assertEqual(
+            measure_fvg_fill(gap, highs, lows, as_of_index=4),
+            FairValueGapFill(gap, 4, 100.0, True),
+        )
+
+    def test_bearish_gap_fill_progress(self):
+        gap = FairValueGap("bearish", 0, 2, 8.0, 10.0)
+        result = measure_fvg_fill(gap, [12, 11, 8, 9, 10], [10, 9, 7, 8, 9])
+        self.assertEqual(result.fill_percent, 100.0)
+        self.assertTrue(result.fully_filled)
+
+    def test_fvg_fill_rejects_future_or_invalid_index(self):
+        gap = FairValueGap("bullish", 0, 2, 10.0, 13.0)
+        with self.assertRaises(ValueError):
+            measure_fvg_fill(gap, [10, 12, 14], [8, 11, 13], as_of_index=3)
 
 
 if __name__ == "__main__":
