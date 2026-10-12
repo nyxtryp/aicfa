@@ -448,9 +448,9 @@ class MarketDataManager:
                     candles.sort(key=lambda item: item.open_time_ms)
                     key = (symbol, timeframe)
                     async with self._lock:
-                        # Merge REST history with candles that arrived live while
-                        # warm-up was running; retain unique timestamps and the
-                        # newest 500 closed candles without discarding live data.
+                        # REST is authoritative for matching timestamps (it can
+                        # correct stale persisted values); keep any newer live candles
+                        # that arrived while warm-up was running but are not in REST.
                         merged = {
                             item.open_time_ms: item
                             for item in self.candles.get(
@@ -458,7 +458,7 @@ class MarketDataManager:
                             )
                         }
                         for item in candles:
-                            merged.setdefault(item.open_time_ms, item)
+                            merged[item.open_time_ms] = item
                         series = deque(
                             sorted(merged.values(), key=lambda item: item.open_time_ms)[-CANDLES_PER_SERIES:],
                             maxlen=CANDLES_PER_SERIES,
