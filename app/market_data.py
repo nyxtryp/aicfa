@@ -662,7 +662,9 @@ class MarketDataManager:
         Startup history already fills the 250 series. Running a second full REST
         pass immediately after history needlessly doubles startup traffic and can
         trigger Binance 429 responses; live closed candles continue to arrive by
-        WebSocket while the hourly reconciliation timer is waiting.
+        WebSocket while the hourly reconciliation timer is waiting. An unexpected
+        failure in one cycle is recorded but must not permanently disable later
+        hourly reconciliation attempts.
         """
         try:
             if self._history_task is not None:
@@ -671,13 +673,19 @@ class MarketDataManager:
                 await asyncio.sleep(RECONCILIATION_INTERVAL_SECONDS)
                 if self._stopping:
                     return
-                await self.reconcile_all_series()
+                try:
+                    await self.reconcile_all_series()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    self.reconciliation_status["status"] = "failed"
+                    self.reconciliation_status["last_attempt_ms"] = int(time.time() * 1000)
+                    logger.exception(
+                        "Unexpected REST reconciliation failure (%s); next hourly attempt remains scheduled",
+                        type(exc).__name__,
+                    )
         except asyncio.CancelledError:
             raise
-        except Exception as exc:
-            self.reconciliation_status["status"] = "failed"
-            self.reconciliation_status["last_attempt_ms"] = int(time.time() * 1000)
-            logger.exception("Unexpected REST reconciliation failure (%s)", type(exc).__name__)
 
     async def _consume_socket(self, name: str, socket: Any) -> None:
         """Consume one socket; overlapping old/new sockets are deduplicated by candle timestamp."""
