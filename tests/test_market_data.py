@@ -273,6 +273,34 @@ class MarketDataTests(unittest.TestCase):
 
 
 
+    def test_freshness_status_flags_stale_series_without_marking_higher_timeframe_stale_early(self):
+        manager = MarketDataManager()
+        now_ms = 2_000_000_000_000
+
+        def candle(timeframe: str, close_time_ms: int) -> ClosedCandle:
+            duration = manager._timeframe_ms(timeframe)
+            return ClosedCandle(
+                symbol="BTCUSDT", timeframe=timeframe,
+                open_time_ms=close_time_ms - duration + 1,
+                close_time_ms=close_time_ms,
+                open=Decimal("100"), high=Decimal("105"), low=Decimal("99"),
+                close=Decimal("103"), volume=Decimal("12.5"),
+            )
+
+        manager.latest[("BTCUSDT", "1m")] = candle("1m", now_ms - 200_000)
+        manager.latest[("BTCUSDT", "4h")] = candle("4h", now_ms - 3 * 60 * 60 * 1000)
+
+        status = manager._freshness_status(now_ms)
+
+        self.assertEqual(status["checked_at_ms"], now_ms)
+        self.assertEqual(status["series_with_data"], 2)
+        self.assertEqual(status["missing_series"], EXPECTED_STREAM_COUNT - 2)
+        self.assertEqual(status["stale_series"], 1)
+        self.assertEqual(status["stale_details"][0]["symbol"], "BTCUSDT")
+        self.assertEqual(status["stale_details"][0]["timeframe"], "1m")
+        self.assertEqual(status["max_age_ms"], 200_000)
+
+
 class SQLiteCandleStoreTests(unittest.TestCase):
     def make_candle(self, index: int) -> ClosedCandle:
         base = 1_791_000_000_000
