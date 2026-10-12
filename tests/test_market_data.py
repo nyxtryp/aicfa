@@ -75,6 +75,33 @@ class RestRateLimitTests(unittest.TestCase):
         self.assertEqual(request.call_count, market_data.REST_MAX_RATE_LIMIT_RETRIES + 1)
 
 
+class ReconciliationScheduleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_first_rest_reconciliation_waits_one_hour_after_history(self):
+        from app.market_data import RECONCILIATION_INTERVAL_SECONDS
+
+        manager = MarketDataManager()
+        manager._history_task = None
+        calls = []
+
+        async def sleep_side_effect(seconds):
+            calls.append(("sleep", seconds))
+            if len(calls) == 2:
+                manager._stopping = True
+
+        async def reconcile_side_effect():
+            calls.append(("reconcile", None))
+
+        manager.reconcile_all_series = AsyncMock(side_effect=reconcile_side_effect)
+        with patch("app.market_data.asyncio.sleep", new=AsyncMock(side_effect=sleep_side_effect)):
+            await manager._reconciliation_loop()
+
+        self.assertEqual(calls, [
+            ("sleep", RECONCILIATION_INTERVAL_SECONDS),
+            ("reconcile", None),
+            ("sleep", RECONCILIATION_INTERVAL_SECONDS),
+        ])
+
+
 class MarketDataTests(unittest.TestCase):
     def test_watchlist_has_exactly_50_unique_symbols(self):
         self.assertEqual(len(TRADFI_SYMBOLS), 21)
