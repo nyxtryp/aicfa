@@ -30,7 +30,7 @@ class SMCChartPayloadTests(unittest.TestCase):
             [("BOS", timestamps[4]), ("CHoCH", timestamps[8])],
         )
         self.assertEqual(payload["order_blocks"][0]["mitigation_timestamp_ms"], timestamps[8])
-        self.assertNotIn(timestamps[9], str(payload))
+        self.assertNotIn(str(timestamps[9]), str(payload))
 
     def test_payload_rejects_missing_or_non_increasing_timestamps(self):
         opens, highs, lows, closes, volumes, timestamps = self.controlled_candles()
