@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import sqlite3
+import threading
+from pathlib import Path
 from collections import deque
 import logging
 import time
@@ -118,11 +122,100 @@ def parse_closed_kline(message: Mapping[str, Any]) -> ClosedCandle | None:
     return candle
 
 
+
+class SQLiteCandleStore:
+    """Durable closed-candle store using SQLite WAL and a 500-row per-series cap."""
+
+    def __init__(self, path: str | Path | None = None) -> None:
+        configured = path or os.environ.get("AICFA_DATA_DIR", "/srv/frostdeploy/aicfa/shared/data")
+        configured_path = Path(configured)
+        self.path = configured_path if configured_path.suffix == ".db" else configured_path / "candles.sqlite3"
+        self._connection: sqlite3.Connection | None = None
+        self._thread_lock = threading.RLock()
+
+    def initialize(self) -> None:
+        with self._thread_lock:
+            if self._connection is not None:
+                return
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            connection = sqlite3.connect(str(self.path), timeout=30)
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA synchronous=NORMAL")
+            connection.execute("PRAGMA busy_timeout=30000")
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS candles (
+                    symbol TEXT NOT NULL, timeframe TEXT NOT NULL,
+                    open_time_ms INTEGER NOT NULL, close_time_ms INTEGER NOT NULL,
+                    open TEXT NOT NULL, high TEXT NOT NULL, low TEXT NOT NULL,
+                    close TEXT NOT NULL, volume TEXT NOT NULL,
+                    PRIMARY KEY (symbol, timeframe, open_time_ms)
+                )
+            """)
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_candles_series_time ON candles(symbol, timeframe, open_time_ms DESC)")
+            connection.commit()
+            self._connection = connection
+
+    def _db(self) -> sqlite3.Connection:
+        if self._connection is None:
+            self.initialize()
+        assert self._connection is not None
+        return self._connection
+
+    @staticmethod
+    def _values(candle: ClosedCandle) -> tuple[Any, ...]:
+        return (candle.symbol, candle.timeframe, candle.open_time_ms, candle.close_time_ms,
+                str(candle.open), str(candle.high), str(candle.low), str(candle.close), str(candle.volume))
+
+    def upsert_many(self, candles: list[ClosedCandle] | tuple[ClosedCandle, ...]) -> None:
+        if not candles:
+            return
+        with self._thread_lock:
+            db = self._db()
+            db.executemany("""
+                INSERT INTO candles (symbol, timeframe, open_time_ms, close_time_ms, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(symbol, timeframe, open_time_ms) DO UPDATE SET
+                    close_time_ms=excluded.close_time_ms, open=excluded.open, high=excluded.high,
+                    low=excluded.low, close=excluded.close, volume=excluded.volume
+            """, (self._values(candle) for candle in candles))
+            for symbol, timeframe in {(c.symbol, c.timeframe) for c in candles}:
+                db.execute("""
+                    DELETE FROM candles WHERE symbol=? AND timeframe=? AND open_time_ms NOT IN (
+                        SELECT open_time_ms FROM candles WHERE symbol=? AND timeframe=?
+                        ORDER BY open_time_ms DESC LIMIT ?
+                    )
+                """, (symbol, timeframe, symbol, timeframe, CANDLES_PER_SERIES))
+            db.commit()
+
+    def load_window(self, symbol: str, timeframe: str) -> tuple[ClosedCandle, ...]:
+        with self._thread_lock:
+            rows = self._db().execute("""
+                SELECT symbol, timeframe, open_time_ms, close_time_ms, open, high, low, close, volume
+                FROM candles WHERE symbol=? AND timeframe=? ORDER BY open_time_ms DESC LIMIT ?
+            """, (symbol, timeframe, CANDLES_PER_SERIES)).fetchall()
+        return tuple(ClosedCandle(
+            symbol=r["symbol"], timeframe=r["timeframe"], open_time_ms=r["open_time_ms"],
+            close_time_ms=r["close_time_ms"], open=Decimal(r["open"]), high=Decimal(r["high"]),
+            low=Decimal(r["low"]), close=Decimal(r["close"]), volume=Decimal(r["volume"])
+        ) for r in reversed(rows))
+
+    def count(self) -> int:
+        with self._thread_lock:
+            return int(self._db().execute("SELECT COUNT(*) FROM candles").fetchone()[0])
+
+    def close(self) -> None:
+        with self._thread_lock:
+            if self._connection is not None:
+                self._connection.close()
+                self._connection = None
+
+
 class MarketDataManager:
     """Two reconnecting Binance connections with a rolling closed-candle window.
 
-    The 500-candle windows are currently in memory. REST warm-up, durable
-    persistence, and SMC processing remain separate follow-up tasks.
+    SQLite/WAL is the durable source of closed candles; memory holds the latest
+    500 candles per configured symbol/timeframe for fast analysis.
     """
 
     def __init__(self) -> None:
@@ -136,6 +229,7 @@ class MarketDataManager:
         self._history_task: asyncio.Task[None] | None = None
         self._stopping = False
         self._lock = asyncio.Lock()
+        self.store = SQLiteCandleStore()
         self.history_status: dict[str, Any] = {
             "status": "not_started",
             "series_loaded": 0,
@@ -161,6 +255,21 @@ class MarketDataManager:
         if self._tasks:
             return
         self._stopping = False
+        # Fail startup if durable storage cannot be initialized; restore saved
+        # windows before REST synchronization begins.
+        self.store.initialize()
+        restored_series = 0
+        restored_candles = 0
+        for symbol in ALL_SYMBOLS:
+            for timeframe in TIMEFRAMES:
+                series = self.store.load_window(symbol, timeframe)
+                if series:
+                    key = (symbol, timeframe)
+                    self.candles[key] = deque(series, maxlen=CANDLES_PER_SERIES)
+                    self.latest[key] = series[-1]
+                    restored_series += 1
+                    restored_candles += len(series)
+        logger.info("Restored %s candle series / %s candles from SQLite", restored_series, restored_candles)
         # Do not block ASGI startup/health checks on 250 REST requests.
         self._history_task = asyncio.create_task(
             self.load_history(), name="aicfa-rest-history"
@@ -183,6 +292,7 @@ class MarketDataManager:
             await asyncio.gather(*tasks, return_exceptions=True)
         for state in self.groups.values():
             state["status"] = "stopped"
+        self.store.close()
 
     @staticmethod
     def _fetch_rest_klines(symbol: str, timeframe: str) -> list[Any]:
@@ -275,6 +385,7 @@ class MarketDataManager:
                         self.candles[key] = series
                         if series:
                             self.latest[key] = series[-1]
+                        self.store.upsert_many(tuple(series))
                         self.history_status["series_loaded"] += 1
                         self.history_status["candles_loaded"] += len(series)
                 except Exception as exc:
@@ -359,6 +470,8 @@ class MarketDataManager:
         previous = self.latest.get(key)
         if previous is not None and candle.open_time_ms <= previous.open_time_ms:
             return False
+        # Persist before publishing to the in-memory window.
+        self.store.upsert_many((candle,))
         series = self.candles.setdefault(
             key, deque(maxlen=CANDLES_PER_SERIES)
         )
@@ -380,6 +493,7 @@ class MarketDataManager:
             "latest_series": len(self.latest),
             "stored_candles": sum(len(series) for series in self.candles.values()),
             "window_size": CANDLES_PER_SERIES,
+            "persistence": {"backend": "sqlite", "journal_mode": "WAL", "database_path": str(self.store.path), "stored_candles": self.store.count() if self.store._connection is not None else 0},
             "history": dict(self.history_status),
             "groups": {name: dict(state) for name, state in self.groups.items()},
         }
