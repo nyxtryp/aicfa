@@ -35,8 +35,10 @@ class SMCAnalysisTests(unittest.TestCase):
 
     def test_rejects_mismatched_arrays_and_out_of_range_index(self):
         args = self.candles()
+        mismatched = list(args)
+        mismatched[4] = mismatched[4][:-1]
         with self.assertRaises(ValueError):
-            analyze_smc(*args[:-1], as_of_index=4)
+            analyze_smc(*mismatched, as_of_index=4)
         with self.assertRaises(ValueError):
             analyze_smc(*args, as_of_index=len(args[0]))
 
