@@ -54,3 +54,37 @@ class LiquidityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_previous_utc_day_extremes_are_not_visible_during_source_day(self):
+        from datetime import datetime, timezone
+        from app.smc.liquidity import find_previous_day_extremes
+
+        def ms(value):
+            return int(datetime.fromisoformat(value).replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+        levels = find_previous_day_extremes(
+            highs=[10, 12, 11, 13],
+            lows=[7, 8, 6, 9],
+            timestamps_ms=[
+                ms("2026-10-12T23:59:00"),
+                ms("2026-10-13T00:00:00"),
+                ms("2026-10-13T00:01:00"),
+                ms("2026-10-14T00:00:00"),
+            ],
+        )
+        # The 12 Oct levels are known only after a candle from 13 Oct exists.
+        day_12 = [level for level in levels if level.source_indices[0] == 0]
+        self.assertEqual(len(day_12), 2)
+        self.assertEqual({level.kind: level.price for level in day_12}, {"high": 10.0, "low": 7.0})
+        self.assertTrue(all(level.confirmation_index == 1 for level in day_12))
+
+    def test_previous_day_extremes_reject_unsorted_timestamps(self):
+        from app.smc.liquidity import find_previous_day_extremes
+        with self.assertRaises(ValueError):
+            find_previous_day_extremes([2, 3], [1, 2], [2000, 1000])
+
+    def test_previous_day_extremes_require_equal_array_lengths(self):
+        from app.smc.liquidity import find_previous_day_extremes
+        with self.assertRaises(ValueError):
+            find_previous_day_extremes([2], [1, 0], [1000])
