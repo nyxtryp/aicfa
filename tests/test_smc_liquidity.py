@@ -4,6 +4,8 @@ from app.smc.liquidity import (
     LiquidityLevel,
     detect_liquidity_sweeps,
     find_liquidity_levels,
+    find_current_day_extremes,
+    is_level_near_zone,
 )
 from app.smc.structure import SwingPoint
 
@@ -50,6 +52,21 @@ class LiquidityTests(unittest.TestCase):
     def test_rejects_inconsistent_candles(self):
         with self.assertRaises(ValueError):
             detect_liquidity_sweeps([1], [2], [1], [])
+
+
+    def test_current_day_extremes_exclude_current_candle_and_prior_utc_day(self):
+        # 2026-01-01 23:59 UTC, then 2026-01-02 00:00 and 00:01 UTC.
+        timestamps = [1767311940000, 1767312000000, 1767312060000]
+        levels = find_current_day_extremes(
+            timestamps, [100, 102, 110], [90, 91, 80], as_of_index=2
+        )
+        self.assertEqual([(x.kind, x.price) for x in levels], [("high", 102.0), ("low", 91.0)])
+        self.assertEqual(levels[0].confirmation_index, 1)
+
+    def test_level_distance_from_zone_uses_atr_limit(self):
+        self.assertTrue(is_level_near_zone(99, 100, 105, 2, max_distance_atr=0.5))
+        self.assertFalse(is_level_near_zone(98.9, 100, 105, 2, max_distance_atr=0.5))
+        self.assertTrue(is_level_near_zone(103, 100, 105, 2, max_distance_atr=0))
 
 
 if __name__ == "__main__":
