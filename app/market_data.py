@@ -43,6 +43,9 @@ TIMEFRAME_SET = frozenset(TIMEFRAMES)
 EXPECTED_STREAM_COUNT = len(ALL_SYMBOLS) * len(TIMEFRAMES)
 CANDLES_PER_SERIES = 500
 RECONCILIATION_INTERVAL_SECONDS = 3600
+WS_ROTATION_INTERVAL_SECONDS = 23 * 60 * 60
+WS_ROTATION_RETRY_SECONDS = 60
+WS_ROTATION_CONFIRM_SECONDS = 1
 REST_KLINES_URL = "https://fapi.binance.com/fapi/v1/klines"
 
 
@@ -563,6 +566,117 @@ class MarketDataManager:
             self.reconciliation_status["last_attempt_ms"] = int(time.time() * 1000)
             logger.exception("Unexpected REST reconciliation failure (%s)", type(exc).__name__)
 
+    async def _consume_socket(self, name: str, socket: Any) -> None:
+        """Consume one socket; overlapping old/new sockets are deduplicated by candle timestamp."""
+        state = self.groups[name]
+        async for raw in socket:
+            state["messages"] += 1
+            state["last_message_ms"] = int(time.time() * 1000)
+            try:
+                message = json.loads(raw)
+                if not isinstance(message, Mapping):
+                    continue
+                candle = parse_closed_kline(message)
+            except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                state["invalid_messages"] += 1
+                logger.warning("Invalid Binance message (%s): %s", name, exc)
+                continue
+            if candle is None:
+                continue
+            previous = self.latest.get((candle.symbol, candle.timeframe))
+            interval_ms = self._timeframe_ms(candle.timeframe)
+            if previous is not None and candle.open_time_ms > previous.open_time_ms + interval_ms:
+                try:
+                    await self._recover_series_gap(candle.symbol, candle.timeframe)
+                    logger.warning("Recovered candle gap via REST for %s %s",
+                                   candle.symbol, candle.timeframe)
+                except Exception as exc:
+                    state["last_error"] = f"gap_recovery:{type(exc).__name__}"
+                    logger.warning("REST gap recovery failed for %s %s (%s)",
+                                   candle.symbol, candle.timeframe, type(exc).__name__)
+                    continue
+            async with self._lock:
+                if not self.add_closed_candle(candle):
+                    continue
+            state["closed_candles"] += 1
+            state["last_closed_candle_ms"] = candle.close_time_ms
+
+    async def _run_group_connection(self, name: str, url: str) -> None:
+        """Keep a group live, rotating its socket make-before-break every 23 hours."""
+        state = self.groups[name]
+        active_context = websockets.connect(
+            url, ping_interval=20, ping_timeout=20, close_timeout=10, max_queue=4096
+        )
+        active_socket = await active_context.__aenter__()
+        consumer = asyncio.create_task(self._consume_socket(name, active_socket))
+        rotation_deadline = asyncio.get_running_loop().time() + WS_ROTATION_INTERVAL_SECONDS
+        try:
+            state["status"] = "connected"
+            state["last_error"] = None
+            while not self._stopping:
+                remaining = max(0.0, rotation_deadline - asyncio.get_running_loop().time())
+                done, _ = await asyncio.wait({consumer}, timeout=remaining)
+                if done:
+                    # Propagate an exception or reconnect if the iterator ended unexpectedly.
+                    consumer.result()
+                    raise ConnectionError("Binance WebSocket stream ended")
+
+                state["status"] = "rotating"
+                replacement_context = websockets.connect(
+                    url, ping_interval=20, ping_timeout=20, close_timeout=10, max_queue=4096
+                )
+                try:
+                    replacement_socket = await replacement_context.__aenter__()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    # Keep the existing connection alive and retry the rotation shortly.
+                    state["status"] = "connected"
+                    state["last_error"] = f"rotation_connect:{type(exc).__name__}"
+                    logger.warning("Binance %s rotation connection failed (%s); keeping old socket",
+                                   name, type(exc).__name__)
+                    rotation_deadline = asyncio.get_running_loop().time() + WS_ROTATION_RETRY_SECONDS
+                    continue
+
+                replacement_consumer = asyncio.create_task(
+                    self._consume_socket(name, replacement_socket)
+                )
+                # The handshake succeeded and the new consumer must remain alive briefly
+                # before the old connection is retired. Duplicate candles are rejected.
+                await asyncio.sleep(WS_ROTATION_CONFIRM_SECONDS)
+                if replacement_consumer.done():
+                    try:
+                        replacement_consumer.result()
+                        replacement_error = "stream_ended"
+                    except Exception as exc:
+                        replacement_error = type(exc).__name__
+                    replacement_consumer.cancel()
+                    await asyncio.gather(replacement_consumer, return_exceptions=True)
+                    await replacement_context.__aexit__(None, None, None)
+                    state["status"] = "connected"
+                    state["last_error"] = f"rotation_unhealthy:{replacement_error}"
+                    logger.warning("Binance %s replacement was not healthy; keeping old socket",
+                                   name)
+                    rotation_deadline = asyncio.get_running_loop().time() + WS_ROTATION_RETRY_SECONDS
+                    continue
+
+                old_context, old_consumer = active_context, consumer
+                active_context, consumer = replacement_context, replacement_consumer
+                old_consumer.cancel()
+                await asyncio.gather(old_consumer, return_exceptions=True)
+                await old_context.__aexit__(None, None, None)
+                state["status"] = "connected"
+                state["last_error"] = None
+                state["reconnects"] += 1
+                logger.info("Binance %s WebSocket rotated successfully; new socket confirmed before old socket closed",
+                            name)
+                rotation_deadline = asyncio.get_running_loop().time() + WS_ROTATION_INTERVAL_SECONDS
+        finally:
+            if not consumer.done():
+                consumer.cancel()
+            await asyncio.gather(consumer, return_exceptions=True)
+            await active_context.__aexit__(None, None, None)
+
     async def _run_group(self, name: str, symbols: tuple[str, ...]) -> None:
         state = self.groups[name]
         url = combined_stream_url(symbols, TIMEFRAMES)
@@ -570,50 +684,13 @@ class MarketDataManager:
         while not self._stopping:
             try:
                 state["status"] = "connecting"
-                async with websockets.connect(
-                    url,
-                    ping_interval=20,
-                    ping_timeout=20,
-                    close_timeout=10,
-                    max_queue=4096,
-                ) as socket:
-                    state["status"] = "connected"
-                    state["last_error"] = None
-                    backoff = 1
-                    async for raw in socket:
-                        state["messages"] += 1
-                        state["last_message_ms"] = int(time.time() * 1000)
-                        try:
-                            message = json.loads(raw)
-                            if not isinstance(message, Mapping):
-                                continue
-                            candle = parse_closed_kline(message)
-                        except (json.JSONDecodeError, ValueError, TypeError) as exc:
-                            state["invalid_messages"] += 1
-                            logger.warning("Invalid Binance message (%s): %s", name, exc)
-                            continue
-                        if candle is None:
-                            continue
-                        previous = self.latest.get((candle.symbol, candle.timeframe))
-                        interval_ms = self._timeframe_ms(candle.timeframe)
-                        if previous is not None and candle.open_time_ms > previous.open_time_ms + interval_ms:
-                            try:
-                                await self._recover_series_gap(candle.symbol, candle.timeframe)
-                                logger.warning("Recovered candle gap via REST for %s %s",
-                                               candle.symbol, candle.timeframe)
-                            except Exception as exc:
-                                state["last_error"] = f"gap_recovery:{type(exc).__name__}"
-                                logger.warning("REST gap recovery failed for %s %s (%s)",
-                                               candle.symbol, candle.timeframe, type(exc).__name__)
-                                continue
-                        async with self._lock:
-                            if not self.add_closed_candle(candle):
-                                continue
-                        state["closed_candles"] += 1
-                        state["last_closed_candle_ms"] = candle.close_time_ms
+                await self._run_group_connection(name, url)
+                if self._stopping:
+                    break
+                raise ConnectionError("Binance WebSocket connection stopped unexpectedly")
             except asyncio.CancelledError:
                 raise
-            except (OSError, ConnectionClosed, asyncio.TimeoutError, Exception) as exc:
+            except Exception as exc:
                 if self._stopping:
                     break
                 state["status"] = "reconnecting"
