@@ -747,5 +747,26 @@ class MarketDataStartupTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(manager._tasks, [])
 
 
+class AggregateStatusTests(unittest.TestCase):
+    def test_rotation_is_reported_as_healthy_while_both_groups_have_live_sockets(self):
+        manager = MarketDataManager()
+        manager.groups["tradfi"]["status"] = "rotating"
+        manager.groups["crypto"]["status"] = "connected"
+
+        with patch.object(manager.store, "_connection", None):
+            status = manager.status()
+
+        self.assertEqual(status["status"], "connected")
+
+    def test_disconnected_group_keeps_aggregate_status_degraded(self):
+        manager = MarketDataManager()
+        manager.groups["tradfi"]["status"] = "rotating"
+        manager.groups["crypto"]["status"] = "reconnecting"
+
+        status = manager.status()
+
+        self.assertEqual(status["status"], "degraded")
+
+
 if __name__ == "__main__":
     unittest.main()
