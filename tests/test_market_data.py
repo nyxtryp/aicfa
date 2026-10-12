@@ -299,6 +299,24 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(manager.store.load_window("BTCUSDT", "1m"), (corrected,))
             manager.store.close()
 
+    async def test_full_reconciliation_checks_all_250_series(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = MarketDataManager()
+            manager.store = SQLiteCandleStore(Path(tmp) / "candles.sqlite3")
+            manager.store.initialize()
+            base = 1_700_000_000_000
+            row = [base, "100", "105", "99", "103", "12.5", base + 59_999]
+            manager._fetch_rest_klines = lambda symbol, timeframe: [row]
+
+            await manager.reconcile_all_series()
+
+            self.assertEqual(manager.reconciliation_status["status"], "complete")
+            self.assertEqual(manager.reconciliation_status["series_checked"], 250)
+            self.assertEqual(manager.reconciliation_status["candles_checked"], 250)
+            self.assertEqual(manager.reconciliation_status["errors"], [])
+            self.assertEqual(manager.store.count(), 250)
+            manager.store.close()
+
     def test_supported_timeframe_durations(self):
         manager = MarketDataManager()
         self.assertEqual(manager._timeframe_ms("1m"), 60_000)
