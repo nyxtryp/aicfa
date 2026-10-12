@@ -90,7 +90,7 @@ class LiquidityTests(unittest.TestCase):
         day_12 = [level for level in levels if level.source_indices[0] == 0]
         self.assertEqual(len(day_12), 2)
         self.assertEqual({level.kind: level.price for level in day_12}, {"high": 10.0, "low": 7.0})
-        self.assertTrue(all(level.confirmation_index == 1 for level in day_12))
+        self.assertTrue(all(level.confirmation_index == 0 for level in day_12))
 
     def test_previous_day_extremes_reject_unsorted_timestamps(self):
         from app.smc.liquidity import find_previous_day_extremes
@@ -101,6 +101,24 @@ class LiquidityTests(unittest.TestCase):
         from app.smc.liquidity import find_previous_day_extremes
         with self.assertRaises(ValueError):
             find_previous_day_extremes([2], [1, 0], [1000])
+
+
+    def test_prior_day_level_can_be_swept_on_first_next_day_candle(self):
+        from datetime import datetime, timezone
+        from app.smc.liquidity import find_previous_day_extremes
+
+        def ms(value):
+            return int(datetime.fromisoformat(value).replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+        levels = find_previous_day_extremes(
+            highs=[10, 11],
+            lows=[7, 8],
+            timestamps_ms=[ms("2026-10-12T23:59:00"), ms("2026-10-13T00:00:00")],
+        )
+        events = detect_liquidity_sweeps(
+            highs=[10, 11], lows=[7, 8], closes=[9, 9.5], levels=levels
+        )
+        self.assertEqual([(event.direction, event.candle_index) for event in events], [("bearish", 1)])
 
 
 if __name__ == "__main__":
