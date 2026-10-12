@@ -1,6 +1,6 @@
 # AICFA — техническое задание SMC Scanner
 
-- **Версия:** 1.0
+- **Версия:** 1.1 (уточнение состава инструментов от 2026-10-12)
 - **Статус:** утверждено как базовый план разработки; уточнения фиксируются отдельными изменениями
 - **Назначение:** персональный веб-сканер SMC-сетапов, без исполнения ордеров
 - **Основное правило:** реализация ведётся строго по пунктам этого документа и журнала `PROGRESS.md`. Не начинать следующий этап без проверки и явного подтверждения пользователя.
@@ -44,13 +44,17 @@ AICFA круглосуточно следит за заданными 50 инс�
 
 ## 2. Инструменты
 
-### 2.1. TradFi — 20
+### 2.1. TradFi — 21
 
-`XAUUSDT, XAGUSDT, XPTUSDT, SNDKUSDT, MUUSDT, SOXLUSDT, MUUUSDT, SOXSUSDT, INTCUSDT, NVDAUSDT, TSLAUSDT, PLTRUSDT, COINUSDT, MSTRUSDT, HOODUSDT, AMZNUSDT, CRCLUSDT, SPCXUSDT, QQQUSDT, TSLLUSDT`.
+`XAUUSDT, CLUSDT, SKHYNIXUSDT, SOXLUSDT, XAGUSDT, SNDKUSDT, BZUSDT, KORUUSDT, SPCXUSDT, MUUSDT, SKHYUSDT, SAMSUNGUSDT, SOXSUSDT, MSTRUSDT, CRCLUSDT, QQQUSDT, SNXXUSDT, EWYUSDT, NATGASUSDT, NVDAUSDT, SPYUSDT`.
 
-### 2.2. Крипто — 30
+Список выбран по предоставленному пользователем снимку суточного оборота TradFi-контрактов Binance с добавлением `SPYUSDT` как ETF, отслеживающего S&P 500. Состав не гарантирует постоянный рейтинг по обороту и повторно валидируется по текущему справочнику.
 
-`BTCUSDT, ETHUSDT, BNBUSDT, XRPUSDT, SOLUSDT, DOGEUSDT, ADAUSDT, TRXUSDT, LINKUSDT, AVAXUSDT, DOTUSDT, TONUSDT, BCHUSDT, LTCUSDT, XLMUSDT, HYPEUSDT, SUIUSDT, AAVEUSDT, ZECUSDT, TAOUSDT, ENAUSDT, ONDOUSDT, NEARUSDT, UNIUSDT, 1000PEPEUSDT, 1000BONKUSDT, WLDUSDT, INJUSDT, ARBUSDT, APTUSDT`.
+### 2.2. Крипто — 29
+
+`BTCUSDT, ETHUSDT, BNBUSDT, XRPUSDT, SOLUSDT, DOGEUSDT, ADAUSDT, TRXUSDT, LINKUSDT, AVAXUSDT, DOTUSDT, BCHUSDT, LTCUSDT, XLMUSDT, HYPEUSDT, SUIUSDT, AAVEUSDT, ZECUSDT, TAOUSDT, ENAUSDT, ONDOUSDT, NEARUSDT, UNIUSDT, 1000PEPEUSDT, 1000BONKUSDT, WLDUSDT, INJUSDT, ARBUSDT, APTUSDT`.
+
+`TONUSDT` исключён из списка по решению пользователя от 2026-10-12.
 
 ### 2.3. Валидация инструментов
 
