@@ -1,5 +1,7 @@
 import asyncio
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import AsyncMock
 from decimal import Decimal
 
@@ -14,6 +16,7 @@ from app.market_data import (
     combined_stream_url,
     MarketDataManager,
     parse_closed_kline,
+    SQLiteCandleStore,
 )
 
 
@@ -171,6 +174,56 @@ class MarketDataTests(unittest.TestCase):
         message["data"]["k"]["h"] = "98"
         with self.assertRaises(ValueError):
             parse_closed_kline(message)
+
+
+
+class SQLiteCandleStoreTests(unittest.TestCase):
+    def make_candle(self, index: int) -> ClosedCandle:
+        base = 1_791_000_000_000
+        return ClosedCandle(
+            symbol="BTCUSDT", timeframe="1m",
+            open_time_ms=base + index * 60_000,
+            close_time_ms=base + index * 60_000 + 59_999,
+            open=Decimal("100"), high=Decimal("105"), low=Decimal("99"),
+            close=Decimal("103"), volume=Decimal("12.5"),
+        )
+
+    def test_sqlite_wal_persists_and_restores_latest_500_candles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "candles.sqlite3"
+            store = SQLiteCandleStore(db_path)
+            store.initialize()
+            mode = store._db().execute("PRAGMA journal_mode").fetchone()[0]
+            self.assertEqual(str(mode).lower(), "wal")
+            candles = [self.make_candle(i) for i in range(501)]
+            store.upsert_many(candles)
+            self.assertEqual(store.count(), 500)
+            restored = store.load_window("BTCUSDT", "1m")
+            self.assertEqual(len(restored), 500)
+            self.assertEqual(restored[0].open_time_ms, candles[1].open_time_ms)
+            self.assertEqual(restored[-1].open_time_ms, candles[-1].open_time_ms)
+            # Same primary key is an upsert, not a duplicate.
+            store.upsert_many((candles[-1], candles[-1]))
+            self.assertEqual(store.count(), 500)
+            store.close()
+
+            restarted = SQLiteCandleStore(db_path)
+            self.assertEqual(restarted.count(), 500)
+            again = restarted.load_window("BTCUSDT", "1m")
+            self.assertEqual(again, restored)
+            restarted.close()
+
+    def test_manager_persists_live_closed_candle_when_store_is_initialized(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = MarketDataManager()
+            manager.store = SQLiteCandleStore(Path(tmp) / "candles.sqlite3")
+            manager.store.initialize()
+            candle = self.make_candle(0)
+            self.assertTrue(manager.add_closed_candle(candle))
+            manager.store.close()
+            reopened = SQLiteCandleStore(Path(tmp) / "candles.sqlite3")
+            self.assertEqual(reopened.load_window("BTCUSDT", "1m"), (candle,))
+            reopened.close()
 
 
 class MarketDataStartupTests(unittest.IsolatedAsyncioTestCase):
