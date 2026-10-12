@@ -259,6 +259,7 @@ class MarketDataManager:
                         "symbol": symbol,
                         "timeframe": timeframe,
                         "error": type(exc).__name__,
+                        "detail": str(exc)[:240],
                     })
                     logger.warning(
                         "REST history failed for %s %s (%s)",
