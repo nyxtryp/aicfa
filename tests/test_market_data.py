@@ -429,6 +429,53 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(events.index(("enter", 1)), events.index(("exit", 0)))
         self.assertGreaterEqual(manager.groups["crypto"]["rotations"], 1)
 
+    async def test_failed_rotation_keeps_old_socket_until_shutdown(self):
+        manager = MarketDataManager()
+        events = []
+
+        class FakeSocket:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                await asyncio.Event().wait()
+
+        class FakeContext:
+            def __init__(self, number):
+                self.number = number
+
+            async def __aenter__(self):
+                events.append(("enter_attempt", self.number))
+                if self.number == 1:
+                    manager._stopping = True
+                    raise OSError("replacement unavailable")
+                events.append(("entered", self.number))
+                return FakeSocket()
+
+            async def __aexit__(self, exc_type, exc, tb):
+                events.append(("exit", self.number))
+
+        contexts = []
+
+        def fake_connect(*args, **kwargs):
+            ctx = FakeContext(len(contexts))
+            contexts.append(ctx)
+            return ctx
+
+        with patch("app.market_data.websockets.connect", side_effect=fake_connect), \\
+             patch("app.market_data.WS_ROTATION_INTERVAL_SECONDS", 0.001), \\
+             patch("app.market_data.WS_ROTATION_RETRY_SECONDS", 0.001):
+            task = asyncio.create_task(manager._run_group_connection("crypto", "wss://example.test"))
+            await asyncio.sleep(0.01)
+            manager._stopping = True
+            await asyncio.wait_for(task, timeout=0.2)
+
+        self.assertIn(("entered", 0), events)
+        self.assertIn(("enter_attempt", 1), events)
+        self.assertIn(("exit", 0), events)
+        self.assertLess(events.index(("enter_attempt", 1)), events.index(("exit", 0)))
+        self.assertEqual(manager.groups["crypto"]["rotations"], 0)
+
     async def test_rest_fallback_polls_series_when_websocket_is_down(self):
         manager = MarketDataManager()
         manager.groups["crypto"]["status"] = "reconnecting"
