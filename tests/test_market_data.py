@@ -292,6 +292,7 @@ class MarketDataTests(unittest.TestCase):
 
         status = manager._freshness_status(now_ms)
 
+        self.assertEqual(status["status"], "degraded")
         self.assertEqual(status["checked_at_ms"], now_ms)
         self.assertEqual(status["series_with_data"], 2)
         self.assertEqual(status["missing_series"], EXPECTED_STREAM_COUNT - 2)
