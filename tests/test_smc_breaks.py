@@ -48,5 +48,15 @@ class StructureBreakTests(unittest.TestCase):
             detect_structure_breaks([1, 2], (SwingPoint("middle", 0, 0, 1.0),))
 
 
+    def test_break_that_happened_before_swing_confirmation_is_not_emitted_late(self):
+        swings = (SwingPoint("high", 1, 3, 10.0),)
+        # Price closed above the eventual swing level before that swing became
+        # knowable; confirmation must not retroactively manufacture a BOS.
+        self.assertEqual(
+            detect_structure_breaks([9, 11, 11.5, 12, 13], swings),
+            (),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
