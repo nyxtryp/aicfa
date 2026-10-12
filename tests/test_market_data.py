@@ -429,6 +429,21 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(events.index(("enter", 1)), events.index(("exit", 0)))
         self.assertGreaterEqual(manager.groups["crypto"]["rotations"], 1)
 
+    async def test_rest_fallback_polls_series_when_websocket_is_down(self):
+        manager = MarketDataManager()
+        manager.groups["crypto"]["status"] = "reconnecting"
+
+        async def one_poll(symbol, timeframe):
+            manager._stopping = True
+            return 1
+
+        manager._reconcile_series = AsyncMock(side_effect=one_poll)
+        await manager._rest_fallback_loop("crypto", ("BTCUSDT",))
+
+        manager._reconcile_series.assert_awaited_once_with("BTCUSDT", "1m")
+        self.assertEqual(manager.groups["crypto"]["fallback_polls"], 1)
+        self.assertEqual(manager.groups["crypto"]["fallback_errors"], 0)
+
     def test_supported_timeframe_durations(self):
         manager = MarketDataManager()
         self.assertEqual(manager._timeframe_ms("1m"), 60_000)
