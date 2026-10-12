@@ -32,6 +32,11 @@ class SMCAnalysisTests(unittest.TestCase):
         self.assertTrue(all(x.confirmation_index <= 10 for x in snapshot.swings))
         self.assertTrue(all(x.candle_index <= 10 for x in snapshot.structure_breaks))
         self.assertTrue(all(x.confirmation_index <= 10 for x in snapshot.fvg))
+        self.assertEqual(len(snapshot.order_block_mitigation), len(snapshot.order_blocks))
+        self.assertTrue(all(
+            x.mitigation_index is None or x.mitigation_index <= 10
+            for x in snapshot.order_block_mitigation
+        ))
 
     def test_rejects_mismatched_arrays_and_out_of_range_index(self):
         args = self.candles()
