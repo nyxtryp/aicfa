@@ -17,6 +17,22 @@ class SMCAnalysisTests(unittest.TestCase):
         timestamps = [1_790_000_000_000 + i * 60_000 for i in range(len(closes))]
         return opens, highs, lows, closes, volumes, timestamps
 
+    def test_control_candles_produce_expected_bullish_fvg(self):
+        from app.smc.fvg import FairValueGap, FairValueGapFill
+
+        result = analyze_smc(
+            opens=[9.0, 11.0, 13.2],
+            highs=[10.0, 12.0, 14.0],
+            lows=[8.0, 10.0, 13.0],
+            closes=[9.0, 11.0, 13.5],
+            volumes=[100.0, 110.0, 120.0],
+            timestamps_ms=[1_790_000_000_000, 1_790_000_060_000, 1_790_000_120_000],
+            swing_left=1, swing_right=1, atr_period=1, volume_period=1,
+        )
+        expected_gap = FairValueGap("bullish", 0, 2, 10.0, 13.0)
+        self.assertEqual(result.fvg, (expected_gap,))
+        self.assertEqual(result.fvg_fill, (FairValueGapFill(expected_gap, 2, 0.0, False),))
+
     def test_snapshot_is_deterministic(self):
         args = self.candles()
         first = analyze_smc(*args, as_of_index=12, atr_period=3, volume_period=3)
