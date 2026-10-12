@@ -832,3 +832,11 @@
 - **Коммиты:** движок [a3c1108](https://github.com/nyxtryp/aicfa/commit/a3c1108678cc57a49a976ed8a30fa28597ee1ebb); тесты [aa3b255](https://github.com/nyxtryp/aicfa/commit/aa3b255ee0a3601ac338850c497329c3a79cd47c); исправление фикстуры [6244f0a](https://github.com/nyxtryp/aicfa/commit/6244f0a1b5be6246de602e8b4295acb1c80a285f).
 - **CI:** ожидается для нового движка и последней версии теста; не считать интеграционную проверку пройденной до успешного GitHub Actions run.
 - **Ограничения:** это snapshot-движок, пока не подключён к production scanner и не сохраняет события. Пользовательская визуальная проверка разметки остаётся обязательной; Фаза 1 не принята, live-сигналы не включать.
+
+
+### 2026-10-13 — Фаза 2: результат CI по единому SMC snapshot
+
+- **Первый прогон:** CI на коммите [aa3b255](https://github.com/nyxtryp/aicfa/commit/aa3b255ee0a3601ac338850c497329c3a79cd47c) завершился failure из-за тестовой фикстуры: тест передал на один аргумент меньше и получил TypeError до проверки валидации приложения. Лог: https://github.com/nyxtryp/aicfa/actions/runs/38291242468.
+- **Исправление:** фикстура теперь передаёт все шесть массивов, но делает один массив короче для проверки ValueError; commit [6244f0a](https://github.com/nyxtryp/aicfa/commit/6244f0a1b5be6246de602e8b4295acb1c80a285f).
+- **CI после исправления:** полный набор из 85 тестов завершился SUCCESS: https://github.com/nyxtryp/aicfa/actions/runs/38291286426. Следующий прогон после записи этого результата также SUCCESS: https://github.com/nyxtryp/aicfa/actions/runs/38291328357.
+- **Статус:** причинно-ограниченный snapshot и тесты проходят CI. Это подтверждает unit/integration-level вычисления, но не является пользовательской визуальной приёмкой, подключением к production scanner или приёмкой Фазы 2 целиком.
