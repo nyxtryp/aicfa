@@ -134,6 +134,36 @@ class MarketDataTests(unittest.TestCase):
         self.assertFalse(manager.add_closed_candle(older))
         self.assertEqual(len(manager.candle_window("BTCUSDT", "1m")), 1)
 
+    def test_rest_candle_parser_excludes_unclosed_candle(self):
+        row = [
+            1_791_000_000_000,
+            "100.00",
+            "105.00",
+            "99.00",
+            "103.00",
+            "12.5",
+            1_791_000_059_999,
+        ]
+        candle = MarketDataManager._parse_rest_candle("BTCUSDT", "1m", row)
+        self.assertIsNotNone(candle)
+        assert candle is not None
+        self.assertEqual(candle.symbol, "BTCUSDT")
+        self.assertEqual(candle.timeframe, "1m")
+        self.assertEqual(candle.open_time_ms, 1_791_000_000_000)
+
+    def test_rest_candle_parser_rejects_currently_forming_candle(self):
+        now_ms = __import__("time").time_ns() // 1_000_000
+        row = [
+            now_ms,
+            "100.00",
+            "105.00",
+            "99.00",
+            "103.00",
+            "12.5",
+            now_ms + 59_999,
+        ]
+        self.assertIsNone(MarketDataManager._parse_rest_candle("BTCUSDT", "1m", row))
+
     def test_invalid_price_range_raises(self):
         message = event()
         message["data"]["k"]["h"] = "98"
