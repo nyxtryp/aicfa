@@ -298,7 +298,7 @@ class MarketDataTests(unittest.TestCase):
         self.assertEqual(status["stale_series"], 1)
         self.assertEqual(status["stale_details"][0]["symbol"], "BTCUSDT")
         self.assertEqual(status["stale_details"][0]["timeframe"], "1m")
-        self.assertEqual(status["max_age_ms"], 200_000)
+        self.assertEqual(status["max_age_ms"], 3 * 60 * 60 * 1000)
 
 
 class SQLiteCandleStoreTests(unittest.TestCase):
