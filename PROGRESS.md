@@ -434,3 +434,14 @@
 - **Коммиты кода и теста:** [7e23977a8c78489c70e756978bb09cdc27faf494](https://github.com/nyxtryp/aicfa/commit/7e23977a8c78489c70e756978bb09cdc27faf494), [ad674f70f3927f564ded3b8ffee05dc08bceba34](https://github.com/nyxtryp/aicfa/commit/ad674f70f3927f564ded3b8ffee05dc08bceba34), [6d904a9322dda38417f0cce8208faa379ab54f9f](https://github.com/nyxtryp/aicfa/commit/6d904a9322dda38417f0cce8208faa379ab54f9f).
 - **ТЗ и порядок:** §3.2 уточнён; Фаза 1 разбита на восемь обязательных пунктов. В §15 зафиксировано правило: тестировать и документировать каждый пункт, не переходить к SMC до приёмки Фазы 1. Коммит с изменением порядка Фазы 1: [11173109dcbd0d38ca1f8cefb2f4f4aeb1625b7a](https://github.com/nyxtryp/aicfa/commit/11173109dcbd0d38ca1f8cefb2f4f4aeb1625b7a); версия ТЗ обновлена до 1.3 коммитом [78586f21188d097ca8cd82641574718be983cb10](https://github.com/nyxtryp/aicfa/commit/78586f21188d097ca8cd82641574718be983cb10).
 - **Следующий шаг:** дождаться автодеплоя ротации; прогнать весь набор тестов на сервере и проверить `/api/data-status`, включая `rotations`, health, history, reconciliation, SQLite и обе группы соединений.
+
+
+### 2026-10-12 — 90-секундная проверка живых WebSocket после деплоя
+
+- **Активный релиз:** `/srv/frostdeploy/aicfa/releases/2026-10-12T15-54-32-396fae7`; время начала наблюдения `2026-10-12T15:55:33+00:00`.
+- **До и после 90 секунд:** общий статус `connected`; `/health` вернул `{"status":"ok","service":"aicfa"}`; история `complete` (250 серий, 125000 свечей, errors=[]); SQLite/WAL содержит 125000 свечей.
+- **TradFi:** status=connected; messages 3652 → 11401; closed_candles 42 → 84; reconnects=0; invalid_messages=0; last_error=null.
+- **Crypto:** status=connected; messages 5987 → 16403; closed_candles 57 → 115; reconnects=0; invalid_messages=0; last_error=null. В обеих группах обновился timestamp последней закрытой свечи.
+- **Вывод:** живое поступление данных и стабильность соединений в течение 90 секунд подтверждены.
+- **Ротация WebSocket:** rotations=0 до и после наблюдения. Это ожидаемо при таком коротком интервале и не подтверждает/не опровергает выполнение ротации через 23 часа. Для серверской приёмки требуется наблюдать саму плановую ротацию либо выполнить контролируемый тестовый интервал без изменения production-настройки.
+- **Статус:** поток данных — серверная проверка OK; 23-часовая ротация — [~] код и unit-тест есть, фактическая production-ротация ещё не наблюдалась; Фаза 1 не принята.
