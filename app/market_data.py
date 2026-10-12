@@ -857,15 +857,25 @@ class MarketDataManager:
         stale_after_grace_ms = 120_000
         missing: list[dict[str, str]] = []
         stale: list[dict[str, Any]] = []
+        underfilled: list[dict[str, Any]] = []
         max_age_ms = 0
         series_with_data = 0
         for symbol in ALL_SYMBOLS:
             for timeframe in TIMEFRAMES:
-                candle = self.latest.get((symbol, timeframe))
+                key = (symbol, timeframe)
+                candle = self.latest.get(key)
                 if candle is None:
                     missing.append({"symbol": symbol, "timeframe": timeframe})
                     continue
                 series_with_data += 1
+                window_size = len(self.candles.get(key, ()))
+                if window_size < CANDLES_PER_SERIES:
+                    underfilled.append({
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "candles": window_size,
+                        "expected_candles": CANDLES_PER_SERIES,
+                    })
                 age_ms = max(0, checked_at_ms - candle.close_time_ms)
                 max_age_ms = max(max_age_ms, age_ms)
                 allowed_age_ms = self._timeframe_ms(timeframe) + stale_after_grace_ms
@@ -877,13 +887,15 @@ class MarketDataManager:
                         "allowed_age_ms": allowed_age_ms,
                     })
         return {
-            "status": "ok" if not missing and not stale else "degraded",
+            "status": "ok" if not missing and not stale and not underfilled else "degraded",
             "checked_at_ms": checked_at_ms,
             "series_with_data": series_with_data,
             "missing_series": len(missing),
+            "underfilled_series": len(underfilled),
             "stale_series": len(stale),
             "max_age_ms": max_age_ms,
             "missing_details": missing[:25],
+            "underfilled_details": underfilled[:25],
             "stale_details": stale[:25],
             "grace_ms": stale_after_grace_ms,
         }
