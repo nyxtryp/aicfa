@@ -54,5 +54,16 @@ class FairValueGapTests(unittest.TestCase):
             measure_fvg_fill(gap, [10, 12, 14], [8, 11, 13], as_of_index=3)
 
 
+    def test_rounding_does_not_mark_near_full_gap_as_fully_filled(self):
+        gap = FairValueGap("bullish", 0, 2, 10.0, 13.0)
+        result = measure_fvg_fill(
+            gap,
+            [10, 12, 14, 11],
+            [8, 11, 13, 10.0000000001],
+        )
+        self.assertEqual(result.fill_percent, 100.0)
+        self.assertFalse(result.fully_filled)
+
+
 if __name__ == "__main__":
     unittest.main()
