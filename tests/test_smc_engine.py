@@ -38,6 +38,30 @@ class SMCAnalysisTests(unittest.TestCase):
             for x in snapshot.order_block_mitigation
         ))
 
+    def test_controlled_candles_produce_expected_bos_choch_and_order_blocks(self):
+        opens = [9.0, 10.0, 10.0, 9.0, 11.0, 11.0, 10.0, 12.0, 8.0]
+        highs = [10.0, 12.0, 11.0, 10.0, 13.0, 12.0, 11.0, 14.0, 9.0]
+        lows = [8.0, 9.0, 8.0, 7.0, 10.0, 9.0, 8.0, 11.0, 7.0]
+        closes = [9.5, 11.0, 9.0, 9.5, 12.5, 11.5, 9.0, 12.5, 7.5]
+        volumes = [100.0] * len(closes)
+        timestamps = [1_790_000_000_000 + i * 60_000 for i in range(len(closes))]
+
+        result = analyze_smc(
+            opens, highs, lows, closes, volumes, timestamps,
+            swing_left=1, swing_right=1, atr_period=2, volume_period=2,
+        )
+
+        self.assertEqual(
+            [(event.kind, event.direction, event.candle_index, event.swing_index)
+             for event in result.structure_breaks],
+            [("BOS", "bullish", 4, 1), ("CHoCH", "bearish", 8, 6)],
+        )
+        self.assertEqual(
+            [(block.direction, block.candle_index, block.confirmation_index)
+             for block in result.order_blocks],
+            [("bullish", 2, 4), ("bearish", 7, 8)],
+        )
+
     def test_rejects_mismatched_arrays_and_out_of_range_index(self):
         args = self.candles()
         mismatched = list(args)
