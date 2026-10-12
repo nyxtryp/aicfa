@@ -1,4 +1,6 @@
+import asyncio
 import unittest
+from unittest.mock import AsyncMock
 from decimal import Decimal
 
 from app.market_data import (
@@ -169,6 +171,28 @@ class MarketDataTests(unittest.TestCase):
         message["data"]["k"]["h"] = "98"
         with self.assertRaises(ValueError):
             parse_closed_kline(message)
+
+
+class MarketDataStartupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_start_does_not_wait_for_rest_history_before_health_check(self):
+        manager = MarketDataManager()
+
+        async def blocked_history():
+            await asyncio.Event().wait()
+
+        manager.load_history = AsyncMock(side_effect=blocked_history)
+        manager._run_group = AsyncMock()
+
+        await asyncio.wait_for(manager.start(), timeout=0.2)
+        await asyncio.sleep(0)
+
+        self.assertIsNotNone(manager._history_task)
+        self.assertFalse(manager._history_task.done())
+        self.assertEqual(len(manager._tasks), 2)
+
+        await manager.stop()
+        self.assertIsNone(manager._history_task)
+        self.assertEqual(manager._tasks, [])
 
 
 if __name__ == "__main__":
