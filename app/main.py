@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import asyncio
 import logging
+import time
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -11,6 +12,7 @@ from app.market_data import MarketDataManager
 logger = logging.getLogger("aicfa.backup")
 BACKUP_INTERVAL_SECONDS = 24 * 60 * 60
 BACKUP_RETRY_SECONDS = 60 * 60
+backup_status = {"status": "waiting", "last_success_ms": None, "filename": None, "size_bytes": None, "last_error": None}
 
 market_data = MarketDataManager()
 
@@ -26,11 +28,13 @@ async def _daily_backup_loop() -> None:
                 create_verified_backup,
                 market_data.store.path,
             )
+            backup_status.update({"status": "ok", "last_success_ms": int(time.time() * 1000), "filename": path.name, "size_bytes": path.stat().st_size, "last_error": None})
             logger.info("Verified SQLite backup created: %s", path)
             delay = BACKUP_INTERVAL_SECONDS
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
+            backup_status.update({"status": "error", "last_error": type(exc).__name__})
             logger.exception("SQLite backup failed; retrying in %s seconds", BACKUP_RETRY_SECONDS)
             delay = BACKUP_RETRY_SECONDS
         await asyncio.sleep(delay)
@@ -106,3 +110,9 @@ async def health() -> dict[str, str]:
 async def data_status() -> dict:
     """Live ingestion health; this does not imply SMC signals are available."""
     return market_data.status()
+
+
+@app.get("/api/backup-status")
+async def backup_health() -> dict:
+    """Expose the last verified backup result without leaking filesystem paths."""
+    return dict(backup_status)
