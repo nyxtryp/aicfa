@@ -260,6 +260,7 @@ class MarketDataManager:
             "closed_candles": 0,
             "invalid_messages": 0,
             "reconnects": 0,
+            "rotations": 0,
             "last_message_ms": None,
             "last_closed_candle_ms": None,
             "last_error": None,
@@ -643,7 +644,13 @@ class MarketDataManager:
                 )
                 # The handshake succeeded and the new consumer must remain alive briefly
                 # before the old connection is retired. Duplicate candles are rejected.
-                await asyncio.sleep(WS_ROTATION_CONFIRM_SECONDS)
+                try:
+                    await asyncio.sleep(WS_ROTATION_CONFIRM_SECONDS)
+                except BaseException:
+                    replacement_consumer.cancel()
+                    await asyncio.gather(replacement_consumer, return_exceptions=True)
+                    await replacement_context.__aexit__(None, None, None)
+                    raise
                 if replacement_consumer.done():
                     try:
                         replacement_consumer.result()
@@ -667,7 +674,7 @@ class MarketDataManager:
                 await old_context.__aexit__(None, None, None)
                 state["status"] = "connected"
                 state["last_error"] = None
-                state["reconnects"] += 1
+                state["rotations"] += 1
                 logger.info("Binance %s WebSocket rotated successfully; new socket confirmed before old socket closed",
                             name)
                 rotation_deadline = asyncio.get_running_loop().time() + WS_ROTATION_INTERVAL_SECONDS
