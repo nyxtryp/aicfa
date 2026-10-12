@@ -413,6 +413,45 @@ class MarketDataManager:
             else "partial"
         )
 
+    @staticmethod
+    def _timeframe_ms(timeframe: str) -> int:
+        """Return the fixed duration of a supported Binance kline interval."""
+        durations = {"1m": 60_000, "5m": 300_000, "15m": 900_000,
+                     "1h": 3_600_000, "4h": 14_400_000}
+        try:
+            return durations[timeframe]
+        except KeyError as exc:
+            raise ValueError(f"unsupported timeframe: {timeframe}") from exc
+
+    async def _recover_series_gap(self, symbol: str, timeframe: str) -> None:
+        """Reconcile a series from REST after a detected live-candle time gap."""
+        rows = await asyncio.to_thread(self._fetch_rest_klines, symbol, timeframe)
+        restored: list[ClosedCandle] = []
+        for row in rows:
+            candle = self._parse_rest_candle(symbol, timeframe, row)
+            if candle is not None:
+                restored.append(candle)
+        restored.sort(key=lambda item: item.open_time_ms)
+        if not restored:
+            raise ValueError("REST gap recovery returned no closed candles")
+
+        key = (symbol, timeframe)
+        async with self._lock:
+            merged = {item.open_time_ms: item for item in self.candles.get(
+                key, deque(maxlen=CANDLES_PER_SERIES)
+            )}
+            # REST is authoritative for candles missed while the WebSocket was disconnected.
+            for item in restored:
+                merged[item.open_time_ms] = item
+            series = deque(
+                sorted(merged.values(), key=lambda item: item.open_time_ms)[-CANDLES_PER_SERIES:],
+                maxlen=CANDLES_PER_SERIES,
+            )
+            self.store.upsert_many(tuple(series))
+            self.candles[key] = series
+            if series:
+                self.latest[key] = series[-1]
+
     async def _run_group(self, name: str, symbols: tuple[str, ...]) -> None:
         state = self.groups[name]
         url = combined_stream_url(symbols, TIMEFRAMES)
@@ -444,6 +483,18 @@ class MarketDataManager:
                             continue
                         if candle is None:
                             continue
+                        previous = self.latest.get((candle.symbol, candle.timeframe))
+                        interval_ms = self._timeframe_ms(candle.timeframe)
+                        if previous is not None and candle.open_time_ms > previous.open_time_ms + interval_ms:
+                            try:
+                                await self._recover_series_gap(candle.symbol, candle.timeframe)
+                                logger.warning("Recovered candle gap via REST for %s %s",
+                                               candle.symbol, candle.timeframe)
+                            except Exception as exc:
+                                state["last_error"] = f"gap_recovery:{type(exc).__name__}"
+                                logger.warning("REST gap recovery failed for %s %s (%s)",
+                                               candle.symbol, candle.timeframe, type(exc).__name__)
+                                continue
                         async with self._lock:
                             if not self.add_closed_candle(candle):
                                 continue
