@@ -471,7 +471,8 @@ class MarketDataManager:
         if previous is not None and candle.open_time_ms <= previous.open_time_ms:
             return False
         # Persist before publishing to the in-memory window.
-        self.store.upsert_many((candle,))
+        if self.store._connection is not None:
+            self.store.upsert_many((candle,))
         series = self.candles.setdefault(
             key, deque(maxlen=CANDLES_PER_SERIES)
         )
