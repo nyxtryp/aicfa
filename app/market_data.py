@@ -181,7 +181,7 @@ class MarketDataManager:
         query = urllib.parse.urlencode({
             "symbol": symbol,
             "interval": timeframe,
-            "limit": CANDLES_PER_SERIES,
+            "limit": CANDLES_PER_SERIES + 1,
         })
         request = urllib.request.Request(
             f"{REST_KLINES_URL}?{query}",
@@ -224,7 +224,11 @@ class MarketDataManager:
         return candle
 
     async def load_history(self) -> None:
-        """Warm each of the 250 series with its latest 500 closed REST candles."""
+        """Warm each of the 250 series with its latest 500 closed REST candles.
+
+        Ask Binance for 501 rows because the last row may still be forming.
+        Filtering that row leaves enough data for the full 500-candle window.
+        """
         self.history_status = {
             "status": "loading",
             "series_loaded": 0,
