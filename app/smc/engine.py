@@ -16,7 +16,12 @@ from app.smc.liquidity import (
     find_previous_day_extremes,
     is_level_near_zone,
 )
-from app.smc.order_blocks import OrderBlock, find_order_blocks
+from app.smc.order_blocks import (
+    OrderBlock,
+    OrderBlockMitigation,
+    find_order_blocks,
+    measure_order_block_mitigation,
+)
 from app.smc.ranges import DealingRange, find_dealing_range, premium_discount
 from app.smc.structure import SwingPoint, find_confirmed_swings
 
@@ -27,6 +32,7 @@ class SMCAnalysis:
     swings: tuple[SwingPoint, ...]
     structure_breaks: tuple[StructureBreak, ...]
     order_blocks: tuple[OrderBlock, ...]
+    order_block_mitigation: tuple[OrderBlockMitigation, ...]
     fvg: tuple[FairValueGap, ...]
     fvg_fill: tuple[FairValueGapFill, ...]
     liquidity_levels: tuple[LiquidityLevel, ...]
@@ -89,6 +95,10 @@ def analyze_smc(
     swings = find_confirmed_swings(hi, lo, left=swing_left, right=swing_right)
     breaks = detect_structure_breaks(cl, swings)
     blocks = find_order_blocks(op, hi, lo, cl, breaks)
+    block_mitigation = tuple(
+        measure_order_block_mitigation(block, cl, as_of_index=end)
+        for block in blocks
+    )
     gaps = find_fair_value_gaps(hi, lo)
     fills = tuple(measure_fvg_fill(gap, hi, lo, as_of_index=end) for gap in gaps)
 
@@ -123,6 +133,7 @@ def analyze_smc(
         swings=swings,
         structure_breaks=breaks,
         order_blocks=blocks,
+        order_block_mitigation=block_mitigation,
         fvg=gaps,
         fvg_fill=fills,
         liquidity_levels=tuple(levels),
