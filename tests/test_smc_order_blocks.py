@@ -1,7 +1,13 @@
 import unittest
 
 from app.smc.breaks import StructureBreak
-from app.smc.order_blocks import OrderBlock, find_order_blocks, is_order_block_mitigated
+from app.smc.order_blocks import (
+    OrderBlock,
+    OrderBlockMitigation,
+    find_order_blocks,
+    is_order_block_mitigated,
+    measure_order_block_mitigation,
+)
 
 
 class OrderBlockTests(unittest.TestCase):
@@ -36,6 +42,34 @@ class OrderBlockTests(unittest.TestCase):
         self.assertTrue(is_order_block_mitigated(bullish, 8.49))
         self.assertFalse(is_order_block_mitigated(bearish, 10.5))
         self.assertTrue(is_order_block_mitigated(bearish, 10.51))
+
+    def test_mitigation_is_first_close_after_creation_and_persists(self):
+        bullish = OrderBlock("bullish", 1, 2, 8.5, 9.0, "BOS", 0)
+        closes = [10.0, 9.5, 12.0, 8.7, 8.4, 9.2]
+        self.assertEqual(
+            measure_order_block_mitigation(bullish, closes, as_of_index=3),
+            OrderBlockMitigation(3, False, None),
+        )
+        self.assertEqual(
+            measure_order_block_mitigation(bullish, closes, as_of_index=4),
+            OrderBlockMitigation(4, True, 4),
+        )
+        self.assertEqual(
+            measure_order_block_mitigation(bullish, closes, as_of_index=5),
+            OrderBlockMitigation(5, True, 4),
+        )
+
+    def test_creation_candle_does_not_mitigate_new_block(self):
+        bullish = OrderBlock("bullish", 1, 2, 8.5, 9.0, "BOS", 0)
+        self.assertEqual(
+            measure_order_block_mitigation(bullish, [10.0, 9.5, 8.0]),
+            OrderBlockMitigation(2, False, None),
+        )
+
+    def test_mitigation_rejects_invalid_as_of_index(self):
+        bullish = OrderBlock("bullish", 1, 2, 8.5, 9.0, "BOS", 0)
+        with self.assertRaises(ValueError):
+            measure_order_block_mitigation(bullish, [10.0, 9.5, 9.2], as_of_index=3)
 
     def test_invalid_ohlc_is_rejected(self):
         with self.assertRaises(ValueError):
