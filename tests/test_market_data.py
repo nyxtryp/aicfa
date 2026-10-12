@@ -384,9 +384,11 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
             row = [base, "100", "106", "99", "104", "13.5", base + 59_999]
             manager._fetch_rest_klines = lambda symbol, timeframe: [row]
 
-            with patch("app.market_data.ALL_SYMBOLS", ("BTCUSDT",)), \\
-                 patch("app.market_data.TIMEFRAMES", ("1m",)), \\
-                 patch("app.market_data.EXPECTED_STREAM_COUNT", 1):
+            with (
+                patch("app.market_data.ALL_SYMBOLS", ("BTCUSDT",)),
+                patch("app.market_data.TIMEFRAMES", ("1m",)),
+                patch("app.market_data.EXPECTED_STREAM_COUNT", 1),
+            ):
                 await manager.load_history()
 
             self.assertEqual(manager.candle_window("BTCUSDT", "1m"), (corrected,))
