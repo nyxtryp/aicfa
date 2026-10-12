@@ -1,3 +1,11 @@
+### 2026-10-13 — добавлен GitHub Actions runner для автопроверки тестов
+
+- **Причина:** запуск тестов на сервере из домашнего каталога завершился `ModuleNotFoundError: No module named 'app'`; это ошибка пути запуска, не доказательство дефекта приложения. Пользователь попросил запускать тесты на GitHub runner.
+- **Изменение:** добавлен `.github/workflows/test.yml`: GitHub-hosted `ubuntu-latest`, Python 3.13, установка `requirements.txt`, запуск `PYTHONPATH=<workspace> python -m unittest discover -s tests -v` на каждый push в main и pull request.
+- **Коммит workflow:** 7fad422bf88e8885b049058d78dcdee76aa7c137.
+- **Статус:** workflow отправлен в main; проверяю, появился ли результат GitHub Actions. Не отмечать тесты успешными до получения результата runner.
+- **Живой снимок пользователя:** `/api/data-status` показывает 250/250 рядов, 125000 свечей, обе WS-группы connected, invalid_messages=0; reconciliation ожидает первого часового запуска; rotations=0 в этом снимке.
+
 ### 2026-10-13 — REST-сверка не должна дублировать стартовую историю
 
 - **Причина:** `_reconciliation_loop` запускал полную сверку всех 250 рядов сразу после `load_history`, а затем ещё раз через час. Это не соответствует смыслу «раз в час» из §3.3 и создавало лишние 250 REST-запросов на старте. Живой поток закрытых свечей при этом уже идёт через WebSocket.
