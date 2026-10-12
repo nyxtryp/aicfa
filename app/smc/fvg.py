@@ -94,5 +94,5 @@ def measure_fvg_fill(
         gap=gap,
         as_of_index=end,
         fill_percent=fill_percent,
-        fully_filled=fill_percent >= 100.0,
+        fully_filled=penetration >= width,
     )
