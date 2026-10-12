@@ -82,10 +82,13 @@ class ReconciliationScheduleTests(unittest.IsolatedAsyncioTestCase):
         manager = MarketDataManager()
         manager._history_task = None
         calls = []
+        sleep_count = 0
 
         async def sleep_side_effect(seconds):
+            nonlocal sleep_count
+            sleep_count += 1
             calls.append(("sleep", seconds))
-            if len(calls) == 2:
+            if sleep_count == 2:
                 manager._stopping = True
 
         async def reconcile_side_effect():
