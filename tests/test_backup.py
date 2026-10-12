@@ -13,7 +13,7 @@ class SQLiteBackupTests(unittest.TestCase):
     def test_backup_is_consistent_and_restores_candles(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            store = SQLiteCandleStore(root / "candles.sqlite3")
+            store = SQLiteCandleStore(root / "candles.db")
             store.initialize()
             candle = ClosedCandle(
                 symbol="BTCUSDT",
@@ -51,7 +51,7 @@ class SQLiteBackupTests(unittest.TestCase):
     def test_backup_retention_removes_only_old_backups(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            source = SQLiteCandleStore(root / "candles.sqlite3")
+            source = SQLiteCandleStore(root / "candles.db")
             source.initialize()
             source.close()
             backup_dir = root / "backups"
