@@ -64,6 +64,17 @@ class RestRateLimitTests(unittest.TestCase):
         self.assertEqual(request.call_count, 2)
         sleep.assert_called_once_with(3.0)
 
+    def test_rate_limit_retries_are_bounded(self):
+        from app import market_data
+        error = urllib.error.HTTPError("https://example.com", 429, "limited", {}, None)
+        with patch("app.market_data.urllib.request.urlopen", side_effect=error) as request:
+            with patch("app.market_data.time.sleep"):
+                with patch.object(market_data, "_rest_next_request_at", 0.0):
+                    with self.assertRaises(urllib.error.HTTPError):
+                        MarketDataManager._fetch_rest_klines("BTCUSDT", "1m")
+        self.assertEqual(request.call_count, market_data.REST_MAX_RATE_LIMIT_RETRIES + 1)
+
+
 class MarketDataTests(unittest.TestCase):
     def test_watchlist_has_exactly_50_unique_symbols(self):
         self.assertEqual(len(TRADFI_SYMBOLS), 21)
