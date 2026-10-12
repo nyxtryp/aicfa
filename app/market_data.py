@@ -42,6 +42,7 @@ SYMBOL_SET = frozenset(ALL_SYMBOLS)
 TIMEFRAME_SET = frozenset(TIMEFRAMES)
 EXPECTED_STREAM_COUNT = len(ALL_SYMBOLS) * len(TIMEFRAMES)
 CANDLES_PER_SERIES = 500
+RECONCILIATION_INTERVAL_SECONDS = 3600
 REST_KLINES_URL = "https://fapi.binance.com/fapi/v1/klines"
 
 
@@ -227,6 +228,7 @@ class MarketDataManager:
         }
         self._tasks: list[asyncio.Task[None]] = []
         self._history_task: asyncio.Task[None] | None = None
+        self._reconciliation_task: asyncio.Task[None] | None = None
         self._stopping = False
         self._lock = asyncio.Lock()
         self.store = SQLiteCandleStore()
@@ -234,6 +236,15 @@ class MarketDataManager:
             "status": "not_started",
             "series_loaded": 0,
             "candles_loaded": 0,
+            "errors": [],
+        }
+        self.reconciliation_status: dict[str, Any] = {
+            "status": "waiting",
+            "interval_seconds": RECONCILIATION_INTERVAL_SECONDS,
+            "last_attempt_ms": None,
+            "last_success_ms": None,
+            "series_checked": 0,
+            "candles_checked": 0,
             "errors": [],
         }
 
@@ -278,6 +289,9 @@ class MarketDataManager:
             asyncio.create_task(self._run_group("tradfi", TRADFI_SYMBOLS), name="aicfa-ws-tradfi"),
             asyncio.create_task(self._run_group("crypto", CRYPTO_SYMBOLS), name="aicfa-ws-crypto"),
         ]
+        self._reconciliation_task = asyncio.create_task(
+            self._reconciliation_loop(), name="aicfa-rest-reconciliation"
+        )
 
     async def stop(self) -> None:
         self._stopping = True
@@ -286,6 +300,10 @@ class MarketDataManager:
             self._history_task.cancel()
             await asyncio.gather(self._history_task, return_exceptions=True)
             self._history_task = None
+        if self._reconciliation_task is not None:
+            self._reconciliation_task.cancel()
+            await asyncio.gather(self._reconciliation_task, return_exceptions=True)
+            self._reconciliation_task = None
         for task in tasks:
             task.cancel()
         if tasks:
@@ -452,6 +470,98 @@ class MarketDataManager:
             if series:
                 self.latest[key] = series[-1]
 
+    async def _reconcile_series(self, symbol: str, timeframe: str) -> int:
+        """Compare the latest closed REST candles with memory/SQLite and repair differences."""
+        rows = await asyncio.to_thread(self._fetch_rest_klines, symbol, timeframe)
+        restored: list[ClosedCandle] = []
+        for row in rows:
+            candle = self._parse_rest_candle(symbol, timeframe, row)
+            if candle is not None:
+                restored.append(candle)
+        restored.sort(key=lambda item: item.open_time_ms)
+        if not restored:
+            raise ValueError("REST reconciliation returned no closed candles")
+
+        key = (symbol, timeframe)
+        async with self._lock:
+            merged = {
+                item.open_time_ms: item
+                for item in self.candles.get(key, deque(maxlen=CANDLES_PER_SERIES))
+            }
+            # REST is authoritative for matching timestamps; keep newer live candles
+            # if the REST response is momentarily behind the stream.
+            for item in restored:
+                current = merged.get(item.open_time_ms)
+                if current is None or item.open_time_ms <= max(
+                    (c.open_time_ms for c in merged.values()), default=item.open_time_ms
+                ):
+                    merged[item.open_time_ms] = item
+            series = deque(
+                sorted(merged.values(), key=lambda item: item.open_time_ms)[-CANDLES_PER_SERIES:],
+                maxlen=CANDLES_PER_SERIES,
+            )
+            self.store.upsert_many(tuple(series))
+            self.candles[key] = series
+            if series:
+                self.latest[key] = series[-1]
+        return len(restored)
+
+    async def reconcile_all_series(self) -> None:
+        """Reconcile all 250 configured series with REST, limiting concurrency."""
+        self.reconciliation_status.update({
+            "status": "running",
+            "series_checked": 0,
+            "candles_checked": 0,
+            "errors": [],
+        })
+        semaphore = asyncio.Semaphore(6)
+
+        async def reconcile_one(symbol: str, timeframe: str) -> None:
+            async with semaphore:
+                try:
+                    count = await self._reconcile_series(symbol, timeframe)
+                    self.reconciliation_status["series_checked"] += 1
+                    self.reconciliation_status["candles_checked"] += count
+                except Exception as exc:
+                    self.reconciliation_status["errors"].append({
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "error": type(exc).__name__,
+                        "detail": str(exc)[:240],
+                    })
+                    logger.warning(
+                        "REST reconciliation failed for %s %s (%s)",
+                        symbol, timeframe, type(exc).__name__,
+                    )
+
+        await asyncio.gather(*(
+            reconcile_one(symbol, timeframe)
+            for symbol in ALL_SYMBOLS
+            for timeframe in TIMEFRAMES
+        ))
+        finished_ms = int(time.time() * 1000)
+        self.reconciliation_status["last_attempt_ms"] = finished_ms
+        if not self.reconciliation_status["errors"] and self.reconciliation_status["series_checked"] == EXPECTED_STREAM_COUNT:
+            self.reconciliation_status["status"] = "complete"
+            self.reconciliation_status["last_success_ms"] = finished_ms
+        else:
+            self.reconciliation_status["status"] = "partial"
+
+    async def _reconciliation_loop(self) -> None:
+        """Run REST reconciliation hourly without delaying service startup."""
+        while not self._stopping:
+            await asyncio.sleep(RECONCILIATION_INTERVAL_SECONDS)
+            if self._stopping:
+                return
+            try:
+                await self.reconcile_all_series()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.reconciliation_status["status"] = "failed"
+                self.reconciliation_status["last_attempt_ms"] = int(time.time() * 1000)
+                logger.exception("Unexpected REST reconciliation failure (%s)", type(exc).__name__)
+
     async def _run_group(self, name: str, symbols: tuple[str, ...]) -> None:
         state = self.groups[name]
         url = combined_stream_url(symbols, TIMEFRAMES)
@@ -547,5 +657,6 @@ class MarketDataManager:
             "window_size": CANDLES_PER_SERIES,
             "persistence": {"backend": "sqlite", "journal_mode": "WAL", "database_path": str(self.store.path), "stored_candles": self.store.count() if self.store._connection is not None else 0},
             "history": dict(self.history_status),
+            "reconciliation": dict(self.reconciliation_status),
             "groups": {name: dict(state) for name, state in self.groups.items()},
         }
