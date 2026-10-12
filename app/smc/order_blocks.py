@@ -87,3 +87,40 @@ def is_order_block_mitigated(block: OrderBlock, close: float) -> bool:
     if block.direction == "bearish":
         return close > block.upper
     raise ValueError("block direction must be bullish or bearish")
+
+
+
+@dataclass(frozen=True, slots=True)
+class OrderBlockMitigation:
+    """Mitigation state known at a particular closed-candle index."""
+
+    as_of_index: int
+    mitigated: bool
+    mitigation_index: int | None
+
+
+def measure_order_block_mitigation(
+    block: OrderBlock,
+    closes: Sequence[float],
+    *,
+    as_of_index: int | None = None,
+) -> OrderBlockMitigation:
+    """Find the first post-confirmation close beyond the block's far edge.
+
+    Mitigation is permanent once observed. The break candle that creates the
+    block is not allowed to mitigate that same block; only later closed candles
+    are examined. Future closes beyond as_of_index are invisible.
+    """
+    if block.direction not in {"bullish", "bearish"} or block.upper <= block.lower:
+        raise ValueError("order block direction or boundaries are invalid")
+    if block.confirmation_index < 0 or block.confirmation_index >= len(closes):
+        raise ValueError("block confirmation index is outside the supplied closes")
+
+    end = len(closes) - 1 if as_of_index is None else as_of_index
+    if end < block.confirmation_index or end >= len(closes):
+        raise ValueError("as_of_index must be between confirmation and last close")
+
+    for index in range(block.confirmation_index + 1, end + 1):
+        if is_order_block_mitigated(block, closes[index]):
+            return OrderBlockMitigation(end, True, index)
+    return OrderBlockMitigation(end, False, None)
