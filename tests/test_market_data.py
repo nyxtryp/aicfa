@@ -663,6 +663,31 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(manager.groups["crypto"]["fallback_polls"], 1)
         self.assertEqual(manager.groups["crypto"]["last_error"], "rest_fallback:OSError")
 
+    async def test_unexpected_fallback_loop_error_does_not_disable_retries(self):
+        manager = MarketDataManager()
+        manager.groups["crypto"]["status"] = "reconnecting"
+        calls = 0
+
+        async def poll(symbol, timeframe):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                manager._stopping = True
+            return 1
+
+        async def fast_sleep(_seconds):
+            return None
+
+        manager._reconcile_series = AsyncMock(side_effect=poll)
+        manager._timeframe_ms = Mock(side_effect=[RuntimeError("unexpected loop failure"), 60_000])
+        with patch("app.market_data.asyncio.sleep", side_effect=fast_sleep):
+            await manager._rest_fallback_loop("crypto", ("BTCUSDT",))
+
+        self.assertEqual(calls, 2)
+        self.assertEqual(manager.groups["crypto"]["fallback_errors"], 1)
+        self.assertEqual(manager.groups["crypto"]["fallback_polls"], 2)
+        self.assertEqual(manager.groups["crypto"]["last_error"], "rest_fallback_loop:RuntimeError")
+
     async def test_rest_fallback_pauses_when_websocket_recovers(self):
         manager = MarketDataManager()
         manager.groups["crypto"]["status"] = "reconnecting"
