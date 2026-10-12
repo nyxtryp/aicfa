@@ -1,15 +1,18 @@
-"""Binance USDⓈ-M candle configuration and closed-kline parsing.
-
-This module deliberately does not connect to the network yet. It provides the
-validated instrument/timeframe configuration and deterministic parser used by
-the scanner's data-ingestion stage.
-"""
+"""Binance USDⓈ-M candle configuration, parsing, and live stream ingestion."""
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
+import time
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Mapping
 
+import websockets
+from websockets.exceptions import ConnectionClosed
+
+logger = logging.getLogger("aicfa.market_data")
 
 TRADFI_SYMBOLS: tuple[str, ...] = (
     "XAUUSDT", "CLUSDT", "SKHYNIXUSDT", "SOXLUSDT", "XAGUSDT",
@@ -18,7 +21,6 @@ TRADFI_SYMBOLS: tuple[str, ...] = (
     "QQQUSDT", "SNXXUSDT", "EWYUSDT", "NATGASUSDT", "NVDAUSDT",
     "SPYUSDT",
 )
-
 CRYPTO_SYMBOLS: tuple[str, ...] = (
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "SOLUSDT",
     "DOGEUSDT", "ADAUSDT", "TRXUSDT", "LINKUSDT", "AVAXUSDT",
@@ -27,7 +29,6 @@ CRYPTO_SYMBOLS: tuple[str, ...] = (
     "ONDOUSDT", "NEARUSDT", "UNIUSDT", "1000PEPEUSDT",
     "1000BONKUSDT", "WLDUSDT", "INJUSDT", "ARBUSDT", "APTUSDT",
 )
-
 TIMEFRAMES: tuple[str, ...] = ("1m", "5m", "15m", "1h", "4h")
 ALL_SYMBOLS: tuple[str, ...] = TRADFI_SYMBOLS + CRYPTO_SYMBOLS
 SYMBOL_SET = frozenset(ALL_SYMBOLS)
@@ -38,7 +39,6 @@ EXPECTED_STREAM_COUNT = len(ALL_SYMBOLS) * len(TIMEFRAMES)
 @dataclass(frozen=True, slots=True)
 class ClosedCandle:
     """A finalized Binance kline; timestamps are Unix milliseconds (UTC)."""
-
     symbol: str
     timeframe: str
     open_time_ms: int
@@ -73,26 +73,19 @@ def _decimal(value: Any, field: str) -> Decimal:
 
 
 def parse_closed_kline(message: Mapping[str, Any]) -> ClosedCandle | None:
-    """Parse a raw or combined Binance kline event.
-
-    Returns None for non-kline events, unclosed candles, or symbols/timeframes
-    outside the configured watchlist. Malformed kline payloads raise ValueError.
-    """
+    """Return a validated candle only for a configured, finalized kline event."""
     event: Any = message.get("data", message)
     if not isinstance(event, Mapping) or event.get("e") != "kline":
         return None
-
     kline = event.get("k")
     if not isinstance(kline, Mapping):
         raise ValueError("kline event is missing its k payload")
     if kline.get("x") is not True:
         return None
-
     symbol = str(kline.get("s", "")).upper()
     timeframe = str(kline.get("i", ""))
     if symbol not in SYMBOL_SET or timeframe not in TIMEFRAME_SET:
         return None
-
     try:
         open_time_ms = int(kline["t"])
         close_time_ms = int(kline["T"])
@@ -100,7 +93,6 @@ def parse_closed_kline(message: Mapping[str, Any]) -> ClosedCandle | None:
         raise ValueError("invalid kline timestamp") from exc
     if open_time_ms < 0 or close_time_ms < open_time_ms:
         raise ValueError("invalid kline time range")
-
     candle = ClosedCandle(
         symbol=symbol,
         timeframe=timeframe,
@@ -119,3 +111,116 @@ def parse_closed_kline(message: Mapping[str, Any]) -> ClosedCandle | None:
     if candle.volume < 0:
         raise ValueError("kline volume must not be negative")
     return candle
+
+
+class MarketDataManager:
+    """Two reconnecting Binance connections; stores only each series' latest close.
+
+    Persistence, REST history/backfill, and SMC processing are intentionally
+    separate follow-up tasks. This in-memory cache is not a replacement for DB.
+    """
+
+    def __init__(self) -> None:
+        self.latest: dict[tuple[str, str], ClosedCandle] = {}
+        self.groups: dict[str, dict[str, Any]] = {
+            "tradfi": self._new_group(len(TRADFI_SYMBOLS) * len(TIMEFRAMES)),
+            "crypto": self._new_group(len(CRYPTO_SYMBOLS) * len(TIMEFRAMES)),
+        }
+        self._tasks: list[asyncio.Task[None]] = []
+        self._stopping = False
+        self._lock = asyncio.Lock()
+
+    @staticmethod
+    def _new_group(expected: int) -> dict[str, Any]:
+        return {
+            "status": "stopped",
+            "expected_streams": expected,
+            "messages": 0,
+            "closed_candles": 0,
+            "invalid_messages": 0,
+            "reconnects": 0,
+            "last_message_ms": None,
+            "last_closed_candle_ms": None,
+            "last_error": None,
+        }
+
+    async def start(self) -> None:
+        if self._tasks:
+            return
+        self._stopping = False
+        self._tasks = [
+            asyncio.create_task(self._run_group("tradfi", TRADFI_SYMBOLS), name="aicfa-ws-tradfi"),
+            asyncio.create_task(self._run_group("crypto", CRYPTO_SYMBOLS), name="aicfa-ws-crypto"),
+        ]
+
+    async def stop(self) -> None:
+        self._stopping = True
+        tasks, self._tasks = self._tasks, []
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        for state in self.groups.values():
+            state["status"] = "stopped"
+
+    async def _run_group(self, name: str, symbols: tuple[str, ...]) -> None:
+        state = self.groups[name]
+        url = combined_stream_url(symbols, TIMEFRAMES)
+        backoff = 1
+        while not self._stopping:
+            try:
+                state["status"] = "connecting"
+                async with websockets.connect(
+                    url,
+                    ping_interval=20,
+                    ping_timeout=20,
+                    close_timeout=10,
+                    max_queue=4096,
+                ) as socket:
+                    state["status"] = "connected"
+                    state["last_error"] = None
+                    backoff = 1
+                    async for raw in socket:
+                        state["messages"] += 1
+                        state["last_message_ms"] = int(time.time() * 1000)
+                        try:
+                            message = json.loads(raw)
+                            if not isinstance(message, Mapping):
+                                continue
+                            candle = parse_closed_kline(message)
+                        except (json.JSONDecodeError, ValueError, TypeError) as exc:
+                            state["invalid_messages"] += 1
+                            logger.warning("Invalid Binance message (%s): %s", name, exc)
+                            continue
+                        if candle is None:
+                            continue
+                        key = (candle.symbol, candle.timeframe)
+                        async with self._lock:
+                            previous = self.latest.get(key)
+                            if previous is not None and candle.open_time_ms <= previous.open_time_ms:
+                                continue
+                            self.latest[key] = candle
+                        state["closed_candles"] += 1
+                        state["last_closed_candle_ms"] = candle.close_time_ms
+            except asyncio.CancelledError:
+                raise
+            except (OSError, ConnectionClosed, asyncio.TimeoutError, Exception) as exc:
+                if self._stopping:
+                    break
+                state["status"] = "reconnecting"
+                state["last_error"] = type(exc).__name__
+                state["reconnects"] += 1
+                logger.warning("Binance %s stream disconnected (%s); retrying", name, type(exc).__name__)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 30)
+        state["status"] = "stopped"
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "status": "connected" if all(g["status"] == "connected" for g in self.groups.values()) else "degraded",
+            "instruments": len(ALL_SYMBOLS),
+            "timeframes": list(TIMEFRAMES),
+            "expected_streams": EXPECTED_STREAM_COUNT,
+            "latest_series": len(self.latest),
+            "groups": {name: dict(state) for name, state in self.groups.items()},
+        }
