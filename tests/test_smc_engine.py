@@ -78,6 +78,27 @@ class SMCAnalysisTests(unittest.TestCase):
             [("bullish", 2, 4), ("bearish", 7, 8)],
         )
 
+    def test_previous_day_high_can_be_swept_on_first_candle_of_new_utc_day(self):
+        opens = [8.2, 9.0, 9.2, 10.5]
+        highs = [9.0, 10.0, 9.5, 11.0]
+        lows = [8.0, 8.5, 8.2, 9.0]
+        closes = [8.5, 9.5, 9.0, 9.5]
+        volumes = [100.0, 110.0, 105.0, 120.0]
+        timestamps = [1_791_849_420_000 + i * 60_000 for i in range(4)]
+
+        result = analyze_smc(
+            opens, highs, lows, closes, volumes, timestamps,
+            swing_left=1, swing_right=1, atr_period=2, volume_period=2,
+        )
+
+        self.assertTrue(any(
+            sweep.candle_index == 3
+            and sweep.direction == "bearish"
+            and sweep.level == 10.0
+            and sweep.level_kind == "high"
+            for sweep in result.sweeps
+        ))
+
     def test_rejects_mismatched_arrays_and_out_of_range_index(self):
         args = self.candles()
         mismatched = list(args)
