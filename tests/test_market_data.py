@@ -104,6 +104,37 @@ class ReconciliationScheduleTests(unittest.IsolatedAsyncioTestCase):
             ("sleep", RECONCILIATION_INTERVAL_SECONDS),
         ])
 
+    async def test_unexpected_reconciliation_failure_does_not_disable_next_hourly_attempt(self):
+        from app.market_data import RECONCILIATION_INTERVAL_SECONDS
+
+        manager = MarketDataManager()
+        manager._history_task = None
+        sleep_count = 0
+        reconcile_count = 0
+
+        async def sleep_side_effect(seconds):
+            nonlocal sleep_count
+            self.assertEqual(seconds, RECONCILIATION_INTERVAL_SECONDS)
+            sleep_count += 1
+            if sleep_count == 3:
+                manager._stopping = True
+
+        async def reconcile_side_effect():
+            nonlocal reconcile_count
+            reconcile_count += 1
+            if reconcile_count == 1:
+                raise RuntimeError("transient reconciliation failure")
+            manager.reconciliation_status["status"] = "complete"
+            manager._stopping = True
+
+        manager.reconcile_all_series = AsyncMock(side_effect=reconcile_side_effect)
+        with patch("app.market_data.asyncio.sleep", new=AsyncMock(side_effect=sleep_side_effect)):
+            await manager._reconciliation_loop()
+
+        self.assertEqual(reconcile_count, 2)
+        self.assertEqual(sleep_count, 3)
+        self.assertEqual(manager.reconciliation_status["status"], "complete")
+
 
 class MarketDataTests(unittest.TestCase):
     def test_watchlist_has_exactly_50_unique_symbols(self):
