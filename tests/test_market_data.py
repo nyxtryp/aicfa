@@ -8,6 +8,7 @@ from app.market_data import (
     TIMEFRAMES,
     TRADFI_SYMBOLS,
     combined_stream_url,
+    MarketDataManager,
     parse_closed_kline,
 )
 
@@ -74,6 +75,17 @@ class MarketDataTests(unittest.TestCase):
         self.assertIn("btcusdt@kline_1m", url)
         self.assertIn("btcusdt@kline_4h", url)
         self.assertNotIn("@kline_1s", url)
+
+
+    def test_manager_starts_with_two_groups_and_250_expected_streams(self):
+        manager = MarketDataManager()
+        status = manager.status()
+        self.assertEqual(status["expected_streams"], 250)
+        self.assertEqual(status["instruments"], 50)
+        self.assertEqual(status["timeframes"], ["1m", "5m", "15m", "1h", "4h"])
+        self.assertEqual(status["groups"]["tradfi"]["expected_streams"], 105)
+        self.assertEqual(status["groups"]["crypto"]["expected_streams"], 145)
+        self.assertEqual(status["latest_series"], 0)
 
     def test_invalid_price_range_raises(self):
         message = event()
