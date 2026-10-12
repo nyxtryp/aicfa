@@ -537,3 +537,12 @@
 - **Результат GitHub Actions:** SUCCESS, запуск [38279418181](https://github.com/nyxtryp/aicfa/actions/runs/38279418181), коммит теста [9fd8704da992bdc45bd9fc021bc076f0059c5fa4](https://github.com/nyxtryp/aicfa/commit/9fd8704da992bdc45bd9fc021bc076f0059c5fa4).
 - **Ограничение:** тест подтверждает вызов восстановления и порядок обработки, а отдельный тест подтверждает объединение/сохранение пропущенных свечей. Это не заменяет проверку реального сетевого обрыва на production.
 - **Статус:** автоматические тесты пути восстановления — [x] ПРОВЕРЕНО; фактический production-обрыв/восстановление — ожидает наблюдения. Фаза 1 не завершена.
+
+
+### 2026-10-13 — REST-fallback: ошибка запроса и возврат WebSocket
+
+- **Пункт ТЗ:** Фаза 1, пункт 8 — аварийный REST-fallback и прекращение резервного опроса после восстановления WebSocket.
+- **Тесты:** `test_rest_fallback_retries_after_transient_rest_error` проверяет ошибку REST, повтор и успешный следующий опрос; `test_rest_fallback_pauses_when_websocket_recovers` проверяет, что после статуса WebSocket `connected` fallback больше не начинает новые REST-запросы.
+- **GitHub Actions:** SUCCESS, запуск [38279705144](https://github.com/nyxtryp/aicfa/actions/runs/38279705144), коммит [00a270da7491e60eecf62f383c2de1aa36002846](https://github.com/nyxtryp/aicfa/commit/00a270da7491e60eecf62f383c2de1aa36002846).
+- **Ограничение:** тесты ускоренные и изолированные; реальный сетевой обрыв production не симулировался. Проверка ежедневного backup/restore ещё не выполнена.
+- **Статус:** автоматические тесты REST-fallback — [x] ПРОВЕРЕНО; production-аварийный сценарий и backup/restore — [ ] НЕ ПРИНЯТО; Фаза 1 не завершена.
