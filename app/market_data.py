@@ -851,6 +851,42 @@ class MarketDataManager:
         series = self.candles.get((symbol.upper(), timeframe))
         return tuple(series) if series is not None else ()
 
+    def _freshness_status(self, now_ms: int | None = None) -> dict[str, Any]:
+        """Summarize missing/stale candle series without treating higher timeframes as late."""
+        checked_at_ms = int(time.time() * 1000) if now_ms is None else now_ms
+        stale_after_grace_ms = 120_000
+        missing: list[dict[str, str]] = []
+        stale: list[dict[str, Any]] = []
+        max_age_ms = 0
+        series_with_data = 0
+        for symbol in ALL_SYMBOLS:
+            for timeframe in TIMEFRAMES:
+                candle = self.latest.get((symbol, timeframe))
+                if candle is None:
+                    missing.append({"symbol": symbol, "timeframe": timeframe})
+                    continue
+                series_with_data += 1
+                age_ms = max(0, checked_at_ms - candle.close_time_ms)
+                max_age_ms = max(max_age_ms, age_ms)
+                allowed_age_ms = self._timeframe_ms(timeframe) + stale_after_grace_ms
+                if age_ms > allowed_age_ms:
+                    stale.append({
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "age_ms": age_ms,
+                        "allowed_age_ms": allowed_age_ms,
+                    })
+        return {
+            "checked_at_ms": checked_at_ms,
+            "series_with_data": series_with_data,
+            "missing_series": len(missing),
+            "stale_series": len(stale),
+            "max_age_ms": max_age_ms,
+            "missing_details": missing[:25],
+            "stale_details": stale[:25],
+            "grace_ms": stale_after_grace_ms,
+        }
+
     def status(self) -> dict[str, Any]:
         return {
             "status": "connected" if all(g["status"] == "connected" for g in self.groups.values()) else "degraded",
@@ -860,6 +896,7 @@ class MarketDataManager:
             "latest_series": len(self.latest),
             "stored_candles": sum(len(series) for series in self.candles.values()),
             "window_size": CANDLES_PER_SERIES,
+            "freshness": self._freshness_status(),
             "persistence": {"backend": "sqlite", "journal_mode": "WAL", "database_path": str(self.store.path), "stored_candles": self.store.count() if self.store._connection is not None else 0},
             "history": dict(self.history_status),
             "reconciliation": dict(self.reconciliation_status),
