@@ -877,6 +877,7 @@ class MarketDataManager:
                         "allowed_age_ms": allowed_age_ms,
                     })
         return {
+            "status": "ok" if not missing and not stale else "degraded",
             "checked_at_ms": checked_at_ms,
             "series_with_data": series_with_data,
             "missing_series": len(missing),
