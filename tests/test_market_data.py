@@ -389,6 +389,7 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
                 patch("app.market_data.ALL_SYMBOLS", ("BTCUSDT",)),
                 patch("app.market_data.TIMEFRAMES", ("1m",)),
                 patch("app.market_data.EXPECTED_STREAM_COUNT", 1),
+                patch("app.market_data.CANDLES_PER_SERIES", 1),
             ):
                 await manager.load_history()
 
