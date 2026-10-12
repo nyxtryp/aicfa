@@ -228,7 +228,10 @@ class SQLiteCandleStoreTests(unittest.TestCase):
 
 class MarketDataStartupTests(unittest.IsolatedAsyncioTestCase):
     async def test_start_does_not_wait_for_rest_history_before_health_check(self):
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
         manager = MarketDataManager()
+        manager.store = SQLiteCandleStore(Path(tempdir.name) / "candles.sqlite3")
 
         async def blocked_history():
             await asyncio.Event().wait()
