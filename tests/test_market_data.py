@@ -358,6 +358,42 @@ class SQLiteCandleStoreTests(unittest.TestCase):
 
 
 class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_startup_history_corrects_stale_persisted_candle_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = MarketDataManager()
+            manager.store = SQLiteCandleStore(Path(tmp) / "candles.sqlite3")
+            manager.store.initialize()
+            base = 1_700_000_000_000
+            stale = ClosedCandle(
+                symbol="BTCUSDT", timeframe="1m", open_time_ms=base,
+                close_time_ms=base + 59_999, open=Decimal("100"),
+                high=Decimal("105"), low=Decimal("99"), close=Decimal("103"),
+                volume=Decimal("12.5"),
+            )
+            corrected = ClosedCandle(
+                symbol="BTCUSDT", timeframe="1m", open_time_ms=base,
+                close_time_ms=base + 59_999, open=Decimal("100"),
+                high=Decimal("106"), low=Decimal("99"), close=Decimal("104"),
+                volume=Decimal("13.5"),
+            )
+            manager.candles[("BTCUSDT", "1m")] = __import__("collections").deque(
+                [stale], maxlen=CANDLES_PER_SERIES
+            )
+            manager.latest[("BTCUSDT", "1m")] = stale
+            manager.store.upsert_many((stale,))
+            row = [base, "100", "106", "99", "104", "13.5", base + 59_999]
+            manager._fetch_rest_klines = lambda symbol, timeframe: [row]
+
+            with patch("app.market_data.ALL_SYMBOLS", ("BTCUSDT",)), \\
+                 patch("app.market_data.TIMEFRAMES", ("1m",)), \\
+                 patch("app.market_data.EXPECTED_STREAM_COUNT", 1):
+                await manager.load_history()
+
+            self.assertEqual(manager.candle_window("BTCUSDT", "1m"), (corrected,))
+            self.assertEqual(manager.store.load_window("BTCUSDT", "1m"), (corrected,))
+            self.assertEqual(manager.history_status["status"], "complete")
+            manager.store.close()
+
     async def test_live_websocket_gap_triggers_rest_recovery_before_current_candle(self):
         manager = MarketDataManager()
         current = parse_closed_kline(event())
