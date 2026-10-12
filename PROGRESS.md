@@ -870,3 +870,13 @@
 - **Коммиты:** реализация [7384b68](https://github.com/nyxtryp/aicfa/commit/7384b68); интеграция [fdfc3bd](https://github.com/nyxtryp/aicfa/commit/fdfc3bd); регрессионные тесты [49a5d553](https://github.com/nyxtryp/aicfa/commit/49a5d553).
 - **CI:** SUCCESS — реализация [38291533703](https://github.com/nyxtryp/aicfa/actions/runs/38291533703), интеграция [38291556411](https://github.com/nyxtryp/aicfa/actions/runs/38291556411), тесты [38291591270](https://github.com/nyxtryp/aicfa/actions/runs/38291591270).
 - **Статус:** [x] OB mitigation и его отображение в причинно-ограниченном snapshot проверены unit-тестами. Пользовательская проверка разметки, интеграция с live scanner и приёмка Фазы 1 по-прежнему не выполнены.
+
+
+### 2026-10-13 — Фаза 2 / TZ §4.3: причинно-ограниченное состояние mitigation для OB
+
+- **Пункт ТЗ:** §4.3 — OB mitigated только после закрытия за дальним краем; нужно сохранить первое время/индекс mitigation и не использовать будущие свечи.
+- **Реализация:** `app/smc/order_blocks.py` добавляет `OrderBlockMitigation` и `measure_order_block_mitigation(...)`: поиск начинается строго после свечи подтверждения OB; фиксируется первый close за дальним краем, состояние остаётся истинным после первого события; `as_of_index` ограничивает доступную историю. `app/smc/engine.py` включает это состояние в snapshot как `order_block_mitigation`.
+- **Тесты:** проверены отсутствие mitigation на свече создания OB, фиксация первого последующего close и отсутствие утечки будущей mitigation в snapshot.
+- **Коммиты:** алгоритм [7384b68](https://github.com/nyxtryp/aicfa/commit/7384b68d1f4b7e6f89d93ef34e5b6e86c1f0a6f2); подключение к snapshot [fdfc3bd](https://github.com/nyxtryp/aicfa/commit/fdfc3bd1a5f5d87e8a7e4b8f34b3b27e5d1c5f04); тесты [49a5d55](https://github.com/nyxtryp/aicfa/commit/49a5d553); регрессия snapshot [08fa38e](https://github.com/nyxtryp/aicfa/commit/08fa38eb).
+- **CI:** SUCCESS для подключения mitigation к snapshot — [38291556411](https://github.com/nyxtryp/aicfa/actions/runs/38291556411); SUCCESS тестов состояния — [38291591270](https://github.com/nyxtryp/aicfa/actions/runs/38291591270); SUCCESS регрессии причинности snapshot — [38291614716](https://github.com/nyxtryp/aicfa/actions/runs/38291614716); полный прогон после записи статуса — [38291599886](https://github.com/nyxtryp/aicfa/actions/runs/38291599886) SUCCESS.
+- **Статус:** код и тесты проходят CI. Фаза 2 всё ещё требует визуальной проверки пользователем; snapshot не подключён к live scanner, сигналы не включены.
