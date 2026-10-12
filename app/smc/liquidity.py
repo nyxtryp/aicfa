@@ -165,7 +165,9 @@ def find_previous_day_extremes(
         if end < len(day_keys):
             high_index = max(range(start, end), key=lambda i: highs[i])
             low_index = min(range(start, end), key=lambda i: lows[i])
-            confirmation = end
+            # The source day's last closed candle confirms the level; the
+            # first candle of the next UTC day may already sweep it.
+            confirmation = end - 1
             levels.append(LiquidityLevel(
                 kind="high",
                 price=float(highs[high_index]),
