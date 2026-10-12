@@ -1,8 +1,9 @@
 import asyncio
 import unittest
 import tempfile
+import urllib.error
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from decimal import Decimal
 
 from app.market_data import (
@@ -39,6 +40,13 @@ def event(*, closed: bool = True, symbol: str = "BTCUSDT", timeframe: str = "1m"
             },
         },
     }
+
+
+class RestRateLimitTests(unittest.TestCase):
+    def test_retry_helper_parses_numeric_retry_after(self):
+        from app.market_data import _retry_after_seconds
+        error = urllib.error.HTTPError("https://example.com", 429, "limited", {"Retry-After": "3"}, None)
+        self.assertEqual(_retry_after_seconds(error), 3.0)
 
 
 class MarketDataTests(unittest.TestCase):
