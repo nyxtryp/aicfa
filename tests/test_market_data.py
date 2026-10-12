@@ -287,8 +287,12 @@ class MarketDataTests(unittest.TestCase):
                 close=Decimal("103"), volume=Decimal("12.5"),
             )
 
-        manager.latest[("BTCUSDT", "1m")] = candle("1m", now_ms - 200_000)
-        manager.latest[("BTCUSDT", "4h")] = candle("4h", now_ms - 3 * 60 * 60 * 1000)
+        minute_candle = candle("1m", now_ms - 200_000)
+        four_hour_candle = candle("4h", now_ms - 3 * 60 * 60 * 1000)
+        manager.latest[("BTCUSDT", "1m")] = minute_candle
+        manager.latest[("BTCUSDT", "4h")] = four_hour_candle
+        manager.candles[("BTCUSDT", "1m")] = deque([minute_candle], maxlen=CANDLES_PER_SERIES)
+        manager.candles[("BTCUSDT", "4h")] = deque([four_hour_candle], maxlen=CANDLES_PER_SERIES)
 
         status = manager._freshness_status(now_ms)
 
@@ -296,6 +300,8 @@ class MarketDataTests(unittest.TestCase):
         self.assertEqual(status["checked_at_ms"], now_ms)
         self.assertEqual(status["series_with_data"], 2)
         self.assertEqual(status["missing_series"], EXPECTED_STREAM_COUNT - 2)
+        self.assertEqual(status["underfilled_series"], 2)
+        self.assertEqual(status["underfilled_details"][0]["candles"], 1)
         self.assertEqual(status["stale_series"], 1)
         self.assertEqual(status["stale_details"][0]["symbol"], "BTCUSDT")
         self.assertEqual(status["stale_details"][0]["timeframe"], "1m")
