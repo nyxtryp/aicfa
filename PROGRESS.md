@@ -555,3 +555,12 @@
 - **Тесты:** добавлены проверки восстановления записанной свечи из backup, проверки целостности, отказа при отсутствующей базе и удаления устаревших копий.
 - **GitHub Actions:** тесты прошли на runner: [38284469604](https://github.com/nyxtryp/aicfa/actions/runs/38284469604) (backup/restore тесты), [38284494479](https://github.com/nyxtryp/aicfa/actions/runs/38284494479) (интеграция daily task), [38284505337](https://github.com/nyxtryp/aicfa/actions/runs/38284505337) (полный набор после исправления тестовых путей). Коммиты реализации: [0b06f54](https://github.com/nyxtryp/aicfa/commit/0b06f54b499a3002b63f2aa02ebfa5cfbb85e05f), [e2e786a](https://github.com/nyxtryp/aicfa/commit/e2e786a31a3dca3422a2c12d2e1bc7af39c37899), [309cbf6](https://github.com/nyxtryp/aicfa/commit/309cbf66a5211e2d44e038efdc07a21cf5eb8214).
 - **Статус:** автоматические тесты backup/restore — [x] ПРОВЕРЕНО на GitHub runner. Production backup/restore ещё не подтверждён до автодеплоя и проверки реального файла на сервере. Фаза 1 не завершена; к SMC не переходить.
+
+
+### 2026-10-13 — Фаза 1, пункт 9: production-проверка backup
+
+- **Пункт ТЗ:** Фаза 1, пункт 9 — ежедневный backup и доказуемое восстановление.
+- **Изменение для диагностики:** добавлен `GET /api/backup-status`; после успешной проверки копии он показывает `status=ok`, время последнего успеха, имя файла и размер; при ошибке показывает тип ошибки. Полный путь к серверной файловой системе не раскрывается.
+- **GitHub Actions:** предыдущие тесты backup/restore и интеграции задачи прошли: [38284469604](https://github.com/nyxtryp/aicfa/actions/runs/38284469604), [38284494479](https://github.com/nyxtryp/aicfa/actions/runs/38284494479), [38284505337](https://github.com/nyxtryp/aicfa/actions/runs/38284505337). Новый commit с endpoint ожидает проверки: [f416bd2](https://github.com/nyxtryp/aicfa/commit/f416bd224f0ff9e5c844002a70a91f5dd045a852).
+- **Production:** не подтверждено. Удалённое устройство `nyxtryp` сейчас offline, а доступ к публичным API сайта из доступного инструментария не сработал; поэтому я не выдаю production backup/restore за проверенные. После автодеплоя endpoint `/api/backup-status` позволит подтвердить запуск, но полноценное восстановление из фактической копии всё равно требует серверной проверки.
+- **Статус пункта 9:** код и локальные сценарии GitHub Runner — [x] ПРОВЕРЕНО; production backup/restore — [ ] НЕ ПРОВЕРЕНО. Фаза 1 остаётся открытой, к Фазе 2 не переходить.
