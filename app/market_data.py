@@ -357,9 +357,10 @@ class MarketDataManager:
                 if delay > 0:
                     time.sleep(delay)
                 try:
+                    # Pace every attempt, including responses that raise HTTPError.
+                    _rest_next_request_at = time.monotonic() + REST_MIN_INTERVAL_SECONDS
                     with urllib.request.urlopen(request, timeout=20) as response:
                         payload = json.loads(response.read().decode("utf-8"))
-                    _rest_next_request_at = time.monotonic() + REST_MIN_INTERVAL_SECONDS
                     if not isinstance(payload, list):
                         raise ValueError("Binance klines response is not a list")
                     return payload
