@@ -132,7 +132,8 @@ class ReconciliationScheduleTests(unittest.IsolatedAsyncioTestCase):
             await manager._reconciliation_loop()
 
         self.assertEqual(reconcile_count, 2)
-        self.assertEqual(sleep_count, 3)
+        # One wait before the failed attempt and one before observing shutdown.
+        self.assertEqual(sleep_count, 2)
         self.assertEqual(manager.reconciliation_status["status"], "complete")
 
 
