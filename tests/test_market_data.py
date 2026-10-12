@@ -462,9 +462,11 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
             contexts.append(ctx)
             return ctx
 
-        with patch("app.market_data.websockets.connect", side_effect=fake_connect), \\
-             patch("app.market_data.WS_ROTATION_INTERVAL_SECONDS", 0.001), \\
-             patch("app.market_data.WS_ROTATION_RETRY_SECONDS", 0.001):
+        with (
+            patch("app.market_data.websockets.connect", side_effect=fake_connect),
+            patch("app.market_data.WS_ROTATION_INTERVAL_SECONDS", 0.001),
+            patch("app.market_data.WS_ROTATION_RETRY_SECONDS", 0.001),
+        ):
             task = asyncio.create_task(manager._run_group_connection("crypto", "wss://example.test"))
             await asyncio.sleep(0.01)
             manager._stopping = True
