@@ -10,7 +10,7 @@ class OrderBlockTests(unittest.TestCase):
             opens=[8, 9, 10, 11, 10],
             highs=[9, 10, 11, 12, 13],
             lows=[7, 8, 9, 10, 9],
-            closes=[8.5, 8.5, 10.5, 10.5, 12.5],
+            closes=[8.5, 8.5, 10.5, 11.5, 12.5],
             events=[StructureBreak("BOS", "bullish", 4, 0, 11.0)],
         )
         self.assertEqual(
