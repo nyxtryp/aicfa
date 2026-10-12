@@ -9,7 +9,7 @@ class StructureBreakTests(unittest.TestCase):
         swings = (SwingPoint("high", 1, 3, 10.0),)
         # The level is not eligible until index 3; close must exceed 10.
         self.assertEqual(
-            detect_structure_breaks([9, 9, 11, 10, 10.1], swings),
+            detect_structure_breaks([9, 9, 9.5, 10, 10.1], swings),
             (
                 StructureBreak("BOS", "bullish", 4, 1, 10.0),
             ),
