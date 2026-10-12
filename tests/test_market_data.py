@@ -291,6 +291,44 @@ class SQLiteCandleStoreTests(unittest.TestCase):
 
 
 class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_live_websocket_gap_triggers_rest_recovery_before_current_candle(self):
+        manager = MarketDataManager()
+        current = parse_closed_kline(event())
+        self.assertIsNotNone(current)
+        assert current is not None
+        previous = ClosedCandle(
+            symbol=current.symbol, timeframe=current.timeframe,
+            open_time_ms=current.open_time_ms - 120_000,
+            close_time_ms=current.open_time_ms - 60_001,
+            open=Decimal("100"), high=Decimal("105"), low=Decimal("99"),
+            close=Decimal("103"), volume=Decimal("12.5"),
+        )
+        manager.candles[(previous.symbol, previous.timeframe)] = __import__("collections").deque(
+            [previous], maxlen=CANDLES_PER_SERIES
+        )
+        manager.latest[(previous.symbol, previous.timeframe)] = previous
+        manager._recover_series_gap = AsyncMock()
+
+        class OneMessageSocket:
+            def __init__(self):
+                self.sent = False
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                if self.sent:
+                    raise StopAsyncIteration
+                self.sent = True
+                import json
+                return json.dumps(event())
+
+        await manager._consume_socket("crypto", OneMessageSocket())
+
+        manager._recover_series_gap.assert_awaited_once_with("BTCUSDT", "1m")
+        self.assertEqual(manager.latest[("BTCUSDT", "1m")].open_time_ms, current.open_time_ms)
+        self.assertEqual(manager.groups["crypto"]["closed_candles"], 1)
+
     async def test_rest_gap_recovery_merges_missing_candles_and_persists(self):
         with tempfile.TemporaryDirectory() as tmp:
             manager = MarketDataManager()
