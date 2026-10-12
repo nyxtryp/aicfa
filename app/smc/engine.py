@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import Sequence
 
 from app.smc.breaks import StructureBreak, detect_structure_breaks
@@ -86,11 +87,21 @@ def analyze_smc(
     cl = tuple(float(x) for x in closes[:end + 1])
     vol = tuple(float(x) for x in volumes[:end + 1])
     ts = tuple(int(x) for x in timestamps_ms[:end + 1])
+    if any(not isfinite(value) for values in (op, hi, lo, cl, vol) for value in values):
+        raise ValueError("OHLCV values must be finite")
+    if any(volume < 0 for volume in vol):
+        raise ValueError("volumes must be >= 0")
     if any(h < l or o < l or o > h or c < l or c > h
            for o, h, l, c in zip(op, hi, lo, cl)):
         raise ValueError("OHLC candle values are inconsistent")
-    if any(ts[i] > ts[i + 1] for i in range(len(ts) - 1)):
-        raise ValueError("timestamps must be ordered")
+    if any(ts[i] >= ts[i + 1] for i in range(len(ts) - 1)):
+        raise ValueError("timestamps must be strictly increasing")
+    if zone_bounds is not None:
+        zone_lower, zone_upper = zone_bounds
+        if not isfinite(zone_lower) or not isfinite(zone_upper) or zone_lower > zone_upper:
+            raise ValueError("zone_bounds must be finite and ordered")
+    if not isfinite(max_zone_distance_atr) or max_zone_distance_atr < 0:
+        raise ValueError("max_zone_distance_atr must be finite and >= 0")
 
     swings = find_confirmed_swings(hi, lo, left=swing_left, right=swing_right)
     breaks = detect_structure_breaks(cl, swings)
