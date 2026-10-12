@@ -1,19 +1,50 @@
 from contextlib import asynccontextmanager
+import asyncio
+import logging
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
+from app.backup import create_verified_backup
 from app.market_data import MarketDataManager
 
+logger = logging.getLogger("aicfa.backup")
+BACKUP_INTERVAL_SECONDS = 24 * 60 * 60
+BACKUP_RETRY_SECONDS = 60 * 60
+
 market_data = MarketDataManager()
+
+
+async def _daily_backup_loop() -> None:
+    """Back up after startup history finishes, then repeat daily."""
+    history_task = market_data._history_task
+    if history_task is not None:
+        await asyncio.gather(history_task, return_exceptions=True)
+    while True:
+        try:
+            path = await asyncio.to_thread(
+                create_verified_backup,
+                market_data.store.path,
+            )
+            logger.info("Verified SQLite backup created: %s", path)
+            delay = BACKUP_INTERVAL_SECONDS
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("SQLite backup failed; retrying in %s seconds", BACKUP_RETRY_SECONDS)
+            delay = BACKUP_RETRY_SECONDS
+        await asyncio.sleep(delay)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await market_data.start()
+    backup_task = asyncio.create_task(_daily_backup_loop(), name="aicfa-daily-backup")
     try:
         yield
     finally:
+        backup_task.cancel()
+        await asyncio.gather(backup_task, return_exceptions=True)
         await market_data.stop()
 
 
