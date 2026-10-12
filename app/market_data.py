@@ -50,6 +50,7 @@ WS_ROTATION_RETRY_SECONDS = 60
 WS_ROTATION_CONFIRM_SECONDS = 1
 REST_KLINES_URL = "https://fapi.binance.com/fapi/v1/klines"
 REST_MIN_INTERVAL_SECONDS = 0.25
+REST_FALLBACK_DELAY_MS = 2_500
 REST_MAX_RATE_LIMIT_RETRIES = 5
 REST_MAX_BACKOFF_SECONDS = 60.0
 _rest_request_lock = threading.Lock()
@@ -250,6 +251,7 @@ class MarketDataManager:
             "crypto": self._new_group(len(CRYPTO_SYMBOLS) * len(TIMEFRAMES)),
         }
         self._tasks: list[asyncio.Task[None]] = []
+        self._fallback_tasks: list[asyncio.Task[None]] = []
         self._history_task: asyncio.Task[None] | None = None
         self._reconciliation_task: asyncio.Task[None] | None = None
         self._stopping = False
@@ -281,6 +283,8 @@ class MarketDataManager:
             "invalid_messages": 0,
             "reconnects": 0,
             "rotations": 0,
+            "fallback_polls": 0,
+            "fallback_errors": 0,
             "last_message_ms": None,
             "last_closed_candle_ms": None,
             "last_error": None,
@@ -313,6 +317,10 @@ class MarketDataManager:
             asyncio.create_task(self._run_group("tradfi", TRADFI_SYMBOLS), name="aicfa-ws-tradfi"),
             asyncio.create_task(self._run_group("crypto", CRYPTO_SYMBOLS), name="aicfa-ws-crypto"),
         ]
+        self._fallback_tasks = [
+            asyncio.create_task(self._rest_fallback_loop("tradfi", TRADFI_SYMBOLS), name="aicfa-rest-fallback-tradfi"),
+            asyncio.create_task(self._rest_fallback_loop("crypto", CRYPTO_SYMBOLS), name="aicfa-rest-fallback-crypto"),
+        ]
         self._reconciliation_task = asyncio.create_task(
             self._reconciliation_loop(), name="aicfa-rest-reconciliation"
         )
@@ -328,6 +336,11 @@ class MarketDataManager:
             self._reconciliation_task.cancel()
             await asyncio.gather(self._reconciliation_task, return_exceptions=True)
             self._reconciliation_task = None
+        fallback_tasks, self._fallback_tasks = self._fallback_tasks, []
+        for task in fallback_tasks:
+            task.cancel()
+        if fallback_tasks:
+            await asyncio.gather(*fallback_tasks, return_exceptions=True)
         for task in tasks:
             task.cancel()
         if tasks:
@@ -592,6 +605,56 @@ class MarketDataManager:
             self.reconciliation_status["last_success_ms"] = finished_ms
         else:
             self.reconciliation_status["status"] = "partial"
+
+    async def _rest_fallback_loop(self, name: str, symbols: tuple[str, ...]) -> None:
+        """Poll only series whose next candle has closed while this WS group is down.
+
+        All REST calls still pass through the shared process-wide request pacer.
+        Polling is disabled while the WebSocket is healthy; failed series retry
+        after five seconds, and successful series are scheduled for their next close.
+        """
+        try:
+            if self._history_task is not None:
+                await self._history_task
+            keys = [(symbol, timeframe) for symbol in symbols for timeframe in TIMEFRAMES]
+            next_due_ms: dict[tuple[str, str], int] = {}
+            while not self._stopping:
+                if self.groups[name]["status"] in ("connected", "rotating"):
+                    await asyncio.sleep(0.5)
+                    continue
+                now_ms = int(time.time() * 1000)
+                due_keys: list[tuple[str, str]] = []
+                for key in keys:
+                    if key not in next_due_ms:
+                        latest = self.latest.get(key)
+                        next_due_ms[key] = max(now_ms, latest.close_time_ms + REST_FALLBACK_DELAY_MS) if latest else now_ms
+                    if next_due_ms[key] <= now_ms:
+                        due_keys.append(key)
+                if not due_keys:
+                    wait_ms = min(next_due_ms.values()) - now_ms
+                    await asyncio.sleep(min(0.5, max(0.05, wait_ms / 1000)))
+                    continue
+                key = min(due_keys, key=lambda item: next_due_ms[item])
+                try:
+                    await self._reconcile_series(*key)
+                    self.groups[name]["fallback_polls"] += 1
+                    latest = self.latest.get(key)
+                    interval_ms = self._timeframe_ms(key[1])
+                    next_due_ms[key] = (
+                        latest.close_time_ms + interval_ms + REST_FALLBACK_DELAY_MS
+                        if latest else now_ms + interval_ms + REST_FALLBACK_DELAY_MS
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    self.groups[name]["fallback_errors"] += 1
+                    self.groups[name]["last_error"] = f"rest_fallback:{type(exc).__name__}"
+                    next_due_ms[key] = int(time.time() * 1000) + 5000
+                    logger.warning("REST fallback failed for %s %s (%s)", key[0], key[1], type(exc).__name__)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.exception("REST fallback loop stopped for %s (%s)", name, type(exc).__name__)
 
     async def _reconciliation_loop(self) -> None:
         """Run the first REST reconciliation one hour after startup, then hourly.
