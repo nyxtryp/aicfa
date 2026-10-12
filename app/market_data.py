@@ -607,54 +607,65 @@ class MarketDataManager:
             self.reconciliation_status["status"] = "partial"
 
     async def _rest_fallback_loop(self, name: str, symbols: tuple[str, ...]) -> None:
-        """Poll only series whose next candle has closed while this WS group is down.
+        """Keep fallback supervision alive if an unexpected loop-level error occurs."""
+        while not self._stopping:
+            try:
+                if self._history_task is not None:
+                    # A failed warm-up must not permanently disable recovery polling.
+                    await asyncio.gather(self._history_task, return_exceptions=True)
+                await self._run_rest_fallback(name, symbols)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                state = self.groups[name]
+                state["fallback_errors"] += 1
+                state["last_error"] = f"rest_fallback_loop:{type(exc).__name__}"
+                logger.exception("REST fallback supervisor failed for %s; retrying", name)
+                if not self._stopping:
+                    await asyncio.sleep(5)
 
-        All REST calls still pass through the shared process-wide request pacer.
-        Polling is disabled while the WebSocket is healthy; failed series retry
-        after five seconds, and successful series are scheduled for their next close.
-        """
-        try:
-            if self._history_task is not None:
-                await self._history_task
-            keys = [(symbol, timeframe) for symbol in symbols for timeframe in TIMEFRAMES]
-            next_due_ms: dict[tuple[str, str], int] = {}
-            while not self._stopping:
-                if self.groups[name]["status"] in ("connected", "rotating"):
-                    await asyncio.sleep(0.5)
-                    continue
-                now_ms = int(time.time() * 1000)
-                due_keys: list[tuple[str, str]] = []
-                for key in keys:
-                    if key not in next_due_ms:
-                        latest = self.latest.get(key)
-                        next_due_ms[key] = max(now_ms, latest.close_time_ms + REST_FALLBACK_DELAY_MS) if latest else now_ms
-                    if next_due_ms[key] <= now_ms:
-                        due_keys.append(key)
-                if not due_keys:
-                    wait_ms = min(next_due_ms.values()) - now_ms
-                    await asyncio.sleep(min(0.5, max(0.05, wait_ms / 1000)))
-                    continue
-                key = min(due_keys, key=lambda item: next_due_ms[item])
-                try:
-                    await self._reconcile_series(*key)
-                    self.groups[name]["fallback_polls"] += 1
+    async def _run_rest_fallback(self, name: str, symbols: tuple[str, ...]) -> None:
+        """Poll only series due for a closed candle while their WebSocket is down."""
+        keys = [(symbol, timeframe) for symbol in symbols for timeframe in TIMEFRAMES]
+        next_due_ms: dict[tuple[str, str], int] = {}
+        while not self._stopping:
+            if self.groups[name]["status"] in ("connected", "rotating"):
+                await asyncio.sleep(0.5)
+                continue
+            now_ms = int(time.time() * 1000)
+            due_keys: list[tuple[str, str]] = []
+            for key in keys:
+                if key not in next_due_ms:
                     latest = self.latest.get(key)
-                    interval_ms = self._timeframe_ms(key[1])
-                    next_due_ms[key] = (
-                        latest.close_time_ms + interval_ms + REST_FALLBACK_DELAY_MS
-                        if latest else now_ms + interval_ms + REST_FALLBACK_DELAY_MS
-                    )
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:
-                    self.groups[name]["fallback_errors"] += 1
-                    self.groups[name]["last_error"] = f"rest_fallback:{type(exc).__name__}"
-                    next_due_ms[key] = int(time.time() * 1000) + 5000
-                    logger.warning("REST fallback failed for %s %s (%s)", key[0], key[1], type(exc).__name__)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.exception("REST fallback loop stopped for %s (%s)", name, type(exc).__name__)
+                    next_due_ms[key] = max(
+                        now_ms, latest.close_time_ms + REST_FALLBACK_DELAY_MS
+                    ) if latest else now_ms
+                if next_due_ms[key] <= now_ms:
+                    due_keys.append(key)
+            if not due_keys:
+                wait_ms = min(next_due_ms.values()) - now_ms
+                await asyncio.sleep(min(0.5, max(0.05, wait_ms / 1000)))
+                continue
+            key = min(due_keys, key=lambda item: next_due_ms[item])
+            try:
+                await self._reconcile_series(*key)
+                self.groups[name]["fallback_polls"] += 1
+                latest = self.latest.get(key)
+                interval_ms = self._timeframe_ms(key[1])
+                next_due_ms[key] = (
+                    latest.close_time_ms + interval_ms + REST_FALLBACK_DELAY_MS
+                    if latest else now_ms + interval_ms + REST_FALLBACK_DELAY_MS
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.groups[name]["fallback_errors"] += 1
+                self.groups[name]["last_error"] = f"rest_fallback:{type(exc).__name__}"
+                next_due_ms[key] = int(time.time() * 1000) + 5000
+                logger.warning(
+                    "REST fallback failed for %s %s (%s)",
+                    key[0], key[1], type(exc).__name__,
+                )
 
     async def _reconciliation_loop(self) -> None:
         """Run the first REST reconciliation one hour after startup, then hourly.
