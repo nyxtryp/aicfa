@@ -491,11 +491,7 @@ class MarketDataManager:
             # REST is authoritative for matching timestamps; keep newer live candles
             # if the REST response is momentarily behind the stream.
             for item in restored:
-                current = merged.get(item.open_time_ms)
-                if current is None or item.open_time_ms <= max(
-                    (c.open_time_ms for c in merged.values()), default=item.open_time_ms
-                ):
-                    merged[item.open_time_ms] = item
+                merged[item.open_time_ms] = item
             series = deque(
                 sorted(merged.values(), key=lambda item: item.open_time_ms)[-CANDLES_PER_SERIES:],
                 maxlen=CANDLES_PER_SERIES,
@@ -548,19 +544,24 @@ class MarketDataManager:
             self.reconciliation_status["status"] = "partial"
 
     async def _reconciliation_loop(self) -> None:
-        """Run REST reconciliation hourly without delaying service startup."""
-        while not self._stopping:
-            await asyncio.sleep(RECONCILIATION_INTERVAL_SECONDS)
+        """Run one REST reconciliation after initial history, then hourly."""
+        try:
+            if self._history_task is not None:
+                await self._history_task
             if self._stopping:
                 return
-            try:
+            await self.reconcile_all_series()
+            while not self._stopping:
+                await asyncio.sleep(RECONCILIATION_INTERVAL_SECONDS)
+                if self._stopping:
+                    return
                 await self.reconcile_all_series()
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                self.reconciliation_status["status"] = "failed"
-                self.reconciliation_status["last_attempt_ms"] = int(time.time() * 1000)
-                logger.exception("Unexpected REST reconciliation failure (%s)", type(exc).__name__)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.reconciliation_status["status"] = "failed"
+            self.reconciliation_status["last_attempt_ms"] = int(time.time() * 1000)
+            logger.exception("Unexpected REST reconciliation failure (%s)", type(exc).__name__)
 
     async def _run_group(self, name: str, symbols: tuple[str, ...]) -> None:
         state = self.groups[name]
