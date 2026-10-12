@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,8 +32,10 @@ def create_verified_backup(
     temporary = directory / f".candles-{stamp}.sqlite3.tmp"
 
     try:
-        with sqlite3.connect(str(source), timeout=30) as source_db:
-            with sqlite3.connect(str(temporary), timeout=30) as backup_db:
+        # sqlite3.Connection's context manager commits/rolls back but does not
+        # close the connection; explicit closing avoids leaking handles each day.
+        with closing(sqlite3.connect(str(source), timeout=30)) as source_db:
+            with closing(sqlite3.connect(str(temporary), timeout=30)) as backup_db:
                 source_db.backup(backup_db)
                 integrity = backup_db.execute("PRAGMA integrity_check").fetchone()
                 if not integrity or integrity[0] != "ok":
