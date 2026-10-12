@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import deque
 import logging
 import time
 from dataclasses import dataclass
@@ -34,6 +35,7 @@ ALL_SYMBOLS: tuple[str, ...] = TRADFI_SYMBOLS + CRYPTO_SYMBOLS
 SYMBOL_SET = frozenset(ALL_SYMBOLS)
 TIMEFRAME_SET = frozenset(TIMEFRAMES)
 EXPECTED_STREAM_COUNT = len(ALL_SYMBOLS) * len(TIMEFRAMES)
+CANDLES_PER_SERIES = 500
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,13 +116,14 @@ def parse_closed_kline(message: Mapping[str, Any]) -> ClosedCandle | None:
 
 
 class MarketDataManager:
-    """Two reconnecting Binance connections; stores only each series' latest close.
+    """Two reconnecting Binance connections with a rolling closed-candle window.
 
-    Persistence, REST history/backfill, and SMC processing are intentionally
-    separate follow-up tasks. This in-memory cache is not a replacement for DB.
+    The 500-candle windows are currently in memory. REST warm-up, durable
+    persistence, and SMC processing remain separate follow-up tasks.
     """
 
     def __init__(self) -> None:
+        self.candles: dict[tuple[str, str], deque[ClosedCandle]] = {}
         self.latest: dict[tuple[str, str], ClosedCandle] = {}
         self.groups: dict[str, dict[str, Any]] = {
             "tradfi": self._new_group(len(TRADFI_SYMBOLS) * len(TIMEFRAMES)),
@@ -194,12 +197,9 @@ class MarketDataManager:
                             continue
                         if candle is None:
                             continue
-                        key = (candle.symbol, candle.timeframe)
                         async with self._lock:
-                            previous = self.latest.get(key)
-                            if previous is not None and candle.open_time_ms <= previous.open_time_ms:
+                            if not self.add_closed_candle(candle):
                                 continue
-                            self.latest[key] = candle
                         state["closed_candles"] += 1
                         state["last_closed_candle_ms"] = candle.close_time_ms
             except asyncio.CancelledError:
@@ -215,6 +215,26 @@ class MarketDataManager:
                 backoff = min(backoff * 2, 30)
         state["status"] = "stopped"
 
+    def add_closed_candle(self, candle: ClosedCandle) -> bool:
+        """Append a newer closed candle and evict the oldest beyond 500."""
+        key = (candle.symbol, candle.timeframe)
+        if key[0] not in SYMBOL_SET or key[1] not in TIMEFRAME_SET:
+            return False
+        previous = self.latest.get(key)
+        if previous is not None and candle.open_time_ms <= previous.open_time_ms:
+            return False
+        series = self.candles.setdefault(
+            key, deque(maxlen=CANDLES_PER_SERIES)
+        )
+        series.append(candle)
+        self.latest[key] = candle
+        return True
+
+    def candle_window(self, symbol: str, timeframe: str) -> tuple[ClosedCandle, ...]:
+        """Return a stable snapshot of the stored closed-candle window."""
+        series = self.candles.get((symbol.upper(), timeframe))
+        return tuple(series) if series is not None else ()
+
     def status(self) -> dict[str, Any]:
         return {
             "status": "connected" if all(g["status"] == "connected" for g in self.groups.values()) else "degraded",
@@ -222,5 +242,7 @@ class MarketDataManager:
             "timeframes": list(TIMEFRAMES),
             "expected_streams": EXPECTED_STREAM_COUNT,
             "latest_series": len(self.latest),
+            "stored_candles": sum(len(series) for series in self.candles.values()),
+            "window_size": CANDLES_PER_SERIES,
             "groups": {name: dict(state) for name, state in self.groups.items()},
         }
