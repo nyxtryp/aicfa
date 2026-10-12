@@ -594,13 +594,16 @@ class MarketDataManager:
             self.reconciliation_status["status"] = "partial"
 
     async def _reconciliation_loop(self) -> None:
-        """Run one REST reconciliation after initial history, then hourly."""
+        """Run the first REST reconciliation one hour after startup, then hourly.
+
+        Startup history already fills the 250 series. Running a second full REST
+        pass immediately after history needlessly doubles startup traffic and can
+        trigger Binance 429 responses; live closed candles continue to arrive by
+        WebSocket while the hourly reconciliation timer is waiting.
+        """
         try:
             if self._history_task is not None:
                 await self._history_task
-            if self._stopping:
-                return
-            await self.reconcile_all_series()
             while not self._stopping:
                 await asyncio.sleep(RECONCILIATION_INTERVAL_SECONDS)
                 if self._stopping:
