@@ -22,7 +22,7 @@ class LiquidityTests(unittest.TestCase):
         self.assertEqual(equal[0].confirmation_index, 9)
 
     def test_sweep_requires_wick_beyond_and_close_back_inside(self):
-        level = LiquidityLevel("high", 10.0, (2, 5), 6, True)
+        level = LiquidityLevel("high", 10.0, (2, 5), 2, True)
         events = detect_liquidity_sweeps(
             highs=[9, 9, 9, 11, 12],
             lows=[8, 8, 8, 9, 9],
