@@ -77,6 +77,11 @@ class SMCAnalysisTests(unittest.TestCase):
              for block in result.order_blocks],
             [("bullish", 2, 4), ("bearish", 7, 8)],
         )
+        self.assertEqual(
+            [(state.mitigated, state.mitigation_index)
+             for state in result.order_block_mitigation],
+            [(True, 8), (False, None)],
+        )
 
     def test_previous_day_high_can_be_swept_on_first_candle_of_new_utc_day(self):
         opens = [8.2, 9.0, 9.2, 10.5]
