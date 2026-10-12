@@ -531,6 +531,53 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(manager.groups["crypto"]["fallback_polls"], 1)
         self.assertEqual(manager.groups["crypto"]["fallback_errors"], 0)
 
+    async def test_rest_fallback_retries_after_transient_rest_error(self):
+        manager = MarketDataManager()
+        manager.groups["crypto"]["status"] = "reconnecting"
+        calls = 0
+
+        async def flaky_poll(symbol, timeframe):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise OSError("temporary REST failure")
+            manager._stopping = True
+            return 1
+
+        async def fast_sleep(_seconds):
+            return None
+
+        manager._reconcile_series = AsyncMock(side_effect=flaky_poll)
+        with patch("app.market_data.asyncio.sleep", side_effect=fast_sleep):
+            await manager._rest_fallback_loop("crypto", ("BTCUSDT",))
+
+        self.assertEqual(calls, 2)
+        self.assertEqual(manager.groups["crypto"]["fallback_errors"], 1)
+        self.assertEqual(manager.groups["crypto"]["fallback_polls"], 1)
+        self.assertEqual(manager.groups["crypto"]["last_error"], "rest_fallback:OSError")
+
+    async def test_rest_fallback_pauses_when_websocket_recovers(self):
+        manager = MarketDataManager()
+        manager.groups["crypto"]["status"] = "reconnecting"
+        calls = 0
+
+        async def poll_then_recover(symbol, timeframe):
+            nonlocal calls
+            calls += 1
+            manager.groups["crypto"]["status"] = "connected"
+            return 1
+
+        async def stop_after_recovery_wait(_seconds):
+            manager._stopping = True
+
+        manager._reconcile_series = AsyncMock(side_effect=poll_then_recover)
+        with patch("app.market_data.asyncio.sleep", side_effect=stop_after_recovery_wait):
+            await manager._rest_fallback_loop("crypto", ("BTCUSDT",))
+
+        self.assertEqual(calls, 1)
+        self.assertEqual(manager.groups["crypto"]["fallback_polls"], 1)
+        self.assertEqual(manager.groups["crypto"]["fallback_errors"], 0)
+
     def test_supported_timeframe_durations(self):
         manager = MarketDataManager()
         self.assertEqual(manager._timeframe_ms("1m"), 60_000)
