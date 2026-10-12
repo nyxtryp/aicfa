@@ -1,10 +1,27 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+
+from app.market_data import MarketDataManager
+
+market_data = MarketDataManager()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await market_data.start()
+    try:
+        yield
+    finally:
+        await market_data.stop()
+
 
 app = FastAPI(
     title="AICFA",
     description="SMC market scanner",
-    version="0.1.0",
+    version="0.2.0",
+    lifespan=lifespan,
 )
 
 PAGE = """<!doctype html>
@@ -52,3 +69,9 @@ async def index() -> HTMLResponse:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "service": "aicfa"}
+
+
+@app.get("/api/data-status")
+async def data_status() -> dict:
+    """Live ingestion health; this does not imply SMC signals are available."""
+    return market_data.status()
