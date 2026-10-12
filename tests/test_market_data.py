@@ -1,4 +1,5 @@
 import asyncio
+from collections import deque
 import unittest
 import tempfile
 import urllib.error
