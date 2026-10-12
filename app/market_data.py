@@ -913,7 +913,9 @@ class MarketDataManager:
 
     def status(self) -> dict[str, Any]:
         return {
-            "status": "connected" if all(g["status"] == "connected" for g in self.groups.values()) else "degraded",
+            # Rotation is a healthy make-before-break transition: the old socket stays live
+            # until the replacement is confirmed, so it must not mark the whole service degraded.
+            "status": "connected" if all(g["status"] in ("connected", "rotating") for g in self.groups.values()) else "degraded",
             "instruments": len(ALL_SYMBOLS),
             "timeframes": list(TIMEFRAMES),
             "expected_streams": EXPECTED_STREAM_COUNT,
