@@ -126,3 +126,58 @@ def detect_liquidity_sweeps(
             ))
             used.add(position)
     return tuple(events)
+
+
+def find_previous_day_extremes(
+    highs: Sequence[float],
+    lows: Sequence[float],
+    timestamps_ms: Sequence[int],
+) -> tuple[LiquidityLevel, ...]:
+    """Return prior UTC-day high/low levels once the next day is observed.
+
+    Timestamps are candle-open Unix milliseconds in UTC. A day's extrema are
+    never exposed on candles belonging to that same day. The level becomes
+    eligible after the first closed candle whose UTC date is later than the
+    source date, avoiding intraday look-ahead. Missing days are allowed.
+    """
+    if not (len(highs) == len(lows) == len(timestamps_ms)):
+        raise ValueError("highs, lows, and timestamps must have the same length")
+    if any(high < low for high, low in zip(highs, lows)):
+        raise ValueError("each high must be >= its low")
+    if any(timestamps_ms[i] > timestamps_ms[i + 1] for i in range(len(timestamps_ms) - 1)):
+        raise ValueError("timestamps must be ordered")
+
+    from datetime import datetime, timezone
+
+    day_keys = [
+        datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).date()
+        for timestamp in timestamps_ms
+    ]
+    levels: list[LiquidityLevel] = []
+    start = 0
+    while start < len(day_keys):
+        day = day_keys[start]
+        end = start + 1
+        while end < len(day_keys) and day_keys[end] == day:
+            end += 1
+        # The day is usable only if a later UTC date is present in the input.
+        if end < len(day_keys):
+            high_index = max(range(start, end), key=lambda i: highs[i])
+            low_index = min(range(start, end), key=lambda i: lows[i])
+            confirmation = end
+            levels.append(LiquidityLevel(
+                kind="high",
+                price=float(highs[high_index]),
+                source_indices=(high_index,),
+                confirmation_index=confirmation,
+                equal_level=False,
+            ))
+            levels.append(LiquidityLevel(
+                kind="low",
+                price=float(lows[low_index]),
+                source_indices=(low_index,),
+                confirmation_index=confirmation,
+                equal_level=False,
+            ))
+        start = end
+    return tuple(sorted(levels, key=lambda level: (level.confirmation_index, level.kind)))
