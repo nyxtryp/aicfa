@@ -46,13 +46,34 @@ def detect_structure_breaks(
     events: list[StructureBreak] = []
 
     for candle_index, close in enumerate(closes):
+        # A level already crossed before its confirmation was knowable must
+        # not create a delayed, false break event when price stays beyond it.
+        if candle_index > 0:
+            previous_close = closes[candle_index - 1]
+            for position, swing in enumerate(swings):
+                if swing.confirmation_index != candle_index or position in broken:
+                    continue
+                if (swing.kind == "high" and previous_close > swing.price) or (
+                    swing.kind == "low" and previous_close < swing.price
+                ):
+                    broken.add(position)
+
         eligible = [
             (position, swing)
             for position, swing in enumerate(swings)
             if swing.confirmation_index <= candle_index and position not in broken
         ]
-        highs = [(position, swing) for position, swing in eligible if swing.kind == "high" and close > swing.price]
-        lows = [(position, swing) for position, swing in eligible if swing.kind == "low" and close < swing.price]
+        previous_close = closes[candle_index - 1] if candle_index > 0 else None
+        highs = [
+            (position, swing) for position, swing in eligible
+            if swing.kind == "high" and close > swing.price
+            and previous_close is not None and previous_close <= swing.price
+        ]
+        lows = [
+            (position, swing) for position, swing in eligible
+            if swing.kind == "low" and close < swing.price
+            and previous_close is not None and previous_close >= swing.price
+        ]
 
         # Prefer the most recently confirmed crossed swing on each side.
         candidates = []
