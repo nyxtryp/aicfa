@@ -859,3 +859,14 @@
 - **Интеграция snapshot:** `app/smc/engine.py` теперь возвращает `order_block_mitigation` для каждого найденного OB; расчёт ограничен префиксом `as_of_index`, будущие свечи недоступны.
 - **Тесты:** добавлены тесты первого касания дальнего края по close, сохранения статуса после mitigation, исключения свечи создания и проверки границы snapshot. CI для кода — SUCCESS [38291533703](https://github.com/nyxtryp/aicfa/actions/runs/38291533703), интеграции — SUCCESS [38291556411](https://github.com/nyxtryp/aicfa/actions/runs/38291556411), тестов mitigation — SUCCESS [38291591270](https://github.com/nyxtryp/aicfa/actions/runs/38291591270). Полный regression-набор с проверкой snapshot на момент записи выполняется: [38291614716](https://github.com/nyxtryp/aicfa/actions/runs/38291614716).
 - **Статус §4.3:** [x] вычисление состояния mitigation и unit-тесты добавлены; [~] полный CI текущего HEAD ожидается. [ ] визуальная проверка на контрольных графиках и приёмка Фазы 2 не выполнены. Фаза 1 остаётся открытой; live-сетапы не включать.
+
+
+### 2026-10-13 — Фаза 2 / TZ §4.3: состояние mitigation для OB в snapshot
+
+- **Пункт ТЗ:** §4.3 — OB получает состояние mitigated после первого закрытия за дальним краем; сохраняются состояние и индекс события.
+- **Реализация:** `app/smc/order_blocks.py` дополнен `OrderBlockMitigation` и `measure_order_block_mitigation`. Проверяются только закрытия после свечи, на которой создан OB; первое закрытие за дальним краем фиксирует `mitigation_index`, и состояние остаётся true на последующих срезах. Свеча создания OB не может задним числом погасить созданную на ней зону.
+- **Интеграция:** `app/smc/engine.py` включает массив `order_block_mitigation` в результат `analyze_smc`, с расчётом только до `as_of_index`.
+- **Тесты:** проверены первое mitigation-закрытие, постоянство статуса, исключение свечи создания, недопустимый индекс и причинная граница snapshot.
+- **Коммиты:** реализация [7384b68](https://github.com/nyxtryp/aicfa/commit/7384b68); интеграция [fdfc3bd](https://github.com/nyxtryp/aicfa/commit/fdfc3bd); регрессионные тесты [49a5d553](https://github.com/nyxtryp/aicfa/commit/49a5d553).
+- **CI:** SUCCESS — реализация [38291533703](https://github.com/nyxtryp/aicfa/actions/runs/38291533703), интеграция [38291556411](https://github.com/nyxtryp/aicfa/actions/runs/38291556411), тесты [38291591270](https://github.com/nyxtryp/aicfa/actions/runs/38291591270).
+- **Статус:** [x] OB mitigation и его отображение в причинно-ограниченном snapshot проверены unit-тестами. Пользовательская проверка разметки, интеграция с live scanner и приёмка Фазы 1 по-прежнему не выполнены.
