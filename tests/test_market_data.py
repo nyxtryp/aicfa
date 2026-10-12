@@ -2,7 +2,7 @@ import asyncio
 import unittest
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from decimal import Decimal
 
 from app.market_data import (
@@ -316,6 +316,54 @@ class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(manager.reconciliation_status["errors"], [])
             self.assertEqual(manager.store.count(), 250)
             manager.store.close()
+
+    async def test_websocket_rotation_confirms_replacement_before_closing_old_socket(self):
+        manager = MarketDataManager()
+        manager._stopping = False
+        events = []
+
+        class FakeSocket:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                await asyncio.Event().wait()
+                raise StopAsyncIteration
+
+        class FakeContext:
+            def __init__(self, number):
+                self.number = number
+
+            async def __aenter__(self):
+                events.append(("enter", self.number))
+                return FakeSocket()
+
+            async def __aexit__(self, exc_type, exc, tb):
+                events.append(("exit", self.number))
+
+        contexts = []
+
+        def fake_connect(*args, **kwargs):
+            context = FakeContext(len(contexts))
+            contexts.append(context)
+            return context
+
+        with patch("app.market_data.websockets.connect", side_effect=fake_connect), \
+             patch("app.market_data.WS_ROTATION_INTERVAL_SECONDS", 0.03), \
+             patch("app.market_data.WS_ROTATION_CONFIRM_SECONDS", 0.001):
+            task = asyncio.create_task(manager._run_group_connection("crypto", "wss://example.test"))
+            try:
+                await asyncio.sleep(0.05)
+            finally:
+                manager._stopping = True
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+        self.assertGreaterEqual(len(contexts), 2)
+        self.assertIn(("enter", 1), events)
+        self.assertIn(("exit", 0), events)
+        self.assertLess(events.index(("enter", 1)), events.index(("exit", 0)))
+        self.assertGreaterEqual(manager.groups["crypto"]["rotations"], 1)
 
     def test_supported_timeframe_durations(self):
         manager = MarketDataManager()
