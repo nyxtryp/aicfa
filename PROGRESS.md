@@ -880,3 +880,12 @@
 - **Коммиты:** алгоритм [7384b68](https://github.com/nyxtryp/aicfa/commit/7384b68d1f4b7e6f89d93ef34e5b6e86c1f0a6f2); подключение к snapshot [fdfc3bd](https://github.com/nyxtryp/aicfa/commit/fdfc3bd1a5f5d87e8a7e4b8f34b3b27e5d1c5f04); тесты [49a5d55](https://github.com/nyxtryp/aicfa/commit/49a5d553); регрессия snapshot [08fa38e](https://github.com/nyxtryp/aicfa/commit/08fa38eb).
 - **CI:** SUCCESS для подключения mitigation к snapshot — [38291556411](https://github.com/nyxtryp/aicfa/actions/runs/38291556411); SUCCESS тестов состояния — [38291591270](https://github.com/nyxtryp/aicfa/actions/runs/38291591270); SUCCESS регрессии причинности snapshot — [38291614716](https://github.com/nyxtryp/aicfa/actions/runs/38291614716); полный прогон после записи статуса — [38291599886](https://github.com/nyxtryp/aicfa/actions/runs/38291599886) SUCCESS.
 - **Статус:** код и тесты проходят CI. Фаза 2 всё ещё требует визуальной проверки пользователем; snapshot не подключён к live scanner, сигналы не включены.
+
+
+### 2026-10-13 — Фаза 2: контрольный сценарий на фиксированных свечах
+
+- **Пункт ТЗ:** §14, Фаза 2 — проверка на контрольных свечах и воспроизводимость результата движка.
+- **Тест:** в `tests/test_smc_engine.py` добавлен короткий эталонный набор из трёх OHLCV-свечей, где третья свеча формирует bullish FVG. Проверяется точная зона `[10, 13]`, индекс подтверждения `2` и отсутствие заполнения на самой свече формирования.
+- **Коммит:** [e19a5e6](https://github.com/nyxtryp/aicfa/commit/e19a5e6ed51b9a48e61c70e6988ce6c62130dc88).
+- **CI:** ожидается; до успешного Actions run не считать контрольный сценарий подтверждённым.
+- **Граница приёмки:** контрольный тест автоматизирован, но визуальная проверка разметки пользователем пока невозможна в текущем placeholder-интерфейсе. Фаза 2 не объявляется принятой, production scanner не подключён, live-сигналы не включены.
