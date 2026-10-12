@@ -226,6 +226,54 @@ class SQLiteCandleStoreTests(unittest.TestCase):
             reopened.close()
 
 
+class MarketDataGapRecoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_rest_gap_recovery_merges_missing_candles_and_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = MarketDataManager()
+            manager.store = SQLiteCandleStore(Path(tmp) / "candles.sqlite3")
+            manager.store.initialize()
+            base = 1_700_000_000_000
+
+            def candle_at(index: int) -> ClosedCandle:
+                return ClosedCandle(
+                    symbol="BTCUSDT", timeframe="1m",
+                    open_time_ms=base + index * 60_000,
+                    close_time_ms=base + index * 60_000 + 59_999,
+                    open=Decimal("100"), high=Decimal("105"), low=Decimal("99"),
+                    close=Decimal("103"), volume=Decimal("12.5"),
+                )
+
+            first = candle_at(0)
+            manager.candles[("BTCUSDT", "1m")] = __import__("collections").deque(
+                [first], maxlen=CANDLES_PER_SERIES
+            )
+            manager.latest[("BTCUSDT", "1m")] = first
+            rows = [
+                [c.open_time_ms, str(c.open), str(c.high), str(c.low), str(c.close),
+                 str(c.volume), c.close_time_ms]
+                for c in (candle_at(1), candle_at(2))
+            ]
+            manager._fetch_rest_klines = lambda symbol, timeframe: rows
+
+            await manager._recover_series_gap("BTCUSDT", "1m")
+
+            window = manager.candle_window("BTCUSDT", "1m")
+            self.assertEqual([c.open_time_ms for c in window],
+                             [base, base + 60_000, base + 120_000])
+            self.assertEqual(manager.store.count(), 3)
+            manager.store.close()
+
+    def test_supported_timeframe_durations(self):
+        manager = MarketDataManager()
+        self.assertEqual(manager._timeframe_ms("1m"), 60_000)
+        self.assertEqual(manager._timeframe_ms("5m"), 300_000)
+        self.assertEqual(manager._timeframe_ms("15m"), 900_000)
+        self.assertEqual(manager._timeframe_ms("1h"), 3_600_000)
+        self.assertEqual(manager._timeframe_ms("4h"), 14_400_000)
+        with self.assertRaises(ValueError):
+            manager._timeframe_ms("1s")
+
+
 class MarketDataStartupTests(unittest.IsolatedAsyncioTestCase):
     async def test_start_does_not_wait_for_rest_history_before_health_check(self):
         tempdir = tempfile.TemporaryDirectory()
