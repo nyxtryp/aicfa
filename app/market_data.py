@@ -133,6 +133,7 @@ class MarketDataManager:
             "crypto": self._new_group(len(CRYPTO_SYMBOLS) * len(TIMEFRAMES)),
         }
         self._tasks: list[asyncio.Task[None]] = []
+        self._history_task: asyncio.Task[None] | None = None
         self._stopping = False
         self._lock = asyncio.Lock()
         self.history_status: dict[str, Any] = {
@@ -160,7 +161,10 @@ class MarketDataManager:
         if self._tasks:
             return
         self._stopping = False
-        await self.load_history()
+        # Do not block ASGI startup/health checks on 250 REST requests.
+        self._history_task = asyncio.create_task(
+            self.load_history(), name="aicfa-rest-history"
+        )
         self._tasks = [
             asyncio.create_task(self._run_group("tradfi", TRADFI_SYMBOLS), name="aicfa-ws-tradfi"),
             asyncio.create_task(self._run_group("crypto", CRYPTO_SYMBOLS), name="aicfa-ws-crypto"),
@@ -169,6 +173,10 @@ class MarketDataManager:
     async def stop(self) -> None:
         self._stopping = True
         tasks, self._tasks = self._tasks, []
+        if self._history_task is not None:
+            self._history_task.cancel()
+            await asyncio.gather(self._history_task, return_exceptions=True)
+            self._history_task = None
         for task in tasks:
             task.cancel()
         if tasks:
@@ -247,17 +255,28 @@ class MarketDataManager:
                         if candle is not None:
                             candles.append(candle)
                     candles.sort(key=lambda item: item.open_time_ms)
+                    key = (symbol, timeframe)
                     async with self._lock:
-                        series = self.candles.setdefault(
-                            (symbol, timeframe), deque(maxlen=CANDLES_PER_SERIES)
+                        # Merge REST history with candles that arrived live while
+                        # warm-up was running; retain unique timestamps and the
+                        # newest 500 closed candles without discarding live data.
+                        merged = {
+                            item.open_time_ms: item
+                            for item in self.candles.get(
+                                key, deque(maxlen=CANDLES_PER_SERIES)
+                            )
+                        }
+                        for item in candles:
+                            merged.setdefault(item.open_time_ms, item)
+                        series = deque(
+                            sorted(merged.values(), key=lambda item: item.open_time_ms)[-CANDLES_PER_SERIES:],
+                            maxlen=CANDLES_PER_SERIES,
                         )
-                        for candle in candles[-CANDLES_PER_SERIES:]:
-                            if not series or candle.open_time_ms > series[-1].open_time_ms:
-                                series.append(candle)
+                        self.candles[key] = series
                         if series:
-                            self.latest[(symbol, timeframe)] = series[-1]
-                    self.history_status["series_loaded"] += 1
-                    self.history_status["candles_loaded"] += len(candles[-CANDLES_PER_SERIES:])
+                            self.latest[key] = series[-1]
+                        self.history_status["series_loaded"] += 1
+                        self.history_status["candles_loaded"] += len(series)
                 except Exception as exc:
                     self.history_status["errors"].append({
                         "symbol": symbol,
@@ -276,8 +295,11 @@ class MarketDataManager:
             for timeframe in TIMEFRAMES
         ))
         self.history_status["status"] = (
-            "complete" if self.history_status["series_loaded"] == EXPECTED_STREAM_COUNT
-            and not self.history_status["errors"] else "partial"
+            "complete"
+            if self.history_status["series_loaded"] == EXPECTED_STREAM_COUNT
+            and self.history_status["candles_loaded"] == EXPECTED_STREAM_COUNT * CANDLES_PER_SERIES
+            and not self.history_status["errors"]
+            else "partial"
         )
 
     async def _run_group(self, name: str, symbols: tuple[str, ...]) -> None:
