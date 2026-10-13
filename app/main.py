@@ -7,7 +7,9 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 from app.backup import create_verified_backup
-from app.market_data import MarketDataManager
+from app.market_data import ALL_SYMBOLS, TIMEFRAMES, MarketDataManager
+from app.smc.engine import analyze_smc
+from app.smc.presentation import to_chart_payload
 
 logger = logging.getLogger("aicfa.backup")
 BACKUP_INTERVAL_SECONDS = 24 * 60 * 60
@@ -110,6 +112,47 @@ async def health() -> dict[str, str]:
 async def data_status() -> dict:
     """Live ingestion health; this does not imply SMC signals are available."""
     return market_data.status()
+
+
+
+
+@app.get("/api/smc-analysis/{symbol}/{timeframe}")
+async def smc_analysis(symbol: str, timeframe: str) -> dict:
+    """Return causal, chart-ready SMC annotations for the latest closed-candle window."""
+    normalized_symbol = symbol.upper()
+    if normalized_symbol not in ALL_SYMBOLS:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="unknown instrument")
+    if timeframe not in TIMEFRAMES:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="unknown timeframe")
+    series = tuple(market_data.candles.get((normalized_symbol, timeframe), ()))
+    if len(series) < 3:
+        return {
+            "status": "warming_up",
+            "symbol": normalized_symbol,
+            "timeframe": timeframe,
+            "candles": len(series),
+            "required_minimum": 3,
+            "annotations": None,
+        }
+    analysis = await asyncio.to_thread(
+        analyze_smc,
+        [float(c.open) for c in series],
+        [float(c.high) for c in series],
+        [float(c.low) for c in series],
+        [float(c.close) for c in series],
+        [float(c.volume) for c in series],
+        [c.open_time_ms for c in series],
+    )
+    payload = to_chart_payload(analysis, [c.open_time_ms for c in series])
+    return {
+        "status": "ok",
+        "symbol": normalized_symbol,
+        "timeframe": timeframe,
+        "candles": len(series),
+        "annotations": payload,
+    }
 
 
 @app.get("/api/backup-status")
