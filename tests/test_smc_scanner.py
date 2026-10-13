@@ -85,5 +85,22 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidates, [])
 
 
+    def test_scalp_requires_current_one_minute_confirmation(self):
+        # TZ §5–6: scalp candidates require an additional 1m confirmation;
+        # having a valid 5m confirmation alone must never create a candidate.
+        series_without_1m = dict(self.series)
+        series_without_1m["1m"] = ()
+        with patch("app.smc.scanner._analysis", side_effect=lambda candles, profile, timeframe: analysis()):
+            candidates = scan_symbol("BTCUSDT", series_without_1m, trigger_timeframe="5m")
+        self.assertEqual(candidates, [])
+
+    def test_intraday_trigger_only_scans_intraday_profile(self):
+        with patch("app.smc.scanner._analysis", side_effect=lambda candles, profile, timeframe: analysis()):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "intraday")
+        self.assertEqual(candidates[0].timeframe, "15m")
+
+
 if __name__ == "__main__":
     unittest.main()
