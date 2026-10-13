@@ -269,7 +269,7 @@ def _recover_active_history() -> None:
     for symbol in symbols:
         candles.extend(market_data.candles.get((symbol, "1m"), ()))
     for candle in sorted(candles, key=lambda item: item.close_time_ms):
-        _advance_active_setups(candle)
+        _advance_active_setups(candle, publish=False)
 
 
 async def _daily_backup_loop() -> None:
