@@ -45,6 +45,21 @@ class SMCChartPayloadTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "strictly increasing"):
             to_chart_payload(analysis, duplicate)
 
+    def test_payload_rejects_non_integer_timestamps_instead_of_truncating(self):
+        opens, highs, lows, closes, volumes, timestamps = self.controlled_candles()
+        analysis = analyze_smc(
+            opens, highs, lows, closes, volumes, timestamps[:len(closes)],
+            swing_left=1, swing_right=1, atr_period=2, volume_period=2,
+        )
+        fractional = list(timestamps)
+        fractional[2] = fractional[2] + 0.5
+        with self.assertRaisesRegex(ValueError, "integer milliseconds"):
+            to_chart_payload(analysis, fractional)
+        boolean = list(timestamps)
+        boolean[2] = True
+        with self.assertRaisesRegex(ValueError, "integer milliseconds"):
+            to_chart_payload(analysis, boolean)
+
 
 if __name__ == "__main__":
     unittest.main()
