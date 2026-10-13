@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import Sequence
 
 from app.smc.structure import SwingPoint
@@ -43,12 +44,14 @@ def find_dealing_range(
         for s in swings
     ):
         raise ValueError("swing indices must satisfy 0 <= index <= confirmation_index")
+    if any(s.kind not in {"high", "low"} for s in swings):
+        raise ValueError("swing kind must be 'high' or 'low'")
+    if any(not isfinite(s.price) for s in swings):
+        raise ValueError("swing prices must be finite")
     available = sorted(
         (s for s in swings if s.confirmation_index <= as_of_index),
         key=lambda s: (s.confirmation_index, s.index),
     )
-    if any(s.kind not in {"high", "low"} for s in available):
-        raise ValueError("swing kind must be 'high' or 'low'")
 
     collapsed: list[SwingPoint] = []
     for swing in available:
