@@ -595,9 +595,12 @@ class MarketDataManager:
         callback = self.on_closed_candle
         if callback is not None:
             for recovered in (item for item in restored if item.open_time_ms > previous_open_time):
-                result = callback(recovered)
-                if asyncio.iscoroutine(result):
-                    await result
+                try:
+                    result = callback(recovered)
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    logger.exception("Scanner callback failed for REST-recovered %s %s candle", symbol, timeframe)
 
     async def _reconcile_series(self, symbol: str, timeframe: str) -> int:
         """Compare the latest closed REST candles with memory/SQLite and repair differences."""
@@ -634,9 +637,12 @@ class MarketDataManager:
         callback = self.on_closed_candle
         if callback is not None:
             for recovered in (item for item in restored if item.open_time_ms > previous_open_time):
-                result = callback(recovered)
-                if asyncio.iscoroutine(result):
-                    await result
+                try:
+                    result = callback(recovered)
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    logger.exception("Scanner callback failed for REST-recovered %s %s candle", symbol, timeframe)
         return len(restored)
 
     async def reconcile_all_series(self) -> None:
