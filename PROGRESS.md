@@ -1371,3 +1371,13 @@
 - Добавлены тесты рыночных часов (DST, праздничный день, выходные, неизвестная привязка) и проверки UI, что нет browser polling/старого refresh handler, а выбранный сетап размечается на графике.
 - GitHub Actions: 171 тест пройден за 3.60 сек, включая установку календарной зависимости: https://github.com/nyxtryp/aicfa/actions/runs/38403005859.
 - Последний код уже в main. Production smoke-test всё ещё не выполнен: внешний endpoint из текущего окружения проверить не удалось. До этой проверки и сопоставления оставшихся TradFi-часов сканер нельзя объявлять полностью принятым по ТЗ.
+
+
+### 2026-10-13 — расширено покрытие рыночных часов и риск leveraged ETF
+
+- По официальным Binance announcements уточнено расписание commodity TradFi: standard index mode Sunday 18:00 ET — Friday 17:00 ET; weekends/public holidays use EWMA mode. В коде commodity sessions закрываются на ежедневном перерыве 17:00–18:00 ET, на выходных и в дни без NYSE-сессии. Источник расписания: https://www.binance.com/en/support/announcement/detail/f69c05ebdba7422e9c614685abe84dc5; общий принцип regular/off-hours: https://www.binance.com/en/support/announcement/detail/ecf7318c0d434c339e80878588e700d0.
+- Рыночные календари теперь покрывают все 21 TradFi-символ: 14 US-listed акций/ETF (NYSE calendar, DST/праздники/early close), SKHYNIXUSDT и SAMSUNGUSDT (XKRX), пять commodity contracts (XAU/XAG/CL/BZ/NATGAS). SKHYUSDT, SPCXUSDT и SNXXUSDT сопоставлены с US sessions по объявлениям Binance: https://www.binance.com/en/support/announcement/detail/ed2c6a6160c64eb397b534af90b9d66a; https://www.binance.com/en/support/announcement/detail/6fe9f6dc91544df88dc24ad41211feff; https://www.binance.com/en/support/announcement/detail/84ad610bdd284699bc451b7baaa0ff7d.
+- В интерфейсе показывается покрытие часов рынка (21/21); неизвестный тикер без календаря отклоняется, а не получает выдуманное расписание.
+- Для leveraged ETF настроен увеличенный stop buffer 0.5 ATR для SOXL, SOXS, KORU и SNXX; добавлен тест конфигурации.
+- GitHub Actions прошёл: 175 тестов за 5.40 сек на коммите d7d72527a1ae049f1778ed70f0518733fcf98c95: https://github.com/nyxtryp/aicfa/actions/runs/38403549962. Последующий UI-коммит с выводом объяснения SMC ожидает CI.
+- Осталось проверить production deploy/API и заменить временную модель комиссии 0.05% на сторону на явно конфигурируемую ставку из ТЗ. Commodity public-holiday gate использует NYSE holiday calendar как консервативный proxy; если Binance задаёт иной список commodity holidays, его нужно уточнить отдельно.
