@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from math import isfinite
+from numbers import Real
 from typing import Sequence
 
 from app.smc.structure import SwingPoint
@@ -39,11 +41,20 @@ def find_liquidity_levels(
     tolerance_atr. Only swings with an available positive ATR are considered.
     Levels are confirmed no earlier than their latest member's confirmation.
     """
-    if tolerance_atr < 0 or max_age < 1:
-        raise ValueError("tolerance_atr must be >= 0 and max_age >= 1")
+    if isinstance(tolerance_atr, bool) or not isinstance(tolerance_atr, Real) or not isfinite(float(tolerance_atr)) or tolerance_atr < 0:
+        raise ValueError("tolerance_atr must be finite and >= 0")
+    if isinstance(max_age, bool) or not isinstance(max_age, int) or max_age < 1:
+        raise ValueError("max_age must be a positive integer")
+    for value in atr:
+        if value is not None and (isinstance(value, bool) or not isinstance(value, Real) or not isfinite(float(value))):
+            raise ValueError("ATR values must be finite real numbers or None")
     for swing in swings:
         if swing.kind not in {"high", "low"}:
             raise ValueError("swing kind must be 'high' or 'low'")
+        if isinstance(swing.index, bool) or not isinstance(swing.index, int) or isinstance(swing.confirmation_index, bool) or not isinstance(swing.confirmation_index, int) or swing.index < 0 or swing.confirmation_index < swing.index:
+            raise ValueError("swing indices must be valid non-negative integers")
+        if isinstance(swing.price, bool) or not isinstance(swing.price, Real) or not isfinite(float(swing.price)):
+            raise ValueError("swing price must be a finite real number")
 
     grouped: list[list[SwingPoint]] = []
     for swing in sorted(swings, key=lambda item: (item.confirmation_index, item.index)):
@@ -97,11 +108,14 @@ def detect_liquidity_sweeps(
     """
     if not (len(highs) == len(lows) == len(closes)):
         raise ValueError("highs, lows, and closes must have the same length")
+    for values in (highs, lows, closes):
+        if any(isinstance(v, bool) or not isinstance(v, Real) or not isfinite(float(v)) for v in values):
+            raise ValueError("OHLC values must be finite real numbers")
     if any(high < low or close > high or close < low
            for high, low, close in zip(highs, lows, closes)):
         raise ValueError("OHLC values are inconsistent")
-    if max_age < 1:
-        raise ValueError("max_age must be >= 1")
+    if isinstance(max_age, bool) or not isinstance(max_age, int) or max_age < 1:
+        raise ValueError("max_age must be a positive integer")
 
     events: list[LiquiditySweep] = []
     used: set[int] = set()
