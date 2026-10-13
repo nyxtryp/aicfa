@@ -143,6 +143,21 @@ def scan_symbol(
         if len(targets) < 1:
             continue
         tp1 = targets[0]
+        opposing_zones = [
+            (float(block.lower), float(block.upper))
+            for block in confirm.order_blocks
+            if block.direction != expected_break
+        ] + [
+            (float(gap.lower), float(gap.upper))
+            for gap in confirm.fvg
+            if gap.direction != expected_break
+        ]
+        clean_path = not any(
+            (z_low > entry and z_low < tp1) or (z_high > entry and z_high < tp1)
+            if direction == "long"
+            else (z_low < entry and z_low > tp1) or (z_high < entry and z_high > tp1)
+            for z_low, z_high in opposing_zones
+        )
         risk = abs(entry - stop)
         reward = abs(tp1 - entry)
         if risk <= 0 or reward / risk < profile.min_rr:
@@ -160,9 +175,9 @@ def scan_symbol(
             "higher_timeframe_agreement": zone_bias_agreement,
             "confirmation_volume": float(trigger[-1].volume),
             "average_volume": average_volume,
-            "clean_path_to_tp1": True,
+            "clean_path_to_tp1": clean_path,
         }
-        score = 2 + (2 if ob_fvg_overlap else 0) + 1 + 2 + (1 if zone_bias_agreement else 0)
+        score = 2 + (2 if ob_fvg_overlap else 0) + 1 + 2 + (1 if zone_bias_agreement else 0) + (1 if clean_path else 0)
         if average_volume and float(trigger[-1].volume) > 1.5 * average_volume:
             score += 1
         if score < profile.score_threshold:
