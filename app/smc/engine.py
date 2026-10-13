@@ -12,6 +12,7 @@ from app.smc.liquidity import (
     LiquidityLevel,
     LiquiditySweep,
     detect_liquidity_sweeps,
+    detect_current_day_sweeps,
     find_current_day_extremes,
     find_liquidity_levels,
     find_previous_day_extremes,
@@ -119,7 +120,8 @@ def analyze_smc(
         swings, atr, tolerance_atr=liquidity_tolerance_atr, max_age=liquidity_max_age
     ))
     levels.extend(find_previous_day_extremes(hi, lo, ts))
-    levels.extend(find_current_day_extremes(ts, hi, lo, as_of_index=end))
+    current_day_levels = find_current_day_extremes(ts, hi, lo, as_of_index=end)
+    levels.extend(current_day_levels)
 
     if zone_bounds is not None:
         zone_lower, zone_upper = zone_bounds
@@ -135,7 +137,16 @@ def analyze_smc(
                 )
             ]
 
-    sweeps = detect_liquidity_sweeps(hi, lo, cl, levels, max_age=liquidity_max_age)
+    historical_sweeps = detect_liquidity_sweeps(
+        hi, lo, cl, levels, max_age=liquidity_max_age
+    )
+    current_day_sweeps = detect_current_day_sweeps(ts, hi, lo, cl)
+    # Current-day extremes are computed per candle from prior candles only;
+    # do not let the end-of-snapshot level retrospectively create events.
+    sweeps = tuple(sorted(
+        (*historical_sweeps, *current_day_sweeps),
+        key=lambda event: (event.candle_index, event.level_kind, event.level),
+    ))
     dealing_range = find_dealing_range(swings, as_of_index=end)
     pd = premium_discount(cl[-1], dealing_range) if dealing_range else None
 
