@@ -56,3 +56,117 @@ def score_setup(evidence: SetupEvidence) -> SetupScore:
         ("clean_path_to_tp1", 1 if evidence.clean_path_to_tp1 else 0),
     )
     return SetupScore(total=sum(points for _, points in weighted), maximum=10, components=weighted)
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateDecision:
+    """Pure eligibility result; ELIGIBLE is not persisted or activated live."""
+
+    status: str
+    score: SetupScore
+    entry_limit: float | None
+    risk_reward: float | None
+    reasons: tuple[str, ...]
+
+
+def evaluate_candidate(
+    evidence: SetupEvidence,
+    *,
+    direction: str,
+    higher_timeframe_bias: str,
+    premium_discount_zone: str,
+    zone_intersects_ote: bool,
+    confirmation_aligned: bool,
+    one_minute_confirmed: bool,
+    profile: str,
+    entry_price: float,
+    current_price: float,
+    stop_price: float,
+    tp1_price: float,
+    min_rr: float = 1.5,
+    tick_size: float,
+    min_stop_distance: float,
+    score_threshold: int = 6,
+    data_fresh: bool,
+    tradfi_market_open: bool = True,
+    duplicate: bool = False,
+    cooldown_active: bool = False,
+    active_count: int = 0,
+    max_active: int = 8,
+) -> CandidateDecision:
+    """Evaluate §6–7 gates without storing, notifying, or activating a setup."""
+    from app.smc.risk import acceptable_entry_limit, calculate_risk_reward
+
+    side = direction.lower() if isinstance(direction, str) else ""
+    bias = higher_timeframe_bias.lower() if isinstance(higher_timeframe_bias, str) else ""
+    zone = premium_discount_zone.lower() if isinstance(premium_discount_zone, str) else ""
+    profile_name = profile.lower() if isinstance(profile, str) else ""
+    score = score_setup(evidence)
+    reasons: list[str] = []
+
+    if side not in {"long", "short"}:
+        reasons.append("invalid_direction")
+    if bias != side:
+        reasons.append("higher_timeframe_bias_conflict")
+    required_zone = "discount" if side == "long" else "premium"
+    if zone != required_zone:
+        reasons.append("wrong_premium_discount_zone")
+    if not isinstance(zone_intersects_ote, bool) or not zone_intersects_ote:
+        reasons.append("zone_does_not_intersect_ote")
+    if not evidence.liquidity_sweep:
+        reasons.append("liquidity_sweep_missing")
+    if not isinstance(confirmation_aligned, bool) or not confirmation_aligned:
+        reasons.append("confirmation_not_aligned")
+    if profile_name not in {"scalp", "intraday"}:
+        reasons.append("invalid_profile")
+    elif profile_name == "scalp" and (not isinstance(one_minute_confirmed, bool) or not one_minute_confirmed):
+        reasons.append("one_minute_confirmation_missing")
+    if score.total < score_threshold:
+        reasons.append("score_below_threshold")
+    if not isinstance(data_fresh, bool) or not data_fresh:
+        reasons.append("market_data_stale_or_incomplete")
+    if not isinstance(tradfi_market_open, bool) or not tradfi_market_open:
+        reasons.append("tradfi_market_closed")
+    if not isinstance(duplicate, bool) or duplicate:
+        reasons.append("duplicate_setup")
+    if not isinstance(cooldown_active, bool) or cooldown_active:
+        reasons.append("cooldown_active")
+    if isinstance(active_count, bool) or not isinstance(active_count, int) or active_count < 0:
+        reasons.append("invalid_active_count")
+    elif isinstance(max_active, bool) or not isinstance(max_active, int) or max_active < 1 or active_count >= max_active:
+        reasons.append("active_setup_limit_reached")
+
+    entry_limit = None
+    rr = None
+    try:
+        entry = _finite_price("entry_price", entry_price)
+        current = _finite_price("current_price", current_price)
+        stop = _finite_price("stop_price", stop_price)
+        target = _finite_price("tp1_price", tp1_price)
+        min_stop = _finite_price("min_stop_distance", min_stop_distance)
+        if min_stop < 0:
+            raise ValueError("min_stop_distance must be >= 0")
+        if abs(entry - stop) < min_stop:
+            reasons.append("stop_distance_below_minimum")
+        rr = calculate_risk_reward(side, entry, stop, target)
+        entry_limit = acceptable_entry_limit(side, target, stop, min_rr=min_rr, tick_size=tick_size)
+        missed = current > entry_limit if side == "long" else current < entry_limit
+        if rr < min_rr:
+            reasons.append("risk_reward_below_minimum")
+        if missed:
+            reasons.append("price_beyond_acceptable_entry")
+    except (ValueError, TypeError, ArithmeticError):
+        reasons.append("invalid_price_or_risk_parameters")
+        missed = False
+
+    if reasons:
+        status = "MISSED_PRICE" if missed and reasons == ["price_beyond_acceptable_entry"] else "REJECTED"
+    else:
+        status = "ELIGIBLE"
+    return CandidateDecision(status, score, entry_limit, rr, tuple(reasons))
+
+
+def _finite_price(name: str, value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real) or not isfinite(float(value)):
+        raise ValueError(f"{name} must be a finite real number")
+    return float(value)
