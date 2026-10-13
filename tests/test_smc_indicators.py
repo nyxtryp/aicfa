@@ -30,6 +30,21 @@ class IndicatorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             calculate_atr([1], [0], [2], period=1)
 
+    def test_non_finite_indicator_inputs_are_rejected(self):
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    calculate_atr([bad], [0], [0], period=1)
+                with self.assertRaises(ValueError):
+                    calculate_average_volume([bad], period=1)
+
+    def test_period_must_be_a_positive_integer(self):
+        for bad in (0, -1, 1.5, True):
+            with self.subTest(period=bad):
+                with self.assertRaises(ValueError):
+                    calculate_atr([1], [0], [0], period=bad)
+                with self.assertRaises(ValueError):
+                    calculate_average_volume([1], period=bad)
 
 if __name__ == "__main__":
     unittest.main()
