@@ -23,6 +23,9 @@ logger = logging.getLogger("aicfa.backup")
 BACKUP_INTERVAL_SECONDS = 24 * 60 * 60
 BACKUP_RETRY_SECONDS = 60 * 60
 SCANNER_LIVE_ENABLED = os.getenv("AICFA_SCANNER_LIVE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+COMMISSION_RATE_PER_SIDE = float(os.getenv("AICFA_COMMISSION_RATE_PER_SIDE", "0.0005"))
+if not 0 <= COMMISSION_RATE_PER_SIDE <= 0.01:
+    raise ValueError("AICFA_COMMISSION_RATE_PER_SIDE must be between 0 and 0.01")
 backup_status = {"status": "waiting", "last_success_ms": None, "filename": None, "size_bytes": None, "last_error": None}
 
 market_data = MarketDataManager()
@@ -101,10 +104,10 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
         if stop_hit:
             if status == "ACCEPTED":
                 gross_r -= 1.0
-                commission_r += 0.0005 * (entry + stop) / risk
+                commission_r += COMMISSION_RATE_PER_SIDE * (entry + stop) / risk
             else:
                 remaining = 0.5 if status == "TP1" else 0.2
-                commission_r += remaining * 0.0005 * (entry + stop) / risk
+                commission_r += remaining * COMMISSION_RATE_PER_SIDE * (entry + stop) / risk
             payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
             _finish_setup(payload, store, now_ms, "SL", publish=publish)
             continue
@@ -115,8 +118,8 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
         if status == "ACCEPTED" and first_target_hit and breakeven_hit:
             target = targets[0]
             gross_r += 0.5 * ((target - entry) if direction == "long" else (entry - target)) / risk
-            commission_r += 0.5 * 0.0005 * (entry + target) / risk
-            commission_r += 0.5 * 0.0005 * (entry + entry) / risk
+            commission_r += 0.5 * COMMISSION_RATE_PER_SIDE * (entry + target) / risk
+            commission_r += 0.5 * COMMISSION_RATE_PER_SIDE * (entry + entry) / risk
             payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
             _finish_setup(payload, store, now_ms, "SL", publish=publish)
             continue
@@ -128,13 +131,13 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
                 break
             weight = (0.5, 0.3, 0.2)[idx]
             gross_r += weight * ((target - entry) if direction == "long" else (entry - target)) / risk
-            commission_r += weight * 0.0005 * (entry + target) / risk
+            commission_r += weight * COMMISSION_RATE_PER_SIDE * (entry + target) / risk
             reached.append(idx + 1)
         if not reached:
             if expired:
                 remaining = 1.0 if status == "ACCEPTED" else 0.5 if status == "TP1" else 0.2
                 gross_r += remaining * ((close - entry) if direction == "long" else (entry - close)) / risk
-                commission_r += remaining * 0.0005 * (entry + close) / risk
+                commission_r += remaining * COMMISSION_RATE_PER_SIDE * (entry + close) / risk
                 payload.update({"status": "EXPIRED", "gross_r": gross_r, "commission_r": commission_r})
                 _finish_setup(payload, store, now_ms, "EXPIRED", publish=publish)
             continue
@@ -150,7 +153,7 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             if expired:
                 remaining = 0.5 if last == 1 else 0.2
                 gross_r += remaining * ((close - entry) if direction == "long" else (entry - close)) / risk
-                commission_r += remaining * 0.0005 * (entry + close) / risk
+                commission_r += remaining * COMMISSION_RATE_PER_SIDE * (entry + close) / risk
                 payload.update({"status": "EXPIRED", "gross_r": gross_r, "commission_r": commission_r})
                 _finish_setup(payload, store, now_ms, "EXPIRED", publish=publish)
 
@@ -266,7 +269,7 @@ async def _on_closed_candle(candle) -> None:
                         stop_price=candidate.stop_price,
                         tp1_price=candidate.targets[0],
                         tick_size=float(tick_info["tick_size"]),
-                        min_stop_distance=max(0.5 * candidate.atr, candidate.confirmation_price * 0.002),
+                        min_stop_distance=max(0.5 * candidate.atr, candidate.confirmation_price * 4 * COMMISSION_RATE_PER_SIDE),
                         data_fresh=fresh,
                         tradfi_market_open=market_open,
                     )
