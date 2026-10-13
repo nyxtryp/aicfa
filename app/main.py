@@ -114,6 +114,7 @@ async function load(){const symbol=$('symbol').value,tf=$('tf').value;$('chartTi
 $('refresh').addEventListener('click',load);$('symbol').addEventListener('change',load);$('tf').addEventListener('change',load);window.addEventListener('resize',load);load();setInterval(load,15000);
 </script></body></html>
 """
+PAGE = PAGE.replace("__AICFA_SYMBOLS__", json.dumps(ALL_SYMBOLS)).replace("__AICFA_TIMEFRAMES__", json.dumps(TIMEFRAMES))
 
 
 @app.get("/", response_class=HTMLResponse)
