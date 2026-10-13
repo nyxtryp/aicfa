@@ -2,11 +2,14 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 import json
+import os
 import time
+from collections import defaultdict, deque
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
+from app.auth import AuthError, AuthStore
 from app.backup import create_verified_backup
 from app.market_data import ALL_SYMBOLS, TIMEFRAMES, MarketDataManager
 from app.smc.engine import analyze_smc
@@ -61,6 +64,109 @@ app = FastAPI(
     version="0.2.0",
     lifespan=lifespan,
 )
+
+
+AUTH_DATA_DIR = os.environ.get("AICFA_DATA_DIR", "./data")
+auth_store = AuthStore(AUTH_DATA_DIR)
+AUTH_COOKIE = "aicfa_session"
+_attempts: dict[str, deque[float]] = defaultdict(deque)
+LOGIN_WINDOW_SECONDS = 900
+LOGIN_MAX_ATTEMPTS = 8
+PUBLIC_PATHS = {"/health", "/login", "/api/auth/status", "/api/auth/setup", "/api/auth/login", "/api/auth/logout"}
+
+@app.middleware("http")
+async def require_single_user_auth(request: Request, call_next):
+    if request.url.path in PUBLIC_PATHS:
+        return await call_next(request)
+    if not auth_store.configured or not auth_store.verify_session(request.cookies.get(AUTH_COOKIE)):
+        if request.url.path.startswith("/api/"):
+            return JSONResponse({"detail": "authentication required"}, status_code=401)
+        return RedirectResponse("/login", status_code=303)
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        origin = request.headers.get("origin")
+        if origin:
+            from urllib.parse import urlsplit
+            if urlsplit(origin).netloc != request.headers.get("host"):
+                return JSONResponse({"detail": "origin check failed"}, status_code=403)
+    return await call_next(request)
+
+LOGIN_PAGE = """<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AICFA — вход</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#080d18;color:#e8eef8;font:16px system-ui}.box{width:min(90vw,400px);padding:28px;background:#101a2a;border:1px solid #293851;border-radius:16px}input,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0 14px;background:#0b1321;color:#e8eef8;border:1px solid #2a3a53;border-radius:8px}button{background:#17352f}p{color:#a8b8ce}</style></head><body><main class="box"><h1>AICFA</h1><p id="intro">Проверка…</p><form id="login"><label>Пароль</label><input id="password" type="password" autocomplete="current-password" required><button>Войти</button></form><form id="setup" hidden><label>Токен настройки</label><input id="token" type="password" required><label>Новый пароль (от 12 символов)</label><input id="newpass" type="password" minlength="12" required><button>Установить пароль</button></form><p id="msg" role="status"></p></main><script>
+const $=id=>document.getElementById(id),msg=$('msg'),login=$('login'),setup=$('setup');
+async function post(url,data){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}
+fetch('/api/auth/status').then(r=>r.json()).then(d=>{if(d.configured){$('intro').textContent='Войдите в закрытую панель.';setup.hidden=true}else{$('intro').textContent=d.setup_available?'Первичная настройка пароля владельца.':'Настройка закрыта: требуется переменная AICFA_SETUP_TOKEN.';login.hidden=true;setup.hidden=!d.setup_available}}).catch(()=>msg.textContent='Ошибка проверки статуса');
+login.onsubmit=async e=>{e.preventDefault();const r=await post('/api/auth/login',{password:$('password').value});if(r.ok)location.href='/';else msg.textContent=r.status===429?'Слишком много попыток.':'Неверный пароль.'};
+setup.onsubmit=async e=>{e.preventDefault();const r=await post('/api/auth/setup',{token:$('token').value,password:$('newpass').value});if(r.ok){msg.textContent='Пароль установлен. Теперь войдите.';setup.hidden=true;login.hidden=false;$('intro').textContent='Пароль установлен.'}else msg.textContent=r.status===429?'Слишком много попыток.':'Не удалось настроить пароль.'};
+</script></body></html>"""
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page() -> HTMLResponse:
+    return HTMLResponse(LOGIN_PAGE, headers={"Cache-Control": "no-store"})
+
+@app.get("/api/auth/status")
+async def auth_status() -> dict[str, bool]:
+    return {"configured": auth_store.configured, "setup_available": bool(os.environ.get("AICFA_SETUP_TOKEN"))}
+
+def _rate_allowed(request: Request) -> bool:
+    key = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    q = _attempts[key]
+    while q and now - q[0] > LOGIN_WINDOW_SECONDS:
+        q.popleft()
+    if len(q) >= LOGIN_MAX_ATTEMPTS:
+        return False
+    q.append(now)
+    return True
+
+def _cookie(response: JSONResponse, request: Request, token: str) -> None:
+    secure = os.environ.get("AICFA_COOKIE_SECURE", "true").lower() not in {"0", "false", "no"}
+    response.set_cookie(AUTH_COOKIE, token, max_age=12 * 60 * 60, httponly=True, secure=secure, samesite="strict", path="/")
+
+@app.post("/api/auth/setup")
+async def auth_setup(request: Request) -> JSONResponse:
+    if not _rate_allowed(request):
+        return JSONResponse({"detail":"too many attempts"}, status_code=429)
+    expected = os.environ.get("AICFA_SETUP_TOKEN", "")
+    if not expected:
+        return JSONResponse({"detail":"setup disabled"}, status_code=503)
+    try:
+        data = await request.json()
+        auth_store.set_initial_password(str(data.get("password","")), str(data.get("token","")), expected)
+    except (AuthError, ValueError, TypeError):
+        return JSONResponse({"detail":"setup failed"}, status_code=400)
+    return JSONResponse({"status":"configured"})
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request) -> JSONResponse:
+    if not _rate_allowed(request):
+        return JSONResponse({"detail":"too many attempts"}, status_code=429)
+    try:
+        data = await request.json()
+        password = data.get("password", "")
+    except (ValueError, TypeError):
+        return JSONResponse({"detail":"invalid request"}, status_code=400)
+    if not isinstance(password, str) or not auth_store.verify_password(password):
+        return JSONResponse({"detail":"invalid credentials"}, status_code=401)
+    response = JSONResponse({"status":"ok"})
+    _cookie(response, request, auth_store.create_session())
+    return response
+
+@app.post("/api/auth/logout")
+async def auth_logout() -> JSONResponse:
+    response = JSONResponse({"status":"ok"})
+    response.delete_cookie(AUTH_COOKIE, path="/", httponly=True, samesite="strict")
+    return response
+
+@app.post("/api/settings/password")
+async def auth_change_password(request: Request) -> JSONResponse:
+    if not auth_store.verify_session(request.cookies.get(AUTH_COOKIE)):
+        return JSONResponse({"detail":"authentication required"}, status_code=401)
+    try:
+        data = await request.json()
+        auth_store.change_password(str(data.get("current_password","")), str(data.get("new_password","")))
+    except (AuthError, ValueError, TypeError):
+        return JSONResponse({"detail":"password change failed"}, status_code=400)
+    return JSONResponse({"status":"ok"})
 
 PAGE = """<!doctype html>
 <html lang="ru">
