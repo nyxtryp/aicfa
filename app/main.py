@@ -163,9 +163,9 @@ def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_st
 
 async def _on_closed_candle(candle) -> None:
     global _scanner_last_event_ms
-    _scanner_last_event_ms = candle.close_time_ms
     _advance_active_setups(candle)
     if candle.timeframe in {"5m", "15m"}:
+        _scanner_last_event_ms = candle.close_time_ms
         snapshot = {tf: tuple(x for x in market_data.candles.get((candle.symbol, tf), ()) if x.close_time_ms <= candle.close_time_ms) for tf in TIMEFRAMES}
         try:
             candidates = await asyncio.to_thread(scan_symbol, candle.symbol, snapshot, trigger_timeframe=candle.timeframe)
@@ -589,6 +589,8 @@ async def setup_candidates(include_rejected: bool = False) -> dict:
     connected = status.get("groups", {}).get("tradfi", {}).get("status") == "connected" and status.get("groups", {}).get("crypto", {}).get("status") == "connected"
     return {"status": "running" if connected else "warming_up",
             "last_scan_time_ms": _scanner_last_event_ms,
+            "exchange_metadata": status.get("exchange_metadata", {}),
+            "active_count": _get_setup_store().active_count(),
             "candidates": _get_setup_store().list_candidates(include_rejected=include_rejected)}
 
 
