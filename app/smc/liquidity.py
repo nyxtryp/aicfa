@@ -157,12 +157,15 @@ def find_previous_day_extremes(
     """
     if not (len(highs) == len(lows) == len(timestamps_ms)):
         raise ValueError("highs, lows, and timestamps must have the same length")
+    for values in (highs, lows):
+        if any(isinstance(value, bool) or not isinstance(value, Real) or not isfinite(float(value)) for value in values):
+            raise ValueError("OHLC values must be finite real numbers")
     if any(high < low for high, low in zip(highs, lows)):
         raise ValueError("each high must be >= its low")
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in timestamps_ms):
+        raise ValueError("timestamps must be integer Unix milliseconds")
     if any(timestamps_ms[i] >= timestamps_ms[i + 1] for i in range(len(timestamps_ms) - 1)):
         raise ValueError("timestamps must be strictly increasing")
-
-    from datetime import datetime, timezone
 
     day_keys = [
         datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).date()
@@ -216,12 +219,21 @@ def find_current_day_extremes(
     """
     if not (len(timestamps_ms) == len(highs) == len(lows)):
         raise ValueError("timestamps, highs, and lows must have the same length")
+    if isinstance(as_of_index, bool) or not isinstance(as_of_index, int):
+        raise ValueError("as_of_index must be an integer")
     if as_of_index < 0 or as_of_index >= len(highs):
         raise ValueError("as_of_index is outside the supplied candles")
-    if as_of_index == 0:
-        return ()
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in timestamps_ms):
+        raise ValueError("timestamps must be integer Unix milliseconds")
+    if any(timestamps_ms[i] >= timestamps_ms[i + 1] for i in range(len(timestamps_ms) - 1)):
+        raise ValueError("timestamps must be strictly increasing")
+    for values in (highs, lows):
+        if any(isinstance(value, bool) or not isinstance(value, Real) or not isfinite(float(value)) for value in values):
+            raise ValueError("OHLC values must be finite real numbers")
     if any(high < low for high, low in zip(highs, lows)):
         raise ValueError("each high must be >= its low")
+    if as_of_index == 0:
+        return ()
 
     current_day = datetime.fromtimestamp(
         timestamps_ms[as_of_index] / 1000, tz=timezone.utc
@@ -253,6 +265,9 @@ def is_level_near_zone(
     max_distance_atr: float,
 ) -> bool:
     """Return whether a liquidity level is inside/near a zone within ATR distance."""
+    values = (level_price, zone_lower, zone_upper, atr_value, max_distance_atr)
+    if any(isinstance(value, bool) or not isinstance(value, Real) or not isfinite(float(value)) for value in values):
+        raise ValueError("level, zone, ATR, and distance values must be finite real numbers")
     if zone_lower > zone_upper:
         raise ValueError("zone_lower must be <= zone_upper")
     if atr_value <= 0 or max_distance_atr < 0:
@@ -278,9 +293,14 @@ def detect_current_day_sweeps(
     """
     if not (len(timestamps_ms) == len(highs) == len(lows) == len(closes)):
         raise ValueError("timestamps, highs, lows, and closes must have the same length")
+    for values in (highs, lows, closes):
+        if any(isinstance(value, bool) or not isinstance(value, Real) or not isfinite(float(value)) for value in values):
+            raise ValueError("OHLC values must be finite real numbers")
     if any(high < low or close < low or close > high
            for high, low, close in zip(highs, lows, closes)):
         raise ValueError("OHLC values are inconsistent")
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in timestamps_ms):
+        raise ValueError("timestamps must be integer Unix milliseconds")
     if any(timestamps_ms[i] >= timestamps_ms[i + 1]
            for i in range(len(timestamps_ms) - 1)):
         raise ValueError("timestamps must be strictly increasing")
