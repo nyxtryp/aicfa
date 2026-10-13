@@ -45,6 +45,11 @@ _event_history = deque(maxlen=200)
 _analysis_cache: dict[tuple[str, str], dict] = {}
 _setup_candidates: dict[str, dict] = {}
 _scanner_last_event_ms: int | None = None
+_scanner_event_count = 0
+_scanner_error_count = 0
+_scanner_last_error: str | None = None
+_scanner_last_candidate_count = 0
+_scanner_last_ready_series = 0
 
 
 def _publish_event(payload: dict) -> None:
@@ -214,14 +219,19 @@ async def _invalidate_on_opposite_choch(candle) -> None:
 
 
 async def _on_closed_candle(candle) -> None:
-    global _scanner_last_event_ms
+    global _scanner_last_event_ms, _scanner_event_count, _scanner_error_count, _scanner_last_error, _scanner_last_candidate_count, _scanner_last_ready_series
     _advance_active_setups(candle)
     await _invalidate_on_opposite_choch(candle)
     if candle.timeframe in {"5m", "15m"}:
         _scanner_last_event_ms = candle.close_time_ms
+        _scanner_event_count += 1
         snapshot = {tf: tuple(x for x in market_data.candles.get((candle.symbol, tf), ()) if x.close_time_ms <= candle.close_time_ms) for tf in TIMEFRAMES}
+        _scanner_last_ready_series = sum(len(snapshot.get(tf, ())) >= 40 for tf in TIMEFRAMES)
+        _scanner_last_candidate_count = 0
+        _scanner_last_error = None
         try:
             candidates = await asyncio.to_thread(scan_symbol, candle.symbol, snapshot, trigger_timeframe=candle.timeframe)
+            _scanner_last_candidate_count = len(candidates)
             for candidate in candidates:
                 payload = candidate.as_dict()
                 tick_info = market_data.exchange_filters.get(candidate.symbol)
@@ -286,7 +296,9 @@ async def _on_closed_candle(candle) -> None:
                 if saved:
                     _setup_candidates[candidate.key] = payload
                     _publish_event({"type": "setup_candidate", "setup": payload})
-        except Exception:
+        except Exception as exc:
+            _scanner_error_count += 1
+            _scanner_last_error = type(exc).__name__
             logger.exception("Automatic SMC scan failed for %s %s", candle.symbol, candle.timeframe)
     series = tuple(x for x in market_data.candles.get((candle.symbol, candle.timeframe), ()) if x.close_time_ms <= candle.close_time_ms)
     event = {"type": "closed_candle", "symbol": candle.symbol,
@@ -560,7 +572,7 @@ function openSetup(s){selectedSetup=s;$("symbol").value=s.symbol;$("tf").value=s
 function row(label,value){const d=document.createElement('div');d.className='rowitem';const a=document.createElement('span');a.textContent=label;const b=document.createElement('strong');b.textContent=value;d.append(a,b);$('stats').append(d)}
 async function loadStatus(){try{const st=await fetch('/api/data-status').then(r=>r.json());const connected=st.groups?.tradfi?.status==='connected'&&st.groups?.crypto?.status==='connected';$('connection').textContent=connected?'Поток активен':'Проверка потока';$('led').style.background=connected?'#59d6ad':'#f4bd62';$('stream').textContent=connected?'CONNECTED':'CONNECTING';$('series').textContent=fmt(st.latest_series);$('candleCount').textContent=fmt(st.stored_candles);$('history').textContent=st.history?.status||'—';return st}catch(e){$('connection').textContent='Ошибка статуса';console.error('Could not load market status',e);return null}}
 async function load(){if(!selectedSetup)return;const symbol=$('symbol').value,tf=$('tf').value;$('chartTitle').textContent=symbol+' · '+tf;try{const an=await fetch('/api/smc-analysis/'+encodeURIComponent(symbol)+'/'+encodeURIComponent(tf)).then(r=>r.json());if(an.status!=='ok'){$('chartNote').textContent='Ряд прогревается: '+(an.candles||0)+' свечей';draw({candles:[]});return}draw(an);const cs=an.candles,last=cs[cs.length-1];$('lastPrice').textContent=fmt(last.close);$('chartNote').textContent='Свечей: '+cs.length+' · последнее закрытие: '+new Date(last.timestamp_ms).toLocaleString();const a=an.annotations;$('annotationCount').textContent=String(a.swings.length+a.structure_breaks.length+a.order_blocks.length+a.fvg.length+a.liquidity_levels.length+a.sweeps.length);$('stats').replaceChildren();row('Последняя цена',fmt(last.close));row('Premium / Discount',a.premium_discount||'Нет подтверждённого диапазона');row('ATR(14)',fmt(a.atr));row('Средний объём',fmt(a.average_volume));row('Swing points',String(a.swings.length));row('BOS / CHoCH',String(a.structure_breaks.length));row('Order Blocks',String(a.order_blocks.length));row('FVG',String(a.fvg.length));row('Liquidity levels',String(a.liquidity_levels.length));row('Sweeps',String(a.sweeps.length));const ev=[...a.structure_breaks.map(x=>({t:x.timestamp_ms,label:x.kind+' · '+x.direction+' · '+fmt(x.level)})),...a.sweeps.map(x=>({t:x.timestamp_ms,label:'Sweep '+x.direction+' · '+fmt(x.level)}))].sort((x,y)=>y.t-x.t).slice(0,6);$('events').replaceChildren();if(!ev.length){$('events').innerHTML='<div class="empty">На текущем окне событий нет</div>'}else ev.forEach(e=>{const d=document.createElement('div');d.className='event';const b=document.createElement('b');b.textContent=new Date(e.t).toLocaleTimeString();d.append(b,document.createTextNode('  '+e.label));$('events').append(d)})}catch(e){$('connection').textContent='Ошибка API';$('chartNote').textContent='Не удалось получить анализ. Проверьте статус сервиса.';console.error(e)}}
-$('symbol').addEventListener('change',load);$('tf').addEventListener('change',load);async function loadSetups(){try{const r=await fetch('/api/setups'+($('showRejected')&&$('showRejected').checked?'?include_rejected=true':''));if(!r.ok)return;const data=await r.json();if($('marketHoursStatus'))$('marketHoursStatus').textContent='Режим: '+(data.scanner_mode||'shadow')+' · часы рынка: '+(data.market_hours?data.market_hours.mapped+'/'+data.market_hours.total:'проверка');const host=$('setups');host.replaceChildren();$('setupCount').textContent=String(data.candidates.length);if(!data.candidates.length){host.innerHTML='<div class="empty">Подходящих сетапов пока нет. Сигналы не выдумываются.</div>';return}for(const s of data.candidates.slice().reverse()){const d=document.createElement('div');d.className='event';const b=document.createElement('b');b.textContent=s.symbol+' · '+s.profile.toUpperCase()+' · '+s.direction.toUpperCase();const detail=document.createElement('div');detail.textContent='Статус '+s.status+' · скор '+s.score+'/10 · вход '+fmt(s.confirmation_price)+' · лимит '+fmt(s.entry_limit)+' · стоп '+fmt(s.stop_price)+' · RR '+fmt(s.risk_reward)+' · '+new Date(s.confirmation_time_ms).toLocaleString()+(s.reasons&&s.reasons.length?' · '+s.reasons.join(', '):'')+(s.decision_reasons&&s.decision_reasons.length?' · '+s.decision_reasons.join(', '):'');d.append(b,detail);d.style.cursor='pointer';d.title='Открыть график сетапа';d.addEventListener('click',()=>openSetup(s));host.append(d)}}catch(e){console.error('Could not load setup candidates',e)}}
+$('symbol').addEventListener('change',load);$('tf').addEventListener('change',load);async function loadSetups(){try{const r=await fetch('/api/setups'+($('showRejected')&&$('showRejected').checked?'?include_rejected=true':''));if(!r.ok)return;const data=await r.json();if($('marketHoursStatus')){const sd=data.scanner_diagnostics||{};const scanTime=data.last_scan_time_ms?new Date(data.last_scan_time_ms).toLocaleTimeString():'ожидание свечи';$('marketHoursStatus').textContent='Режим: '+(data.scanner_mode||'shadow')+' · часы рынка: '+(data.market_hours?data.market_hours.mapped+'/'+data.market_hours.total:'проверка')+' · скан-проверок: '+(sd.events||0)+' · последняя: '+scanTime+' · ошибки: '+(sd.errors||0)+(sd.last_error?' ('+sd.last_error+')':'')+' · готовых ТФ: '+(sd.last_ready_series||0)+'/5';}const host=$('setups');host.replaceChildren();$('setupCount').textContent=String(data.candidates.length);if(!data.candidates.length){host.innerHTML='<div class="empty">Подходящих сетапов пока нет. Сигналы не выдумываются.</div>';return}for(const s of data.candidates.slice().reverse()){const d=document.createElement('div');d.className='event';const b=document.createElement('b');b.textContent=s.symbol+' · '+s.profile.toUpperCase()+' · '+s.direction.toUpperCase();const detail=document.createElement('div');detail.textContent='Статус '+s.status+' · скор '+s.score+'/10 · вход '+fmt(s.confirmation_price)+' · лимит '+fmt(s.entry_limit)+' · стоп '+fmt(s.stop_price)+' · RR '+fmt(s.risk_reward)+' · '+new Date(s.confirmation_time_ms).toLocaleString()+(s.reasons&&s.reasons.length?' · '+s.reasons.join(', '):'')+(s.decision_reasons&&s.decision_reasons.length?' · '+s.decision_reasons.join(', '):'');d.append(b,detail);d.style.cursor='pointer';d.title='Открыть график сетапа';d.addEventListener('click',()=>openSetup(s));host.append(d)}}catch(e){console.error('Could not load setup candidates',e)}}
 async function loadActive(){try{const r=await fetch('/api/active-setups');if(!r.ok)return;const data=await r.json();const host=$('activeSetups');host.replaceChildren();if(!data.setups.length){host.innerHTML='<div class="empty">Пока нет принятых сетапов.</div>';return}for(const s of data.setups){const d=document.createElement('div');d.className='event';d.textContent=s.symbol+' · '+s.profile+' · '+s.direction+' · '+s.status+' · вход '+fmt(s.confirmation_price)+' · стоп '+fmt(s.stop_price)+' · TP '+s.targets.map(fmt).join(' / ');d.style.cursor='pointer';d.addEventListener('click',()=>openSetup(s));host.append(d)}}catch(e){console.error(e)}}
 async function loadJournal(){try{const r=await fetch('/api/journal');if(!r.ok)return;const data=await r.json();const host=$('realizedJournal');host.replaceChildren();if(!data.trades.length){host.innerHTML='<div class="empty">Журнал пока пуст.</div>';return}for(const t of data.trades){const d=document.createElement('div');d.className='event';d.textContent=t.symbol+' · '+t.profile+' · '+t.direction+' · '+t.final_status+' · gross '+Number(t.gross_r).toFixed(2)+'R · комиссии '+Number(t.commission_r).toFixed(3)+'R · net '+Number(t.net_r).toFixed(2)+'R';d.style.cursor='pointer';d.addEventListener('click',()=>openSetup(t));host.append(d)}}catch(e){console.error(e)}}
 if($('showRejected'))$('showRejected').addEventListener('change',loadSetups);window.addEventListener('resize',()=>{if(selectedSetup)load()});loadStatus();loadSetups();loadActive();loadJournal();let firstClosedCandleStatusLoaded=false;const eventSource=new EventSource('/api/events');eventSource.onmessage=e=>{try{const event=JSON.parse(e.data);if(event.type==='setup_candidate'){loadStatus();loadSetups();loadActive()}if(event.type==='setup_lifecycle'){loadStatus();loadSetups();loadActive();loadJournal()}if(event.type==='closed_candle'){if(!firstClosedCandleStatusLoaded){firstClosedCandleStatusLoaded=true;loadStatus()}if(selectedSetup&&event.symbol===selectedSetup.symbol&&event.timeframe===selectedSetup.timeframe){load()}}}catch(err){console.error('Invalid scanner event',err)}};eventSource.onerror=()=>{$('connection').textContent='Восстановление потока событий'};$('logout').addEventListener('click',async()=>{await fetch('/api/auth/logout',{method:'POST'});location.href='/login'});$('changePassword').addEventListener('click',async()=>{const current_password=prompt('Текущий пароль');if(current_password===null)return;const new_password=prompt('Новый пароль (минимум 12 символов)');if(new_password===null)return;const r=await fetch('/api/settings/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password,new_password})});alert(r.ok?'Пароль изменён. Войдите заново при следующем входе.':'Не удалось сменить пароль. Проверьте текущий пароль и длину нового.');});
@@ -665,6 +677,13 @@ async def setup_candidates(include_rejected: bool = False) -> dict:
     connected = status.get("groups", {}).get("tradfi", {}).get("status") == "connected" and status.get("groups", {}).get("crypto", {}).get("status") == "connected"
     return {"status": "running" if connected else "warming_up",
             "last_scan_time_ms": _scanner_last_event_ms,
+            "scanner_diagnostics": {
+                "events": _scanner_event_count,
+                "errors": _scanner_error_count,
+                "last_error": _scanner_last_error,
+                "last_candidate_count": _scanner_last_candidate_count,
+                "last_ready_series": _scanner_last_ready_series,
+            },
             "scanner_mode": "live" if SCANNER_LIVE_ENABLED else "shadow",
             "live_acceptance_enabled": SCANNER_LIVE_ENABLED,
             "exchange_metadata": status.get("exchange_metadata", {}),
