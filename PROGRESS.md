@@ -1353,3 +1353,12 @@
 - Startup recovery replays retained 1m candles for persisted active setups after history load, without sending SSE events from the worker thread. Lifecycle state markers prevent replaying events already recorded.
 - Fixed a JavaScript startup error caused by the removed manual refresh button; corrected stream status lookups to use the actual grouped status response. The active and realized panels also open the corresponding chart.
 - Latest earlier CI results passed through commit 7ccef8968cfa2efe422d3b75d270c32440c5865; newer REST replay/UI commits still require CI confirmation. Production deployment remains unverified.
+
+
+### 2026-10-13 — проверка последнего этапа автосканера
+
+- Сканер теперь пересчитывает scoring по фактическим признакам SMC, требует актуальное подтверждение 1m для scalp, учитывает только неотработанные зоны и полный overlap зоны против TP1. REST gap recovery/hourly reconciliation передают новые закрытые свечи в тот же обработчик с отсечением данных по времени события.
+- Принятые сетапы сопровождаются на закрытых 1m свечах: TP1/TP2/TP3 — 50/30/20; SL, перевод остатка в безубыток, EXPIRED с расчётом выхода по последнему закрытию, INVALIDATED по краю зоны/противоположному CHoCH. Запись перехода идемпотентна по статусу и времени события. Журнал сохраняет gross R, комиссию и net R.
+- График выбранного сетапа показывает entry, допустимый лимит, SL и TP1/TP2/TP3; клик из входящих, активных и реализованных списков выбирает нужный график. Удалён устаревший обработчик кнопки обновления, который мешал запуску JS после переделки интерфейса. Периодического browser polling нет.
+- CI GitHub Actions успешно завершён: 167 unit-тестов за 1.97 сек для коммита bff2a406d75ccd2b871c20702eed7983b3af378c; проверки UI после этого также прошли: https://github.com/nyxtryp/aicfa/actions/runs/38402834613.
+- Ограничения остаются открытыми: TradFi-сетапы намеренно отклоняются, пока не реализован и не проверен календарь базового рынка; minimum stop использует временный proxy 0.5 ATR / 0.2% цены вместо конфигурируемой комиссии; реальный production deploy/API не удалось проверить из этого окружения. Нужна отдельная production smoke-проверка перед признанием сканера принятым.
