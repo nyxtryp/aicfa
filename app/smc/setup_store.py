@@ -159,7 +159,7 @@ class SetupStore:
                 ).fetchall()
             else:
                 rows = db.execute(
-                    "SELECT payload_json FROM setup_candidates WHERE status NOT IN ('REJECTED','MISSED_PRICE') ORDER BY confirmation_time_ms DESC LIMIT ?",
+                    "SELECT payload_json FROM setup_candidates WHERE status IN ('CANDIDATE','ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
                     (max(1, min(int(limit), 1000)),),
                 ).fetchall()
         return [json.loads(row["payload_json"]) for row in rows]
