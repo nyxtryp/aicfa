@@ -145,8 +145,8 @@ def find_previous_day_extremes(
         raise ValueError("highs, lows, and timestamps must have the same length")
     if any(high < low for high, low in zip(highs, lows)):
         raise ValueError("each high must be >= its low")
-    if any(timestamps_ms[i] > timestamps_ms[i + 1] for i in range(len(timestamps_ms) - 1)):
-        raise ValueError("timestamps must be ordered")
+    if any(timestamps_ms[i] >= timestamps_ms[i + 1] for i in range(len(timestamps_ms) - 1)):
+        raise ValueError("timestamps must be strictly increasing")
 
     from datetime import datetime, timezone
 
