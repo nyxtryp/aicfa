@@ -10,7 +10,7 @@ from typing import Mapping, Sequence
 
 from app.market_data import ClosedCandle
 from app.smc.engine import SMCAnalysis, analyze_smc
-from app.smc.profiles import PROFILES, ProfileConfig
+from app.smc.profiles import PROFILES, STOP_BUFFER_ATR_OVERRIDES, ProfileConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,7 +130,8 @@ def scan_symbol(
         atr = confirm.atr[-1]
         if atr is None or atr <= 0:
             continue
-        stop = stop_raw - 0.3 * atr if direction == "long" else stop_raw + 0.3 * atr
+        stop_buffer_atr = max(profile.stop_buffer_atr, STOP_BUFFER_ATR_OVERRIDES.get(symbol, profile.stop_buffer_atr))
+        stop = stop_raw - stop_buffer_atr * atr if direction == "long" else stop_raw + stop_buffer_atr * atr
         entry = float(trigger[-1].close)
         if (direction == "long" and stop >= entry) or (direction == "short" and stop <= entry):
             continue
