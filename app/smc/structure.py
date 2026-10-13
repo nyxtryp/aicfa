@@ -6,6 +6,8 @@ For equal extrema, the earliest candle in a plateau wins.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
+from numbers import Integral, Real
 from typing import Sequence
 
 
@@ -31,21 +33,29 @@ def find_confirmed_swings(
     used for lows. This resolves equal-price plateaus deterministically in
     favor of the earliest candle.
     """
-    if left < 1 or right < 1:
-        raise ValueError("left and right must both be >= 1")
+    for name, value in (("left", left), ("right", right)):
+        if isinstance(value, bool) or not isinstance(value, Integral) or value < 1:
+            raise ValueError(f"{name} must be a positive integer")
     if len(highs) != len(lows):
         raise ValueError("highs and lows must have the same length")
-    if any(high < low for high, low in zip(highs, lows)):
+    if any(
+        isinstance(value, bool) or not isinstance(value, Real) or not isfinite(value)
+        for value in (*highs, *lows)
+    ):
+        raise ValueError("highs and lows must contain finite real numbers")
+    high_values = tuple(float(value) for value in highs)
+    low_values = tuple(float(value) for value in lows)
+    if any(high < low for high, low in zip(high_values, low_values)):
         raise ValueError("each high must be >= its low")
 
     points: list[SwingPoint] = []
-    for index in range(left, len(highs) - right):
-        high = highs[index]
-        low = lows[index]
-        left_highs = highs[index - left:index]
-        right_highs = highs[index + 1:index + right + 1]
-        left_lows = lows[index - left:index]
-        right_lows = lows[index + 1:index + right + 1]
+    for index in range(left, len(high_values) - right):
+        high = high_values[index]
+        low = low_values[index]
+        left_highs = high_values[index - left:index]
+        right_highs = high_values[index + 1:index + right + 1]
+        left_lows = low_values[index - left:index]
+        right_lows = low_values[index + 1:index + right + 1]
 
         if high > max(left_highs) and high >= max(right_highs):
             points.append(SwingPoint("high", index, index + right, float(high)))
