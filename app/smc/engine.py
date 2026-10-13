@@ -78,9 +78,16 @@ def analyze_smc(
     size = len(closes)
     if size == 0:
         raise ValueError("at least one candle is required")
-    end = size - 1 if as_of_index is None else as_of_index
+    if as_of_index is not None and (
+        isinstance(as_of_index, bool) or not isinstance(as_of_index, Integral)
+    ):
+        raise ValueError("as_of_index must be an integer")
+    end = size - 1 if as_of_index is None else int(as_of_index)
     if end < 0 or end >= size:
         raise ValueError("as_of_index is outside the supplied candles")
+    for name, value in (("swing_left", swing_left), ("swing_right", swing_right)):
+        if isinstance(value, bool) or not isinstance(value, Integral) or value < 1:
+            raise ValueError(f"{name} must be a positive integer")
 
     # Slice first, before invoking any detector, to make future data inaccessible.
     op = tuple(float(x) for x in opens[:end + 1])
