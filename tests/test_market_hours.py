@@ -30,7 +30,7 @@ class TradFiMarketHoursTests(unittest.TestCase):
 
     def test_unmapped_tradfi_contract_fails_closed(self):
         instant = datetime(2026, 10, 13, 14, 0, tzinfo=timezone.utc)
-        self.assertIsNone(tradfi_market_is_open("XAUUSDT", instant))
+        self.assertIsNone(tradfi_market_is_open("SPCXUSDT", instant))
         self.assertIsNone(tradfi_market_is_open("UNKNOWNUSDT", instant))
 
     def test_naive_datetimes_are_rejected(self):
