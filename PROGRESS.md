@@ -1032,3 +1032,10 @@
 - Добавлены регрессионные тесты для некорректного индекса и укороченного массива индикатора.
 - Коммиты: код `f63e4fcbc6f8ead8b3cfe35983bb7cb17e023607`; тесты `6d5816ce4f727c65e3d6806f914931f835fb99ea`.
 - Статус: ожидается GitHub Actions. Графическая приёмка остаётся отдельным незакрытым требованием §4/Фазы 2.
+
+
+### 2026-10-13 — CI подтверждён: индексы dealing range и chart payload
+
+- Индексы dealing range: тесты прошли — https://github.com/nyxtryp/aicfa/actions/runs/38387732739; запись результата в журнал также прошла — https://github.com/nyxtryp/aicfa/actions/runs/38387747495.
+- Сериализатор графика: код прошёл CI — https://github.com/nyxtryp/aicfa/actions/runs/38387785044; тесты прошли — https://github.com/nyxtryp/aicfa/actions/runs/38387802966.
+- Workflow для последнего обновления журнала на момент записи ещё выполняется: https://github.com/nyxtryp/aicfa/actions/runs/38387819244.
