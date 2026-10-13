@@ -166,7 +166,9 @@ async def auth_change_password(request: Request) -> JSONResponse:
         auth_store.change_password(str(data.get("current_password","")), str(data.get("new_password","")))
     except (AuthError, ValueError, TypeError):
         return JSONResponse({"detail":"password change failed"}, status_code=400)
-    return JSONResponse({"status":"ok"})
+    response = JSONResponse({"status":"ok"})
+    _cookie(response, request, auth_store.create_session())
+    return response
 
 PAGE = """<!doctype html>
 <html lang="ru">
