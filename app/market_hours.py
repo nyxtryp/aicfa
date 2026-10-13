@@ -6,7 +6,8 @@ None and must not be accepted until their contract calendar is configured.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 from functools import lru_cache
 from typing import Literal
 
@@ -19,6 +20,8 @@ US_EQUITY_SYMBOLS = frozenset({
     "CRCLUSDT", "QQQUSDT", "EWYUSDT", "NVDAUSDT", "SPYUSDT",
     "SNDKUSDT",
 })
+COMMODITY_SYMBOLS = frozenset({"XAUUSDT", "XAGUSDT", "CLUSDT", "BZUSDT", "NATGASUSDT"})
+_NEW_YORK = ZoneInfo("America/New_York")
 
 
 @lru_cache(maxsize=16)
@@ -36,13 +39,44 @@ def _session_bounds(day: date) -> tuple[tuple[datetime, datetime], ...]:
     return tuple(bounds)
 
 
+@lru_cache(maxsize=32)
+def _has_us_session(day: date) -> bool:
+    schedule = mcal.get_calendar("NYSE").schedule(
+        start_date=day.isoformat(), end_date=day.isoformat()
+    )
+    return not schedule.empty
+
+
+def _commodity_session_is_open(instant: datetime) -> bool:
+    """Binance commodity TradFi standard-index window: Sun 18:00–Fri 17:00 ET, with daily break."""
+    local = instant.astimezone(_NEW_YORK)
+    day = local.date()
+    clock = local.time().replace(tzinfo=None)
+    weekday = local.weekday()
+    if weekday == 5 or (weekday == 6 and clock < time(18, 0)):
+        return False
+    if weekday == 6:
+        return _has_us_session(day + timedelta(days=1))
+    if not _has_us_session(day):
+        return False
+    if weekday == 4 and clock >= time(17, 0):
+        return False
+    if weekday < 5 and time(17, 0) <= clock < time(18, 0):
+        return False
+    if clock >= time(18, 0):
+        return weekday < 4 and _has_us_session(day + timedelta(days=1))
+    return clock < time(17, 0)
+
+
 def tradfi_market_is_open(symbol: str, now: datetime | None = None) -> bool | None:
-    """True/False for a mapped US equity; None means no verified calendar mapping."""
+    """True/False for mapped markets; None means no verified calendar mapping."""
     normalized = symbol.upper() if isinstance(symbol, str) else ""
-    if normalized not in US_EQUITY_SYMBOLS:
-        return None
     instant = now or datetime.now(timezone.utc)
     if instant.tzinfo is None:
         raise ValueError("now must be timezone-aware")
     instant = instant.astimezone(timezone.utc)
-    return any(opened <= instant < closed for opened, closed in _session_bounds(instant.date()))
+    if normalized in US_EQUITY_SYMBOLS:
+        return any(opened <= instant < closed for opened, closed in _session_bounds(instant.date()))
+    if normalized in COMMODITY_SYMBOLS:
+        return _commodity_session_is_open(instant)
+    return None
