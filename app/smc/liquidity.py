@@ -116,6 +116,15 @@ def detect_liquidity_sweeps(
         raise ValueError("OHLC values are inconsistent")
     if isinstance(max_age, bool) or not isinstance(max_age, int) or max_age < 1:
         raise ValueError("max_age must be a positive integer")
+    for level in levels:
+        if level.kind not in {"high", "low"}:
+            raise ValueError("liquidity level kind must be 'high' or 'low'")
+        if isinstance(level.price, bool) or not isinstance(level.price, Real) or not isfinite(float(level.price)):
+            raise ValueError("liquidity level price must be finite")
+        if isinstance(level.confirmation_index, bool) or not isinstance(level.confirmation_index, int) or level.confirmation_index < 0:
+            raise ValueError("level confirmation_index must be a non-negative integer")
+        if any(isinstance(index, bool) or not isinstance(index, int) or index < 0 for index in level.source_indices):
+            raise ValueError("level source indices must be non-negative integers")
 
     events: list[LiquiditySweep] = []
     used: set[int] = set()
