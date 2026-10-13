@@ -28,9 +28,22 @@ class TradFiMarketHoursTests(unittest.TestCase):
         self.assertFalse(tradfi_market_is_open("NATGASUSDT", weekend))
         self.assertTrue(tradfi_market_is_open("BZUSDT", sunday_open))
 
+
+    def test_korean_equities_use_korea_exchange_calendar(self):
+        open_session = datetime(2026, 10, 13, 1, 0, tzinfo=timezone.utc)  # 10:00 KST
+        after_close = datetime(2026, 10, 13, 7, 0, tzinfo=timezone.utc)  # 16:00 KST
+        self.assertTrue(tradfi_market_is_open("SKHYNIXUSDT", open_session))
+        self.assertTrue(tradfi_market_is_open("SAMSUNGUSDT", open_session))
+        self.assertFalse(tradfi_market_is_open("SAMSUNGUSDT", after_close))
+
+    def test_us_listed_adr_and_spacex_underlying_use_us_calendar(self):
+        open_session = datetime(2026, 10, 13, 14, 0, tzinfo=timezone.utc)
+        self.assertTrue(tradfi_market_is_open("SKHYUSDT", open_session))
+        self.assertTrue(tradfi_market_is_open("SPCXUSDT", open_session))
+
     def test_unmapped_tradfi_contract_fails_closed(self):
         instant = datetime(2026, 10, 13, 14, 0, tzinfo=timezone.utc)
-        self.assertIsNone(tradfi_market_is_open("SPCXUSDT", instant))
+        self.assertIsNone(tradfi_market_is_open("SNXXUSDT", instant))
         self.assertIsNone(tradfi_market_is_open("UNKNOWNUSDT", instant))
 
     def test_naive_datetimes_are_rejected(self):
