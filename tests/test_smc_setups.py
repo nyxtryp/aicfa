@@ -51,8 +51,8 @@ class SetupScoringTests(unittest.TestCase):
             premium_discount_zone="discount", zone_intersects_ote=True,
             confirmation_aligned=True, one_minute_confirmed=True,
             profile="intraday", entry_price=100, current_price=100.5,
-            stop_price=95, tp1_price=110, min_rr=1.5, tick_size=0.1,
-            min_stop_distance=1, score_threshold=6, data_fresh=True,
+            stop_price=95, tp1_price=110, tick_size=0.1,
+            min_stop_distance=1, data_fresh=True,
             tradfi_market_open=True, duplicate=False, cooldown_active=False,
             active_count=0, max_active=8,
         )
