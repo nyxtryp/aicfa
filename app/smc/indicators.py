@@ -1,6 +1,8 @@
 """Closed-candle ATR and average-volume indicators with fixed methods."""
 from __future__ import annotations
 
+from math import isfinite
+from numbers import Integral
 from typing import Sequence
 
 
@@ -21,8 +23,10 @@ def calculate_atr(
     """
     if not (len(highs) == len(lows) == len(closes)):
         raise ValueError("highs, lows, and closes must have the same length")
-    if period < 1:
-        raise ValueError("period must be >= 1")
+    if isinstance(period, bool) or not isinstance(period, Integral) or period < 1:
+        raise ValueError("period must be a positive integer")
+    if any(not isfinite(float(value)) for values in (highs, lows, closes) for value in values):
+        raise ValueError("OHLC values must be finite")
     if any(high < low or close < low or close > high
            for high, low, close in zip(highs, lows, closes)):
         raise ValueError("OHLC values are inconsistent")
@@ -59,6 +63,8 @@ def calculate_average_volume(
     """Return trailing simple average volume; early values are None."""
     if period < 1:
         raise ValueError("period must be >= 1")
+    if any(not isfinite(float(volume)) for volume in volumes):
+        raise ValueError("volumes must be finite")
     if any(volume < 0 for volume in volumes):
         raise ValueError("volumes must be >= 0")
 
