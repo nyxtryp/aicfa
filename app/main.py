@@ -514,11 +514,11 @@ h1{font-size:clamp(1.8rem,4vw,2.7rem);letter-spacing:-.04em;margin:0 0 8px}.mute
 select,button{background:#111c2d;border:1px solid #2a3a53;color:#e8eef8;padding:11px 13px;border-radius:10px;font:inherit}button{cursor:pointer;background:#17352f;border-color:#286456}button:hover{background:#1d493e}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}.metric,.panel{background:linear-gradient(145deg,#111b2b,#0d1523);border:1px solid #202e43;border-radius:15px;padding:17px}
 .metric .label{font-size:.78rem;color:#8fa0b8}.metric .value{font-size:1.45rem;font-weight:750;margin-top:8px;overflow-wrap:anywhere}.metric .hint{font-size:.76rem;color:#70839f;margin-top:4px}
-.layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,.8fr);gap:14px}.panel-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:15px;font-weight:700}.chart-wrap{height:390px;position:relative}.chart-wrap canvas{width:100%;height:100%;display:block}.chart-note{font-size:.78rem;color:#8495ad;margin-top:12px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.dashboard{display:grid;grid-template-columns:minmax(240px,.78fr) minmax(0,2fr) minmax(260px,.82fr);gap:14px;align-items:start}.dashboard-column{display:grid;gap:14px;min-width:0}.dashboard .panel{min-width:0;margin:0!important}.incoming-panel{max-height:calc(100vh - 28px);overflow:auto;position:sticky;top:14px}.right-stack{display:grid;gap:14px;min-width:0}.chart-column{min-width:0}.chart-column #setupChart{grid-template-columns:minmax(0,1fr)}.chart-column #setupChart aside{margin-top:0}.panel-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:15px;font-weight:700}.chart-wrap{height:390px;position:relative}.chart-wrap canvas{width:100%;height:100%;display:block}.chart-note{font-size:.78rem;color:#8495ad;margin-top:12px}
 .rows{display:grid;gap:9px}.rowitem{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid #202c3f;font-size:.88rem}.rowitem:last-child{border:0}.rowitem span:first-child{color:#8fa0b8}.rowitem strong{text-align:right;overflow-wrap:anywhere}
 .event{padding:10px 12px;border-radius:10px;background:#0b1320;border:1px solid #1f2c40;margin-bottom:8px;font-size:.82rem}.event b{color:#6ce0bb}.empty{color:#8292aa;padding:18px 0;font-size:.88rem}
 footer{color:#61738e;font-size:.75rem;margin-top:20px;line-height:1.6}
-@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}.chart-wrap{height:320px}}
+@media(max-width:1100px){.dashboard{grid-template-columns:minmax(220px,.8fr) minmax(0,1.6fr)}.right-stack{grid-column:1 / -1;grid-template-columns:repeat(2,minmax(0,1fr))}.incoming-panel{position:static;max-height:none}}@media(max-width:700px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard{grid-template-columns:minmax(0,1fr)}.right-stack{grid-column:auto;grid-template-columns:minmax(0,1fr)}.chart-wrap{height:320px}}
 @media(max-width:420px){.grid{grid-template-columns:1fr 1fr}.metric{padding:12px}.metric .value{font-size:1.1rem}.chart-wrap{height:260px}}
 </style></head>
 <body>
@@ -532,16 +532,22 @@ footer{color:#61738e;font-size:.75rem;margin-top:20px;line-height:1.6}
 <div class="metric"><div class="label">Закрытые свечи</div><div class="value" id="candleCount">—</div><div class="hint">хранимое окно</div></div>
 <div class="metric"><div class="label">История</div><div class="value" id="history">—</div><div class="hint">начальная загрузка</div></div>
 </section>
-<section class="panel" style="margin-bottom:18px"><div class="panel-title"><span>Входящие сетапы</span><span class="pill" id="setupCount">0</span><label style="margin-left:12px"><input id="showRejected" type="checkbox"> Показывать отклонённые</label></div><div id="setups"><div class="empty">Автоматический поиск по закрытым свечам. Ожидание подходящих сетапов…</div></div></section>
-<section class="panel" style="margin-bottom:18px"><div class="panel-title">Принятые сетапы</div><div id="activeSetups"><div class="empty">Пока нет принятых сетапов.</div></div></section>
-<section class="panel" style="margin-bottom:18px"><div class="panel-title">Реализованные</div><div id="realizedJournal"><div class="empty">Журнал пока пуст.</div></div></section>
-<div class="panel empty" id="chartPlaceholder" style="margin-bottom:18px;padding:28px;text-align:center">График появится после выбора найденного сетапа выше. Если сетапов нет, смотреть случайный BTC-график не нужно.</div>
-<div class="layout" id="setupChart" style="display:none">
-<section class="panel"><div class="panel-title"><span id="chartTitle">Выберите сетап</span><span class="pill" id="lastPrice">Ожидание данных</span></div>
-<div class="chart-wrap"><canvas id="chart" aria-label="График свечей"></canvas></div><div class="chart-note" id="chartNote">Загрузка закрытых свечей и расчёт разметки SMC…</div></section>
-<aside class="panel"><div class="panel-title"><span>SMC-разметка</span><span class="pill" id="annotationCount">—</span></div>
-<div class="rows" id="stats"><div class="empty">Ожидание анализа…</div></div><div class="panel-title" style="margin-top:22px"><span>Последние события</span></div><div id="events"><div class="empty">Событий пока нет</div></div></aside>
+<section class="dashboard">
+<div class="dashboard-column">
+<section class="panel incoming-panel" id="incomingPanel"><div class="panel-title"><span>Входящие сетапы</span><span class="pill" id="setupCount">0</span><label style="margin-left:12px"><input id="showRejected" type="checkbox"> Показывать отклонённые</label></div><div id="setups"><div class="empty">Автоматический поиск по закрытым свечам. Ожидание подходящих сетапов…</div></div></section>
 </div>
+<div class="chart-column">
+<div class="panel empty" id="chartPlaceholder" style="padding:28px;text-align:center">Выберите сетап во входящих, принятых или реализованных — здесь откроется его график.</div>
+<div class="layout" id="setupChart" style="display:none">
+<section class="panel"><div class="panel-title"><span id="chartTitle">Выберите сетап</span><span class="pill" id="lastPrice">Ожидание данных</span></div><div class="chart-wrap"><canvas id="chart" aria-label="График свечей"></canvas></div><div class="chart-note" id="chartNote">Загрузка закрытых свечей и расчёт разметки SMC…</div></section>
+<aside class="panel"><div class="panel-title"><span>Сетап и SMC-разметка</span><span class="pill" id="annotationCount">—</span></div><div class="rows" id="stats"><div class="empty">Выберите сетап, чтобы увидеть его параметры и SMC-разметку.</div></div><div class="panel-title" style="margin-top:22px"><span>Последние события</span></div><div id="events"><div class="empty">Событий пока нет</div></div></aside>
+</div>
+</div>
+<div class="right-stack">
+<section class="panel"><div class="panel-title">Принятые сетапы</div><div id="activeSetups"><div class="empty">Пока нет принятых сетапов.</div></div></section>
+<section class="panel"><div class="panel-title">Реализованные</div><div id="realizedJournal"><div class="empty">Журнал пока пуст.</div></div></section>
+</div>
+</section>
 <footer>Анализ выполняется только по закрытым свечам. Разметка не является торговой рекомендацией. Автоматический поиск сетапов по закрытым свечам всех инструментов. Исполнение сделок отключено.</footer>
 </main>
 <script>
