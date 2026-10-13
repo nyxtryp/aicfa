@@ -14,6 +14,7 @@ from app.backup import create_verified_backup
 from app.market_data import ALL_SYMBOLS, TIMEFRAMES, MarketDataManager
 from app.smc.engine import analyze_smc
 from app.smc.presentation import to_chart_payload
+from app.smc.scanner import scan_symbol
 
 logger = logging.getLogger("aicfa.backup")
 BACKUP_INTERVAL_SECONDS = 24 * 60 * 60
@@ -25,6 +26,8 @@ market_data = MarketDataManager()
 _event_subscribers: set[asyncio.Queue[str]] = set()
 _event_history = deque(maxlen=200)
 _analysis_cache: dict[tuple[str, str], dict] = {}
+_setup_candidates: dict[str, dict] = {}
+_scanner_last_event_ms: int | None = None
 
 
 def _publish_event(payload: dict) -> None:
@@ -43,6 +46,19 @@ def _publish_event(payload: dict) -> None:
 
 
 async def _on_closed_candle(candle) -> None:
+    global _scanner_last_event_ms
+    _scanner_last_event_ms = candle.close_time_ms
+    if candle.timeframe in {"5m", "15m"}:
+        snapshot = {tf: tuple(market_data.candles.get((candle.symbol, tf), ())) for tf in TIMEFRAMES}
+        try:
+            candidates = await asyncio.to_thread(scan_symbol, candle.symbol, snapshot, trigger_timeframe=candle.timeframe)
+            for candidate in candidates:
+                if candidate.key not in _setup_candidates:
+                    payload = candidate.as_dict()
+                    _setup_candidates[candidate.key] = payload
+                    _publish_event({"type": "setup_candidate", "setup": payload})
+        except Exception:
+            logger.exception("Automatic SMC scan failed for %s %s", candle.symbol, candle.timeframe)
     series = tuple(market_data.candles.get((candle.symbol, candle.timeframe), ()))
     event = {"type": "closed_candle", "symbol": candle.symbol,
              "timeframe": candle.timeframe, "close_time_ms": candle.close_time_ms,
@@ -380,6 +396,16 @@ async def smc_analysis(symbol: str, timeframe: str) -> dict:
         } for c in series],
         "annotations": payload,
     }
+
+
+@app.get("/api/setups")
+async def setup_candidates() -> dict:
+    """Current in-memory candidates detected automatically from closed candles."""
+    status = market_data.status()
+    connected = status.get("tradfi", {}).get("status") == "connected" or status.get("crypto", {}).get("status") == "connected"
+    return {"status": "running" if connected else "warming_up",
+            "last_scan_time_ms": _scanner_last_event_ms,
+            "candidates": list(_setup_candidates.values())}
 
 
 @app.get("/api/backup-status")
