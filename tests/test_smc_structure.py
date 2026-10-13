@@ -41,6 +41,20 @@ class ConfirmedSwingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             find_confirmed_swings([0], [1], left=1, right=1)
 
+    def test_rejects_non_integer_swing_windows(self):
+        for name in ("left", "right"):
+            for value in (True, 1.5, 0, -1):
+                kwargs = {"left": 1, "right": 1, name: value}
+                with self.subTest(parameter=name, value=value):
+                    with self.assertRaisesRegex(ValueError, f"{name} must be a positive integer"):
+                        find_confirmed_swings([1, 2, 1], [0, 1, 0], **kwargs)
+
+    def test_rejects_non_finite_or_non_numeric_prices(self):
+        for bad_value in (float("nan"), float("inf"), float("-inf"), True, "2"):
+            with self.subTest(value=bad_value):
+                with self.assertRaisesRegex(ValueError, "finite real numbers"):
+                    find_confirmed_swings([1, bad_value, 1], [0, 0, 0], left=1, right=1)
+
     def test_does_not_emit_unconfirmed_tail(self):
         points = find_confirmed_swings([1, 2, 9], [0, 1, 2], left=1, right=2)
         self.assertEqual(points, ())
