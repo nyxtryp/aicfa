@@ -126,6 +126,23 @@ class SMCAnalysisTests(unittest.TestCase):
         self.assertEqual(len(matching), 1)
         self.assertEqual((matching[0].direction, matching[0].level), ("bearish", 10.0))
 
+    def test_zone_filter_also_applies_to_intraday_sweeps(self):
+        result = analyze_smc(
+            opens=[9.0, 9.0],
+            highs=[10.0, 12.0],
+            lows=[8.0, 8.5],
+            closes=[9.0, 9.5],
+            volumes=[100.0, 120.0],
+            timestamps_ms=[1791849600000, 1791849660000],
+            swing_left=1,
+            swing_right=1,
+            atr_period=1,
+            volume_period=1,
+            zone_bounds=(100.0, 101.0),
+            max_zone_distance_atr=0.0,
+        )
+        self.assertEqual(result.sweeps, ())
+
     def test_rejects_mismatched_arrays_and_out_of_range_index(self):
         args = self.candles()
         mismatched = list(args)
