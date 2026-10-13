@@ -60,8 +60,10 @@ def find_order_blocks(
             raise ValueError("event kind must be BOS or CHoCH")
         if (isinstance(event.candle_index, bool) or not isinstance(event.candle_index, int)
                 or isinstance(event.swing_index, bool) or not isinstance(event.swing_index, int)
-                or event.swing_index < 0):
+                or event.candle_index < 0 or event.swing_index < 0):
             raise ValueError("event indices must be non-negative integers")
+        if isinstance(event.level, bool) or not isinstance(event.level, Real) or not isfinite(float(event.level)):
+            raise ValueError("event level must be a finite real number")
         if event.candle_index < 0 or event.candle_index >= len(closes):
             continue
         start = max(0, event.swing_index + 1)
@@ -129,6 +131,10 @@ def measure_order_block_mitigation(
     are examined. Future closes beyond as_of_index are invisible.
     """
     if (block.direction not in {"bullish", "bearish"}
+            or isinstance(block.candle_index, bool) or not isinstance(block.candle_index, int)
+            or isinstance(block.source_swing_index, bool) or not isinstance(block.source_swing_index, int)
+            or block.candle_index < 0 or block.source_swing_index < 0
+            or block.candle_index > block.confirmation_index
             or isinstance(block.lower, bool) or not isinstance(block.lower, Real)
             or isinstance(block.upper, bool) or not isinstance(block.upper, Real)
             or not isfinite(float(block.lower)) or not isfinite(float(block.upper))
