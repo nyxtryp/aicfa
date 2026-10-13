@@ -50,6 +50,18 @@ class LiquidityTests(unittest.TestCase):
         swings = (SwingPoint("low", 1, 2, 5.0),)
         self.assertEqual(find_liquidity_levels(swings, [0.0, 0.0, 0.0]), ())
 
+    def test_liquidity_rejects_non_finite_prices_and_invalid_parameters(self):
+        level = LiquidityLevel("high", 10.0, (0,), 0, False)
+        for value in (float("nan"), float("inf"), True, "10"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                detect_liquidity_sweeps([11], [8], [9], [LiquidityLevel("high", value, (0,), 0)])
+            with self.subTest(atr=value), self.assertRaises(ValueError):
+                find_liquidity_levels((SwingPoint("high", 0, 0, 10.0),), [value])
+        with self.assertRaises(ValueError):
+            detect_liquidity_sweeps([11], [8], [9], [level], max_age=1.5)
+        with self.assertRaises(ValueError):
+            find_liquidity_levels((SwingPoint("high", True, 1, 10.0),), [1.0, 1.0])
+
     def test_rejects_inconsistent_candles(self):
         with self.assertRaises(ValueError):
             detect_liquidity_sweeps([1], [2], [1], [])
