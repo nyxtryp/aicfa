@@ -111,6 +111,16 @@ def _advance_active_setups(candle) -> None:
             continue
         stages = {"ACCEPTED": 0, "TP1": 1, "TP2": 2}
         stage = stages.get(status, 3)
+        first_target_hit = (high >= targets[0]) if direction == "long" else (low <= targets[0])
+        breakeven_hit = (low <= entry) if direction == "long" else (high >= entry)
+        if status == "ACCEPTED" and first_target_hit and breakeven_hit:
+            target = targets[0]
+            gross_r += 0.5 * ((target - entry) if direction == "long" else (entry - target)) / risk
+            commission_r += 0.5 * 0.0005 * (entry + target) / risk
+            commission_r += 0.5 * 0.0005 * (entry + entry) / risk
+            payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
+            _finish_setup(payload, store, now_ms, "SL")
+            continue
         reached = []
         for idx in range(stage, 3):
             target = targets[idx]
@@ -132,9 +142,6 @@ def _advance_active_setups(candle) -> None:
             payload["status"] = f"TP{last}"
             if store.transition(payload["key"], payload, event_type=f"TP{last}", event_time_ms=now_ms):
                 _publish_event({"type": "setup_lifecycle", "setup": payload})
-            if last == 1 and (low <= entry if direction == "long" else high >= entry):
-                payload["status"] = "SL"
-                _finish_setup(payload, store, now_ms, "SL")
 
 
 def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_status: str) -> None:
