@@ -13,7 +13,7 @@ from app.auth import AuthError, AuthStore
 from app.backup import create_verified_backup
 from app.market_data import ALL_SYMBOLS, TIMEFRAMES, TRADFI_SYMBOLS, MarketDataManager
 from app.smc.engine import analyze_smc
-from app.market_hours import COMMODITY_SYMBOLS, US_EQUITY_SYMBOLS, tradfi_market_is_open
+from app.market_hours import COMMODITY_SYMBOLS, KRX_EQUITY_SYMBOLS, US_EQUITY_SYMBOLS, tradfi_market_is_open
 from app.smc.presentation import to_chart_payload
 from app.smc.scanner import scan_symbol
 from app.smc.setups import SetupEvidence, evaluate_candidate
@@ -653,9 +653,9 @@ async def setup_candidates(include_rejected: bool = False) -> dict:
             "exchange_metadata": status.get("exchange_metadata", {}),
             "active_count": _get_setup_store().active_count(),
             "market_hours": {
-                "mapped": len((US_EQUITY_SYMBOLS | COMMODITY_SYMBOLS) & set(TRADFI_SYMBOLS)),
+                "mapped": len((US_EQUITY_SYMBOLS | KRX_EQUITY_SYMBOLS | COMMODITY_SYMBOLS) & set(TRADFI_SYMBOLS)),
                 "total": len(TRADFI_SYMBOLS),
-                "unmapped": sorted(set(TRADFI_SYMBOLS) - US_EQUITY_SYMBOLS - COMMODITY_SYMBOLS),
+                "unmapped": sorted(set(TRADFI_SYMBOLS) - US_EQUITY_SYMBOLS - KRX_EQUITY_SYMBOLS - COMMODITY_SYMBOLS),
             },
             "candidates": _get_setup_store().list_candidates(include_rejected=include_rejected)}
 
