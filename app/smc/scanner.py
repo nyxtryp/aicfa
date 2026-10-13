@@ -5,7 +5,7 @@ It deliberately refuses to invent tick sizes or accept a setup without exchange 
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Mapping, Sequence
 
 from app.market_data import ClosedCandle
@@ -28,7 +28,8 @@ class SetupCandidate:
     reasons: tuple[str, ...]
     zone: tuple[float, float]
     timeframe: str
-    evidence: dict[str, bool | float]
+    evidence: dict[str, bool | float] = field(default_factory=dict)
+    atr: float = 0.0
 
     def as_dict(self) -> dict:
         result = asdict(self)
@@ -176,6 +177,6 @@ def scan_symbol(
             reasons=("htf_bias_aligned", "premium_discount_aligned", "active_zone_in_ote",
                      "liquidity_sweep", "confirmation_break", "rr_passed"),
             zone=(selected[0], selected[1]), timeframe=profile.confirmation_timeframe,
-            evidence=evidence,
+            evidence=evidence, atr=float(atr),
         ))
     return found
