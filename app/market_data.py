@@ -594,7 +594,7 @@ class MarketDataManager:
                 self.latest[key] = series[-1]
         callback = self.on_closed_candle
         if callback is not None:
-            for recovered in (item for item in restored if item.open_time_ms > previous_open_time):
+            for recovered in ((item for item in restored if item.open_time_ms > previous_open_time) if previous_open_time >= 0 else iter(restored[-1:])):
                 try:
                     result = callback(recovered)
                     if asyncio.iscoroutine(result):
@@ -636,7 +636,7 @@ class MarketDataManager:
                 self.latest[key] = series[-1]
         callback = self.on_closed_candle
         if callback is not None:
-            for recovered in (item for item in restored if item.open_time_ms > previous_open_time):
+            for recovered in ((item for item in restored if item.open_time_ms > previous_open_time) if previous_open_time >= 0 else iter(restored[-1:])):
                 try:
                     result = callback(recovered)
                     if asyncio.iscoroutine(result):
