@@ -99,5 +99,45 @@ class SetupScoringTests(unittest.TestCase):
         self.assertEqual(decision.entry_limit, 99.0)
 
 
+    def test_stop_distance_below_minimum_is_rejected(self):
+        decision = self.evaluate(stop_price=99.5, min_stop_distance=1)
+        self.assertEqual(decision.status, "REJECTED")
+        self.assertIn("stop_distance_below_minimum", decision.reasons)
+
+    def test_tradfi_closed_market_is_rejected(self):
+        decision = self.evaluate(tradfi_market_open=False)
+        self.assertEqual(decision.status, "REJECTED")
+        self.assertIn("tradfi_market_closed", decision.reasons)
+
+    def test_score_below_profile_threshold_is_rejected(self):
+        evidence = self.evidence(
+            order_block_fvg_overlap=False,
+            higher_timeframe_agreement=False,
+            confirmation_volume=100,
+            average_volume=100,
+            clean_path_to_tp1=False,
+        )
+        decision = evaluate_candidate(
+            evidence, direction="long", higher_timeframe_bias="long",
+            premium_discount_zone="discount", zone_intersects_ote=True,
+            confirmation_aligned=True, one_minute_confirmed=True,
+            profile="intraday", entry_price=100, current_price=100,
+            stop_price=95, tp1_price=110, tick_size=0.1,
+            min_stop_distance=1, data_fresh=True,
+        )
+        self.assertEqual(decision.status, "REJECTED")
+        self.assertIn("score_below_threshold", decision.reasons)
+
+    def test_wrong_side_stop_or_target_is_rejected(self):
+        decision = self.evaluate(stop_price=105)
+        self.assertEqual(decision.status, "REJECTED")
+        self.assertIn("invalid_price_or_risk_parameters", decision.reasons)
+
+    def test_global_active_setup_limit_is_enforced_before_eligibility(self):
+        decision = self.evaluate(active_count=8, max_active=8)
+        self.assertEqual(decision.status, "REJECTED")
+        self.assertIn("active_setup_limit_reached", decision.reasons)
+
+
 if __name__ == "__main__":
     unittest.main()
