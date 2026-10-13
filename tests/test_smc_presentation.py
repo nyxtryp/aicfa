@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 
 from app.smc.engine import analyze_smc
 from app.smc.presentation import to_chart_payload
@@ -44,6 +45,26 @@ class SMCChartPayloadTests(unittest.TestCase):
         duplicate[3] = duplicate[2]
         with self.assertRaisesRegex(ValueError, "strictly increasing"):
             to_chart_payload(analysis, duplicate)
+
+    def test_payload_rejects_non_integer_analysis_index(self):
+        opens, highs, lows, closes, volumes, timestamps = self.controlled_candles()
+        analysis = analyze_smc(
+            opens, highs, lows, closes, volumes, timestamps[:len(closes)],
+            swing_left=1, swing_right=1, atr_period=2, volume_period=2,
+        )
+        for index in (True, 2.5):
+            with self.subTest(index=index):
+                with self.assertRaisesRegex(ValueError, "analysis index must be an integer"):
+                    to_chart_payload(replace(analysis, as_of_index=index), timestamps)
+
+    def test_payload_rejects_short_indicator_arrays(self):
+        opens, highs, lows, closes, volumes, timestamps = self.controlled_candles()
+        analysis = analyze_smc(
+            opens, highs, lows, closes, volumes, timestamps[:len(closes)],
+            swing_left=1, swing_right=1, atr_period=2, volume_period=2,
+        )
+        with self.assertRaisesRegex(ValueError, "indicator arrays"):
+            to_chart_payload(replace(analysis, atr=analysis.atr[:2]), timestamps)
 
     def test_payload_rejects_non_integer_timestamps_instead_of_truncating(self):
         opens, highs, lows, closes, volumes, timestamps = self.controlled_candles()
