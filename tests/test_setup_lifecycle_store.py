@@ -87,6 +87,19 @@ class SetupDecisionStoreTests(unittest.TestCase):
             self.assertGreater(journal["commission_r"], 0)
             self.assertAlmostEqual(journal["net_r"], journal["gross_r"] - journal["commission_r"])
 
+
+    def test_duplicate_lifecycle_event_at_same_timestamp_is_ignored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SetupStore(Path(directory) / "setups.sqlite3")
+            candidate = self.candidate("dedup")
+            self.assertTrue(store.save_decision(candidate, cooldown_minutes=30)[0])
+            tp1 = dict(candidate, status="TP1", last_event_time_ms=1_100_000, gross_r=0.5)
+            self.assertTrue(store.transition("dedup", tp1, event_type="TP1",
+                                             event_time_ms=1_100_000))
+            self.assertFalse(store.transition("dedup", tp1, event_type="TP1",
+                                              event_time_ms=1_100_000))
+            self.assertEqual(store.event_count("dedup"), 2)
+
     def test_lifecycle_transition_writes_realized_journal_once(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SetupStore(Path(directory) / "setups.sqlite3")
