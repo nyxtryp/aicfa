@@ -113,27 +113,32 @@ class SetupStore:
         with self._connection() as db:
             if db.execute("SELECT 1 FROM setup_candidates WHERE setup_key=?", (key,)).fetchone():
                 return False, decided
-            reasons = list(decided.get("decision_reasons", []))
-            if decided.get("status") == "ACCEPTED":
+            decision_reasons = list(decided.get("decision_reasons", []))
+            gate_reasons: list[str] = []
+            status = str(decided.get("status", "REJECTED"))
+            if status == "ACCEPTED":
                 active = int(db.execute(
                     "SELECT COUNT(*) FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
                 ).fetchone()[0])
                 if active >= max_active:
-                    reasons.append("active_setup_limit_reached")
+                    gate_reasons.append("active_setup_limit_reached")
                 if db.execute(
                     "SELECT 1 FROM setup_candidates WHERE symbol=? AND profile=? AND status IN ('ACCEPTED','ACTIVE','TP1','TP2') LIMIT 1",
                     (decided["symbol"], decided["profile"]),
                 ).fetchone():
-                    reasons.append("active_setup_for_symbol_profile")
+                    gate_reasons.append("active_setup_for_symbol_profile")
+            if status in ("ACCEPTED", "CANDIDATE"):
                 cooldown_ms = max(0, int(cooldown_minutes)) * 60_000
                 if cooldown_ms and db.execute(
                     "SELECT 1 FROM setup_candidates WHERE symbol=? AND profile=? AND zone_key=? AND status NOT IN ('REJECTED','MISSED_PRICE') AND confirmation_time_ms>=? LIMIT 1",
                     (decided["symbol"], decided["profile"], zone_key, timestamp - cooldown_ms),
                 ).fetchone():
-                    reasons.append("cooldown_active")
-                if reasons:
-                    decided["status"] = "REJECTED"
-                    decided["decision_reasons"] = list(dict.fromkeys(reasons))
+                    gate_reasons.append("cooldown_active")
+            if gate_reasons:
+                decided["status"] = "REJECTED"
+                decided["decision_reasons"] = list(dict.fromkeys(decision_reasons + gate_reasons))
+            elif decision_reasons:
+                decided["decision_reasons"] = list(dict.fromkeys(decision_reasons))
             encoded = json.dumps(decided, separators=(",", ":"), sort_keys=True)
             cursor = db.execute(
                 """INSERT OR IGNORE INTO setup_candidates
