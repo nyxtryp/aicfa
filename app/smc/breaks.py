@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
+from numbers import Real
 from typing import Sequence
 
 from app.smc.structure import SwingPoint
@@ -32,11 +34,25 @@ def detect_structure_breaks(
     If a candle crosses several eligible swings, only the latest confirmed
     swing in that direction is considered.
     """
+    normalized_closes: list[float] = []
+    for close in closes:
+        if isinstance(close, bool) or not isinstance(close, Real) or not isfinite(float(close)):
+            raise ValueError("closes must contain only finite real numbers")
+        normalized_closes.append(float(close))
+    closes = normalized_closes
+
     for swing in swings:
         if swing.kind not in {"high", "low"}:
             raise ValueError("swing kind must be 'high' or 'low'")
-        if swing.index < 0 or swing.confirmation_index < swing.index:
-            raise ValueError("swing indices are invalid")
+        if (
+            isinstance(swing.index, bool) or not isinstance(swing.index, int)
+            or isinstance(swing.confirmation_index, bool)
+            or not isinstance(swing.confirmation_index, int)
+            or swing.index < 0 or swing.confirmation_index < swing.index
+        ):
+            raise ValueError("swing indices must be valid non-negative integers")
+        if isinstance(swing.price, bool) or not isinstance(swing.price, Real) or not isfinite(float(swing.price)):
+            raise ValueError("swing price must be a finite real number")
         if swing.confirmation_index >= len(closes):
             # It is valid to pass future/unconfirmed swings; they are ignored.
             continue
