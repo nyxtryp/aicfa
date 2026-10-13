@@ -101,6 +101,13 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidates[0].profile, "intraday")
         self.assertEqual(candidates[0].timeframe, "15m")
 
+    def test_stale_one_minute_confirmation_is_rejected(self):
+        stale_series = dict(self.series)
+        stale_series["1m"] = tuple(candle(i - 10) for i in range(40))
+        with patch("app.smc.scanner._analysis", side_effect=lambda candles, profile, timeframe: analysis()):
+            candidates = scan_symbol("BTCUSDT", stale_series, trigger_timeframe="5m")
+        self.assertEqual(candidates, [])
+
 
 if __name__ == "__main__":
     unittest.main()
