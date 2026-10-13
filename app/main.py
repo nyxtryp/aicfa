@@ -24,6 +24,7 @@ market_data = MarketDataManager()
 
 _event_subscribers: set[asyncio.Queue[str]] = set()
 _event_history = deque(maxlen=200)
+_analysis_cache: dict[tuple[str, str], dict] = {}
 
 
 def _publish_event(payload: dict) -> None:
@@ -57,6 +58,18 @@ async def _on_closed_candle(candle) -> None:
             [x.open_time_ms for x in series],
         )
         annotations = to_chart_payload(analysis, [x.open_time_ms for x in series])
+        _analysis_cache[(candle.symbol, candle.timeframe)] = {
+            "status": "ok",
+            "symbol": candle.symbol,
+            "timeframe": candle.timeframe,
+            "candles_count": len(series),
+            "candles": [{
+                "timestamp_ms": x.open_time_ms,
+                "open": float(x.open), "high": float(x.high), "low": float(x.low),
+                "close": float(x.close), "volume": float(x.volume),
+            } for x in series],
+            "annotations": annotations,
+        }
         event["analysis"] = {key: len(annotations.get(key, [])) for key in
                              ("swings", "structure_breaks", "order_blocks", "fvg",
                               "liquidity_levels", "sweeps")}
@@ -330,6 +343,9 @@ async def smc_analysis(symbol: str, timeframe: str) -> dict:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="unknown timeframe")
     series = tuple(market_data.candles.get((normalized_symbol, timeframe), ()))
+    cached = _analysis_cache.get((normalized_symbol, timeframe))
+    if cached and series and cached["candles"][-1]["timestamp_ms"] == series[-1].open_time_ms:
+        return cached
     if len(series) < 3:
         return {
             "status": "warming_up",
