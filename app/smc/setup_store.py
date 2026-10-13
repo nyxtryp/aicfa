@@ -21,6 +21,7 @@ class SetupStore:
                     status TEXT NOT NULL,
                     confirmation_time_ms INTEGER NOT NULL,
                     score INTEGER NOT NULL,
+                    zone_key TEXT NOT NULL DEFAULT '',
                     payload_json TEXT NOT NULL,
                     created_at_ms INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER) * 1000),
                     updated_at_ms INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER) * 1000)
@@ -35,6 +36,9 @@ class SetupStore:
                     payload_json TEXT NOT NULL
                 )
             """)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(setup_candidates)").fetchall()}
+            if "zone_key" not in columns:
+                db.execute("ALTER TABLE setup_candidates ADD COLUMN zone_key TEXT NOT NULL DEFAULT ''")
             db.execute("CREATE INDEX IF NOT EXISTS idx_setup_candidates_status_time ON setup_candidates(status, confirmation_time_ms DESC)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_setup_candidate_events_key_time ON setup_candidate_events(setup_key, event_time_ms)")
 
@@ -76,6 +80,60 @@ class SetupStore:
                 (key, "CANDIDATE_DETECTED", int(payload["confirmation_time_ms"]), encoded),
             )
             return True
+
+
+    def active_count(self) -> int:
+        with self._connection() as db:
+            return int(db.execute(
+                "SELECT COUNT(*) FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
+            ).fetchone()[0])
+
+    def save_decision(self, payload: Mapping[str, Any], *, cooldown_minutes: int, max_active: int = 8) -> tuple[bool, dict[str, Any]]:
+        """Persist one decision atomically with global cap, symbol/profile and zone cooldown gates."""
+        key = str(payload["key"])
+        decided = dict(payload)
+        zone_key = str(payload.get("zone_key") or "|".join(map(str, payload.get("zone", []))))
+        encoded = json.dumps(decided, separators=(",", ":"), sort_keys=True)
+        timestamp = int(payload["confirmation_time_ms"])
+        with self._connection() as db:
+            if db.execute("SELECT 1 FROM setup_candidates WHERE setup_key=?", (key,)).fetchone():
+                return False, decided
+            reasons = list(decided.get("decision_reasons", []))
+            if decided.get("status") == "ACCEPTED":
+                active = int(db.execute(
+                    "SELECT COUNT(*) FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
+                ).fetchone()[0])
+                if active >= max_active:
+                    reasons.append("active_setup_limit_reached")
+                if db.execute(
+                    "SELECT 1 FROM setup_candidates WHERE symbol=? AND profile=? AND status IN ('ACCEPTED','ACTIVE','TP1','TP2') LIMIT 1",
+                    (decided["symbol"], decided["profile"]),
+                ).fetchone():
+                    reasons.append("active_setup_for_symbol_profile")
+                cooldown_ms = max(0, int(cooldown_minutes)) * 60_000
+                if cooldown_ms and db.execute(
+                    "SELECT 1 FROM setup_candidates WHERE symbol=? AND profile=? AND zone_key=? AND status IN ('ACCEPTED','ACTIVE','TP1','TP2') AND confirmation_time_ms>=? LIMIT 1",
+                    (decided["symbol"], decided["profile"], zone_key, timestamp - cooldown_ms),
+                ).fetchone():
+                    reasons.append("cooldown_active")
+                if reasons:
+                    decided["status"] = "REJECTED"
+                    decided["decision_reasons"] = list(dict.fromkeys(reasons))
+            encoded = json.dumps(decided, separators=(",", ":"), sort_keys=True)
+            cursor = db.execute(
+                """INSERT OR IGNORE INTO setup_candidates
+                   (setup_key,symbol,profile,direction,status,confirmation_time_ms,score,zone_key,payload_json)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (key, decided["symbol"], decided["profile"], decided["direction"],
+                 decided["status"], timestamp, int(decided.get("score", 0)), zone_key, encoded),
+            )
+            if cursor.rowcount != 1:
+                return False, decided
+            db.execute(
+                "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
+                (key, "SETUP_" + str(decided["status"]), timestamp, encoded),
+            )
+            return True, decided
 
     def list_candidates(self, *, limit: int = 200) -> list[dict[str, Any]]:
         with self._connection() as db:
