@@ -111,7 +111,7 @@ def scan_symbol(
                     if block.direction == latest_bias.direction and not state.mitigated]
         fvg_zones = [(float(gap.lower), float(gap.upper)) for gap, fill in zip(zone.fvg, zone.fvg_fill)
                      if gap.direction == latest_bias.direction and not fill.fully_filled]
-        ob_fvg_overlap = any(a0 <= b1 and b0 <= a1 for a0, a1 in ob_zones for b0, b1 in fvg_zones)
+        ob_fvg_overlap = any(a0 <= b1 and b0 <= a1 and max(a0, b0) <= ote_high and min(a1, b1) >= ote_low for a0, a1 in ob_zones for b0, b1 in fvg_zones)
         zone_bias_agreement = bool(zone.structure_breaks and zone.structure_breaks[-1].direction == latest_bias.direction)
 
         latest_trigger_break = confirm.structure_breaks[-1]
@@ -145,12 +145,12 @@ def scan_symbol(
         tp1 = targets[0]
         opposing_zones = [
             (float(block.lower), float(block.upper))
-            for block in confirm.order_blocks
-            if block.direction != expected_break
+            for block, state in zip(confirm.order_blocks, confirm.order_block_mitigation)
+            if block.direction != expected_break and not state.mitigated
         ] + [
             (float(gap.lower), float(gap.upper))
-            for gap in confirm.fvg
-            if gap.direction != expected_break
+            for gap, fill in zip(confirm.fvg, confirm.fvg_fill)
+            if gap.direction != expected_break and not fill.fully_filled
         ]
         clean_path = not any(
             (z_high > entry and z_low < tp1)
