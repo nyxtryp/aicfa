@@ -150,7 +150,15 @@ async def smc_analysis(symbol: str, timeframe: str) -> dict:
         "status": "ok",
         "symbol": normalized_symbol,
         "timeframe": timeframe,
-        "candles": len(series),
+        "candles_count": len(series),
+        "candles": [{
+            "timestamp_ms": c.open_time_ms,
+            "open": float(c.open),
+            "high": float(c.high),
+            "low": float(c.low),
+            "close": float(c.close),
+            "volume": float(c.volume),
+        } for c in series],
         "annotations": payload,
     }
 
