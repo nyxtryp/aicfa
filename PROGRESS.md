@@ -1327,3 +1327,12 @@
 - Коммиты: scanner `ffb0153d0210d923b72e7e6d49abf864924d5874`; серверная интеграция `e0cbedbd44a06da80aea0a9c98fa671eba59ae2e`; панель интерфейса `1a16d6118fd511fd367a0f7c38a70012683ba09e`.
 - **Не считать сканер готовым:** кандидаты пока хранятся только в памяти процесса; автоматическое принятие `ACCEPTED`, получение биржевого `tickSize`, полная атомарная проверка лимита/дублей/кулдауна, сопровождение, журнал и восстановление состояния ещё не подключены. Отсутствие подходящих условий означает пустой список, а не искусственный сигнал.
 - **Проверки:** изменения закоммичены в `main`; CI и production deploy ещё не подтверждены. Нужно проверить синтаксис/тесты на GitHub runner и добавить unit-тесты сканера до объявления этого шага проверенным.
+
+
+### 2026-10-13 — persistence and CI correction for automatic candidates
+
+- Added `app/smc/setup_store.py`: SQLite persistence for detected candidates, unique key/deduplication, audit event `CANDIDATE_DETECTED`, and API retrieval after process restart.
+- Added tests for scanner timeframe gating, empty/insufficient windows, candidate serialization, persistent insert, replay deduplication, and audit count: `tests/test_auto_scanner.py`, `tests/test_setup_store.py`.
+- First CI runs failed because persistent storage was opened during module import against the production default path on a clean runner. Corrected by lazy initialization in `app/main.py`; latest GitHub Actions run passed: https://github.com/nyxtryp/aicfa/actions/runs/38400454321 (commit `641b367fe50754c746975fc90a72e3c761e74f87`).
+- The incoming list now opens the corresponding chart when a candidate is clicked; no visible manual symbol/timeframe controls remain.
+- **Still not accepted as complete:** persisted items are `CANDIDATE`, not `ACCEPTED`; live exchange tick sizes, all §7 gates (active cap/cooldown/market status/duplicate zone), lifecycle/partial exits, realized journal, and recovery/replay for candles delivered through REST are still outstanding. Production deployment/runtime behaviour has not been verified.
