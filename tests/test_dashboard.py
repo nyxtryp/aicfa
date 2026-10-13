@@ -15,6 +15,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('id="activeSetups"', PAGE)
         self.assertIn('id="realizedJournal"', PAGE)
         self.assertIn('id="showRejected"', PAGE)
+        self.assertIn('id="marketHoursStatus"', PAGE)
         self.assertNotIn("$('refresh').addEventListener", PAGE)
         self.assertNotIn("setInterval(", PAGE)
         self.assertIn("let selectedSetup=null", PAGE)
