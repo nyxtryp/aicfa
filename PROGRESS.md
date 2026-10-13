@@ -1345,3 +1345,11 @@
 - Added durable active lifecycle and journal: 1m candle monitoring, partial targets 50/30/20, breakeven stop after TP1, expiry/invalidation, gross R/commission R/net R, active/journal API and UI panels. Same-candle TP1 and breakeven is resolved conservatively.
 - Added tests for atomic active-cap enforcement and journal transitions. CI succeeded through commit b7201853c8bacaaf6580e354ced6778dd1dfc1a7: https://github.com/nyxtryp/aicfa/actions/runs/38401658963. The newer cooldown and same-bar safety commits are still awaiting their CI result.
 - Still open: replay REST-recovered candles through the scanner; restore active setups by replaying missed 1m history after downtime; validate actual production deploy/API. The minimum stop currently uses 0.5 ATR and 0.2% of entry as a conservative commission proxy; this must be replaced by the explicitly configured commission model.
+
+
+### 2026-10-13 — REST replay and interface corrections
+
+- REST gap recovery and hourly reconciliation now pass newly restored closed candles to the same scanner callback in chronological order; historical scans slice every timeframe at the event close time to avoid future-data leakage. An empty series replays only the newest restored candle, not all 500 bars.
+- Startup recovery replays retained 1m candles for persisted active setups after history load, without sending SSE events from the worker thread. Lifecycle state markers prevent replaying events already recorded.
+- Fixed a JavaScript startup error caused by the removed manual refresh button; corrected stream status lookups to use the actual grouped status response. The active and realized panels also open the corresponding chart.
+- Latest earlier CI results passed through commit 7ccef8968cfa2efe422d3b75d270c32440c5865; newer REST replay/UI commits still require CI confirmation. Production deployment remains unverified.
