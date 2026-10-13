@@ -3,6 +3,7 @@ import unittest
 from app.smc.liquidity import (
     LiquidityLevel,
     detect_liquidity_sweeps,
+    detect_current_day_sweeps,
     find_liquidity_levels,
     find_current_day_extremes,
     is_level_near_zone,
@@ -62,6 +63,24 @@ class LiquidityTests(unittest.TestCase):
         )
         self.assertEqual([(x.kind, x.price) for x in levels], [("high", 102.0), ("low", 91.0)])
         self.assertEqual(levels[0].confirmation_index, 1)
+
+    def test_current_day_sweep_uses_only_prior_candles(self):
+        # Both candles are on the same UTC day. Candle 1 sweeps candle 0's high.
+        events = detect_current_day_sweeps(
+            timestamps_ms=[1791849600000, 1791849660000],
+            highs=[10.0, 12.0],
+            lows=[8.0, 8.5],
+            closes=[9.0, 9.5],
+        )
+        self.assertEqual(
+            [(event.direction, event.candle_index, event.level, event.source_indices)
+             for event in events],
+            [("bearish", 1, 10.0, (0,))],
+        )
+
+    def test_current_day_sweep_rejects_duplicate_timestamps(self):
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            detect_current_day_sweeps([1000, 1000], [2, 3], [1, 1], [1.5, 2.0])
 
     def test_level_distance_from_zone_uses_atr_limit(self):
         self.assertTrue(is_level_near_zone(99, 100, 105, 2, max_distance_atr=0.5))
