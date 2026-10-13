@@ -172,6 +172,21 @@ class SMCAnalysisTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "volumes"):
             analyze_smc(*negative_volume)
 
+    def test_rejects_boolean_and_fractional_snapshot_indices(self):
+        args = self.candles()
+        for bad_index in (True, 2.5):
+            with self.subTest(as_of_index=bad_index):
+                with self.assertRaisesRegex(ValueError, "as_of_index must be an integer"):
+                    analyze_smc(*args, as_of_index=bad_index)
+
+    def test_rejects_non_integer_or_non_positive_swing_parameters(self):
+        args = self.candles()
+        for parameter in ("swing_left", "swing_right"):
+            for bad_value in (True, 1.5, 0, -1):
+                with self.subTest(parameter=parameter, value=bad_value):
+                    with self.assertRaisesRegex(ValueError, f"{parameter} must be a positive integer"):
+                        analyze_smc(*args, **{parameter: bad_value})
+
     def test_rejects_boolean_and_fractional_timestamps(self):
         args = self.candles()
         for bad_timestamp in (True, 1_790_000_000_000.5):
