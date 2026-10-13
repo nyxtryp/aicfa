@@ -7,7 +7,7 @@ import time
 from collections import defaultdict, deque
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 
 from app.auth import AuthError, AuthStore
 from app.backup import create_verified_backup
@@ -21,6 +21,49 @@ BACKUP_RETRY_SECONDS = 60 * 60
 backup_status = {"status": "waiting", "last_success_ms": None, "filename": None, "size_bytes": None, "last_error": None}
 
 market_data = MarketDataManager()
+
+_event_subscribers: set[asyncio.Queue[str]] = set()
+_event_history = deque(maxlen=200)
+
+
+def _publish_event(payload: dict) -> None:
+    encoded = json.dumps(payload, separators=(",", ":"))
+    _event_history.append(encoded)
+    for queue in tuple(_event_subscribers):
+        if queue.full():
+            try:
+                queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+        try:
+            queue.put_nowait(encoded)
+        except asyncio.QueueFull:
+            pass
+
+
+async def _on_closed_candle(candle) -> None:
+    series = tuple(market_data.candles.get((candle.symbol, candle.timeframe), ()))
+    event = {"type": "closed_candle", "symbol": candle.symbol,
+             "timeframe": candle.timeframe, "close_time_ms": candle.close_time_ms,
+             "series_size": len(series)}
+    if len(series) >= 3:
+        analysis = await asyncio.to_thread(
+            analyze_smc,
+            [float(x.open) for x in series],
+            [float(x.high) for x in series],
+            [float(x.low) for x in series],
+            [float(x.close) for x in series],
+            [float(x.volume) for x in series],
+            [x.open_time_ms for x in series],
+        )
+        annotations = to_chart_payload(analysis, [x.open_time_ms for x in series])
+        event["analysis"] = {key: len(annotations.get(key, [])) for key in
+                             ("swings", "structure_breaks", "order_blocks", "fvg",
+                              "liquidity_levels", "sweeps")}
+    _publish_event(event)
+
+
+market_data.on_closed_candle = _on_closed_candle
 
 
 async def _daily_backup_loop() -> None:
@@ -252,6 +295,28 @@ async def health() -> dict[str, str]:
 async def data_status() -> dict:
     """Live ingestion health; this does not imply SMC signals are available."""
     return market_data.status()
+
+
+@app.get("/api/events")
+async def event_stream(request: Request):
+    """Push closed-candle events to the browser without periodic API polling."""
+    async def stream():
+        queue: asyncio.Queue[str] = asyncio.Queue(maxsize=100)
+        _event_subscribers.add(queue)
+        try:
+            yield "retry: 3000\\n"
+            for item in tuple(_event_history):
+                yield f"data: {item}\\n\\n"
+            while not await request.is_disconnected():
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=20)
+                    yield f"data: {item}\\n\\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\\n\\n"
+        finally:
+            _event_subscribers.discard(queue)
+    return StreamingResponse(stream(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
 
 
 
