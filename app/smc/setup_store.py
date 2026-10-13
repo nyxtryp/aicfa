@@ -28,6 +28,21 @@ class SetupStore:
                 )
             """)
             db.execute("""
+                CREATE TABLE IF NOT EXISTS setup_journal (
+                    setup_key TEXT PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    profile TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    final_status TEXT NOT NULL,
+                    opened_at_ms INTEGER NOT NULL,
+                    closed_at_ms INTEGER NOT NULL,
+                    gross_r REAL NOT NULL,
+                    commission_r REAL NOT NULL,
+                    net_r REAL NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+            """)
+            db.execute("""
                 CREATE TABLE IF NOT EXISTS setup_candidate_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     setup_key TEXT NOT NULL,
@@ -147,6 +162,51 @@ class SetupStore:
                     "SELECT payload_json FROM setup_candidates WHERE status NOT IN ('REJECTED','MISSED_PRICE') ORDER BY confirmation_time_ms DESC LIMIT ?",
                     (max(1, min(int(limit), 1000)),),
                 ).fetchall()
+        return [json.loads(row["payload_json"]) for row in rows]
+
+
+    def list_active(self, *, limit: int = 200) -> list[dict[str, Any]]:
+        with self._connection() as db:
+            rows = db.execute(
+                "SELECT payload_json FROM setup_candidates WHERE status IN ('ACCEPTED','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
+                (max(1, min(int(limit), 1000)),),
+            ).fetchall()
+        return [json.loads(row["payload_json"]) for row in rows]
+
+    def transition(self, setup_key: str, payload: Mapping[str, Any], *, event_type: str,
+                   event_time_ms: int, final_journal: Mapping[str, Any] | None = None) -> bool:
+        encoded = json.dumps(dict(payload), separators=(",", ":"), sort_keys=True)
+        with self._connection() as db:
+            row = db.execute("SELECT status FROM setup_candidates WHERE setup_key=?", (setup_key,)).fetchone()
+            if row is None or row["status"] not in ("ACCEPTED", "TP1", "TP2"):
+                return False
+            db.execute(
+                "UPDATE setup_candidates SET status=?, payload_json=?, updated_at_ms=? WHERE setup_key=?",
+                (str(payload["status"]), encoded, int(event_time_ms), setup_key),
+            )
+            db.execute(
+                "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
+                (setup_key, event_type, int(event_time_ms), encoded),
+            )
+            if final_journal is not None:
+                journal = dict(final_journal)
+                db.execute(
+                    """INSERT OR REPLACE INTO setup_journal
+                       (setup_key,symbol,profile,direction,final_status,opened_at_ms,closed_at_ms,gross_r,commission_r,net_r,payload_json)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    (setup_key, journal["symbol"], journal["profile"], journal["direction"],
+                     journal["final_status"], int(journal["opened_at_ms"]), int(journal["closed_at_ms"]),
+                     float(journal["gross_r"]), float(journal["commission_r"]), float(journal["net_r"]),
+                     json.dumps(journal, separators=(",", ":"), sort_keys=True)),
+                )
+            return True
+
+    def list_journal(self, *, limit: int = 200) -> list[dict[str, Any]]:
+        with self._connection() as db:
+            rows = db.execute(
+                "SELECT payload_json FROM setup_journal ORDER BY closed_at_ms DESC LIMIT ?",
+                (max(1, min(int(limit), 1000)),),
+            ).fetchall()
         return [json.loads(row["payload_json"]) for row in rows]
 
     def event_count(self, setup_key: str) -> int:
