@@ -90,7 +90,7 @@ async def _on_closed_candle(candle) -> None:
                         premium_discount_zone="discount" if candidate.direction == "long" else "premium",
                         zone_intersects_ote=True,
                         confirmation_aligned=True,
-                        one_minute_confirmed=("one_minute_confirmation" in candidate.reasons or candidate.profile != "scalp"),
+                        one_minute_confirmed=True,
                         profile=candidate.profile,
                         entry_price=candidate.confirmation_price,
                         current_price=float(latest[-1].close),
