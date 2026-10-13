@@ -17,6 +17,8 @@ def to_chart_payload(
     serializes analysis; it does not recompute detectors or generate signals.
     """
     end = analysis.as_of_index
+    if isinstance(end, bool) or not isinstance(end, Integral):
+        raise ValueError("analysis index must be an integer")
     if end < 0 or end >= len(timestamps_ms):
         raise ValueError("analysis index is outside the supplied timestamps")
     raw_timestamps = timestamps_ms[:end + 1]
@@ -25,6 +27,8 @@ def to_chart_payload(
     timestamps = tuple(int(value) for value in raw_timestamps)
     if any(timestamps[i] >= timestamps[i + 1] for i in range(len(timestamps) - 1)):
         raise ValueError("timestamps must be strictly increasing")
+    if len(analysis.atr) <= end or len(analysis.average_volume) <= end:
+        raise ValueError("indicator arrays do not cover the analysis index")
     if len(analysis.order_blocks) != len(analysis.order_block_mitigation):
         raise ValueError("order block mitigation states must align with order blocks")
     if len(analysis.fvg) != len(analysis.fvg_fill):
