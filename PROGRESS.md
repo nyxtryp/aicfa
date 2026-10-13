@@ -1016,3 +1016,11 @@
 - Подтверждена успешная GitHub Actions проверка строгих timestamp: код `fa24bbc8f69cc144482568d416d6910e6bab2c72` — https://github.com/nyxtryp/aicfa/actions/runs/38387532783; регрессионный тест — https://github.com/nyxtryp/aicfa/actions/runs/38387543746; обновление журнала — https://github.com/nyxtryp/aicfa/actions/runs/38387558670.
 - Подтверждена успешная GitHub Actions проверка валидации swing-входа: код — https://github.com/nyxtryp/aicfa/actions/runs/38387481974; тест — https://github.com/nyxtryp/aicfa/actions/runs/38387494349; журнал — https://github.com/nyxtryp/aicfa/actions/runs/38387510438.
 - Это подтверждает unit-тесты этих изменений, но не закрывает §4 и Фазу 2 целиком: остаются проверка графической разметки, профили/правила формирования сетапа и дальнейшие пункты ТЗ. Живые сетапы не включены.
+
+
+### 2026-10-13 — SMC §4.6: целочисленные индексы dealing range
+
+- Ужесточена валидация индексов: `as_of_index`, `SwingPoint.index` и `confirmation_index` должны быть целыми числами; bool и дробные значения отклоняются, а не доходят до сортировки/индексации.
+- Добавлены регрессионные тесты для дробных и булевых индексов.
+- Коммиты: реализация `278c44d502d89661833233d187749a5a2d12eb21`; тест `10578f0afb6ee88c5d4ee8bf3af151dcf5a5fe03`.
+- Статус: ожидается GitHub Actions; приёмка §4.6 остаётся открытой до графической проверки и проверки единых правил live/backtest.
