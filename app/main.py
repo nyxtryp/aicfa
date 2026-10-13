@@ -167,7 +167,7 @@ async def _invalidate_on_opposite_choch(candle) -> None:
     if candle.timeframe not in {"5m", "15m"}:
         return
     for setup in _get_setup_store().list_active():
-        if setup.get("status") != "ACCEPTED" or setup.get("timeframe") != candle.timeframe:
+        if setup.get("symbol") != candle.symbol or setup.get("status") != "ACCEPTED" or setup.get("timeframe") != candle.timeframe:
             continue
         if candle.close_time_ms <= int(setup.get("confirmation_time_ms", 0)):
             continue
