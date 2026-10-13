@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -10,7 +11,7 @@ from typing import Any, Mapping
 class SetupStore:
     def __init__(self, database_path: str | Path) -> None:
         self.path = str(database_path)
-        with self._connect() as db:
+        with self._connection() as db:
             db.execute("""
                 CREATE TABLE IF NOT EXISTS setup_candidates (
                     setup_key TEXT PRIMARY KEY,
@@ -42,6 +43,18 @@ class SetupStore:
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA busy_timeout=10000")
         return db
+
+    @contextmanager
+    def _connection(self):
+        db = self._connect()
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def save_candidate(self, payload: Mapping[str, Any]) -> bool:
         """Insert once; return False on replay so candle redelivery cannot duplicate it."""
