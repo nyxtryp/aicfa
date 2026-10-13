@@ -135,12 +135,18 @@ class SetupStore:
             )
             return True, decided
 
-    def list_candidates(self, *, limit: int = 200) -> list[dict[str, Any]]:
+    def list_candidates(self, *, limit: int = 200, include_rejected: bool = False) -> list[dict[str, Any]]:
         with self._connection() as db:
-            rows = db.execute(
-                "SELECT payload_json FROM setup_candidates ORDER BY confirmation_time_ms DESC LIMIT ?",
-                (max(1, min(int(limit), 1000)),),
-            ).fetchall()
+            if include_rejected:
+                rows = db.execute(
+                    "SELECT payload_json FROM setup_candidates ORDER BY confirmation_time_ms DESC LIMIT ?",
+                    (max(1, min(int(limit), 1000)),),
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    "SELECT payload_json FROM setup_candidates WHERE status NOT IN ('REJECTED','MISSED_PRICE') ORDER BY confirmation_time_ms DESC LIMIT ?",
+                    (max(1, min(int(limit), 1000)),),
+                ).fetchall()
         return [json.loads(row["payload_json"]) for row in rows]
 
     def event_count(self, setup_key: str) -> int:
