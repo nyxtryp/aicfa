@@ -1,5 +1,10 @@
 import tempfile
 import unittest
+from decimal import Decimal
+from unittest.mock import patch
+
+from app.main import _advance_active_setups
+from app.market_data import ClosedCandle
 from pathlib import Path
 
 from app.smc.setup_store import SetupStore
@@ -26,6 +31,61 @@ class SetupDecisionStoreTests(unittest.TestCase):
             self.assertEqual(second["status"], "REJECTED")
             self.assertIn("active_setup_for_symbol_profile", second["decision_reasons"])
             self.assertEqual(store.active_count(), 1)
+
+
+    def test_global_active_cap_is_eight(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SetupStore(Path(directory) / "setups.sqlite3")
+            for index in range(8):
+                inserted, payload = store.save_decision(
+                    self.candidate(f"key-{index}", symbol=f"SYM{index}"),
+                    cooldown_minutes=30,
+                )
+                self.assertTrue(inserted)
+                self.assertEqual(payload["status"], "ACCEPTED")
+            inserted, ninth = store.save_decision(
+                self.candidate("key-9", symbol="SYM9"), cooldown_minutes=30
+            )
+            self.assertTrue(inserted)
+            self.assertEqual(ninth["status"], "REJECTED")
+            self.assertIn("active_setup_limit_reached", ninth["decision_reasons"])
+            self.assertEqual(store.active_count(), 8)
+
+    def test_zone_cooldown_survives_setup_completion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SetupStore(Path(directory) / "setups.sqlite3")
+            first = self.candidate("first")
+            self.assertTrue(store.save_decision(first, cooldown_minutes=30)[0])
+            closed = dict(first, status="CLOSED")
+            self.assertTrue(store.transition("first", closed, event_type="CLOSED",
+                                             event_time_ms=1_100_000))
+            second = self.candidate("second")
+            second["confirmation_time_ms"] = 1_200_000
+            inserted, decision = store.save_decision(second, cooldown_minutes=30)
+            self.assertTrue(inserted)
+            self.assertEqual(decision["status"], "REJECTED")
+            self.assertIn("cooldown_active", decision["decision_reasons"])
+
+    def test_expiry_realizes_remaining_position_at_last_close(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SetupStore(Path(directory) / "setups.sqlite3")
+            candidate = self.candidate("expires")
+            self.assertTrue(store.save_decision(candidate, cooldown_minutes=30)[0])
+            candle = ClosedCandle(
+                symbol="BTCUSDT", timeframe="1m",
+                open_time_ms=11_840_000, close_time_ms=11_899_999,
+                open=Decimal("104"), high=Decimal("105"),
+                low=Decimal("102"), close=Decimal("105"),
+                volume=Decimal("10"),
+            )
+            with patch("app.main._get_setup_store", return_value=store):
+                _advance_active_setups(candle, publish=False)
+            self.assertEqual(store.list_active(), [])
+            journal = store.list_journal()[0]
+            self.assertEqual(journal["final_status"], "EXPIRED")
+            self.assertAlmostEqual(journal["gross_r"], 1.0)
+            self.assertGreater(journal["commission_r"], 0)
+            self.assertAlmostEqual(journal["net_r"], journal["gross_r"] - journal["commission_r"])
 
     def test_lifecycle_transition_writes_realized_journal_once(self):
         with tempfile.TemporaryDirectory() as directory:
