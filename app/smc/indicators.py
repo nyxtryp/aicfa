@@ -61,8 +61,8 @@ def calculate_average_volume(
     period: int = 20,
 ) -> tuple[float | None, ...]:
     """Return trailing simple average volume; early values are None."""
-    if period < 1:
-        raise ValueError("period must be >= 1")
+    if isinstance(period, bool) or not isinstance(period, Integral) or period < 1:
+        raise ValueError("period must be a positive integer")
     if any(not isfinite(float(volume)) for volume in volumes):
         raise ValueError("volumes must be finite")
     if any(volume < 0 for volume in volumes):
