@@ -254,6 +254,7 @@ class MarketDataManager:
         self._tasks: list[asyncio.Task[None]] = []
         self._fallback_tasks: list[asyncio.Task[None]] = []
         self._history_task: asyncio.Task[None] | None = None
+        self._metadata_task: asyncio.Task[None] | None = None
         self._reconciliation_task: asyncio.Task[None] | None = None
         self._stopping = False
         self._lock = asyncio.Lock()
@@ -319,7 +320,7 @@ class MarketDataManager:
         self._history_task = asyncio.create_task(
             self.load_history(), name="aicfa-rest-history"
         )
-        asyncio.create_task(self.refresh_exchange_filters(), name="aicfa-exchange-filters")
+        self._metadata_task = asyncio.create_task(self._exchange_metadata_loop(), name="aicfa-exchange-filters")
         self._tasks = [
             asyncio.create_task(self._run_group("tradfi", TRADFI_SYMBOLS), name="aicfa-ws-tradfi"),
             asyncio.create_task(self._run_group("crypto", CRYPTO_SYMBOLS), name="aicfa-ws-crypto"),
@@ -332,6 +333,15 @@ class MarketDataManager:
             self._reconciliation_loop(), name="aicfa-rest-reconciliation"
         )
 
+
+
+    async def _exchange_metadata_loop(self) -> None:
+        while not self._stopping:
+            await self.refresh_exchange_filters()
+            try:
+                await asyncio.sleep(15 * 60)
+            except asyncio.CancelledError:
+                raise
 
     async def refresh_exchange_filters(self) -> None:
         """Load authoritative USD-M Futures tickSize metadata; never infer it."""
@@ -372,6 +382,10 @@ class MarketDataManager:
     async def stop(self) -> None:
         self._stopping = True
         tasks, self._tasks = self._tasks, []
+        if self._metadata_task is not None:
+            self._metadata_task.cancel()
+            await asyncio.gather(self._metadata_task, return_exceptions=True)
+            self._metadata_task = None
         if self._history_task is not None:
             self._history_task.cancel()
             await asyncio.gather(self._history_task, return_exceptions=True)
