@@ -1088,3 +1088,10 @@
 - Добавлены регрессии на NaN/±Infinity/нечисловые цены, некорректные snapshot-индексы и границы gap.
 - Коммиты: код `eb3d7616c7a85b99599c9ec8e31e84aaf254aa1d`; тесты `c04741fd745ad8345be538cdb88ed85c184ab93f`. CI по этим изменениям ожидается.
 - Соседний пункт §4.1: код swing-валидации прошёл CI https://github.com/nyxtryp/aicfa/actions/runs/38389158068; результаты тестов и журнала проверяются отдельно.
+
+
+### 2026-10-13 — CI подтверждён: swing и FVG input validation
+
+- §4.1 swing detector: реализация https://github.com/nyxtryp/aicfa/actions/runs/38389158068 и тесты https://github.com/nyxtryp/aicfa/actions/runs/38389172224 прошли.
+- §4.4 FVG detector/fill: реализация https://github.com/nyxtryp/aicfa/actions/runs/38389223958 и тесты https://github.com/nyxtryp/aicfa/actions/runs/38389238386 прошли.
+- Проверки закрывают некорректные типы/значения входных цен и индексов. Это подтверждение unit-тестов, не визуальная приёмка разметки на графике и не полная приёмка Фазы 2.
