@@ -256,6 +256,9 @@ class MarketDataManager:
         self._reconciliation_task: asyncio.Task[None] | None = None
         self._stopping = False
         self._lock = asyncio.Lock()
+        # Optional event hook invoked only after a genuinely new closed candle
+        # has been persisted and accepted into the rolling window.
+        self.on_closed_candle = None
         self.store = SQLiteCandleStore()
         self.history_status: dict[str, Any] = {
             "status": "not_started",
@@ -732,6 +735,17 @@ class MarketDataManager:
                     continue
             state["closed_candles"] += 1
             state["last_closed_candle_ms"] = candle.close_time_ms
+            callback = self.on_closed_candle
+            if callback is not None:
+                try:
+                    result = callback(candle)
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    logger.exception(
+                        "Closed-candle event handler failed for %s %s",
+                        candle.symbol, candle.timeframe,
+                    )
 
     async def _run_group_connection(self, name: str, url: str) -> None:
         """Keep a group live, rotating its socket make-before-break every 23 hours."""
