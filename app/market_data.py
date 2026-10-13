@@ -43,6 +43,12 @@ ALL_SYMBOLS: tuple[str, ...] = TRADFI_SYMBOLS + CRYPTO_SYMBOLS
 SYMBOL_SET = frozenset(ALL_SYMBOLS)
 TIMEFRAME_SET = frozenset(TIMEFRAMES)
 EXPECTED_STREAM_COUNT = len(ALL_SYMBOLS) * len(TIMEFRAMES)
+CRYPTO_GROUP_SIZE = 10
+CRYPTO_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = tuple(
+    (("crypto" if index == 0 else f"crypto_{index + 1}"),
+     CRYPTO_SYMBOLS[index:index + CRYPTO_GROUP_SIZE])
+    for index in range(0, len(CRYPTO_SYMBOLS), CRYPTO_GROUP_SIZE)
+)
 CANDLES_PER_SERIES = 500
 RECONCILIATION_INTERVAL_SECONDS = 3600
 WS_ROTATION_INTERVAL_SECONDS = 23 * 60 * 60
@@ -238,7 +244,7 @@ class SQLiteCandleStore:
 
 
 class MarketDataManager:
-    """Two reconnecting Binance connections with a rolling closed-candle window.
+    """Four reconnecting Binance connections with a rolling closed-candle window.
 
     SQLite/WAL is the durable source of closed candles; memory holds the latest
     500 candles per configured symbol/timeframe for fast analysis.
@@ -249,7 +255,10 @@ class MarketDataManager:
         self.latest: dict[tuple[str, str], ClosedCandle] = {}
         self.groups: dict[str, dict[str, Any]] = {
             "tradfi": self._new_group(len(TRADFI_SYMBOLS) * len(TIMEFRAMES)),
-            "crypto": self._new_group(len(CRYPTO_SYMBOLS) * len(TIMEFRAMES)),
+            **{
+                name: self._new_group(len(symbols) * len(TIMEFRAMES))
+                for name, symbols in CRYPTO_GROUPS
+            },
         }
         self._tasks: list[asyncio.Task[None]] = []
         self._fallback_tasks: list[asyncio.Task[None]] = []
@@ -321,13 +330,19 @@ class MarketDataManager:
             self.load_history(), name="aicfa-rest-history"
         )
         self._metadata_task = asyncio.create_task(self._exchange_metadata_loop(), name="aicfa-exchange-filters")
+        websocket_groups = (("tradfi", TRADFI_SYMBOLS), *CRYPTO_GROUPS)
         self._tasks = [
-            asyncio.create_task(self._run_group("tradfi", TRADFI_SYMBOLS), name="aicfa-ws-tradfi"),
-            asyncio.create_task(self._run_group("crypto", CRYPTO_SYMBOLS), name="aicfa-ws-crypto"),
+            asyncio.create_task(
+                self._run_group(name, symbols), name=f"aicfa-ws-{name}"
+            )
+            for name, symbols in websocket_groups
         ]
         self._fallback_tasks = [
-            asyncio.create_task(self._rest_fallback_loop("tradfi", TRADFI_SYMBOLS), name="aicfa-rest-fallback-tradfi"),
-            asyncio.create_task(self._rest_fallback_loop("crypto", CRYPTO_SYMBOLS), name="aicfa-rest-fallback-crypto"),
+            asyncio.create_task(
+                self._rest_fallback_loop(name, symbols),
+                name=f"aicfa-rest-fallback-{name}",
+            )
+            for name, symbols in websocket_groups
         ]
         self._reconciliation_task = asyncio.create_task(
             self._reconciliation_loop(), name="aicfa-rest-reconciliation"
