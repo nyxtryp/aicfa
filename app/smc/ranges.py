@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
+from numbers import Integral
 from typing import Sequence
 
 from app.smc.structure import SwingPoint
@@ -34,16 +35,19 @@ def find_dealing_range(
     (highest high or lowest low). No swing can participate before its
     confirmation_index. OTE bounds are the 62%-79% retracement of the impulse.
     """
-    if as_of_index < 0:
-        raise ValueError("as_of_index must be >= 0")
+    if isinstance(as_of_index, bool) or not isinstance(as_of_index, Integral) or as_of_index < 0:
+        raise ValueError("as_of_index must be a non-negative integer")
     if not (0 < ote_min < ote_max < 1):
         raise ValueError("OTE bounds must satisfy 0 < ote_min < ote_max < 1")
 
     if any(
-        s.index < 0 or s.confirmation_index < s.index
+        isinstance(s.index, bool) or not isinstance(s.index, Integral)
+        or isinstance(s.confirmation_index, bool)
+        or not isinstance(s.confirmation_index, Integral)
+        or s.index < 0 or s.confirmation_index < s.index
         for s in swings
     ):
-        raise ValueError("swing indices must satisfy 0 <= index <= confirmation_index")
+        raise ValueError("swing indices must be integers satisfying 0 <= index <= confirmation_index")
     if any(s.kind not in {"high", "low"} for s in swings):
         raise ValueError("swing kind must be 'high' or 'low'")
     if any(not isfinite(s.price) for s in swings):
