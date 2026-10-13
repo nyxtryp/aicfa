@@ -57,9 +57,107 @@ def _publish_event(payload: dict) -> None:
             pass
 
 
+
+def _advance_active_setups(candle) -> None:
+    """Advance persisted setups using finalized 1m candles; ambiguous same-bar outcomes are conservative."""
+    if candle.timeframe != "1m":
+        return
+    store = _get_setup_store()
+    now_ms = candle.close_time_ms
+    for setup in store.list_active():
+        if candle.symbol != setup.get("symbol") or now_ms <= int(setup.get("confirmation_time_ms", 0)):
+            continue
+        payload = dict(setup)
+        direction = payload["direction"]
+        entry = float(payload["confirmation_price"])
+        original_stop = float(payload["stop_price"])
+        targets = [float(x) for x in payload.get("targets", [])]
+        if len(targets) < 3:
+            continue
+        opened = int(payload["confirmation_time_ms"])
+        lifetime_hours = 3 if payload["profile"] == "scalp" else 12
+        if now_ms >= opened + lifetime_hours * 3_600_000:
+            payload["status"] = "EXPIRED"
+            _finish_setup(payload, store, now_ms, "EXPIRED")
+            continue
+        low, high, close = float(candle.low), float(candle.high), float(candle.close)
+        zone = payload.get("zone", [])
+        invalidated = len(zone) == 2 and ((direction == "long" and close < min(zone)) or
+                                           (direction == "short" and close > max(zone)))
+        if invalidated and payload.get("status") == "ACCEPTED":
+            payload["status"] = "INVALIDATED"
+            _finish_setup(payload, store, now_ms, "INVALIDATED")
+            continue
+        status = payload["status"]
+        stop = entry if status in ("TP1", "TP2") else original_stop
+        stop_hit = low <= stop if direction == "long" else high >= stop
+        gross_r = float(payload.get("gross_r", 0.0))
+        commission_r = float(payload.get("commission_r", 0.0))
+        risk = abs(entry - original_stop)
+        if risk <= 0:
+            payload["status"] = "REJECTED"
+            payload["decision_reasons"] = list(payload.get("decision_reasons", [])) + ["invalid_risk_during_lifecycle"]
+            store.transition(payload["key"], payload, event_type="LIFECYCLE_REJECTED", event_time_ms=now_ms)
+            continue
+        if stop_hit:
+            if status == "ACCEPTED":
+                gross_r -= 1.0
+                commission_r += 0.0005 * (entry + stop) / risk
+            else:
+                remaining = 0.5 if status == "TP1" else 0.2
+                commission_r += remaining * 0.0005 * (entry + stop) / risk
+            payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
+            _finish_setup(payload, store, now_ms, "SL")
+            continue
+        stages = {"ACCEPTED": 0, "TP1": 1, "TP2": 2}
+        stage = stages.get(status, 3)
+        reached = []
+        for idx in range(stage, 3):
+            target = targets[idx]
+            hit = high >= target if direction == "long" else low <= target
+            if not hit:
+                break
+            weight = (0.5, 0.3, 0.2)[idx]
+            gross_r += weight * ((target - entry) if direction == "long" else (entry - target)) / risk
+            commission_r += weight * 0.0005 * (entry + target) / risk
+            reached.append(idx + 1)
+        if not reached:
+            continue
+        last = reached[-1]
+        payload.update({"gross_r": gross_r, "commission_r": commission_r, "last_event_time_ms": now_ms})
+        if last == 3:
+            payload["status"] = "CLOSED"
+            _finish_setup(payload, store, now_ms, "TP3")
+        else:
+            payload["status"] = f"TP{last}"
+            if store.transition(payload["key"], payload, event_type=f"TP{last}", event_time_ms=now_ms):
+                _publish_event({"type": "setup_lifecycle", "setup": payload})
+            if last == 1 and (low <= entry if direction == "long" else high >= entry):
+                payload["status"] = "SL"
+                _finish_setup(payload, store, now_ms, "SL")
+
+
+def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_status: str) -> None:
+    payload["final_status"] = final_status
+    payload["closed_at_ms"] = event_time_ms
+    gross_r = float(payload.get("gross_r", 0.0))
+    commission_r = float(payload.get("commission_r", 0.0))
+    payload["net_r"] = gross_r - commission_r
+    journal = {
+        "key": payload["key"], "symbol": payload["symbol"], "profile": payload["profile"],
+        "direction": payload["direction"], "final_status": final_status,
+        "opened_at_ms": int(payload["confirmation_time_ms"]), "closed_at_ms": event_time_ms,
+        "gross_r": gross_r, "commission_r": commission_r, "net_r": payload["net_r"],
+    }
+    if store.transition(payload["key"], payload, event_type=final_status,
+                        event_time_ms=event_time_ms, final_journal=journal):
+        _publish_event({"type": "setup_lifecycle", "setup": payload, "journal": journal})
+
+
 async def _on_closed_candle(candle) -> None:
     global _scanner_last_event_ms
     _scanner_last_event_ms = candle.close_time_ms
+    _advance_active_setups(candle)
     if candle.timeframe in {"5m", "15m"}:
         snapshot = {tf: tuple(market_data.candles.get((candle.symbol, tf), ())) for tf in TIMEFRAMES}
         try:
@@ -75,7 +173,10 @@ async def _on_closed_candle(candle) -> None:
                 payload["entry_limit"] = None
                 payload["risk_reward"] = None
                 payload["decision_reasons"] = []
-                if not tick_info:
+                if len(candidate.targets) < 3:
+                    payload["status"] = "REJECTED"
+                    payload["decision_reasons"] = ["three_confirmed_targets_required"]
+                elif not tick_info:
                     payload["status"] = "REJECTED"
                     payload["decision_reasons"] = ["tick_size_unavailable"]
                 elif not latest:
