@@ -76,10 +76,7 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             continue
         opened = int(payload["confirmation_time_ms"])
         lifetime_hours = 3 if payload["profile"] == "scalp" else 12
-        if now_ms >= opened + lifetime_hours * 3_600_000:
-            payload["status"] = "EXPIRED"
-            _finish_setup(payload, store, now_ms, "EXPIRED", publish=publish)
-            continue
+        expired = now_ms >= opened + lifetime_hours * 3_600_000
         low, high, close = float(candle.low), float(candle.high), float(candle.close)
         zone = payload.get("zone", [])
         invalidated = len(zone) == 2 and ((direction == "long" and close < min(zone)) or
@@ -132,6 +129,12 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             commission_r += weight * 0.0005 * (entry + target) / risk
             reached.append(idx + 1)
         if not reached:
+            if expired:
+                remaining = 1.0 if status == "ACCEPTED" else 0.5 if status == "TP1" else 0.2
+                gross_r += remaining * ((close - entry) if direction == "long" else (entry - close)) / risk
+                commission_r += remaining * 0.0005 * (entry + close) / risk
+                payload.update({"status": "EXPIRED", "gross_r": gross_r, "commission_r": commission_r})
+                _finish_setup(payload, store, now_ms, "EXPIRED", publish=publish)
             continue
         last = reached[-1]
         payload.update({"gross_r": gross_r, "commission_r": commission_r, "last_event_time_ms": now_ms})
@@ -142,6 +145,12 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             payload["status"] = f"TP{last}"
             if store.transition(payload["key"], payload, event_type=f"TP{last}", event_time_ms=now_ms) and publish:
                 _publish_event({"type": "setup_lifecycle", "setup": payload})
+            if expired:
+                remaining = 0.5 if last == 1 else 0.2
+                gross_r += remaining * ((close - entry) if direction == "long" else (entry - close)) / risk
+                commission_r += remaining * 0.0005 * (entry + close) / risk
+                payload.update({"status": "EXPIRED", "gross_r": gross_r, "commission_r": commission_r})
+                _finish_setup(payload, store, now_ms, "EXPIRED", publish=publish)
 
 
 def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_status: str, *, publish: bool = True) -> None:
