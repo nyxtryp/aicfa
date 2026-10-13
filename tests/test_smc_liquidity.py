@@ -116,6 +116,11 @@ class LiquidityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             find_previous_day_extremes([2, 3], [1, 2], [2000, 1000])
 
+    def test_previous_day_extremes_reject_duplicate_timestamps(self):
+        from app.smc.liquidity import find_previous_day_extremes
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            find_previous_day_extremes([2, 3], [1, 2], [1000, 1000])
+
     def test_previous_day_extremes_require_equal_array_lengths(self):
         from app.smc.liquidity import find_previous_day_extremes
         with self.assertRaises(ValueError):
