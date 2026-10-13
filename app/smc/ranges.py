@@ -38,6 +38,11 @@ def find_dealing_range(
     if not (0 < ote_min < ote_max < 1):
         raise ValueError("OTE bounds must satisfy 0 < ote_min < ote_max < 1")
 
+    if any(
+        s.index < 0 or s.confirmation_index < s.index
+        for s in swings
+    ):
+        raise ValueError("swing indices must satisfy 0 <= index <= confirmation_index")
     available = sorted(
         (s for s in swings if s.confirmation_index <= as_of_index),
         key=lambda s: (s.confirmation_index, s.index),
