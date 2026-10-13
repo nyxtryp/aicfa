@@ -58,7 +58,7 @@ def _publish_event(payload: dict) -> None:
 
 
 
-def _advance_active_setups(candle) -> None:
+def _advance_active_setups(candle, *, publish: bool = True) -> None:
     """Advance persisted setups using finalized 1m candles; ambiguous same-bar outcomes are conservative."""
     if candle.timeframe != "1m":
         return
@@ -78,7 +78,7 @@ def _advance_active_setups(candle) -> None:
         lifetime_hours = 3 if payload["profile"] == "scalp" else 12
         if now_ms >= opened + lifetime_hours * 3_600_000:
             payload["status"] = "EXPIRED"
-            _finish_setup(payload, store, now_ms, "EXPIRED")
+            _finish_setup(payload, store, now_ms, "EXPIRED", publish=publish)
             continue
         low, high, close = float(candle.low), float(candle.high), float(candle.close)
         zone = payload.get("zone", [])
@@ -86,7 +86,7 @@ def _advance_active_setups(candle) -> None:
                                            (direction == "short" and close > max(zone)))
         if invalidated and payload.get("status") == "ACCEPTED":
             payload["status"] = "INVALIDATED"
-            _finish_setup(payload, store, now_ms, "INVALIDATED")
+            _finish_setup(payload, store, now_ms, "INVALIDATED", publish=publish)
             continue
         status = payload["status"]
         stop = entry if status in ("TP1", "TP2") else original_stop
@@ -107,7 +107,7 @@ def _advance_active_setups(candle) -> None:
                 remaining = 0.5 if status == "TP1" else 0.2
                 commission_r += remaining * 0.0005 * (entry + stop) / risk
             payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
-            _finish_setup(payload, store, now_ms, "SL")
+            _finish_setup(payload, store, now_ms, "SL", publish=publish)
             continue
         stages = {"ACCEPTED": 0, "TP1": 1, "TP2": 2}
         stage = stages.get(status, 3)
@@ -119,7 +119,7 @@ def _advance_active_setups(candle) -> None:
             commission_r += 0.5 * 0.0005 * (entry + target) / risk
             commission_r += 0.5 * 0.0005 * (entry + entry) / risk
             payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
-            _finish_setup(payload, store, now_ms, "SL")
+            _finish_setup(payload, store, now_ms, "SL", publish=publish)
             continue
         reached = []
         for idx in range(stage, 3):
@@ -137,14 +137,14 @@ def _advance_active_setups(candle) -> None:
         payload.update({"gross_r": gross_r, "commission_r": commission_r, "last_event_time_ms": now_ms})
         if last == 3:
             payload["status"] = "CLOSED"
-            _finish_setup(payload, store, now_ms, "TP3")
+            _finish_setup(payload, store, now_ms, "TP3", publish=publish)
         else:
             payload["status"] = f"TP{last}"
-            if store.transition(payload["key"], payload, event_type=f"TP{last}", event_time_ms=now_ms):
+            if store.transition(payload["key"], payload, event_type=f"TP{last}", event_time_ms=now_ms) and publish:
                 _publish_event({"type": "setup_lifecycle", "setup": payload})
 
 
-def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_status: str) -> None:
+def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_status: str, *, publish: bool = True) -> None:
     payload["final_status"] = final_status
     payload["closed_at_ms"] = event_time_ms
     gross_r = float(payload.get("gross_r", 0.0))
@@ -157,7 +157,7 @@ def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_st
         "gross_r": gross_r, "commission_r": commission_r, "net_r": payload["net_r"],
     }
     if store.transition(payload["key"], payload, event_type=final_status,
-                        event_time_ms=event_time_ms, final_journal=journal):
+                        event_time_ms=event_time_ms, final_journal=journal) and publish:
         _publish_event({"type": "setup_lifecycle", "setup": payload, "journal": journal})
 
 
