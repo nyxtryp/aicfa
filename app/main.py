@@ -304,13 +304,13 @@ async def event_stream(request: Request):
         queue: asyncio.Queue[str] = asyncio.Queue(maxsize=100)
         _event_subscribers.add(queue)
         try:
-            yield "retry: 3000\\n"
+            yield "retry: 3000\n"
             while not await request.is_disconnected():
                 try:
                     item = await asyncio.wait_for(queue.get(), timeout=20)
-                    yield f"data: {item}\\n\\n"
+                    yield f"data: {item}\n\n"
                 except asyncio.TimeoutError:
-                    yield ": keep-alive\\n\\n"
+                    yield ": keep-alive\n\n"
         finally:
             _event_subscribers.discard(queue)
     return StreamingResponse(stream(), media_type="text/event-stream",
