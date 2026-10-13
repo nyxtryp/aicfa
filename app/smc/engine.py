@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
+from numbers import Integral
 from typing import Sequence
 
 from app.smc.breaks import StructureBreak, detect_structure_breaks
@@ -87,7 +88,10 @@ def analyze_smc(
     lo = tuple(float(x) for x in lows[:end + 1])
     cl = tuple(float(x) for x in closes[:end + 1])
     vol = tuple(float(x) for x in volumes[:end + 1])
-    ts = tuple(int(x) for x in timestamps_ms[:end + 1])
+    raw_timestamps = tuple(timestamps_ms[:end + 1])
+    if any(isinstance(value, bool) or not isinstance(value, Integral) for value in raw_timestamps):
+        raise ValueError("timestamps must be integer milliseconds")
+    ts = tuple(int(x) for x in raw_timestamps)
     if any(not isfinite(value) for values in (op, hi, lo, cl, vol) for value in values):
         raise ValueError("OHLCV values must be finite")
     if any(volume < 0 for volume in vol):
