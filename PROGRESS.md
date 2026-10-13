@@ -1381,3 +1381,12 @@
 - Для leveraged ETF настроен увеличенный stop buffer 0.5 ATR для SOXL, SOXS, KORU и SNXX; добавлен тест конфигурации.
 - GitHub Actions прошёл: 175 тестов за 5.40 сек на коммите d7d72527a1ae049f1778ed70f0518733fcf98c95: https://github.com/nyxtryp/aicfa/actions/runs/38403549962. Последующий UI-коммит с выводом объяснения SMC ожидает CI.
 - Осталось проверить production deploy/API и заменить временную модель комиссии 0.05% на сторону на явно конфигурируемую ставку из ТЗ. Commodity public-holiday gate использует NYSE holiday calendar как консервативный proxy; если Binance задаёт иной список commodity holidays, его нужно уточнить отдельно.
+
+
+### 2026-10-13 — финальная корректировка live-gate и комиссии
+
+- Все 21 TradFi-символ теперь имеют календарное сопоставление: US-listed акции/ETF — NYSE session calendar, SKHYNIX/SAMSUNG — XKRX, commodities — Binance standard-index window. SNXX/SKHY/SPCX mapping подтверждён официальными листинг-объявлениями Binance. В интерфейсе coverage отображается как 21/21.
+- Важная защита по TZ §14 / строка о временном решении Фазы 1: по умолчанию AICFA_SCANNER_LIVE_ENABLED=false, режим отображается как shadow. Кандидаты, прошедшие фильтры, видны со статусом CANDIDATE и объяснением; они не занимают активный лимит и не становятся ACCEPTED до приёмки Фазы 1. Для повтора той же зоны в shadow также действует кулдаун. Не включать live-gate до подтверждения всех критериев Фазы 1 пользователем.
+- Комиссия вынесена в AICFA_COMMISSION_RATE_PER_SIDE (по умолчанию 0.0005 = 0.05% на сторону). Минимальный стоп проверяется как max(0.5 ATR, 4 × комиссия × цена). Валовый R, комиссии и net R считаются с этим параметром.
+- GitHub Actions успешно прошёл: 176 тестов за 5.62 сек на коммите a09013fa95c64f412103947b927a4895989b4a8d: https://github.com/nyxtryp/aicfa/actions/runs/38403964371.
+- Остаётся обязательная production smoke-проверка на FreimDeploy: из текущего окружения прямой fetch aicfa.aicfa.ru заблокирован, поэтому нельзя подтвердить, что последний commit уже развернулся и что на живом процессе есть все новые таблицы/API. После Phase 1 live-проверки надо подтвердить хранение, восстановление, REST reconciliation, ротацию WebSocket, backup/restore и только затем включать live acceptance.
