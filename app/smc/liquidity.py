@@ -247,3 +247,60 @@ def is_level_near_zone(
         return True
     distance = zone_lower - level_price if level_price < zone_lower else level_price - zone_upper
     return distance <= atr_value * max_distance_atr
+
+
+def detect_current_day_sweeps(
+    timestamps_ms: Sequence[int],
+    highs: Sequence[float],
+    lows: Sequence[float],
+    closes: Sequence[float],
+) -> tuple[LiquiditySweep, ...]:
+    """Detect intraday-extreme sweeps causally, candle by candle.
+
+    For each candle, the reference high/low is calculated only from earlier
+    closed candles with the same UTC date. The current candle is never part of
+    its own reference level. A sweep requires a wick beyond that prior extreme
+    and a close back across it.
+    """
+    if not (len(timestamps_ms) == len(highs) == len(lows) == len(closes)):
+        raise ValueError("timestamps, highs, lows, and closes must have the same length")
+    if any(high < low or close < low or close > high
+           for high, low, close in zip(highs, lows, closes)):
+        raise ValueError("OHLC values are inconsistent")
+    if any(timestamps_ms[i] >= timestamps_ms[i + 1]
+           for i in range(len(timestamps_ms) - 1)):
+        raise ValueError("timestamps must be strictly increasing")
+
+    days = [
+        datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc).date()
+        for timestamp in timestamps_ms
+    ]
+    events: list[LiquiditySweep] = []
+    prior_high: dict[object, tuple[float, tuple[int, ...]]] = {}
+    prior_low: dict[object, tuple[float, tuple[int, ...]]] = {}
+
+    for index, day in enumerate(days):
+        if day in prior_high:
+            high_level, high_sources = prior_high[day]
+            if highs[index] > high_level and closes[index] < high_level:
+                events.append(LiquiditySweep(
+                    "bearish", index, float(high_level), "high", high_sources
+                ))
+        if day in prior_low:
+            low_level, low_sources = prior_low[day]
+            if lows[index] < low_level and closes[index] > low_level:
+                events.append(LiquiditySweep(
+                    "bullish", index, float(low_level), "low", low_sources
+                ))
+
+        # Update references only after checking the current candle.
+        if day not in prior_high or highs[index] > prior_high[day][0]:
+            prior_high[day] = (float(highs[index]), (index,))
+        elif highs[index] == prior_high[day][0]:
+            prior_high[day] = (prior_high[day][0], prior_high[day][1] + (index,))
+        if day not in prior_low or lows[index] < prior_low[day][0]:
+            prior_low[day] = (float(lows[index]), (index,))
+        elif lows[index] == prior_low[day][0]:
+            prior_low[day] = (prior_low[day][0], prior_low[day][1] + (index,))
+
+    return tuple(events)
