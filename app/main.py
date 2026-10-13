@@ -23,7 +23,16 @@ BACKUP_RETRY_SECONDS = 60 * 60
 backup_status = {"status": "waiting", "last_success_ms": None, "filename": None, "size_bytes": None, "last_error": None}
 
 market_data = MarketDataManager()
-setup_store = SetupStore(market_data.store.path)
+setup_store: SetupStore | None = None
+
+
+def _get_setup_store() -> SetupStore:
+    global setup_store
+    if setup_store is None:
+        # Defer opening persistent storage until the app has started and the
+        # candle store has created its configured data directory.
+        setup_store = SetupStore(market_data.store.path)
+    return setup_store
 
 _event_subscribers: set[asyncio.Queue[str]] = set()
 _event_history = deque(maxlen=200)
@@ -56,7 +65,7 @@ async def _on_closed_candle(candle) -> None:
             candidates = await asyncio.to_thread(scan_symbol, candle.symbol, snapshot, trigger_timeframe=candle.timeframe)
             for candidate in candidates:
                 payload = candidate.as_dict()
-                if setup_store.save_candidate(payload):
+                if _get_setup_store().save_candidate(payload):
                     _setup_candidates[candidate.key] = payload
                     _publish_event({"type": "setup_candidate", "setup": payload})
         except Exception:
@@ -409,7 +418,7 @@ async def setup_candidates() -> dict:
     connected = status.get("tradfi", {}).get("status") == "connected" or status.get("crypto", {}).get("status") == "connected"
     return {"status": "running" if connected else "warming_up",
             "last_scan_time_ms": _scanner_last_event_ms,
-            "candidates": setup_store.list_candidates()}
+            "candidates": _get_setup_store().list_candidates()}
 
 
 @app.get("/api/backup-status")
