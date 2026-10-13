@@ -50,6 +50,16 @@ class DealingRangeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             find_dealing_range([], as_of_index=0, ote_min=0.8, ote_max=0.7)
 
+    def test_invalid_swing_indices_are_rejected(self):
+        malformed = [
+            SwingPoint("low", -1, 2, 100.0),
+            SwingPoint("high", 5, 4, 200.0),
+        ]
+        for swing in malformed:
+            with self.subTest(swing=swing):
+                with self.assertRaisesRegex(ValueError, "swing indices"):
+                    find_dealing_range([swing], as_of_index=10)
+
 
 if __name__ == "__main__":
     unittest.main()
