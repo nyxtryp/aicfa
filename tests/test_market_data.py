@@ -188,7 +188,10 @@ class MarketDataTests(unittest.TestCase):
         self.assertEqual(status["instruments"], 50)
         self.assertEqual(status["timeframes"], ["1m", "5m", "15m", "1h", "4h"])
         self.assertEqual(status["groups"]["tradfi"]["expected_streams"], 105)
-        self.assertEqual(status["groups"]["crypto"]["expected_streams"], 145)
+        self.assertEqual(status["groups"]["crypto"]["expected_streams"], 50)
+        self.assertEqual(status["groups"]["crypto_2"]["expected_streams"], 50)
+        self.assertEqual(status["groups"]["crypto_3"]["expected_streams"], 45)
+        self.assertEqual(sum(group["expected_streams"] for group in status["groups"].values()), 250)
         self.assertEqual(status["latest_series"], 0)
         self.assertEqual(status["stored_candles"], 0)
         self.assertEqual(status["window_size"], 500)
@@ -740,7 +743,7 @@ class MarketDataStartupTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(manager._history_task)
         self.assertFalse(manager._history_task.done())
-        self.assertEqual(len(manager._tasks), 2)
+        self.assertEqual(len(manager._tasks), 4)
 
         await manager.stop()
         self.assertIsNone(manager._history_task)
@@ -751,7 +754,8 @@ class AggregateStatusTests(unittest.TestCase):
     def test_rotation_is_reported_as_healthy_while_both_groups_have_live_sockets(self):
         manager = MarketDataManager()
         manager.groups["tradfi"]["status"] = "rotating"
-        manager.groups["crypto"]["status"] = "connected"
+        for name in ("crypto", "crypto_2", "crypto_3"):
+            manager.groups[name]["status"] = "connected"
 
         with patch.object(manager.store, "_connection", None):
             status = manager.status()
@@ -762,6 +766,8 @@ class AggregateStatusTests(unittest.TestCase):
         manager = MarketDataManager()
         manager.groups["tradfi"]["status"] = "rotating"
         manager.groups["crypto"]["status"] = "reconnecting"
+        manager.groups["crypto_2"]["status"] = "connected"
+        manager.groups["crypto_3"]["status"] = "connected"
 
         status = manager.status()
 
