@@ -2,6 +2,7 @@ import unittest
 
 from app.main import PAGE, index
 from app.market_data import ALL_SYMBOLS, TIMEFRAMES
+from app.main import LOGIN_PAGE, app
 
 
 class DashboardTests(unittest.IsolatedAsyncioTestCase):
@@ -15,6 +16,10 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("zone((ann.fvg||[])", PAGE)
         self.assertIn("for(const e of ann.structure_breaks||[])", PAGE)
         self.assertIn("for(const e of ann.sweeps||[])", PAGE)
+        self.assertIn("/api/auth/login", [route.path for route in app.routes])
+        self.assertIn("/api/settings/password", [route.path for route in app.routes])
+        self.assertIn("autocomplete=\"current-password\"", LOGIN_PAGE)
+        self.assertIn("AICFA_SETUP_TOKEN", LOGIN_PAGE)
         self.assertNotIn("__AICFA_SYMBOLS__", PAGE)
         self.assertNotIn("__AICFA_TIMEFRAMES__", PAGE)
         for symbol in ALL_SYMBOLS:
