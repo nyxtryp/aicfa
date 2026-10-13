@@ -1268,3 +1268,6 @@
 - Тест AuthStore теперь проверяет отзыв старой сессии после смены пароля.
 - Коммиты: UI — https://github.com/nyxtryp/aicfa/commit/9acfd71de2794cd2ce8680188bae0b9a196470a2; отзыв сессий — https://github.com/nyxtryp/aicfa/commit/b3a831ab64554705be0c214539e8c229eae61124; тест — https://github.com/nyxtryp/aicfa/commit/5015d4127e73e369b486145b267a06e28a74daeb; обновление cookie — https://github.com/nyxtryp/aicfa/commit/281006a49689c1a49222c4311534855278b16dcf.
 - **Статус:** ждём CI после последних изменений. Для production требуется задать `AICFA_SETUP_TOKEN` в FreimDeploy и проверить полный входной цикл. Лимит попыток пока хранится в памяти одного процесса; персистентная/межпроцессная блокировка остаётся открытой задачей.
+
+
+- **CI-результат интеграции входа:** GitHub Actions run https://github.com/nyxtryp/aicfa/actions/runs/38393847737 завершился `success` после обновления cookie и теста отзыва сессий. Более ранний запуск на промежуточной версии `b3a831ab` упал; причина исправлена в последующих коммитах, включая проверку `5015d412` и установку новой cookie `281006a4`. Production-проверка ещё не выполнялась.
