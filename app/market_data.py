@@ -925,7 +925,7 @@ class MarketDataManager:
                 state["status"] = "reconnecting"
                 state["last_error"] = type(exc).__name__
                 state["reconnects"] += 1
-                logger.warning("Binance %s stream disconnected (%s); retrying", name, type(exc).__name__)
+                logger.warning("Binance %s stream disconnected (%s: %s; close_code=%r; close_reason=%r); retrying", name, type(exc).__name__, str(exc)[:300], getattr(exc, "code", None), getattr(exc, "reason", None))
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 30)
         state["status"] = "stopped"
