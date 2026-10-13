@@ -586,7 +586,7 @@ async def smc_analysis(symbol: str, timeframe: str) -> dict:
 async def setup_candidates(include_rejected: bool = False) -> dict:
     """Current in-memory candidates detected automatically from closed candles."""
     status = market_data.status()
-    connected = status.get("tradfi", {}).get("status") == "connected" or status.get("crypto", {}).get("status") == "connected"
+    connected = status.get("groups", {}).get("tradfi", {}).get("status") == "connected" and status.get("groups", {}).get("crypto", {}).get("status") == "connected"
     return {"status": "running" if connected else "warming_up",
             "last_scan_time_ms": _scanner_last_event_ms,
             "candidates": _get_setup_store().list_candidates(include_rejected=include_rejected)}
