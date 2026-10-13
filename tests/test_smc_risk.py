@@ -31,9 +31,9 @@ class RiskCalculationTests(unittest.TestCase):
         for value in (float("nan"), float("inf"), True, "100"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 calculate_risk_reward("long", value, 95, 110)
-        for kwargs in ({"min_rr": 0}, {"tick_size": 0}, {"tick_size": float("nan")}):
-            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
-                acceptable_entry_limit("long", 120, 90, tick_size=0.1, **kwargs)
+        for min_rr, tick_size in ((0, 0.1), (1.5, 0), (1.5, float("nan"))):
+            with self.subTest(min_rr=min_rr, tick_size=tick_size), self.assertRaises(ValueError):
+                acceptable_entry_limit("long", 120, 90, min_rr=min_rr, tick_size=tick_size)
 
 
 if __name__ == "__main__":
