@@ -15,6 +15,7 @@ from app.market_data import ALL_SYMBOLS, TIMEFRAMES, MarketDataManager
 from app.smc.engine import analyze_smc
 from app.smc.presentation import to_chart_payload
 from app.smc.scanner import scan_symbol
+from app.smc.setup_store import SetupStore
 
 logger = logging.getLogger("aicfa.backup")
 BACKUP_INTERVAL_SECONDS = 24 * 60 * 60
@@ -22,6 +23,7 @@ BACKUP_RETRY_SECONDS = 60 * 60
 backup_status = {"status": "waiting", "last_success_ms": None, "filename": None, "size_bytes": None, "last_error": None}
 
 market_data = MarketDataManager()
+setup_store = SetupStore(market_data.store.path)
 
 _event_subscribers: set[asyncio.Queue[str]] = set()
 _event_history = deque(maxlen=200)
@@ -53,8 +55,8 @@ async def _on_closed_candle(candle) -> None:
         try:
             candidates = await asyncio.to_thread(scan_symbol, candle.symbol, snapshot, trigger_timeframe=candle.timeframe)
             for candidate in candidates:
-                if candidate.key not in _setup_candidates:
-                    payload = candidate.as_dict()
+                payload = candidate.as_dict()
+                if setup_store.save_candidate(payload):
                     _setup_candidates[candidate.key] = payload
                     _publish_event({"type": "setup_candidate", "setup": payload})
         except Exception:
@@ -407,7 +409,7 @@ async def setup_candidates() -> dict:
     connected = status.get("tradfi", {}).get("status") == "connected" or status.get("crypto", {}).get("status") == "connected"
     return {"status": "running" if connected else "warming_up",
             "last_scan_time_ms": _scanner_last_event_ms,
-            "candidates": list(_setup_candidates.values())}
+            "candidates": setup_store.list_candidates()}
 
 
 @app.get("/api/backup-status")
