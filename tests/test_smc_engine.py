@@ -172,6 +172,16 @@ class SMCAnalysisTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "volumes"):
             analyze_smc(*negative_volume)
 
+    def test_rejects_boolean_and_fractional_timestamps(self):
+        args = self.candles()
+        for bad_timestamp in (True, 1_790_000_000_000.5):
+            malformed = list(args)
+            malformed[5] = list(args[5])
+            malformed[5][2] = bad_timestamp
+            with self.subTest(timestamp=bad_timestamp):
+                with self.assertRaisesRegex(ValueError, "integer milliseconds"):
+                    analyze_smc(*malformed)
+
     def test_invalid_zone_bounds_are_rejected_even_without_levels(self):
         args = self.candles()
         with self.assertRaisesRegex(ValueError, "zone_bounds"):
