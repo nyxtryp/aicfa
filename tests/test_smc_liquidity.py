@@ -157,5 +157,39 @@ class LiquidityTests(unittest.TestCase):
         self.assertEqual([(event.direction, event.candle_index) for event in events], [("bearish", 1)])
 
 
+
+    def test_previous_day_extremes_reject_non_finite_prices_and_bad_timestamps(self):
+        from app.smc.liquidity import find_previous_day_extremes
+        for value in (float("nan"), float("inf"), True, "10"):
+            with self.subTest(price=value), self.assertRaises(ValueError):
+                find_previous_day_extremes([value, 11], [1, 2], [1000, 86401000])
+        for value in (True, 1000.5, "1000"):
+            with self.subTest(timestamp=value), self.assertRaises(ValueError):
+                find_previous_day_extremes([2, 3], [1, 2], [value, 86401000])
+
+    def test_current_day_extremes_reject_bad_inputs(self):
+        for index in (True, 1.0):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                find_current_day_extremes([1000, 2000], [2, 3], [1, 2], as_of_index=index)
+        for timestamps in ([1000, True], [1000, 1500.5], [2000, 1000]):
+            with self.subTest(timestamps=timestamps), self.assertRaises(ValueError):
+                find_current_day_extremes(timestamps, [2, 3], [1, 2], as_of_index=1)
+        with self.assertRaises(ValueError):
+            find_current_day_extremes([1000, 2000], [2, float("nan")], [1, 2], as_of_index=1)
+
+    def test_current_day_sweeps_reject_non_finite_ohlc_and_bad_timestamp_types(self):
+        for value in (float("nan"), float("inf"), True, "10"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                detect_current_day_sweeps([1000], [value], [1], [1.5])
+        for value in (True, 1000.5, "1000"):
+            with self.subTest(timestamp=value), self.assertRaises(ValueError):
+                detect_current_day_sweeps([value], [2], [1], [1.5])
+
+    def test_zone_distance_rejects_non_finite_inputs(self):
+        for value in (float("nan"), float("inf"), True, "100"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                is_level_near_zone(value, 100, 105, 2, max_distance_atr=1)
+
+
 if __name__ == "__main__":
     unittest.main()
