@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
+from numbers import Integral, Real
 from typing import Sequence
 
 
@@ -25,19 +27,26 @@ def find_fair_value_gaps(
     """
     if len(highs) != len(lows):
         raise ValueError("highs and lows must have the same length")
-    if any(high < low for high, low in zip(highs, lows)):
+    if any(
+        isinstance(value, bool) or not isinstance(value, Real) or not isfinite(value)
+        for value in (*highs, *lows)
+    ):
+        raise ValueError("highs and lows must contain finite real numbers")
+    high_values = tuple(float(value) for value in highs)
+    low_values = tuple(float(value) for value in lows)
+    if any(high < low for high, low in zip(high_values, low_values)):
         raise ValueError("each high must be >= its low")
 
     gaps: list[FairValueGap] = []
-    for index in range(2, len(highs)):
+    for index in range(2, len(high_values)):
         first = index - 2
-        if lows[index] > highs[first]:
+        if low_values[index] > high_values[first]:
             gaps.append(FairValueGap(
-                "bullish", first, index, float(highs[first]), float(lows[index])
+                "bullish", first, index, high_values[first], low_values[index]
             ))
-        elif highs[index] < lows[first]:
+        elif high_values[index] < low_values[first]:
             gaps.append(FairValueGap(
-                "bearish", first, index, float(highs[index]), float(lows[first])
+                "bearish", first, index, high_values[index], low_values[first]
             ))
     return tuple(gaps)
 
@@ -71,22 +80,39 @@ def measure_fvg_fill(
         raise ValueError("highs and lows must have the same length")
     if any(high < low for high, low in zip(highs, lows)):
         raise ValueError("each high must be >= its low")
-    if gap.direction not in {"bullish", "bearish"} or gap.upper <= gap.lower:
+    if any(
+        isinstance(value, bool) or not isinstance(value, Real) or not isfinite(value)
+        for value in (gap.lower, gap.upper)
+    ) or gap.direction not in {"bullish", "bearish"} or gap.upper <= gap.lower:
         raise ValueError("gap direction or boundaries are invalid")
-    if gap.confirmation_index < 0 or gap.confirmation_index >= len(highs):
+    for name, value in (
+        ("first_candle_index", gap.first_candle_index),
+        ("confirmation_index", gap.confirmation_index),
+    ):
+        if isinstance(value, bool) or not isinstance(value, Integral) or value < 0:
+            raise ValueError(f"gap {name} must be a non-negative integer")
+    if gap.first_candle_index > gap.confirmation_index - 2:
+        raise ValueError("gap first candle must precede confirmation by two candles")
+    if gap.confirmation_index >= len(highs):
         raise ValueError("gap confirmation index is outside the supplied candles")
 
-    end = len(highs) - 1 if as_of_index is None else as_of_index
+    if as_of_index is not None and (
+        isinstance(as_of_index, bool) or not isinstance(as_of_index, Integral)
+    ):
+        raise ValueError("as_of_index must be an integer")
+    end = len(highs) - 1 if as_of_index is None else int(as_of_index)
     if end < gap.confirmation_index or end >= len(highs):
         raise ValueError("as_of_index must be between confirmation and last candle")
 
+    high_values = tuple(float(value) for value in highs)
+    low_values = tuple(float(value) for value in lows)
     subsequent = range(gap.confirmation_index + 1, end + 1)
     width = gap.upper - gap.lower
     if gap.direction == "bullish":
-        lowest = min((lows[i] for i in subsequent), default=gap.upper)
+        lowest = min((low_values[i] for i in subsequent), default=gap.upper)
         penetration = min(width, max(0.0, gap.upper - lowest))
     else:
-        highest = max((highs[i] for i in subsequent), default=gap.lower)
+        highest = max((high_values[i] for i in subsequent), default=gap.lower)
         penetration = min(width, max(0.0, highest - gap.lower))
 
     fully_filled = penetration >= width
