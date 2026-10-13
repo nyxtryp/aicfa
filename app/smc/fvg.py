@@ -89,10 +89,13 @@ def measure_fvg_fill(
         highest = max((highs[i] for i in subsequent), default=gap.lower)
         penetration = min(width, max(0.0, highest - gap.lower))
 
-    fill_percent = round(penetration / width * 100.0, 8)
+    fully_filled = penetration >= width
+    fill_percent = 100.0 if fully_filled else min(
+        round(penetration / width * 100.0, 8), 99.99999999
+    )
     return FairValueGapFill(
         gap=gap,
         as_of_index=end,
         fill_percent=fill_percent,
-        fully_filled=penetration >= width,
+        fully_filled=fully_filled,
     )
