@@ -11,10 +11,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Stre
 
 from app.auth import AuthError, AuthStore
 from app.backup import create_verified_backup
-from app.market_data import ALL_SYMBOLS, TIMEFRAMES, MarketDataManager
+from app.market_data import ALL_SYMBOLS, TIMEFRAMES, TRADFI_SYMBOLS, MarketDataManager
 from app.smc.engine import analyze_smc
 from app.smc.presentation import to_chart_payload
 from app.smc.scanner import scan_symbol
+from app.smc.setups import SetupEvidence, evaluate_candidate
 from app.smc.setup_store import SetupStore
 
 logger = logging.getLogger("aicfa.backup")
@@ -65,7 +66,50 @@ async def _on_closed_candle(candle) -> None:
             candidates = await asyncio.to_thread(scan_symbol, candle.symbol, snapshot, trigger_timeframe=candle.timeframe)
             for candidate in candidates:
                 payload = candidate.as_dict()
-                if _get_setup_store().save_candidate(payload):
+                tick_info = market_data.exchange_filters.get(candidate.symbol)
+                latest = snapshot.get(candidate.timeframe, ())
+                now_ms = int(time.time() * 1000)
+                tf_ms = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000}[candidate.timeframe]
+                fresh = bool(latest and now_ms - latest[-1].close_time_ms <= tf_ms + 120_000)
+                payload["zone_key"] = f"{candidate.symbol}:{candidate.profile}:{candidate.direction}:{candidate.zone[0]:.12g}:{candidate.zone[1]:.12g}"
+                payload["entry_limit"] = None
+                payload["risk_reward"] = None
+                payload["decision_reasons"] = []
+                if not tick_info:
+                    payload["status"] = "REJECTED"
+                    payload["decision_reasons"] = ["tick_size_unavailable"]
+                elif not latest:
+                    payload["status"] = "REJECTED"
+                    payload["decision_reasons"] = ["confirmation_data_missing"]
+                else:
+                    evidence = SetupEvidence(**candidate.evidence)
+                    decision = evaluate_candidate(
+                        evidence,
+                        direction=candidate.direction,
+                        higher_timeframe_bias=candidate.direction,
+                        premium_discount_zone="discount" if candidate.direction == "long" else "premium",
+                        zone_intersects_ote=True,
+                        confirmation_aligned=True,
+                        one_minute_confirmed=("one_minute_confirmation" in candidate.reasons or candidate.profile != "scalp"),
+                        profile=candidate.profile,
+                        entry_price=candidate.confirmation_price,
+                        current_price=float(latest[-1].close),
+                        stop_price=candidate.stop_price,
+                        tp1_price=candidate.targets[0],
+                        tick_size=float(tick_info["tick_size"]),
+                        min_stop_distance=max(0.5 * candidate.atr, candidate.confirmation_price * 0.002),
+                        data_fresh=fresh,
+                        tradfi_market_open=candidate.symbol not in TRADFI_SYMBOLS,
+                    )
+                    payload["entry_limit"] = decision.entry_limit
+                    payload["risk_reward"] = decision.risk_reward
+                    payload["score"] = decision.score.total
+                    payload["decision_reasons"] = list(decision.reasons)
+                    payload["status"] = "ACCEPTED" if decision.status == "ELIGIBLE" else decision.status
+                saved, payload = _get_setup_store().save_decision(
+                    payload, cooldown_minutes=30 if candidate.profile == "scalp" else 120, max_active=8
+                )
+                if saved:
                     _setup_candidates[candidate.key] = payload
                     _publish_event({"type": "setup_candidate", "setup": payload})
         except Exception:
