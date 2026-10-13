@@ -350,6 +350,35 @@ def _recover_active_history() -> None:
         _advance_active_setups(candle, publish=False)
 
 
+async def _scanner_startup_warmup() -> None:
+    """Run the SMC scanner once on each currently fresh finalized 5m/15m candle.
+
+    The REST history load populates candle windows but intentionally does not emit
+    candle events. Without this warm-up, the UI can report zero scanner checks
+    after every restart until the next 5m/15m close. Only fresh candles are used;
+    stale history is never replayed into candidate decisions.
+    """
+    history_task = market_data._history_task
+    if history_task is not None:
+        await asyncio.gather(history_task, return_exceptions=True)
+    now_ms = int(time.time() * 1000)
+    warmup_events = 0
+    for symbol in ALL_SYMBOLS:
+        for timeframe, duration_ms in (("5m", 300_000), ("15m", 900_000)):
+            series = market_data.candles.get((symbol, timeframe), ())
+            if not series:
+                continue
+            latest = series[-1]
+            if now_ms - latest.close_time_ms > duration_ms + 120_000:
+                continue
+            try:
+                await _on_closed_candle(latest)
+                warmup_events += 1
+            except Exception:
+                logger.exception("SMC startup warm-up failed for %s %s", symbol, timeframe)
+    logger.info("SMC startup warm-up processed %s fresh finalized candle events", warmup_events)
+
+
 async def _daily_backup_loop() -> None:
     """Back up after startup history finishes, then repeat daily."""
     history_task = market_data._history_task
@@ -378,11 +407,13 @@ async def _daily_backup_loop() -> None:
 async def lifespan(app: FastAPI):
     await market_data.start()
     backup_task = asyncio.create_task(_daily_backup_loop(), name="aicfa-daily-backup")
+    scanner_warmup_task = asyncio.create_task(_scanner_startup_warmup(), name="aicfa-scanner-startup-warmup")
     try:
         yield
     finally:
-        backup_task.cancel()
-        await asyncio.gather(backup_task, return_exceptions=True)
+        for task in (backup_task, scanner_warmup_task):
+            task.cancel()
+        await asyncio.gather(backup_task, scanner_warmup_task, return_exceptions=True)
         await market_data.stop()
 
 
