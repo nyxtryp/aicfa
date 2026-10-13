@@ -18,15 +18,16 @@ import pandas_market_calendars as mcal
 US_EQUITY_SYMBOLS = frozenset({
     "SOXLUSDT", "KORUUSDT", "MUUSDT", "SOXSUSDT", "MSTRUSDT",
     "CRCLUSDT", "QQQUSDT", "EWYUSDT", "NVDAUSDT", "SPYUSDT",
-    "SNDKUSDT",
+    "SNDKUSDT", "SKHYUSDT", "SPCXUSDT",
 })
+KRX_EQUITY_SYMBOLS = frozenset({"SKHYNIXUSDT", "SAMSUNGUSDT"})
 COMMODITY_SYMBOLS = frozenset({"XAUUSDT", "XAGUSDT", "CLUSDT", "BZUSDT", "NATGASUSDT"})
 _NEW_YORK = ZoneInfo("America/New_York")
 
 
 @lru_cache(maxsize=16)
-def _session_bounds(day: date) -> tuple[tuple[datetime, datetime], ...]:
-    calendar = mcal.get_calendar("NYSE")
+def _session_bounds(day: date, calendar_name: str = "NYSE") -> tuple[tuple[datetime, datetime], ...]:
+    calendar = mcal.get_calendar(calendar_name)
     schedule = calendar.schedule(
         start_date=(day - timedelta(days=1)).isoformat(),
         end_date=(day + timedelta(days=1)).isoformat(),
@@ -76,7 +77,9 @@ def tradfi_market_is_open(symbol: str, now: datetime | None = None) -> bool | No
         raise ValueError("now must be timezone-aware")
     instant = instant.astimezone(timezone.utc)
     if normalized in US_EQUITY_SYMBOLS:
-        return any(opened <= instant < closed for opened, closed in _session_bounds(instant.date()))
+        return any(opened <= instant < closed for opened, closed in _session_bounds(instant.date(), "NYSE"))
+    if normalized in KRX_EQUITY_SYMBOLS:
+        return any(opened <= instant < closed for opened, closed in _session_bounds(instant.date(), "XKRX"))
     if normalized in COMMODITY_SYMBOLS:
         return _commodity_session_is_open(instant)
     return None
