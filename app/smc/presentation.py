@@ -1,6 +1,7 @@
 """Chart-ready, timestamped serialization of causal SMC snapshots."""
 from __future__ import annotations
 
+from numbers import Integral
 from typing import Sequence
 
 from app.smc.engine import SMCAnalysis
@@ -18,7 +19,10 @@ def to_chart_payload(
     end = analysis.as_of_index
     if end < 0 or end >= len(timestamps_ms):
         raise ValueError("analysis index is outside the supplied timestamps")
-    timestamps = tuple(int(value) for value in timestamps_ms[:end + 1])
+    raw_timestamps = timestamps_ms[:end + 1]
+    if any(isinstance(value, bool) or not isinstance(value, Integral) for value in raw_timestamps):
+        raise ValueError("timestamps must be integer milliseconds")
+    timestamps = tuple(int(value) for value in raw_timestamps)
     if any(timestamps[i] >= timestamps[i + 1] for i in range(len(timestamps) - 1)):
         raise ValueError("timestamps must be strictly increasing")
     if len(analysis.order_blocks) != len(analysis.order_block_mitigation):
