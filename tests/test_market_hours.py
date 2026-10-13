@@ -17,6 +17,17 @@ class TradFiMarketHoursTests(unittest.TestCase):
         self.assertFalse(tradfi_market_is_open("NVDAUSDT", saturday))
         self.assertFalse(tradfi_market_is_open("NVDAUSDT", thanksgiving))
 
+
+    def test_commodity_contracts_use_sunday_to_friday_session_and_daily_break(self):
+        weekday_open = datetime(2026, 10, 13, 15, 0, tzinfo=timezone.utc)  # 11:00 ET
+        maintenance_break = datetime(2026, 10, 13, 21, 30, tzinfo=timezone.utc)  # 17:30 ET
+        weekend = datetime(2026, 10, 17, 15, 0, tzinfo=timezone.utc)
+        sunday_open = datetime(2026, 10, 18, 22, 30, tzinfo=timezone.utc)  # 18:30 ET
+        self.assertTrue(tradfi_market_is_open("XAUUSDT", weekday_open))
+        self.assertFalse(tradfi_market_is_open("CLUSDT", maintenance_break))
+        self.assertFalse(tradfi_market_is_open("NATGASUSDT", weekend))
+        self.assertTrue(tradfi_market_is_open("BZUSDT", sunday_open))
+
     def test_unmapped_tradfi_contract_fails_closed(self):
         instant = datetime(2026, 10, 13, 14, 0, tzinfo=timezone.utc)
         self.assertIsNone(tradfi_market_is_open("XAUUSDT", instant))
