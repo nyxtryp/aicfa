@@ -131,7 +131,12 @@ async def auth_setup(request: Request) -> JSONResponse:
         return JSONResponse({"detail":"setup disabled"}, status_code=503)
     try:
         data = await request.json()
-        auth_store.set_initial_password(str(data.get("password","")), str(data.get("token","")), expected)
+        if not isinstance(data, dict):
+            raise ValueError("JSON object required")
+        password, token = data.get("password", ""), data.get("token", "")
+        if not isinstance(password, str) or not isinstance(token, str):
+            raise ValueError("password and token must be strings")
+        auth_store.set_initial_password(password, token, expected)
     except (AuthError, ValueError, TypeError):
         return JSONResponse({"detail":"setup failed"}, status_code=400)
     return JSONResponse({"status":"configured"})
@@ -142,6 +147,8 @@ async def auth_login(request: Request) -> JSONResponse:
         return JSONResponse({"detail":"too many attempts"}, status_code=429)
     try:
         data = await request.json()
+        if not isinstance(data, dict):
+            return JSONResponse({"detail":"invalid request"}, status_code=400)
         password = data.get("password", "")
     except (ValueError, TypeError):
         return JSONResponse({"detail":"invalid request"}, status_code=400)
@@ -163,7 +170,12 @@ async def auth_change_password(request: Request) -> JSONResponse:
         return JSONResponse({"detail":"authentication required"}, status_code=401)
     try:
         data = await request.json()
-        auth_store.change_password(str(data.get("current_password","")), str(data.get("new_password","")))
+        if not isinstance(data, dict):
+            raise ValueError("JSON object required")
+        current_password, new_password = data.get("current_password", ""), data.get("new_password", "")
+        if not isinstance(current_password, str) or not isinstance(new_password, str):
+            raise ValueError("passwords must be strings")
+        auth_store.change_password(current_password, new_password)
     except (AuthError, ValueError, TypeError):
         return JSONResponse({"detail":"password change failed"}, status_code=400)
     response = JSONResponse({"status":"ok"})
