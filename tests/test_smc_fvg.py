@@ -29,6 +29,25 @@ class FairValueGapTests(unittest.TestCase):
             find_fair_value_gaps([0], [1])
 
 
+    def test_rejects_non_finite_or_non_numeric_prices(self):
+        for bad_value in (float("nan"), float("inf"), float("-inf"), True, "2"):
+            with self.subTest(value=bad_value):
+                with self.assertRaisesRegex(ValueError, "finite real numbers"):
+                    find_fair_value_gaps([1, bad_value, 1], [0, 0, 0])
+
+    def test_fill_rejects_invalid_indices_and_gap_boundaries(self):
+        highs = [10, 12, 14, 14]
+        lows = [8, 11, 13, 12]
+        gap = FairValueGap("bullish", 0, 2, 10.0, 13.0)
+        for bad_index in (True, 2.5):
+            with self.subTest(as_of_index=bad_index):
+                with self.assertRaisesRegex(ValueError, "as_of_index must be an integer"):
+                    measure_fvg_fill(gap, highs, lows, as_of_index=bad_index)
+        with self.assertRaisesRegex(ValueError, "first candle must precede confirmation"):
+            measure_fvg_fill(FairValueGap("bullish", 1, 2, 10.0, 13.0), highs, lows)
+        with self.assertRaisesRegex(ValueError, "boundaries are invalid"):
+            measure_fvg_fill(FairValueGap("bullish", 0, 2, float("nan"), 13.0), highs, lows)
+
     def test_bullish_gap_fill_progress_uses_only_post_confirmation_candles(self):
         gap = FairValueGap("bullish", 0, 2, 10.0, 13.0)
         highs = [10, 12, 14, 14, 12]
