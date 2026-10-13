@@ -127,7 +127,7 @@ class SetupStore:
                     reasons.append("active_setup_for_symbol_profile")
                 cooldown_ms = max(0, int(cooldown_minutes)) * 60_000
                 if cooldown_ms and db.execute(
-                    "SELECT 1 FROM setup_candidates WHERE symbol=? AND profile=? AND zone_key=? AND status IN ('ACCEPTED','ACTIVE','TP1','TP2') AND confirmation_time_ms>=? LIMIT 1",
+                    "SELECT 1 FROM setup_candidates WHERE symbol=? AND profile=? AND zone_key=? AND status NOT IN ('REJECTED','MISSED_PRICE') AND confirmation_time_ms>=? LIMIT 1",
                     (decided["symbol"], decided["profile"], zone_key, timestamp - cooldown_ms),
                 ).fetchone():
                     reasons.append("cooldown_active")
