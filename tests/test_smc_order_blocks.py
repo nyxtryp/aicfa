@@ -75,6 +75,27 @@ class OrderBlockTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             find_order_blocks([5], [4], [6], [5], [])
 
+    def test_non_finite_ohlc_is_rejected(self):
+        for value in (float("nan"), float("inf"), True, "10"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                find_order_blocks([value], [11], [9], [10], [])
+
+    def test_invalid_event_indices_and_kind_are_rejected(self):
+        for event in (
+            StructureBreak("BOS", "bullish", True, 0, 10.0),
+            StructureBreak("UNKNOWN", "bullish", 1, 0, 10.0),
+            StructureBreak("BOS", "bullish", 1, -1, 10.0),
+        ):
+            with self.subTest(event=event), self.assertRaises(ValueError):
+                find_order_blocks([9, 10], [10, 11], [8, 9], [9.5, 10.5], [event])
+
+    def test_mitigation_rejects_non_finite_close_and_fractional_snapshot(self):
+        block = OrderBlock("bullish", 1, 1, 8.5, 9.0, "BOS", 0)
+        with self.assertRaises(ValueError):
+            measure_order_block_mitigation(block, [10.0, 9.5, float("nan")])
+        with self.assertRaises(ValueError):
+            measure_order_block_mitigation(block, [10.0, 9.5], as_of_index=1.5)
+
 
 if __name__ == "__main__":
     unittest.main()
