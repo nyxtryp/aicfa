@@ -57,7 +57,9 @@ class SMCAnalysisApiTests(unittest.IsolatedAsyncioTestCase):
         try:
             result = await smc_analysis("BTCUSDT", "1m")
             self.assertEqual(result["status"], "ok")
-            self.assertEqual(result["candles"], 4)
+            self.assertEqual(result["candles_count"], 4)
+            self.assertEqual(len(result["candles"]), 4)
+            self.assertIn("open", result["candles"][0])
             annotations = result["annotations"]
             self.assertEqual(annotations["as_of_index"], 3)
             self.assertEqual(annotations["as_of_timestamp_ms"], rows[-1].open_time_ms)
