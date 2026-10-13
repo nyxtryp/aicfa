@@ -21,6 +21,15 @@ class ProfileConfig:
     tradfi_cutoff_minutes: int | None
 
 
+# Wider structural buffer for leveraged ETF underlyings in the configured TradFi universe.
+STOP_BUFFER_ATR_OVERRIDES: dict[str, float] = {
+    "SOXLUSDT": 0.5,
+    "SOXSUSDT": 0.5,
+    "KORUUSDT": 0.5,
+    "SNXXUSDT": 0.5,
+}
+
+
 PROFILES: dict[str, ProfileConfig] = {
     "scalp": ProfileConfig(
         name="scalp",
