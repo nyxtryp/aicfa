@@ -1,6 +1,6 @@
 import unittest
 
-from app.main import PAGE, index
+from app.main import PAGE, SCANNER_LIVE_ENABLED, index
 from app.market_data import ALL_SYMBOLS, TIMEFRAMES
 from app.main import LOGIN_PAGE, app
 
@@ -16,6 +16,8 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('id="realizedJournal"', PAGE)
         self.assertIn('id="showRejected"', PAGE)
         self.assertIn('id="marketHoursStatus"', PAGE)
+        self.assertIn("Режим: shadow", PAGE)
+        self.assertFalse(SCANNER_LIVE_ENABLED)
         self.assertNotIn("$('refresh').addEventListener", PAGE)
         self.assertNotIn("setInterval(", PAGE)
         self.assertIn("let selectedSetup=null", PAGE)
