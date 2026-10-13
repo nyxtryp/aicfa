@@ -13,6 +13,7 @@ from app.auth import AuthError, AuthStore
 from app.backup import create_verified_backup
 from app.market_data import ALL_SYMBOLS, TIMEFRAMES, TRADFI_SYMBOLS, MarketDataManager
 from app.smc.engine import analyze_smc
+from app.market_hours import tradfi_market_is_open
 from app.smc.presentation import to_chart_payload
 from app.smc.scanner import scan_symbol
 from app.smc.setups import SetupEvidence, evaluate_candidate
@@ -224,6 +225,11 @@ async def _on_closed_candle(candle) -> None:
                 now_ms = int(time.time() * 1000)
                 tf_ms = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000}[candidate.timeframe]
                 fresh = bool(latest and now_ms - latest[-1].close_time_ms <= tf_ms + 120_000)
+                market_open = True
+                market_hours_known = True
+                if candidate.symbol in TRADFI_SYMBOLS:
+                    market_open = tradfi_market_is_open(candidate.symbol)
+                    market_hours_known = market_open is not None
                 payload["zone_key"] = f"{candidate.symbol}:{candidate.profile}:{candidate.direction}:{candidate.zone[0]:.12g}:{candidate.zone[1]:.12g}"
                 payload["entry_limit"] = None
                 payload["risk_reward"] = None
@@ -237,6 +243,12 @@ async def _on_closed_candle(candle) -> None:
                 elif not latest:
                     payload["status"] = "REJECTED"
                     payload["decision_reasons"] = ["confirmation_data_missing"]
+                elif not market_hours_known:
+                    payload["status"] = "REJECTED"
+                    payload["decision_reasons"] = ["market_hours_unverified"]
+                elif not market_open:
+                    payload["status"] = "REJECTED"
+                    payload["decision_reasons"] = ["tradfi_market_closed"]
                 else:
                     evidence = SetupEvidence(**candidate.evidence)
                     decision = evaluate_candidate(
@@ -255,7 +267,7 @@ async def _on_closed_candle(candle) -> None:
                         tick_size=float(tick_info["tick_size"]),
                         min_stop_distance=max(0.5 * candidate.atr, candidate.confirmation_price * 0.002),
                         data_fresh=fresh,
-                        tradfi_market_open=candidate.symbol not in TRADFI_SYMBOLS,
+                        tradfi_market_open=market_open,
                     )
                     payload["entry_limit"] = decision.entry_limit
                     payload["risk_reward"] = decision.risk_reward
