@@ -10,6 +10,10 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("SMC Scanner", response.body.decode())
         self.assertIn("/api/smc-analysis/", PAGE)
         self.assertIn("canvas", PAGE)
+        self.assertIn("zone((ann.order_blocks||[])", PAGE)
+        self.assertIn("zone((ann.fvg||[])", PAGE)
+        self.assertIn("for(const e of ann.structure_breaks||[])", PAGE)
+        self.assertIn("for(const e of ann.sweeps||[])", PAGE)
         self.assertNotIn("каркас сайта запущен", PAGE.lower())
 
 
