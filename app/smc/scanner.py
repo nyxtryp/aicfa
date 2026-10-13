@@ -153,9 +153,9 @@ def scan_symbol(
             if gap.direction != expected_break
         ]
         clean_path = not any(
-            (z_low > entry and z_low < tp1) or (z_high > entry and z_high < tp1)
+            (z_high > entry and z_low < tp1)
             if direction == "long"
-            else (z_low < entry and z_low > tp1) or (z_high < entry and z_high > tp1)
+            else (z_low < entry and z_high > tp1)
             for z_low, z_high in opposing_zones
         )
         risk = abs(entry - stop)
@@ -163,7 +163,7 @@ def scan_symbol(
         if risk <= 0 or reward / risk < profile.min_rr:
             continue
         if profile.extra_confirmation_timeframe is not None:
-            if extra is None or not extra.structure_breaks or extra.structure_breaks[-1].direction != expected_break:
+            if extra is None or not extra.structure_breaks or extra.structure_breaks[-1].direction != expected_break or extra.structure_breaks[-1].candle_index != len(extra_series) - 1:
                 continue
 
         average_volume = float(confirm.average_volume[-1] or 0)
