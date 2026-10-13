@@ -105,6 +105,27 @@ class SMCAnalysisTests(unittest.TestCase):
             for sweep in result.sweeps
         ))
 
+    def test_current_day_sweep_is_returned_by_snapshot_without_duplicate(self):
+        timestamps = [1791849600000, 1791849660000]
+        result = analyze_smc(
+            opens=[9.0, 9.0],
+            highs=[10.0, 12.0],
+            lows=[8.0, 8.5],
+            closes=[9.0, 9.5],
+            volumes=[100.0, 120.0],
+            timestamps_ms=timestamps,
+            swing_left=1,
+            swing_right=1,
+            atr_period=2,
+            volume_period=2,
+        )
+        matching = [
+            event for event in result.sweeps
+            if event.candle_index == 1 and event.level_kind == "high"
+        ]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual((matching[0].direction, matching[0].level), ("bearish", 10.0))
+
     def test_rejects_mismatched_arrays_and_out_of_range_index(self):
         args = self.candles()
         mismatched = list(args)
