@@ -83,10 +83,10 @@ def evaluate_candidate(
     current_price: float,
     stop_price: float,
     tp1_price: float,
-    min_rr: float = 1.5,
+    min_rr: float | None = None,
     tick_size: float,
     min_stop_distance: float,
-    score_threshold: int = 6,
+    score_threshold: int | None = None,
     data_fresh: bool,
     tradfi_market_open: bool = True,
     duplicate: bool = False,
@@ -95,12 +95,23 @@ def evaluate_candidate(
     max_active: int = 8,
 ) -> CandidateDecision:
     """Evaluate §6–7 gates without storing, notifying, or activating a setup."""
+    from app.smc.profiles import get_profile
     from app.smc.risk import acceptable_entry_limit, calculate_risk_reward
 
     side = direction.lower() if isinstance(direction, str) else ""
     bias = higher_timeframe_bias.lower() if isinstance(higher_timeframe_bias, str) else ""
     zone = premium_discount_zone.lower() if isinstance(premium_discount_zone, str) else ""
     profile_name = profile.lower() if isinstance(profile, str) else ""
+    profile_config = None
+    try:
+        profile_config = get_profile(profile_name)
+    except ValueError:
+        pass
+    if profile_config is not None:
+        if min_rr is None:
+            min_rr = profile_config.min_rr
+        if score_threshold is None:
+            score_threshold = profile_config.score_threshold
     score = score_setup(evidence)
     reasons: list[str] = []
 
@@ -117,11 +128,15 @@ def evaluate_candidate(
         reasons.append("liquidity_sweep_missing")
     if not isinstance(confirmation_aligned, bool) or not confirmation_aligned:
         reasons.append("confirmation_not_aligned")
-    if profile_name not in {"scalp", "intraday"}:
+    if profile_config is None:
         reasons.append("invalid_profile")
-    elif profile_name == "scalp" and (not isinstance(one_minute_confirmed, bool) or not one_minute_confirmed):
+    elif profile_config.extra_confirmation_timeframe is not None and (
+        not isinstance(one_minute_confirmed, bool) or not one_minute_confirmed
+    ):
         reasons.append("one_minute_confirmation_missing")
-    if score.total < score_threshold:
+    if isinstance(score_threshold, bool) or not isinstance(score_threshold, int) or not 0 <= score_threshold <= 10:
+        reasons.append("invalid_score_threshold")
+    elif score.total < score_threshold:
         reasons.append("score_below_threshold")
     if not isinstance(data_fresh, bool) or not data_fresh:
         reasons.append("market_data_stale_or_incomplete")
