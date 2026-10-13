@@ -66,6 +66,18 @@ class DealingRangeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             find_dealing_range([], as_of_index=0, ote_min=0.8, ote_max=0.7)
 
+    def test_fractional_and_boolean_indices_are_rejected(self):
+        invalid_inputs = [
+            ([SwingPoint("low", 1.5, 2, 100.0)], 2),
+            ([SwingPoint("low", 1, True, 100.0)], 2),
+            ([], 1.5),
+            ([], True),
+        ]
+        for swings, as_of_index in invalid_inputs:
+            with self.subTest(swings=swings, as_of_index=as_of_index):
+                with self.assertRaises(ValueError):
+                    find_dealing_range(swings, as_of_index=as_of_index)
+
     def test_invalid_swing_indices_are_rejected(self):
         malformed = [
             SwingPoint("low", -1, 2, 100.0),
