@@ -89,6 +89,22 @@ class OrderBlockTests(unittest.TestCase):
             with self.subTest(event=event), self.assertRaises(ValueError):
                 find_order_blocks([9, 10], [10, 11], [8, 9], [9.5, 10.5], [event])
 
+    def test_rejects_non_finite_event_level_and_invalid_block_source_indices(self):
+        for level in (float("nan"), float("inf"), True, "10"):
+            with self.subTest(level=level), self.assertRaises(ValueError):
+                find_order_blocks(
+                    [9, 10], [10, 11], [8, 9], [9.5, 10.5],
+                    [StructureBreak("BOS", "bullish", 1, 0, level)],
+                )
+        invalid_blocks = (
+            OrderBlock("bullish", True, 1, 8.5, 9.0, "BOS", 0),
+            OrderBlock("bullish", 2, 1, 8.5, 9.0, "BOS", 0),
+            OrderBlock("bullish", 0, 1, 8.5, 9.0, "BOS", True),
+        )
+        for block in invalid_blocks:
+            with self.subTest(block=block), self.assertRaises(ValueError):
+                measure_order_block_mitigation(block, [10.0, 9.5])
+
     def test_mitigation_rejects_non_finite_close_and_fractional_snapshot(self):
         block = OrderBlock("bullish", 1, 1, 8.5, 9.0, "BOS", 0)
         with self.assertRaises(ValueError):
