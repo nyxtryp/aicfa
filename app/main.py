@@ -305,8 +305,6 @@ async def event_stream(request: Request):
         _event_subscribers.add(queue)
         try:
             yield "retry: 3000\\n"
-            for item in tuple(_event_history):
-                yield f"data: {item}\\n\\n"
             while not await request.is_disconnected():
                 try:
                     item = await asyncio.wait_for(queue.get(), timeout=20)
