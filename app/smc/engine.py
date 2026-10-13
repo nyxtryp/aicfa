@@ -142,6 +142,18 @@ def analyze_smc(
         hi, lo, cl, historical_levels, max_age=liquidity_max_age
     )
     current_day_sweeps = detect_current_day_sweeps(ts, hi, lo, cl)
+    if zone_bounds is not None:
+        current_atr = atr[end]
+        if current_atr is None or current_atr <= 0:
+            current_day_sweeps = ()
+        else:
+            current_day_sweeps = tuple(
+                event for event in current_day_sweeps
+                if is_level_near_zone(
+                    event.level, zone_bounds[0], zone_bounds[1], current_atr,
+                    max_distance_atr=max_zone_distance_atr,
+                )
+            )
     # Current-day extremes are computed per candle from prior candles only;
     # do not let the end-of-snapshot level retrospectively create events.
     sweeps = tuple(sorted(
