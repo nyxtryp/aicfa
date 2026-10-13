@@ -108,6 +108,11 @@ class AuthStore:
             "digest": base64.urlsafe_b64encode(self._hash_password(new_password, salt)).decode("ascii"),
         }
         self._write_private(self.password_path, json.dumps(record, separators=(",", ":")).encode("utf-8"))
+        self.rotate_sessions()
+
+    def rotate_sessions(self) -> None:
+        """Invalidate all existing sessions by replacing the signing key."""
+        self._write_private(self.signing_key_path, secrets.token_bytes(32))
 
     def _signing_key(self) -> bytes:
         self._ensure_dir()
