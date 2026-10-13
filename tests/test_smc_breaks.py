@@ -57,6 +57,22 @@ class StructureBreakTests(unittest.TestCase):
             (),
         )
 
+    def test_non_finite_or_non_numeric_close_is_rejected(self):
+        for closes in ([1, float("nan")], [1, float("inf")], [1, True], [1, "2"]):
+            with self.subTest(closes=closes), self.assertRaises(ValueError):
+                detect_structure_breaks(closes, ())
+
+    def test_invalid_swing_indices_and_price_are_rejected_even_for_future_swings(self):
+        invalid_swings = (
+            SwingPoint("high", True, 99, 10.0),
+            SwingPoint("high", 1, 1.5, 10.0),
+            SwingPoint("high", 1, 99, float("nan")),
+            SwingPoint("high", 1, 99, float("inf")),
+        )
+        for swing in invalid_swings:
+            with self.subTest(swing=swing), self.assertRaises(ValueError):
+                detect_structure_breaks([1, 2], (swing,))
+
 
 if __name__ == "__main__":
     unittest.main()
