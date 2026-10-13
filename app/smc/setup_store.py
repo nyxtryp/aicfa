@@ -177,8 +177,12 @@ class SetupStore:
                    event_time_ms: int, final_journal: Mapping[str, Any] | None = None) -> bool:
         encoded = json.dumps(dict(payload), separators=(",", ":"), sort_keys=True)
         with self._connection() as db:
-            row = db.execute("SELECT status FROM setup_candidates WHERE setup_key=?", (setup_key,)).fetchone()
+            row = db.execute("SELECT status,payload_json FROM setup_candidates WHERE setup_key=?", (setup_key,)).fetchone()
             if row is None or row["status"] not in ("ACCEPTED", "TP1", "TP2"):
+                return False
+            existing_payload = json.loads(row["payload_json"])
+            previous_event_ms = int(existing_payload.get("last_event_time_ms", existing_payload.get("confirmation_time_ms", 0)))
+            if row["status"] == str(payload["status"]) and int(event_time_ms) <= previous_event_ms:
                 return False
             db.execute(
                 "UPDATE setup_candidates SET status=?, payload_json=?, updated_at_ms=? WHERE setup_key=?",
