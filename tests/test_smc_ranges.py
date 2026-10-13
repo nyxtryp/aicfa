@@ -46,6 +46,22 @@ class DealingRangeTests(unittest.TestCase):
         self.assertEqual((result.start_index, result.end_index), (3, 6))
         self.assertEqual((result.low, result.high), (100.0, 180.0))
 
+    def test_invalid_future_swing_kind_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "swing kind"):
+            find_dealing_range(
+                [SwingPoint("unknown", 5, 8, 200.0)],
+                as_of_index=4,
+            )
+
+    def test_non_finite_swing_price_is_rejected_even_if_unconfirmed(self):
+        for price in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(price=price):
+                with self.assertRaisesRegex(ValueError, "swing prices"):
+                    find_dealing_range(
+                        [SwingPoint("high", 5, 8, price)],
+                        as_of_index=4,
+                    )
+
     def test_invalid_ote_bounds_rejected(self):
         with self.assertRaises(ValueError):
             find_dealing_range([], as_of_index=0, ote_min=0.8, ote_max=0.7)
