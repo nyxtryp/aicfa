@@ -65,7 +65,7 @@ def _advance_active_setups(candle) -> None:
     store = _get_setup_store()
     now_ms = candle.close_time_ms
     for setup in store.list_active():
-        if candle.symbol != setup.get("symbol") or now_ms <= int(setup.get("confirmation_time_ms", 0)):
+        if candle.symbol != setup.get("symbol") or now_ms <= max(int(setup.get("confirmation_time_ms", 0)), int(setup.get("last_event_time_ms", 0))):
             continue
         payload = dict(setup)
         direction = payload["direction"]
@@ -258,11 +258,26 @@ async def _on_closed_candle(candle) -> None:
 market_data.on_closed_candle = _on_closed_candle
 
 
+
+def _recover_active_history() -> None:
+    """Replay persisted active setups through retained 1m candles after downtime."""
+    active = _get_setup_store().list_active()
+    if not active:
+        return
+    symbols = {str(setup["symbol"]) for setup in active}
+    candles = []
+    for symbol in symbols:
+        candles.extend(market_data.candles.get((symbol, "1m"), ()))
+    for candle in sorted(candles, key=lambda item: item.close_time_ms):
+        _advance_active_setups(candle)
+
+
 async def _daily_backup_loop() -> None:
     """Back up after startup history finishes, then repeat daily."""
     history_task = market_data._history_task
     if history_task is not None:
         await asyncio.gather(history_task, return_exceptions=True)
+    await asyncio.to_thread(_recover_active_history)
     while True:
         try:
             path = await asyncio.to_thread(
