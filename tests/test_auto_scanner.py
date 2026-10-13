@@ -1,5 +1,7 @@
 import unittest
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from app.market_data import ClosedCandle, TIMEFRAMES
 from app.smc.scanner import SetupCandidate, scan_symbol
@@ -28,6 +30,51 @@ class AutomaticScannerTests(unittest.TestCase):
         series = {tf: self.candles(timeframe=tf, count=60) for tf in TIMEFRAMES}
         self.assertEqual(scan_symbol("BTCUSDT", series, trigger_timeframe="1m"), [])
         self.assertEqual(scan_symbol("BTCUSDT", series, trigger_timeframe="4h"), [])
+
+
+    def test_emits_candidate_when_multitimeframe_smc_rules_align(self):
+        series = {tf: self.candles(timeframe=tf, count=60) for tf in TIMEFRAMES}
+        block = SimpleNamespace(direction="bullish", lower=99.0, upper=101.0, confirmation_index=10)
+        block_state = SimpleNamespace(mitigated=False)
+        gap = SimpleNamespace(direction="bullish", lower=99.5, upper=100.5, confirmation_index=12)
+        gap_fill = SimpleNamespace(fully_filled=False)
+
+        def analysis_for(candles, profile, timeframe):
+            last = len(candles) - 1
+            base = dict(
+                as_of_index=last, structure_breaks=(), order_blocks=(),
+                order_block_mitigation=(), fvg=(), fvg_fill=(), sweeps=(),
+                liquidity_levels=(), dealing_range=None, premium_discount=None,
+                atr=tuple([1.0] * len(candles)),
+                average_volume=tuple([100.0] * len(candles)),
+            )
+            if timeframe == "1h":
+                base["structure_breaks"] = (SimpleNamespace(direction="bullish", candle_index=last - 2),)
+            elif timeframe == "15m":
+                base.update(
+                    structure_breaks=(SimpleNamespace(direction="bullish", candle_index=last - 2),),
+                    order_blocks=(block,), order_block_mitigation=(block_state,),
+                    fvg=(gap,), fvg_fill=(gap_fill,),
+                    dealing_range=SimpleNamespace(ote_lower=99.0, ote_upper=101.0),
+                    premium_discount="discount",
+                )
+            elif timeframe == "5m":
+                base.update(
+                    structure_breaks=(SimpleNamespace(direction="bullish", candle_index=last),),
+                    sweeps=(SimpleNamespace(direction="bullish", candle_index=last - 1),),
+                    liquidity_levels=tuple(SimpleNamespace(price=p) for p in (110.0, 120.0, 130.0)),
+                )
+            elif timeframe == "1m":
+                base["structure_breaks"] = (SimpleNamespace(direction="bullish", candle_index=last),)
+            return SimpleNamespace(**base)
+
+        with patch("app.smc.scanner._analysis", side_effect=analysis_for):
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "scalp")
+        self.assertEqual(candidates[0].direction, "long")
+        self.assertEqual(len(candidates[0].targets), 3)
+        self.assertTrue(candidates[0].evidence["order_block_fvg_overlap"])
 
     def test_candidate_serialization_is_json_ready(self):
         candidate = SetupCandidate(
