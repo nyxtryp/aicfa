@@ -64,37 +64,54 @@ app = FastAPI(
 PAGE = """<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b1020">
-  <title>AICFA — SMC Scanner</title>
-  <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: #0b1020; color: #e8edf7; }
-    main { width: min(920px, calc(100% - 32px)); margin: 10vh auto; }
-    .eyebrow { color: #8b9bb8; font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; }
-    h1 { margin: 14px 0 8px; font-size: clamp(2.4rem, 7vw, 4.5rem); letter-spacing: -.055em; }
-    .accent { color: #72e0c1; }
-    p { color: #aab6cc; line-height: 1.7; max-width: 620px; }
-    .panel { margin-top: 36px; padding: 22px; border: 1px solid #26334c; border-radius: 16px; background: #111a2d; }
-    .status { display: inline-flex; gap: 9px; align-items: center; color: #f2c879; font-size: .9rem; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #f2c879; }
-    .note { margin-bottom: 0; font-size: .9rem; }
-  </style>
-</head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080d18"><title>AICFA — SMC Scanner</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#080d18;color:#e8eef8}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#14243b 0,transparent 42%),#080d18;min-height:100vh}
+header{display:flex;justify-content:space-between;align-items:center;padding:20px clamp(16px,4vw,48px);border-bottom:1px solid #1f2a3d;gap:16px;flex-wrap:wrap}
+.brand{font-size:1.35rem;font-weight:800;letter-spacing:.08em}.brand span{color:#63e6be}.sub{color:#8292aa;font-size:.8rem;margin-top:4px}
+.pill{border:1px solid #293851;border-radius:999px;padding:8px 12px;color:#a9bad1;font-size:.8rem}.led{display:inline-block;width:7px;height:7px;border-radius:50%;background:#f4bd62;margin-right:8px}
+main{max-width:1500px;margin:auto;padding:26px clamp(16px,4vw,48px) 48px}.top{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+h1{font-size:clamp(1.8rem,4vw,2.7rem);letter-spacing:-.04em;margin:0 0 8px}.muted{color:#8fa0b8}.controls{display:flex;gap:8px;flex-wrap:wrap}
+select,button{background:#111c2d;border:1px solid #2a3a53;color:#e8eef8;padding:11px 13px;border-radius:10px;font:inherit}button{cursor:pointer;background:#17352f;border-color:#286456}button:hover{background:#1d493e}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}.metric,.panel{background:linear-gradient(145deg,#111b2b,#0d1523);border:1px solid #202e43;border-radius:15px;padding:17px}
+.metric .label{font-size:.78rem;color:#8fa0b8}.metric .value{font-size:1.45rem;font-weight:750;margin-top:8px;overflow-wrap:anywhere}.metric .hint{font-size:.76rem;color:#70839f;margin-top:4px}
+.layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,.8fr);gap:14px}.panel-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:15px;font-weight:700}.chart-wrap{height:390px;position:relative}.chart-wrap canvas{width:100%;height:100%;display:block}.chart-note{font-size:.78rem;color:#8495ad;margin-top:12px}
+.rows{display:grid;gap:9px}.rowitem{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid #202c3f;font-size:.88rem}.rowitem:last-child{border:0}.rowitem span:first-child{color:#8fa0b8}.rowitem strong{text-align:right;overflow-wrap:anywhere}
+.event{padding:10px 12px;border-radius:10px;background:#0b1320;border:1px solid #1f2c40;margin-bottom:8px;font-size:.82rem}.event b{color:#6ce0bb}.empty{color:#8292aa;padding:18px 0;font-size:.88rem}
+footer{color:#61738e;font-size:.75rem;margin-top:20px;line-height:1.6}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}.chart-wrap{height:320px}}
+@media(max-width:420px){.grid{grid-template-columns:1fr 1fr}.metric{padding:12px}.metric .value{font-size:1.1rem}.chart-wrap{height:260px}}
+</style></head>
 <body>
-  <main>
-    <div class="eyebrow">Personal market analysis</div>
-    <h1>AICFA<span class="accent">.</span></h1>
-    <p>SMC Scanner — персональная панель анализа рынка. Сайт развёрнут, но рыночные данные, SMC-движок и торговые сигналы ещё не подключены.</p>
-    <section class="panel" aria-live="polite">
-      <div class="status"><span class="dot"></span> Каркас сайта запущен</div>
-      <p class="note">Следующий этап — проверка окружения и публичного API Binance, затем реализация потока рыночных данных по техническому заданию.</p>
-    </section>
-  </main>
-</body>
-</html>
+<header><div><div class="brand">AICFA<span>.</span></div><div class="sub">PERSONAL MARKET STRUCTURE TERMINAL</div></div><div class="pill"><i class="led" id="led"></i><span id="connection">Подключение…</span></div></header>
+<main>
+<div class="top"><div><h1>SMC Scanner</h1><div class="muted">Закрытые свечи · BOS/CHoCH · Order Blocks · FVG · Liquidity</div></div>
+<div class="controls"><select id="symbol" aria-label="Инструмент"></select><select id="tf" aria-label="Таймфрейм"><option>1m</option><option>5m</option><option>15m</option><option>1h</option><option>4h</option></select><button id="refresh">Обновить</button></div></div>
+<section class="grid">
+<div class="metric"><div class="label">Поток Binance</div><div class="value" id="stream">—</div><div class="hint">статус соединения</div></div>
+<div class="metric"><div class="label">Свечные серии</div><div class="value" id="series">—</div><div class="hint">ожидается 250</div></div>
+<div class="metric"><div class="label">Закрытые свечи</div><div class="value" id="candleCount">—</div><div class="hint">хранимое окно</div></div>
+<div class="metric"><div class="label">История</div><div class="value" id="history">—</div><div class="hint">начальная загрузка</div></div>
+</section>
+<div class="layout">
+<section class="panel"><div class="panel-title"><span id="chartTitle">BTCUSDT · 1m</span><span class="pill" id="lastPrice">Ожидание данных</span></div>
+<div class="chart-wrap"><canvas id="chart" aria-label="График свечей"></canvas></div><div class="chart-note" id="chartNote">Загрузка закрытых свечей и расчёт разметки SMC…</div></section>
+<aside class="panel"><div class="panel-title"><span>SMC-разметка</span><span class="pill" id="annotationCount">—</span></div>
+<div class="rows" id="stats"><div class="empty">Ожидание анализа…</div></div><div class="panel-title" style="margin-top:22px"><span>Последние события</span></div><div id="events"><div class="empty">Событий пока нет</div></div></aside>
+</div>
+<footer>Анализ выполняется только по закрытым свечам. Разметка не является торговой рекомендацией. Автоматическое принятие сетапов и исполнение сделок отключены. Обновление данных — автоматически каждые 15 секунд.</footer>
+</main>
+<script>
+const symbols=['BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','SOLUSDT','DOGEUSDT','ADAUSDT','TRXUSDT','LINKUSDT','AVAXUSDT','DOTUSDT','BCHUSDT','LTCUSDT','XLMUSDT','HYPEUSDT','SUIUSDT','AAVEUSDT','ZECUSDT','TAOUSDT','ENAUSDT','ONDOUSDT','NEARUSDT','UNIUSDT','1000PEPEUSDT','1000BONKUSDT','WLDUSDT','INJUSDT','ARBUSDT','APTUSDT','XAUUSDT','CLUSDT','SKHYNIXUSDT','SOXLUSDT','XAGUSDT','SNDKUSDT','BZUSDT','KORUUSDT','SPCXUSDT','MUUSDT','SKHYUSDT','SAMSUNGUSDT','SOXSUSDT','MSTRUSDT','CRCLUSDT','QQQUSDT','SNXXUSDT','EWYUSDT','NATGASUSDT','NVDAUSDT','SPYUSDT'];
+const $=id=>document.getElementById(id);symbols.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;$('symbol').append(o)});$('symbol').value='BTCUSDT';
+function fmt(n){return n==null?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:8})}
+function draw(data){const canvas=$('chart'),ctx=canvas.getContext('2d'),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;canvas.width=Math.max(1,rect.width*dpr);canvas.height=Math.max(1,rect.height*dpr);ctx.scale(dpr,dpr);const w=rect.width,h=rect.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0a1220';ctx.fillRect(0,0,w,h);const cs=data.candles||[];if(!cs.length){ctx.fillStyle='#8192aa';ctx.fillText('Ожидание свечей…',20,30);return}const view=cs.slice(-100),lo=Math.min(...view.map(c=>c.low)),hi=Math.max(...view.map(c=>c.high)),span=hi-lo||1,pad={l:10,r:64,t:16,b:24},cw=(w-pad.l-pad.r)/view.length;const y=p=>pad.t+(hi-p)/span*(h-pad.t-pad.b);ctx.strokeStyle='#1d2a3d';ctx.lineWidth=1;for(let i=0;i<5;i++){const yy=pad.t+i*(h-pad.t-pad.b)/4;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(w-pad.r,yy);ctx.stroke();ctx.fillStyle='#7e90a9';ctx.font='10px system-ui';ctx.fillText(fmt(hi-i*span/4),w-pad.r+5,yy+3)}view.forEach((c,i)=>{const x=pad.l+i*cw+cw/2,up=c.close>=c.open;ctx.strokeStyle=up?'#59d6ad':'#f07883';ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(x,y(c.high));ctx.lineTo(x,y(c.low));ctx.stroke();const top=y(Math.max(c.open,c.close)),bot=y(Math.min(c.open,c.close));ctx.fillRect(x-Math.max(1,cw*.29),top,Math.max(2,cw*.58),Math.max(1,bot-top))});const last=view[view.length-1];ctx.strokeStyle='#e6bc6d';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pad.l,y(last.close));ctx.lineTo(w-pad.r,y(last.close));ctx.stroke();ctx.setLineDash([])}
+function row(label,value){const d=document.createElement('div');d.className='rowitem';const a=document.createElement('span');a.textContent=label;const b=document.createElement('strong');b.textContent=value;d.append(a,b);$('stats').append(d)}
+async function load(){const symbol=$('symbol').value,tf=$('tf').value;$('chartTitle').textContent=symbol+' · '+tf;try{const [st,an]=await Promise.all([fetch('/api/data-status').then(r=>r.json()),fetch('/api/smc-analysis/'+encodeURIComponent(symbol)+'/'+encodeURIComponent(tf)).then(r=>r.json())]);$('connection').textContent=(st.tradfi?.status==='connected'&&st.crypto?.status==='connected')?'Поток активен':'Проверка потока';$('led').style.background=(st.tradfi?.status==='connected'&&st.crypto?.status==='connected')?'#59d6ad':'#f4bd62';$('stream').textContent=(st.tradfi?.status==='connected'&&st.crypto?.status==='connected')?'CONNECTED':'CONNECTING';$('series').textContent=fmt(st.series_loaded??st.history?.series_loaded);$('candleCount').textContent=fmt(st.stored_candles??st.candles_stored);$('history').textContent=st.history?.status||st.history_status?.status||'—';if(an.status!=='ok'){$('chartNote').textContent='Ряд прогревается: '+(an.candles||0)+' свечей';draw({candles:[]});return}draw(an);const cs=an.candles,last=cs[cs.length-1];$('lastPrice').textContent=fmt(last.close);$('chartNote').textContent='Свечей: '+cs.length+' · последнее закрытие: '+new Date(last.timestamp_ms).toLocaleString();const a=an.annotations;$('annotationCount').textContent=String(a.swings.length+a.structure_breaks.length+a.order_blocks.length+a.fvg.length+a.liquidity_levels.length+a.sweeps.length);$('stats').replaceChildren();row('Последняя цена',fmt(last.close));row('Premium / Discount',a.premium_discount||'Нет подтверждённого диапазона');row('ATR(14)',fmt(a.atr));row('Средний объём',fmt(a.average_volume));row('Swing points',String(a.swings.length));row('BOS / CHoCH',String(a.structure_breaks.length));row('Order Blocks',String(a.order_blocks.length));row('FVG',String(a.fvg.length));row('Liquidity levels',String(a.liquidity_levels.length));row('Sweeps',String(a.sweeps.length));const ev=[...a.structure_breaks.map(x=>({t:x.timestamp_ms,label:x.kind+' · '+x.direction+' · '+fmt(x.level)})),...a.sweeps.map(x=>({t:x.timestamp_ms,label:'Sweep '+x.direction+' · '+fmt(x.level)}))].sort((x,y)=>y.t-x.t).slice(0,6);$('events').replaceChildren();if(!ev.length){$('events').innerHTML='<div class="empty">На текущем окне событий нет</div>'}else ev.forEach(e=>{const d=document.createElement('div');d.className='event';const b=document.createElement('b');b.textContent=new Date(e.t).toLocaleTimeString();d.append(b,document.createTextNode('  '+e.label));$('events').append(d)})}catch(e){$('connection').textContent='Ошибка API';$('chartNote').textContent='Не удалось получить анализ. Проверьте статус сервиса.';console.error(e)}}
+$('refresh').addEventListener('click',load);$('symbol').addEventListener('change',load);$('tf').addEventListener('change',load);window.addEventListener('resize',load);load();setInterval(load,15000);
+</script></body></html>
 """
 
 
