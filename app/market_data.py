@@ -575,6 +575,8 @@ class MarketDataManager:
             raise ValueError("REST gap recovery returned no closed candles")
 
         key = (symbol, timeframe)
+        previous_latest = self.latest.get(key)
+        previous_open_time = previous_latest.open_time_ms if previous_latest else -1
         async with self._lock:
             merged = {item.open_time_ms: item for item in self.candles.get(
                 key, deque(maxlen=CANDLES_PER_SERIES)
@@ -590,6 +592,12 @@ class MarketDataManager:
             self.candles[key] = series
             if series:
                 self.latest[key] = series[-1]
+        callback = self.on_closed_candle
+        if callback is not None:
+            for recovered in (item for item in restored if item.open_time_ms > previous_open_time):
+                result = callback(recovered)
+                if asyncio.iscoroutine(result):
+                    await result
 
     async def _reconcile_series(self, symbol: str, timeframe: str) -> int:
         """Compare the latest closed REST candles with memory/SQLite and repair differences."""
@@ -604,6 +612,8 @@ class MarketDataManager:
             raise ValueError("REST reconciliation returned no closed candles")
 
         key = (symbol, timeframe)
+        previous_latest = self.latest.get(key)
+        previous_open_time = previous_latest.open_time_ms if previous_latest else -1
         async with self._lock:
             merged = {
                 item.open_time_ms: item
@@ -621,6 +631,12 @@ class MarketDataManager:
             self.candles[key] = series
             if series:
                 self.latest[key] = series[-1]
+        callback = self.on_closed_candle
+        if callback is not None:
+            for recovered in (item for item in restored if item.open_time_ms > previous_open_time):
+                result = callback(recovered)
+                if asyncio.iscoroutine(result):
+                    await result
         return len(restored)
 
     async def reconcile_all_series(self) -> None:
