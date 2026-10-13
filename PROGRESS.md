@@ -1009,3 +1009,10 @@
 - Добавлен регрессионный тест для bool и дробной метки времени.
 - Коммиты: код `fa24bbc8f69cc144482568d416d6910e6bab2c72`; тест `6f354f51425ad7d736270a772a52a93c762635d4`.
 - Статус: GitHub Actions для этой серии коммитов ожидается; приёмка SMC-фазы по-прежнему требует визуальной проверки графика.
+
+
+### 2026-10-13 — результаты CI по последним исправлениям SMC
+
+- Подтверждена успешная GitHub Actions проверка строгих timestamp: код `fa24bbc8f69cc144482568d416d6910e6bab2c72` — https://github.com/nyxtryp/aicfa/actions/runs/38387532783; регрессионный тест — https://github.com/nyxtryp/aicfa/actions/runs/38387543746; обновление журнала — https://github.com/nyxtryp/aicfa/actions/runs/38387558670.
+- Подтверждена успешная GitHub Actions проверка валидации swing-входа: код — https://github.com/nyxtryp/aicfa/actions/runs/38387481974; тест — https://github.com/nyxtryp/aicfa/actions/runs/38387494349; журнал — https://github.com/nyxtryp/aicfa/actions/runs/38387510438.
+- Это подтверждает unit-тесты этих изменений, но не закрывает §4 и Фазу 2 целиком: остаются проверка графической разметки, профили/правила формирования сетапа и дальнейшие пункты ТЗ. Живые сетапы не включены.
