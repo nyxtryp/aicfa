@@ -1,6 +1,6 @@
 import unittest
 
-from app.smc.profiles import PROFILES, get_profile
+from app.smc.profiles import PROFILES, STOP_BUFFER_ATR_OVERRIDES, get_profile
 
 
 class ProfileConfigTests(unittest.TestCase):
@@ -26,6 +26,12 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual((profile.swing_left, profile.swing_right), (3, 3))
         self.assertEqual((profile.lifetime_hours, profile.cooldown_minutes), (12, 120))
         self.assertEqual(profile.tradfi_cutoff_minutes, 15)
+
+    def test_leveraged_etfs_use_wider_stop_buffer(self):
+        self.assertEqual(STOP_BUFFER_ATR_OVERRIDES, {
+            "SOXLUSDT": 0.5, "SOXSUSDT": 0.5,
+            "KORUUSDT": 0.5, "SNXXUSDT": 0.5,
+        })
 
     def test_only_two_profiles_are_available(self):
         self.assertEqual(set(PROFILES), {"scalp", "intraday"})
