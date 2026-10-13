@@ -60,7 +60,7 @@ class SetupStore:
         """Insert once; return False on replay so candle redelivery cannot duplicate it."""
         key = str(payload["key"])
         encoded = json.dumps(dict(payload), separators=(",", ":"), sort_keys=True)
-        with self._connect() as db:
+        with self._connection() as db:
             cursor = db.execute(
                 """INSERT OR IGNORE INTO setup_candidates
                    (setup_key,symbol,profile,direction,status,confirmation_time_ms,score,payload_json)
@@ -78,7 +78,7 @@ class SetupStore:
             return True
 
     def list_candidates(self, *, limit: int = 200) -> list[dict[str, Any]]:
-        with self._connect() as db:
+        with self._connection() as db:
             rows = db.execute(
                 "SELECT payload_json FROM setup_candidates ORDER BY confirmation_time_ms DESC LIMIT ?",
                 (max(1, min(int(limit), 1000)),),
@@ -86,7 +86,7 @@ class SetupStore:
         return [json.loads(row["payload_json"]) for row in rows]
 
     def event_count(self, setup_key: str) -> int:
-        with self._connect() as db:
+        with self._connection() as db:
             row = db.execute(
                 "SELECT COUNT(*) AS n FROM setup_candidate_events WHERE setup_key=?",
                 (setup_key,),
