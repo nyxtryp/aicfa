@@ -161,9 +161,46 @@ def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_st
         _publish_event({"type": "setup_lifecycle", "setup": payload, "journal": journal})
 
 
+
+async def _invalidate_on_opposite_choch(candle) -> None:
+    """Invalidate an unscaled active setup on an opposite CHoCH at its confirmation timeframe."""
+    if candle.timeframe not in {"5m", "15m"}:
+        return
+    for setup in _get_setup_store().list_active():
+        if setup.get("status") != "ACCEPTED" or setup.get("timeframe") != candle.timeframe:
+            continue
+        if candle.close_time_ms <= int(setup.get("confirmation_time_ms", 0)):
+            continue
+        series = tuple(
+            item for item in market_data.candles.get((candle.symbol, candle.timeframe), ())
+            if item.close_time_ms <= candle.close_time_ms
+        )
+        if len(series) < 40:
+            continue
+        analysis = await asyncio.to_thread(
+            analyze_smc,
+            [float(item.open) for item in series],
+            [float(item.high) for item in series],
+            [float(item.low) for item in series],
+            [float(item.close) for item in series],
+            [float(item.volume) for item in series],
+            [item.open_time_ms for item in series],
+        )
+        if not analysis.structure_breaks:
+            continue
+        latest_break = analysis.structure_breaks[-1]
+        opposite = "bearish" if setup["direction"] == "long" else "bullish"
+        if latest_break.kind != "CHoCH" or latest_break.direction != opposite:
+            continue
+        payload = dict(setup)
+        payload["status"] = "INVALIDATED"
+        _finish_setup(payload, _get_setup_store(), candle.close_time_ms, "INVALIDATED")
+
+
 async def _on_closed_candle(candle) -> None:
     global _scanner_last_event_ms
     _advance_active_setups(candle)
+    await _invalidate_on_opposite_choch(candle)
     if candle.timeframe in {"5m", "15m"}:
         _scanner_last_event_ms = candle.close_time_ms
         snapshot = {tf: tuple(x for x in market_data.candles.get((candle.symbol, tf), ()) if x.close_time_ms <= candle.close_time_ms) for tf in TIMEFRAMES}
