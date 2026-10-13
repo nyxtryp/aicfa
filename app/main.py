@@ -166,7 +166,7 @@ async def _on_closed_candle(candle) -> None:
     _scanner_last_event_ms = candle.close_time_ms
     _advance_active_setups(candle)
     if candle.timeframe in {"5m", "15m"}:
-        snapshot = {tf: tuple(market_data.candles.get((candle.symbol, tf), ())) for tf in TIMEFRAMES}
+        snapshot = {tf: tuple(x for x in market_data.candles.get((candle.symbol, tf), ()) if x.close_time_ms <= candle.close_time_ms) for tf in TIMEFRAMES}
         try:
             candidates = await asyncio.to_thread(scan_symbol, candle.symbol, snapshot, trigger_timeframe=candle.timeframe)
             for candidate in candidates:
@@ -222,7 +222,7 @@ async def _on_closed_candle(candle) -> None:
                     _publish_event({"type": "setup_candidate", "setup": payload})
         except Exception:
             logger.exception("Automatic SMC scan failed for %s %s", candle.symbol, candle.timeframe)
-    series = tuple(market_data.candles.get((candle.symbol, candle.timeframe), ()))
+    series = tuple(x for x in market_data.candles.get((candle.symbol, candle.timeframe), ()) if x.close_time_ms <= candle.close_time_ms)
     event = {"type": "closed_candle", "symbol": candle.symbol,
              "timeframe": candle.timeframe, "close_time_ms": candle.close_time_ms,
              "series_size": len(series)}
