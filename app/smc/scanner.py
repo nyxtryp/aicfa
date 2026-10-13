@@ -28,6 +28,7 @@ class SetupCandidate:
     reasons: tuple[str, ...]
     zone: tuple[float, float]
     timeframe: str
+    evidence: dict[str, bool | float]
 
     def as_dict(self) -> dict:
         result = asdict(self)
@@ -105,6 +106,12 @@ def scan_symbol(
                          and z[0] <= current_price <= z[1]), None)
         if selected is None:
             continue
+        ob_zones = [(float(block.lower), float(block.upper)) for block, state in zip(zone.order_blocks, zone.order_block_mitigation)
+                    if block.direction == latest_bias.direction and not state.mitigated]
+        fvg_zones = [(float(gap.lower), float(gap.upper)) for gap, fill in zip(zone.fvg, zone.fvg_fill)
+                     if gap.direction == latest_bias.direction and not fill.fully_filled]
+        ob_fvg_overlap = any(a0 <= b1 and b0 <= a1 for a0, a1 in ob_zones for b0, b1 in fvg_zones)
+        zone_bias_agreement = bool(zone.structure_breaks and zone.structure_breaks[-1].direction == latest_bias.direction)
 
         latest_trigger_break = confirm.structure_breaks[-1]
         if latest_trigger_break.candle_index != len(trigger) - 1:
@@ -143,10 +150,18 @@ def scan_symbol(
             if extra is None or not extra.structure_breaks or extra.structure_breaks[-1].direction != expected_break:
                 continue
 
-        score = 2 + 1 + 2 + 1
-        if any(b.direction == expected_break for b in bias.structure_breaks):
-            score += 1
-        average_volume = confirm.average_volume[-1]
+        average_volume = float(confirm.average_volume[-1] or 0)
+        evidence = {
+            "liquidity_sweep": True,
+            "order_block_fvg_overlap": ob_fvg_overlap,
+            "ote_overlap": True,
+            "higher_timeframe_bias_aligned": True,
+            "higher_timeframe_agreement": zone_bias_agreement,
+            "confirmation_volume": float(trigger[-1].volume),
+            "average_volume": average_volume,
+            "clean_path_to_tp1": True,
+        }
+        score = 2 + (2 if ob_fvg_overlap else 0) + 1 + 2 + (1 if zone_bias_agreement else 0)
         if average_volume and float(trigger[-1].volume) > 1.5 * average_volume:
             score += 1
         if score < profile.score_threshold:
@@ -161,5 +176,6 @@ def scan_symbol(
             reasons=("htf_bias_aligned", "premium_discount_aligned", "active_zone_in_ote",
                      "liquidity_sweep", "confirmation_break", "rr_passed"),
             zone=(selected[0], selected[1]), timeframe=profile.confirmation_timeframe,
+            evidence=evidence,
         ))
     return found
