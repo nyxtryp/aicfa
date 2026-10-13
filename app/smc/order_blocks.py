@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
+from numbers import Real
 from typing import Sequence
 
 from app.smc.breaks import StructureBreak
@@ -36,6 +38,15 @@ def find_order_blocks(
     lengths = {len(opens), len(highs), len(lows), len(closes)}
     if len(lengths) != 1:
         raise ValueError("OHLC arrays must have the same length")
+    normalized = []
+    for values in (opens, highs, lows, closes):
+        row = []
+        for value in values:
+            if isinstance(value, bool) or not isinstance(value, Real) or not isfinite(float(value)):
+                raise ValueError("OHLC values must be finite real numbers")
+            row.append(float(value))
+        normalized.append(row)
+    opens, highs, lows, closes = normalized
     if any(high < low or high < open_ or high < close or low > open_ or low > close
            for open_, high, low, close in zip(opens, highs, lows, closes)):
         raise ValueError("OHLC candle values are inconsistent")
@@ -45,6 +56,12 @@ def find_order_blocks(
     for event in events:
         if event.direction not in {"bullish", "bearish"}:
             raise ValueError("event direction must be bullish or bearish")
+        if event.kind not in {"BOS", "CHoCH"}:
+            raise ValueError("event kind must be BOS or CHoCH")
+        if (isinstance(event.candle_index, bool) or not isinstance(event.candle_index, int)
+                or isinstance(event.swing_index, bool) or not isinstance(event.swing_index, int)
+                or event.swing_index < 0):
+            raise ValueError("event indices must be non-negative integers")
         if event.candle_index < 0 or event.candle_index >= len(closes):
             continue
         start = max(0, event.swing_index + 1)
@@ -111,12 +128,23 @@ def measure_order_block_mitigation(
     block is not allowed to mitigate that same block; only later closed candles
     are examined. Future closes beyond as_of_index are invisible.
     """
-    if block.direction not in {"bullish", "bearish"} or block.upper <= block.lower:
+    if (block.direction not in {"bullish", "bearish"}
+            or isinstance(block.lower, bool) or not isinstance(block.lower, Real)
+            or isinstance(block.upper, bool) or not isinstance(block.upper, Real)
+            or not isfinite(float(block.lower)) or not isfinite(float(block.upper))
+            or block.upper <= block.lower):
         raise ValueError("order block direction or boundaries are invalid")
+    for close in closes:
+        if isinstance(close, bool) or not isinstance(close, Real) or not isfinite(float(close)):
+            raise ValueError("closes must contain only finite real numbers")
+    if isinstance(block.confirmation_index, bool) or not isinstance(block.confirmation_index, int):
+        raise ValueError("block confirmation index must be an integer")
     if block.confirmation_index < 0 or block.confirmation_index >= len(closes):
         raise ValueError("block confirmation index is outside the supplied closes")
 
     end = len(closes) - 1 if as_of_index is None else as_of_index
+    if isinstance(end, bool) or not isinstance(end, int):
+        raise ValueError("as_of_index must be an integer")
     if end < block.confirmation_index or end >= len(closes):
         raise ValueError("as_of_index must be between confirmation and last close")
 
