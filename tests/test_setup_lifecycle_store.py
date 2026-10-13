@@ -51,6 +51,22 @@ class SetupDecisionStoreTests(unittest.TestCase):
             self.assertIn("active_setup_limit_reached", ninth["decision_reasons"])
             self.assertEqual(store.active_count(), 8)
 
+
+    def test_shadow_candidate_is_kept_but_zone_cooldown_prevents_repeats(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SetupStore(Path(directory) / "setups.sqlite3")
+            first = self.candidate("shadow-one", status="CANDIDATE")
+            first["decision_reasons"] = ["live_acceptance_disabled_until_phase1_accepted"]
+            inserted, decision = store.save_decision(first, cooldown_minutes=30)
+            self.assertTrue(inserted)
+            self.assertEqual(decision["status"], "CANDIDATE")
+            second = self.candidate("shadow-two", status="CANDIDATE")
+            second["confirmation_time_ms"] = 1_100_000
+            inserted, repeated = store.save_decision(second, cooldown_minutes=30)
+            self.assertTrue(inserted)
+            self.assertEqual(repeated["status"], "REJECTED")
+            self.assertIn("cooldown_active", repeated["decision_reasons"])
+
     def test_zone_cooldown_survives_setup_completion(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SetupStore(Path(directory) / "setups.sqlite3")
