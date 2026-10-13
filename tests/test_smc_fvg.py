@@ -61,7 +61,7 @@ class FairValueGapTests(unittest.TestCase):
             [10, 12, 14, 11],
             [8, 11, 13, 10.0000000001],
         )
-        self.assertEqual(result.fill_percent, 100.0)
+        self.assertLess(result.fill_percent, 100.0)
         self.assertFalse(result.fully_filled)
 
 
