@@ -54,11 +54,12 @@ class AuthStoreTests(unittest.TestCase):
         self.now[0] += SESSION_TTL_SECONDS + 1
         self.assertFalse(self.store.verify_session(token))
 
-    def test_password_change_rotates_password_not_session_signing_key(self):
+    def test_password_change_invalidates_old_sessions(self):
         self.configure()
         token = self.store.create_session()
         self.store.change_password("correct horse battery staple", "new correct password")
-        self.assertTrue(self.store.verify_session(token))
+        self.assertFalse(self.store.verify_session(token))
+        self.assertTrue(self.store.verify_session(self.store.create_session()))
 
     def test_unconfigured_store_rejects_sessions(self):
         self.assertFalse(self.store.verify_session("anything"))
