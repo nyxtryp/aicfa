@@ -49,6 +49,7 @@ WS_ROTATION_INTERVAL_SECONDS = 23 * 60 * 60
 WS_ROTATION_RETRY_SECONDS = 60
 WS_ROTATION_CONFIRM_SECONDS = 1
 REST_KLINES_URL = "https://fapi.binance.com/fapi/v1/klines"
+REST_EXCHANGE_INFO_URL = "https://fapi.binance.com/fapi/v1/exchangeInfo"
 REST_MIN_INTERVAL_SECONDS = 0.25
 REST_FALLBACK_DELAY_MS = 2_500
 REST_MAX_RATE_LIMIT_RETRIES = 5
@@ -259,6 +260,8 @@ class MarketDataManager:
         # Optional event hook invoked only after a genuinely new closed candle
         # has been persisted and accepted into the rolling window.
         self.on_closed_candle = None
+        self.exchange_filters: dict[str, dict[str, str]] = {}
+        self.exchange_metadata_status: dict[str, Any] = {"status": "not_started", "updated_at_ms": None, "error": None}
         self.store = SQLiteCandleStore()
         self.history_status: dict[str, Any] = {
             "status": "not_started",
@@ -316,6 +319,7 @@ class MarketDataManager:
         self._history_task = asyncio.create_task(
             self.load_history(), name="aicfa-rest-history"
         )
+        asyncio.create_task(self.refresh_exchange_filters(), name="aicfa-exchange-filters")
         self._tasks = [
             asyncio.create_task(self._run_group("tradfi", TRADFI_SYMBOLS), name="aicfa-ws-tradfi"),
             asyncio.create_task(self._run_group("crypto", CRYPTO_SYMBOLS), name="aicfa-ws-crypto"),
@@ -327,6 +331,43 @@ class MarketDataManager:
         self._reconciliation_task = asyncio.create_task(
             self._reconciliation_loop(), name="aicfa-rest-reconciliation"
         )
+
+
+    async def refresh_exchange_filters(self) -> None:
+        """Load authoritative USD-M Futures tickSize metadata; never infer it."""
+        self.exchange_metadata_status = {"status": "loading", "updated_at_ms": None, "error": None}
+        try:
+            def fetch():
+                request = urllib.request.Request(REST_EXCHANGE_INFO_URL, headers={"User-Agent": "AICFA/1.0"})
+                with urllib.request.urlopen(request, timeout=20) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            payload = await asyncio.to_thread(fetch)
+            found: dict[str, dict[str, str]] = {}
+            for item in payload.get("symbols", []):
+                symbol = item.get("symbol")
+                if symbol not in SYMBOL_SET or item.get("status") != "TRADING":
+                    continue
+                price_filter = next((f for f in item.get("filters", []) if f.get("filterType") == "PRICE_FILTER"), None)
+                if price_filter:
+                    try:
+                        tick = Decimal(str(price_filter.get("tickSize", "0")))
+                        if tick > 0:
+                            found[symbol] = {"tick_size": str(tick), "status": str(item["status"])}
+                    except (InvalidOperation, TypeError, ValueError):
+                        continue
+            self.exchange_filters = found
+            missing = sorted(SYMBOL_SET - set(found))
+            self.exchange_metadata_status = {
+                "status": "ok" if not missing else "partial",
+                "updated_at_ms": int(time.time() * 1000),
+                "error": None if not missing else "missing_or_non_trading_symbols",
+                "available_symbols": len(found),
+                "missing_symbols": missing,
+            }
+            logger.info("Loaded exchange tickSize metadata for %s/%s configured instruments", len(found), len(ALL_SYMBOLS))
+        except Exception as exc:
+            self.exchange_metadata_status = {"status": "error", "updated_at_ms": None, "error": type(exc).__name__}
+            logger.exception("Could not load Binance USD-M Futures exchange filters")
 
     async def stop(self) -> None:
         self._stopping = True
@@ -939,6 +980,7 @@ class MarketDataManager:
             "freshness": self._freshness_status(),
             "persistence": {"backend": "sqlite", "journal_mode": "WAL", "database_path": str(self.store.path), "stored_candles": self.store.count() if self.store._connection is not None else 0},
             "history": dict(self.history_status),
+            "exchange_metadata": dict(self.exchange_metadata_status),
             "reconciliation": dict(self.reconciliation_status),
             "groups": {name: dict(state) for name, state in self.groups.items()},
         }
