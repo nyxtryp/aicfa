@@ -137,8 +137,9 @@ def analyze_smc(
                 )
             ]
 
+    historical_levels = [level for level in levels if level not in current_day_levels]
     historical_sweeps = detect_liquidity_sweeps(
-        hi, lo, cl, levels, max_age=liquidity_max_age
+        hi, lo, cl, historical_levels, max_age=liquidity_max_age
     )
     current_day_sweeps = detect_current_day_sweeps(ts, hi, lo, cl)
     # Current-day extremes are computed per candle from prior candles only;
