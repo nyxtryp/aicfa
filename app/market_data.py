@@ -45,7 +45,7 @@ TIMEFRAME_SET = frozenset(TIMEFRAMES)
 EXPECTED_STREAM_COUNT = len(ALL_SYMBOLS) * len(TIMEFRAMES)
 CRYPTO_GROUP_SIZE = 10
 CRYPTO_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = tuple(
-    (("crypto" if index == 0 else f"crypto_{index + 1}"),
+    (("crypto" if index == 0 else f"crypto_{index // CRYPTO_GROUP_SIZE + 1}"),
      CRYPTO_SYMBOLS[index:index + CRYPTO_GROUP_SIZE])
     for index in range(0, len(CRYPTO_SYMBOLS), CRYPTO_GROUP_SIZE)
 )
