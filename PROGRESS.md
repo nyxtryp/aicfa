@@ -1336,3 +1336,12 @@
 - First CI runs failed because persistent storage was opened during module import against the production default path on a clean runner. Corrected by lazy initialization in `app/main.py`; latest GitHub Actions run passed: https://github.com/nyxtryp/aicfa/actions/runs/38400454321 (commit `641b367fe50754c746975fc90a72e3c761e74f87`).
 - The incoming list now opens the corresponding chart when a candidate is clicked; no visible manual symbol/timeframe controls remain.
 - **Still not accepted as complete:** persisted items are `CANDIDATE`, not `ACCEPTED`; live exchange tick sizes, all §7 gates (active cap/cooldown/market status/duplicate zone), lifecycle/partial exits, realized journal, and recovery/replay for candles delivered through REST are still outstanding. Production deployment/runtime behaviour has not been verified.
+
+
+### 2026-10-13 — follow-up after acceptance/lifecycle implementation
+
+- Added Binance USD-M exchangeInfo tickSize loading with 15-minute retry; unknown tick sizes fail closed.
+- Wired evaluate_candidate into live closed-candle processing, including score/RR/stop-distance/freshness/limit checks, global active cap and active symbol/profile exclusion. TradFi acceptance remains fail-closed until market hours/calendar are implemented. Candidates without three confirmed targets are rejected.
+- Added durable active lifecycle and journal: 1m candle monitoring, partial targets 50/30/20, breakeven stop after TP1, expiry/invalidation, gross R/commission R/net R, active/journal API and UI panels. Same-candle TP1 and breakeven is resolved conservatively.
+- Added tests for atomic active-cap enforcement and journal transitions. CI succeeded through commit b7201853c8bacaaf6580e354ced6778dd1dfc1a7: https://github.com/nyxtryp/aicfa/actions/runs/38401658963. The newer cooldown and same-bar safety commits are still awaiting their CI result.
+- Still open: replay REST-recovered candles through the scanner; restore active setups by replaying missed 1m history after downtime; validate actual production deploy/API. The minimum stop currently uses 0.5 ATR and 0.2% of entry as a conservative commission proxy; this must be replaced by the explicitly configured commission model.
