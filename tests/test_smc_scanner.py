@@ -108,6 +108,15 @@ class ScannerTests(unittest.TestCase):
             candidates = scan_symbol("BTCUSDT", stale_series, trigger_timeframe="5m")
         self.assertEqual(candidates, [])
 
+    def test_zone_touch_before_confirmation_does_not_require_price_still_inside_zone(self):
+        zone_series = list(self.series["15m"])
+        zone_series[-1] = candle(39, low=103.0, high=105.0, close=104.0)
+        series = dict(self.series)
+        series["15m"] = tuple(zone_series)
+        with patch("app.smc.scanner._analysis", side_effect=lambda candles, profile, timeframe: analysis()):
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
+        self.assertEqual(len(candidates), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
