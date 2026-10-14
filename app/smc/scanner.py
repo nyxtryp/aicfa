@@ -80,9 +80,19 @@ def scan_symbol(
             continue
         count("profile_checks")
         trigger = tuple(series_by_timeframe.get(profile.confirmation_timeframe, ()))
-        zone_series = tuple(series_by_timeframe.get(profile.zone_timeframe, ()))
-        bias_series = tuple(series_by_timeframe.get(profile.bias_timeframe, ()))
-        extra_series = tuple(series_by_timeframe.get(profile.extra_confirmation_timeframe, ())) if profile.extra_confirmation_timeframe else ()
+        if not trigger:
+            count("insufficient_history")
+            continue
+        # A scan is a snapshot at the newest closed trigger candle. Other
+        # timeframes may advance independently; never let later candles leak
+        # into bias, zone, or extra-confirmation analysis.
+        confirmation_close_ms = trigger[-1].close_time_ms
+        zone_series = tuple(c for c in series_by_timeframe.get(profile.zone_timeframe, ())
+                            if c.close_time_ms <= confirmation_close_ms)
+        bias_series = tuple(c for c in series_by_timeframe.get(profile.bias_timeframe, ())
+                            if c.close_time_ms <= confirmation_close_ms)
+        extra_series = tuple(c for c in series_by_timeframe.get(profile.extra_confirmation_timeframe, ())
+                             if c.close_time_ms <= confirmation_close_ms) if profile.extra_confirmation_timeframe else ()
         if min(len(trigger), len(zone_series), len(bias_series)) < 40:
             count("insufficient_history")
             continue
@@ -128,7 +138,6 @@ def scan_symbol(
         # not still be inside the zone when the confirmation candle closes.
         # Only candles completed before confirmation are eligible, preventing
         # look-ahead and same-close-time ordering ambiguity.
-        confirmation_close_ms = trigger[-1].close_time_ms
         selected = next((z for z in reversed(active_zones)
                          if z[0] <= ote_high and z[1] >= ote_low
                          and any(
