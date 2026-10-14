@@ -185,15 +185,50 @@ def scan_symbol(
             count("invalid_stop")
             continue
 
-        targets = sorted(
+        liquidity_targets = sorted(
             {float(level.price) for level in confirm.liquidity_levels
              if (level.price > entry if direction == "long" else level.price < entry)},
             reverse=(direction == "short"),
         )
-        if len(targets) < 1:
+        if not liquidity_targets:
             count("no_target_liquidity")
             continue
-        tp1 = targets[0]
+
+        # TZ §6: TP1 is the nearest confirmed liquidity. TP2 is the next
+        # available target; TP3 may be a confirmed major swing or range edge.
+        # Do not require all three targets to be liquidity levels of the same
+        # kind, and never move TP1 away from the nearest confirmed liquidity.
+        targets = list(liquidity_targets[:3])
+        last_target = targets[-1]
+        swing_kind = "high" if direction == "long" else "low"
+        swing_targets = sorted(
+            {
+                float(swing.price)
+                for swing in getattr(confirm, "swings", ())
+                if swing.kind == swing_kind
+                and (swing.price > last_target if direction == "long" else swing.price < last_target)
+            },
+            reverse=(direction == "short"),
+        )
+        for target in swing_targets:
+            if len(targets) >= 3:
+                break
+            if not any(abs(target - existing) <= max(abs(entry) * 1e-12, 1e-12) for existing in targets):
+                targets.append(target)
+
+        # The confirmation timeframe's dealing-range edge is the final fallback
+        # for TP3, only when it lies beyond every target already selected.
+        confirmation_range = confirm.dealing_range
+        if len(targets) < 3 and confirmation_range is not None:
+            edge = float(confirmation_range.high if direction == "long" else confirmation_range.low)
+            beyond_last = edge > targets[-1] if direction == "long" else edge < targets[-1]
+            if beyond_last and not any(abs(edge - existing) <= max(abs(entry) * 1e-12, 1e-12) for existing in targets):
+                targets.append(edge)
+
+        if len(targets) < 3:
+            count("insufficient_confirmed_targets")
+            continue
+        tp1 = liquidity_targets[0]
         opposing_zones = [
             (float(block.lower), float(block.upper))
             for block, state in zip(confirm.order_blocks, confirm.order_block_mitigation)
