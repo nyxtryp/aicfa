@@ -109,7 +109,10 @@ def scan_symbol(
         latest_bias = bias.structure_breaks[-1]
         direction = "long" if latest_bias.direction == "bullish" else "short"
         required_zone = "discount" if direction == "long" else "premium"
-        if zone.premium_discount != required_zone:
+        # TZ §6 defines Premium/Discount as part of the higher-timeframe bias,
+        # not the zone-timeframe OTE calculation. Keep these independent: HTF
+        # PD validates direction while the zone timeframe supplies the OTE leg.
+        if bias.premium_discount != required_zone:
             count("premium_discount_mismatch")
             continue
         dr = zone.dealing_range
