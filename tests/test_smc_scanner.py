@@ -27,7 +27,7 @@ def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0), swings=()):
     return SimpleNamespace(
         structure_breaks=(bullish_break,),
         swings=tuple(swings),
-        dealing_range=SimpleNamespace(ote_lower=99.0, ote_upper=101.0),
+        dealing_range=SimpleNamespace(ote_lower=99.0, ote_upper=101.0, high=104.0, low=96.0),
         premium_discount="discount",
         as_of_index=39,
         order_blocks=(block,),
