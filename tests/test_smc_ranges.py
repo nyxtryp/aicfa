@@ -89,5 +89,21 @@ class DealingRangeTests(unittest.TestCase):
                     find_dealing_range([swing], as_of_index=10)
 
 
+    def test_directional_ote_skips_latest_countertrend_leg(self):
+        swings = (
+            SwingPoint("low", 2, 4, 100.0),
+            SwingPoint("high", 8, 10, 200.0),
+            SwingPoint("low", 14, 16, 120.0),
+        )
+        result = find_dealing_range(swings, as_of_index=16, direction="bullish")
+        self.assertEqual((result.start_index, result.end_index), (2, 8))
+        self.assertEqual((result.ote_lower, result.ote_upper), (121.0, 138.0))
+        self.assertEqual(result.direction, "bullish")
+
+    def test_invalid_direction_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "direction must be"):
+            find_dealing_range([], as_of_index=0, direction="long")
+
+
 if __name__ == "__main__":
     unittest.main()
