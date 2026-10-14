@@ -54,7 +54,7 @@ class AutomaticScannerTests(unittest.TestCase):
         def analysis_for(candles, profile, timeframe):
             last = len(candles) - 1
             base = dict(
-                as_of_index=last, structure_breaks=(), order_blocks=(),
+                as_of_index=last, structure_breaks=(), swings=(), order_blocks=(),
                 order_block_mitigation=(), fvg=(), fvg_fill=(), sweeps=(),
                 liquidity_levels=(), dealing_range=None, premium_discount=None,
                 atr=tuple([1.0] * len(candles)),
@@ -66,6 +66,10 @@ class AutomaticScannerTests(unittest.TestCase):
             elif timeframe == "15m":
                 base.update(
                     structure_breaks=(SimpleNamespace(direction="bullish", candle_index=last - 2),),
+                    swings=(
+                        SimpleNamespace(kind="low", index=20, confirmation_index=22, price=97.0),
+                        SimpleNamespace(kind="high", index=30, confirmation_index=32, price=103.0),
+                    ),
                     order_blocks=(block,), order_block_mitigation=(block_state,),
                     fvg=(gap,), fvg_fill=(gap_fill,),
                     dealing_range=SimpleNamespace(ote_lower=99.0, ote_upper=101.0),
