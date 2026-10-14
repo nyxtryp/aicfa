@@ -77,6 +77,18 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].targets, (105.0, 110.0, 120.0))
 
+    def test_tp1_alone_is_enough_when_tp2_and_tp3_are_not_confirmed(self):
+        # The fixture's range edge is not beyond TP1, and no farther swings
+        # exist. TP2/TP3 must remain absent rather than rejecting the setup.
+        with patch(
+            "app.smc.scanner._analysis",
+            side_effect=lambda candles, profile, timeframe: analysis(levels=(105.0,), swings=()),
+        ):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].targets, (105.0,))
+
     def test_old_confirmation_break_is_not_replayed_as_new_candidate(self):
         def mocked_analysis(candles, profile, timeframe):
             return analysis(trigger_index=38 if timeframe == "5m" else 39)
