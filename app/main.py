@@ -83,9 +83,11 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
         direction = payload["direction"]
         entry = float(payload["confirmation_price"])
         original_stop = float(payload["stop_price"])
-        targets = [float(x) for x in payload.get("targets", [])]
-        if len(targets) < 3:
+        targets = [float(x) for x in payload.get("targets", [])][:3]
+        if not targets:
+            # A persisted setup must have TP1, but guard corrupted legacy rows.
             continue
+        target_weights = {1: (1.0,), 2: (0.5, 0.5), 3: (0.5, 0.3, 0.2)}[len(targets)]
         opened = int(payload["confirmation_time_ms"])
         lifetime_hours = 3 if payload["profile"] == "scalp" else 12
         expired = now_ms >= opened + lifetime_hours * 3_600_000
@@ -113,7 +115,8 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
                 gross_r -= 1.0
                 commission_r += COMMISSION_RATE_PER_SIDE * (entry + stop) / risk
             else:
-                remaining = 0.5 if status == "TP1" else 0.2
+                completed_targets = {"TP1": 1, "TP2": 2}.get(status, 0)
+                remaining = max(0.0, 1.0 - sum(target_weights[:completed_targets]))
                 commission_r += remaining * COMMISSION_RATE_PER_SIDE * (entry + stop) / risk
             payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
             _finish_setup(payload, store, now_ms, "SL", publish=publish)
@@ -131,18 +134,19 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             _finish_setup(payload, store, now_ms, "SL", publish=publish)
             continue
         reached = []
-        for idx in range(stage, 3):
+        for idx in range(stage, len(targets)):
             target = targets[idx]
             hit = high >= target if direction == "long" else low <= target
             if not hit:
                 break
-            weight = (0.5, 0.3, 0.2)[idx]
+            weight = target_weights[idx]
             gross_r += weight * ((target - entry) if direction == "long" else (entry - target)) / risk
             commission_r += weight * COMMISSION_RATE_PER_SIDE * (entry + target) / risk
             reached.append(idx + 1)
         if not reached:
             if expired:
-                remaining = 1.0 if status == "ACCEPTED" else 0.5 if status == "TP1" else 0.2
+                completed_targets = {"ACCEPTED": 0, "TP1": 1, "TP2": 2}.get(status, len(targets))
+                remaining = max(0.0, 1.0 - sum(target_weights[:completed_targets]))
                 gross_r += remaining * ((close - entry) if direction == "long" else (entry - close)) / risk
                 commission_r += remaining * COMMISSION_RATE_PER_SIDE * (entry + close) / risk
                 payload.update({"status": "EXPIRED", "gross_r": gross_r, "commission_r": commission_r})
@@ -150,15 +154,15 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             continue
         last = reached[-1]
         payload.update({"gross_r": gross_r, "commission_r": commission_r, "last_event_time_ms": now_ms})
-        if last == 3:
+        if last == len(targets):
             payload["status"] = "CLOSED"
-            _finish_setup(payload, store, now_ms, "TP3", publish=publish)
+            _finish_setup(payload, store, now_ms, f"TP{last}", publish=publish)
         else:
             payload["status"] = f"TP{last}"
             if store.transition(payload["key"], payload, event_type=f"TP{last}", event_time_ms=now_ms) and publish:
                 _publish_event({"type": "setup_lifecycle", "setup": payload})
             if expired:
-                remaining = 0.5 if last == 1 else 0.2
+                remaining = max(0.0, 1.0 - sum(target_weights[:last]))
                 gross_r += remaining * ((close - entry) if direction == "long" else (entry - close)) / risk
                 commission_r += remaining * COMMISSION_RATE_PER_SIDE * (entry + close) / risk
                 payload.update({"status": "EXPIRED", "gross_r": gross_r, "commission_r": commission_r})
@@ -257,9 +261,9 @@ async def _on_closed_candle(candle) -> None:
                 payload["entry_limit"] = None
                 payload["risk_reward"] = None
                 payload["decision_reasons"] = []
-                if len(candidate.targets) < 3:
+                if not candidate.targets:
                     payload["status"] = "REJECTED"
-                    payload["decision_reasons"] = ["three_confirmed_targets_required"]
+                    payload["decision_reasons"] = ["tp1_target_missing"]
                 elif not tick_info:
                     payload["status"] = "REJECTED"
                     payload["decision_reasons"] = ["tick_size_unavailable"]
