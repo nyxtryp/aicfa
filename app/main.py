@@ -50,6 +50,8 @@ _scanner_error_count = 0
 _scanner_last_error: str | None = None
 _scanner_last_candidate_count = 0
 _scanner_last_ready_series = 0
+_scanner_last_rejections: dict[str, int] = {}
+_scanner_rejection_totals: dict[str, int] = defaultdict(int)
 
 
 def _publish_event(payload: dict) -> None:
@@ -219,7 +221,7 @@ async def _invalidate_on_opposite_choch(candle) -> None:
 
 
 async def _on_closed_candle(candle) -> None:
-    global _scanner_last_event_ms, _scanner_event_count, _scanner_error_count, _scanner_last_error, _scanner_last_candidate_count, _scanner_last_ready_series
+    global _scanner_last_event_ms, _scanner_event_count, _scanner_error_count, _scanner_last_error, _scanner_last_candidate_count, _scanner_last_ready_series, _scanner_last_rejections
     _advance_active_setups(candle)
     await _invalidate_on_opposite_choch(candle)
     if candle.timeframe in {"5m", "15m"}:
@@ -229,9 +231,16 @@ async def _on_closed_candle(candle) -> None:
         _scanner_last_ready_series = sum(len(snapshot.get(tf, ())) >= 40 for tf in TIMEFRAMES)
         _scanner_last_candidate_count = 0
         _scanner_last_error = None
+        scan_diagnostics: dict[str, int] = {}
         try:
-            candidates = await asyncio.to_thread(scan_symbol, candle.symbol, snapshot, trigger_timeframe=candle.timeframe)
+            candidates = await asyncio.to_thread(
+                scan_symbol, candle.symbol, snapshot,
+                trigger_timeframe=candle.timeframe, diagnostics=scan_diagnostics,
+            )
             _scanner_last_candidate_count = len(candidates)
+            _scanner_last_rejections = dict(scan_diagnostics)
+            for reason, count in scan_diagnostics.items():
+                _scanner_rejection_totals[reason] += count
             for candidate in candidates:
                 payload = candidate.as_dict()
                 tick_info = market_data.exchange_filters.get(candidate.symbol)
@@ -714,6 +723,8 @@ async def setup_candidates(include_rejected: bool = False) -> dict:
                 "last_error": _scanner_last_error,
                 "last_candidate_count": _scanner_last_candidate_count,
                 "last_ready_series": _scanner_last_ready_series,
+                "last_stage_counts": dict(_scanner_last_rejections),
+                "total_stage_counts": dict(_scanner_rejection_totals),
             },
             "scanner_mode": "live" if SCANNER_LIVE_ENABLED else "shadow",
             "live_acceptance_enabled": SCANNER_LIVE_ENABLED,
