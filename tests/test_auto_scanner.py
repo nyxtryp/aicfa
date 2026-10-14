@@ -9,11 +9,23 @@ from app.smc.scanner import SetupCandidate, scan_symbol
 
 class AutomaticScannerTests(unittest.TestCase):
     def candles(self, symbol="BTCUSDT", timeframe="5m", count=20):
-        step = 60_000 if timeframe == "1m" else 300_000
+        # Keep each timeframe's real candle duration and align the newest
+        # close across series so the scanner's no-look-ahead snapshot has
+        # sufficient historical 1m candles at the 5m confirmation time.
+        step = {
+            "1m": 60_000,
+            "5m": 300_000,
+            "15m": 900_000,
+            "1h": 3_600_000,
+            "4h": 14_400_000,
+        }[timeframe]
+        common_close_ms = 1_800_000_000_000
+        first_open_ms = common_close_ms - count * step + 1
         return tuple(
             ClosedCandle(
                 symbol=symbol, timeframe=timeframe,
-                open_time_ms=i * step, close_time_ms=(i + 1) * step - 1,
+                open_time_ms=first_open_ms + i * step,
+                close_time_ms=first_open_ms + (i + 1) * step - 1,
                 open=Decimal("100"), high=Decimal("101"),
                 low=Decimal("99"), close=Decimal("100"),
                 volume=Decimal("10"),
