@@ -225,9 +225,9 @@ def scan_symbol(
             if beyond_last and not any(abs(edge - existing) <= max(abs(entry) * 1e-12, 1e-12) for existing in targets):
                 targets.append(edge)
 
-        if len(targets) < 3:
-            count("insufficient_confirmed_targets")
-            continue
+        # TP1 is required for the RR check; TP2/TP3 are optional structural
+        # extensions. Never reject an otherwise valid setup just because the
+        # market structure does not provide farther confirmed targets.
         tp1 = liquidity_targets[0]
         opposing_zones = [
             (float(block.lower), float(block.upper))
