@@ -28,6 +28,7 @@ def find_dealing_range(
     as_of_index: int,
     ote_min: float = 0.62,
     ote_max: float = 0.79,
+    direction: str | None = None,
 ) -> DealingRange | None:
     """Return the latest alternating confirmed swing leg available as of index.
 
@@ -39,6 +40,8 @@ def find_dealing_range(
         raise ValueError("as_of_index must be a non-negative integer")
     if not (0 < ote_min < ote_max < 1):
         raise ValueError("OTE bounds must satisfy 0 < ote_min < ote_max < 1")
+    if direction not in (None, "bullish", "bearish"):
+        raise ValueError("direction must be None, 'bullish', or 'bearish'")
 
     if any(
         isinstance(s.index, bool) or not isinstance(s.index, Integral)
@@ -72,9 +75,24 @@ def find_dealing_range(
 
     if len(collapsed) < 2:
         return None
-    start, end = collapsed[-2], collapsed[-1]
-    if start.kind == end.kind:
+    # OTE must be measured on an impulse aligned with the HTF structure bias.
+    # The newest confirmed leg may be a countertrend pullback; using it as the
+    # entry impulse reverses the OTE side and silently filters valid setups.
+    pair = None
+    for end_position in range(len(collapsed) - 1, 0, -1):
+        candidate_start, candidate_end = collapsed[end_position - 1], collapsed[end_position]
+        if candidate_start.kind == candidate_end.kind:
+            continue
+        candidate_direction = (
+            "bullish" if candidate_start.kind == "low" and candidate_end.kind == "high"
+            else "bearish"
+        )
+        if direction is None or candidate_direction == direction:
+            pair = (candidate_start, candidate_end)
+            break
+    if pair is None:
         return None
+    start, end = pair
 
     if start.kind == "low" and end.kind == "high":
         direction = "bullish"
