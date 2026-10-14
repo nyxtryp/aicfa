@@ -17,7 +17,7 @@ def candle(index, *, low=99.0, high=101.0, close=100.0):
     )
 
 
-def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0)):
+def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0), swings=()):
     bullish_break = SimpleNamespace(direction="bullish", candle_index=trigger_index)
     block = SimpleNamespace(
         direction="bullish", lower=98.0, upper=102.0, confirmation_index=30,
@@ -26,6 +26,7 @@ def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0)):
     liquidity = tuple(SimpleNamespace(price=price) for price in levels)
     return SimpleNamespace(
         structure_breaks=(bullish_break,),
+        swings=tuple(swings),
         dealing_range=SimpleNamespace(ote_lower=99.0, ote_upper=101.0),
         premium_discount="discount",
         as_of_index=39,
@@ -60,6 +61,21 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidate.confirmation_time_ms, self.series["5m"][-1].close_time_ms)
         self.assertEqual(candidate.targets, (105.0, 110.0, 120.0))
         self.assertEqual(candidate.status, "CANDIDATE")
+
+    def test_tp2_tp3_can_use_confirmed_swings_after_nearest_liquidity_tp1(self):
+        swings = (
+            SimpleNamespace(kind="high", price=110.0),
+            SimpleNamespace(kind="high", price=120.0),
+        )
+
+        with patch(
+            "app.smc.scanner._analysis",
+            side_effect=lambda candles, profile, timeframe: analysis(levels=(105.0,), swings=swings),
+        ):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].targets, (105.0, 110.0, 120.0))
 
     def test_old_confirmation_break_is_not_replayed_as_new_candidate(self):
         def mocked_analysis(candles, profile, timeframe):
