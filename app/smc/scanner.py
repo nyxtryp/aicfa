@@ -10,6 +10,7 @@ from typing import Mapping, Sequence
 
 from app.market_data import ClosedCandle
 from app.smc.engine import SMCAnalysis, analyze_smc
+from app.smc.ranges import find_dealing_range
 from app.smc.profiles import PROFILES, STOP_BUFFER_ATR_OVERRIDES, ProfileConfig
 
 
@@ -106,9 +107,6 @@ def scan_symbol(
         if not bias.structure_breaks:
             count("no_htf_structure_break")
             continue
-        if zone.dealing_range is None:
-            count("no_zone_dealing_range")
-            continue
         if not confirm.sweeps:
             count("no_liquidity_sweep")
             continue
@@ -117,6 +115,17 @@ def scan_symbol(
             continue
 
         latest_bias = bias.structure_breaks[-1]
+        # Keep HTF Premium/Discount as the directional location filter, but
+        # measure entry OTE on the most recent confirmed impulse aligned with
+        # that bias, not on a countertrend pullback leg.
+        dr = find_dealing_range(
+            zone.swings,
+            as_of_index=zone.as_of_index,
+            direction=latest_bias.direction,
+        )
+        if dr is None:
+            count("no_directional_zone_dealing_range")
+            continue
         direction = "long" if latest_bias.direction == "bullish" else "short"
         required_zone = "discount" if direction == "long" else "premium"
         # TZ §6 defines Premium/Discount as part of the higher-timeframe bias,
@@ -125,7 +134,6 @@ def scan_symbol(
         if bias.premium_discount != required_zone:
             count("premium_discount_mismatch")
             continue
-        dr = zone.dealing_range
         ote_low, ote_high = sorted((float(dr.ote_lower), float(dr.ote_upper)))
         active_zones: list[tuple[float, float, str, int]] = []
         for block, state in zip(zone.order_blocks, zone.order_block_mitigation):
