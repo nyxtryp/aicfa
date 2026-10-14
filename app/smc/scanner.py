@@ -59,6 +59,7 @@ def scan_symbol(
     series_by_timeframe: Mapping[str, Sequence[ClosedCandle]],
     *,
     trigger_timeframe: str,
+    diagnostics: dict[str, int] | None = None,
 ) -> list[SetupCandidate]:
     """Return only candidates whose confirmation is the newest candle on trigger TF.
 
@@ -69,32 +70,50 @@ def scan_symbol(
     persistence/risk gate, not inferred here.
     """
     found: list[SetupCandidate] = []
+
+    def count(reason: str) -> None:
+        if diagnostics is not None:
+            diagnostics[reason] = diagnostics.get(reason, 0) + 1
+
     for profile_name, profile in PROFILES.items():
         if trigger_timeframe != profile.confirmation_timeframe:
             continue
+        count("profile_checks")
         trigger = tuple(series_by_timeframe.get(profile.confirmation_timeframe, ()))
         zone_series = tuple(series_by_timeframe.get(profile.zone_timeframe, ()))
         bias_series = tuple(series_by_timeframe.get(profile.bias_timeframe, ()))
         extra_series = tuple(series_by_timeframe.get(profile.extra_confirmation_timeframe, ())) if profile.extra_confirmation_timeframe else ()
         if min(len(trigger), len(zone_series), len(bias_series)) < 40:
+            count("insufficient_history")
             continue
         bias = _analysis(bias_series, profile, profile.bias_timeframe)
         zone = _analysis(zone_series, profile, profile.zone_timeframe)
         confirm = _analysis(trigger, profile, profile.confirmation_timeframe)
         extra = _analysis(extra_series, profile, profile.extra_confirmation_timeframe) if extra_series else None
         if bias is None or zone is None or confirm is None:
+            count("analysis_unavailable")
             continue
-        if not bias.structure_breaks or zone.dealing_range is None or not confirm.sweeps or not confirm.structure_breaks:
+        if not bias.structure_breaks:
+            count("no_htf_structure_break")
+            continue
+        if zone.dealing_range is None:
+            count("no_zone_dealing_range")
+            continue
+        if not confirm.sweeps:
+            count("no_liquidity_sweep")
+            continue
+        if not confirm.structure_breaks:
+            count("no_structure_break")
             continue
 
         latest_bias = bias.structure_breaks[-1]
         direction = "long" if latest_bias.direction == "bullish" else "short"
         required_zone = "discount" if direction == "long" else "premium"
         if zone.premium_discount != required_zone:
+            count("premium_discount_mismatch")
             continue
         dr = zone.dealing_range
         ote_low, ote_high = sorted((float(dr.ote_lower), float(dr.ote_upper)))
-        current_price = float(zone_series[-1].close)
         active_zones: list[tuple[float, float, str, int]] = []
         for block, state in zip(zone.order_blocks, zone.order_block_mitigation):
             if block.direction == latest_bias.direction and not state.mitigated and block.confirmation_index <= zone.as_of_index:
@@ -102,11 +121,24 @@ def scan_symbol(
         for gap, fill in zip(zone.fvg, zone.fvg_fill):
             if gap.direction == latest_bias.direction and not fill.fully_filled and gap.confirmation_index <= zone.as_of_index:
                 active_zones.append((float(gap.lower), float(gap.upper), "FVG", int(gap.confirmation_index)))
+        # TZ §6: price must enter the active zone before confirmation; it need
+        # not still be inside the zone when the confirmation candle closes.
+        # Only candles completed before confirmation are eligible, preventing
+        # look-ahead and same-close-time ordering ambiguity.
+        confirmation_close_ms = trigger[-1].close_time_ms
         selected = next((z for z in reversed(active_zones)
                          if z[0] <= ote_high and z[1] >= ote_low
-                         and z[0] <= current_price <= z[1]), None)
+                         and any(
+                             candle.close_time_ms < confirmation_close_ms
+                             and index > z[3]
+                             and float(candle.high) >= z[0]
+                             and float(candle.low) <= z[1]
+                             for index, candle in enumerate(zone_series)
+                         )), None)
         if selected is None:
+            count("no_active_zone_touched_in_ote_before_confirmation")
             continue
+        count("active_zone_touched_in_ote")
         ob_zones = [(float(block.lower), float(block.upper)) for block, state in zip(zone.order_blocks, zone.order_block_mitigation)
                     if block.direction == latest_bias.direction and not state.mitigated]
         fvg_zones = [(float(gap.lower), float(gap.upper)) for gap, fill in zip(zone.fvg, zone.fvg_fill)
@@ -116,24 +148,29 @@ def scan_symbol(
 
         latest_trigger_break = confirm.structure_breaks[-1]
         if latest_trigger_break.candle_index != len(trigger) - 1:
+            count("confirmation_break_not_latest")
             continue
         expected_break = "bullish" if direction == "long" else "bearish"
         if latest_trigger_break.direction != expected_break:
+            count("confirmation_direction_mismatch")
             continue
         prior_sweeps = [s for s in confirm.sweeps if s.candle_index < latest_trigger_break.candle_index
                         and s.direction == expected_break]
         if not prior_sweeps:
+            count("no_prior_directional_sweep")
             continue
         sweep = prior_sweeps[-1]
         sweep_candle = trigger[sweep.candle_index]
         stop_raw = float(sweep_candle.low if direction == "long" else sweep_candle.high)
         atr = confirm.atr[-1]
         if atr is None or atr <= 0:
+            count("invalid_atr")
             continue
         stop_buffer_atr = max(profile.stop_buffer_atr, STOP_BUFFER_ATR_OVERRIDES.get(symbol, profile.stop_buffer_atr))
         stop = stop_raw - stop_buffer_atr * atr if direction == "long" else stop_raw + stop_buffer_atr * atr
         entry = float(trigger[-1].close)
         if (direction == "long" and stop >= entry) or (direction == "short" and stop <= entry):
+            count("invalid_stop")
             continue
 
         targets = sorted(
@@ -142,6 +179,7 @@ def scan_symbol(
             reverse=(direction == "short"),
         )
         if len(targets) < 1:
+            count("no_target_liquidity")
             continue
         tp1 = targets[0]
         opposing_zones = [
@@ -162,15 +200,18 @@ def scan_symbol(
         risk = abs(entry - stop)
         reward = abs(tp1 - entry)
         if risk <= 0 or reward / risk < profile.min_rr:
+            count("risk_reward_below_minimum")
             continue
         if profile.extra_confirmation_timeframe is not None:
             if extra is None or not extra.structure_breaks or extra.structure_breaks[-1].direction != expected_break or extra.structure_breaks[-1].candle_index != len(extra_series) - 1:
+                count("missing_current_extra_confirmation")
                 continue
             # A latest-index 1m break can still be stale when the 1m feed has
             # stopped advancing. Require the extra confirmation to be close in
             # time to the 5m confirmation, and never allow a future-dated bar.
             extra_age_ms = trigger[-1].close_time_ms - extra_series[-1].close_time_ms
             if extra_age_ms < 0 or extra_age_ms > 180_000:
+                count("stale_extra_confirmation")
                 continue
 
         average_volume = float(confirm.average_volume[-1] or 0)
@@ -188,6 +229,7 @@ def scan_symbol(
         if average_volume and float(trigger[-1].volume) > 1.5 * average_volume:
             score += 1
         if score < profile.score_threshold:
+            count("score_below_threshold")
             continue
         # Include zone origin and candle timestamp to make replay idempotent.
         key = f"{symbol}:{profile_name}:{direction}:{selected[2]}:{zone_series[selected[3]].open_time_ms}:{trigger[-1].open_time_ms}"
@@ -201,4 +243,5 @@ def scan_symbol(
             zone=(selected[0], selected[1]), timeframe=profile.confirmation_timeframe,
             evidence=evidence, atr=float(atr),
         ))
+        count("candidate_generated")
     return found
