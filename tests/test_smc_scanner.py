@@ -118,5 +118,21 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
 
 
+    def test_premium_discount_alignment_uses_higher_timeframe_bias_range(self):
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            if timeframe == "15m":
+                result.premium_discount = "premium"
+            elif timeframe == "1h":
+                result.premium_discount = "discount"
+            return result
+
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].direction, "long")
+
+
 if __name__ == "__main__":
     unittest.main()
