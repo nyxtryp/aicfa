@@ -68,8 +68,8 @@ class ScannerTests(unittest.TestCase):
 
     def test_tp2_tp3_can_use_confirmed_swings_after_nearest_liquidity_tp1(self):
         swings = (
-            SimpleNamespace(kind="high", price=110.0),
-            SimpleNamespace(kind="high", price=120.0),
+            SimpleNamespace(kind="high", index=34, confirmation_index=36, price=110.0),
+            SimpleNamespace(kind="high", index=37, confirmation_index=39, price=120.0),
         )
 
         with patch(
