@@ -134,5 +134,28 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidates[0].direction, "long")
 
 
+    def test_future_candles_on_other_timeframes_are_excluded_from_snapshot(self):
+        # Timeframes can advance independently; analysis must be frozen at the
+        # newest closed trigger candle, not use later HTF/zone/1m data.
+        series = dict(self.series)
+        for timeframe in ("1m", "15m", "1h"):
+            series[timeframe] = series[timeframe] + (candle(40),)
+        seen = {}
+
+        def mocked_analysis(candles, profile, timeframe):
+            seen[timeframe] = tuple(c.close_time_ms for c in candles)
+            return analysis()
+
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(set(seen), {"1h", "15m", "5m", "1m"})
+        trigger_close = series["5m"][-1].close_time_ms
+        for timeframe, timestamps in seen.items():
+            self.assertTrue(all(ts <= trigger_close for ts in timestamps), timeframe)
+            self.assertEqual(len(timestamps), 40, timeframe)
+
+
 if __name__ == "__main__":
     unittest.main()
