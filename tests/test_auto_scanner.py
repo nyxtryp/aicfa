@@ -50,6 +50,7 @@ class AutomaticScannerTests(unittest.TestCase):
             )
             if timeframe == "1h":
                 base["structure_breaks"] = (SimpleNamespace(direction="bullish", candle_index=last - 2),)
+                base["premium_discount"] = "discount"
             elif timeframe == "15m":
                 base.update(
                     structure_breaks=(SimpleNamespace(direction="bullish", candle_index=last - 2),),
