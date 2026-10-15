@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Mapping, Sequence
 
 from app.market_data import ClosedCandle
+from app.smc.liquidity import is_level_near_zone
 from app.smc.engine import SMCAnalysis, analyze_smc
 from app.smc.ranges import find_dealing_range, premium_discount
 from app.smc.profiles import PROFILES, STOP_BUFFER_ATR_OVERRIDES, ProfileConfig
@@ -157,6 +158,9 @@ def scan_symbol(
         for gap, fill in zip(zone.fvg, zone.fvg_fill):
             if gap.direction == latest_bias.direction and not fill.fully_filled and gap.confirmation_index <= zone.as_of_index:
                 active_zones.append((float(gap.lower), float(gap.upper), "FVG", int(gap.confirmation_index)))
+        # Zone families are appended separately above; sort by actual creation
+        # time so a newer OB can be preferred over an older FVG (and vice versa).
+        active_zones.sort(key=lambda item: (item[3], item[2]))
         # The latest structure break may be followed by a short, bounded
         # confirmation window. Requiring the BOS to be on the exact last candle
         # misses valid closed-candle setups when the feed and HTF bars close at
@@ -172,33 +176,57 @@ def scan_symbol(
         if latest_trigger_break.direction != expected_break:
             count("confirmation_direction_mismatch")
             continue
-        prior_sweeps = [s for s in confirm.sweeps
-                        if s.candle_index < break_index and s.direction == expected_break]
-        if not prior_sweeps:
-            count("no_prior_directional_sweep")
-            continue
-        sweep = prior_sweeps[-1]
         break_close_ms = trigger[break_index].close_time_ms
 
-        # A zone is created on its zone timeframe but can be tapped by a lower
-        # timeframe candle. Check the actual trigger candles after zone creation
-        # and before BOS; checking only zone-timeframe candles misses valid
-        # intrabar retests and can accidentally accept a touch after confirmation.
-        selected = next((z for z in reversed(active_zones)
-                         if z[0] <= ote_high and z[1] >= ote_low
-                         and 0 <= z[3] < len(zone_series)
-                         and any(
-                             index < break_index
-                             and candle.close_time_ms > zone_series[z[3]].close_time_ms
-                             and candle.close_time_ms < break_close_ms
-                             and float(candle.high) >= z[0]
-                             and float(candle.low) <= z[1]
-                             for index, candle in enumerate(trigger)
-                         )), None)
+        # Find the newest valid zone first, but fall back to older active zones
+        # when the newest zone was not actually retested before the break.
+        selected = None
+        for candidate_zone in reversed(active_zones):
+            if not (candidate_zone[0] <= ote_high and candidate_zone[1] >= ote_low):
+                continue
+            zone_index = candidate_zone[3]
+            if not 0 <= zone_index < len(zone_series):
+                continue
+            zone_created_ms = zone_series[zone_index].close_time_ms
+            touched = any(
+                index < break_index
+                and candle.close_time_ms > zone_created_ms
+                and candle.close_time_ms < break_close_ms
+                and float(candle.high) >= candidate_zone[0]
+                and float(candle.low) <= candidate_zone[1]
+                for index, candle in enumerate(trigger)
+            )
+            if touched:
+                selected = candidate_zone
+                break
         if selected is None:
             count("no_active_zone_touched_in_ote_before_confirmation")
             continue
         count("active_zone_touched_in_ote")
+
+        # A sweep must be relevant to the selected zone, not just any old
+        # same-direction sweep elsewhere in the 500-candle window. Require it
+        # after zone creation and before the confirming break, with the swept
+        # level within one zone-timeframe ATR of the nearest zone edge.
+        zone_created_ms = zone_series[selected[3]].close_time_ms
+        zone_atr = zone.atr[selected[3]] if selected[3] < len(zone.atr) else None
+        if zone_atr is None or zone_atr <= 0:
+            count("invalid_zone_atr")
+            continue
+        prior_sweeps = [
+            sweep_event for sweep_event in confirm.sweeps
+            if sweep_event.candle_index < break_index
+            and sweep_event.direction == expected_break
+            and trigger[sweep_event.candle_index].close_time_ms > zone_created_ms
+            and is_level_near_zone(
+                float(sweep_event.level), selected[0], selected[1], float(zone_atr),
+                max_distance_atr=1.0,
+            )
+        ]
+        if not prior_sweeps:
+            count("no_prior_directional_sweep_near_zone")
+            continue
+        sweep = prior_sweeps[-1]
         ob_zones = [(float(block.lower), float(block.upper)) for block, state in zip(zone.order_blocks, zone.order_block_mitigation)
                     if block.direction == latest_bias.direction and not state.mitigated]
         fvg_zones = [(float(gap.lower), float(gap.upper)) for gap, fill in zip(zone.fvg, zone.fvg_fill)

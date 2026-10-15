@@ -26,7 +26,7 @@ def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0), swings=()):
     block = SimpleNamespace(
         direction="bullish", lower=98.0, upper=102.0, confirmation_index=30,
     )
-    sweep = SimpleNamespace(direction="bullish", candle_index=38)
+    sweep = SimpleNamespace(direction="bullish", candle_index=38, level=100.0)
     liquidity = tuple(SimpleNamespace(price=price) for price in levels)
     return SimpleNamespace(
         structure_breaks=(bullish_break,),
@@ -65,6 +65,56 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidate.confirmation_time_ms, self.series["5m"][-1].close_time_ms)
         self.assertEqual(candidate.targets, (105.0, 110.0, 120.0))
         self.assertEqual(candidate.status, "CANDIDATE")
+
+    def test_newest_retested_zone_is_selected_and_sweep_must_be_near_it(self):
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            if timeframe == "15m":
+                result.order_blocks = (
+                    SimpleNamespace(direction="bullish", lower=98.0, upper=102.0, confirmation_index=30),
+                    SimpleNamespace(direction="bullish", lower=99.0, upper=101.0, confirmation_index=35),
+                )
+                result.order_block_mitigation = (
+                    SimpleNamespace(mitigated=False),
+                    SimpleNamespace(mitigated=False),
+                )
+            return result
+
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].zone, (99.0, 101.0))
+
+    def test_sweep_before_zone_creation_cannot_validate_zone(self):
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            result.sweeps = (SimpleNamespace(direction="bullish", candle_index=20, level=100.0),)
+            return result
+
+        diagnostics = {}
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol(
+                "BTCUSDT", self.series, trigger_timeframe="5m", diagnostics=diagnostics
+            )
+
+        self.assertEqual(candidates, [])
+        self.assertEqual(diagnostics.get("no_prior_directional_sweep_near_zone"), 1)
+
+    def test_unrelated_sweep_cannot_validate_a_zone(self):
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            result.sweeps = (SimpleNamespace(direction="bullish", candle_index=38, level=200.0),)
+            return result
+
+        diagnostics = {}
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol(
+                "BTCUSDT", self.series, trigger_timeframe="5m", diagnostics=diagnostics
+            )
+
+        self.assertEqual(candidates, [])
+        self.assertEqual(diagnostics.get("no_prior_directional_sweep_near_zone"), 1)
 
     def test_score_is_capped_at_ten_with_all_confluences(self):
         series = dict(self.series)
@@ -118,7 +168,7 @@ class ScannerTests(unittest.TestCase):
         def mocked_analysis(candles, profile, timeframe):
             result = analysis(trigger_index=38 if timeframe == "5m" else 39)
             if timeframe == "5m":
-                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37, level=100.0),)
             return result
 
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
@@ -192,7 +242,7 @@ class ScannerTests(unittest.TestCase):
         def mocked_analysis(candles, profile, timeframe):
             result = analysis()
             if timeframe == "5m":
-                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37, level=100.0),)
             return result
 
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
