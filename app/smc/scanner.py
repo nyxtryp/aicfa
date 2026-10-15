@@ -309,8 +309,9 @@ def scan_symbol(
             status="CANDIDATE", confirmation_time_ms=trigger[-1].close_time_ms,
             confirmation_price=entry, stop_price=stop,
             targets=tuple(targets[:3]), score=score,
-            reasons=("htf_bias_aligned", "premium_discount_aligned", "active_zone_in_ote",
-                     "liquidity_sweep", "confirmation_break", "rr_passed"),
+            reasons=("htf_bias_aligned",
+                     *(("premium_discount_aligned",) if pd_aligned else ("premium_discount_not_aligned_confluence_only",)),
+                     "active_zone_in_ote", "liquidity_sweep", "confirmation_break", "rr_passed"),
             zone=(selected[0], selected[1]), timeframe=profile.confirmation_timeframe,
             evidence=evidence, atr=float(atr),
         ))
