@@ -118,11 +118,15 @@ def scan_symbol(
         # Both HTF Premium/Discount and zone-TF OTE must use an impulse aligned
         # with the current HTF structure bias. The default latest leg can be a
         # countertrend pullback and invert the Premium/Discount classification.
+        # Premium/Discount is evaluated at the current causal HTF snapshot,
+        # not frozen at the candle where the latest BOS/CHoCH happened.
+        # Select the newest confirmed impulse aligned with that structure bias;
+        # find_dealing_range skips any newer countertrend pullback and excludes
+        # swings whose right-hand confirmation candles have not closed yet.
         bias_dr = find_dealing_range(
             bias.swings,
-            as_of_index=latest_bias.candle_index,
+            as_of_index=bias.as_of_index,
             direction=latest_bias.direction,
-            end_swing_index=getattr(latest_bias, "swing_index", None),
         )
         if bias_dr is None:
             count("no_directional_bias_dealing_range")

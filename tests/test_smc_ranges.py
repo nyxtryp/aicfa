@@ -123,6 +123,39 @@ class DealingRangeTests(unittest.TestCase):
         )
         self.assertIsNone(result)
 
+    def test_bullish_pd_uses_latest_confirmed_bullish_impulse_not_old_bos_swing(self):
+        # The latest HTF BOS can reference an old swing. Later confirmed
+        # structure has formed a newer bullish impulse and then a pullback.
+        # PD must use the latest bullish leg (150 -> 240), not the stale 100 -> 200.
+        swings = (
+            SwingPoint("low", 2, 4, 100.0),
+            SwingPoint("high", 8, 10, 200.0),
+            SwingPoint("low", 14, 16, 150.0),
+            SwingPoint("high", 20, 22, 240.0),
+            SwingPoint("low", 26, 28, 180.0),  # countertrend pullback
+            SwingPoint("high", 34, 36, 260.0),  # not confirmed at snapshot
+        )
+        result = find_dealing_range(swings, as_of_index=30, direction="bullish")
+        self.assertEqual((result.start_index, result.end_index), (14, 20))
+        self.assertEqual((result.low, result.high, result.equilibrium), (150.0, 240.0, 195.0))
+        self.assertEqual(result.confirmation_index, 22)
+
+    def test_bearish_pd_uses_latest_confirmed_bearish_impulse_not_old_choch_swing(self):
+        # Mirror of the bullish case: a newer bearish impulse wins over the
+        # stale range that the latest structure event originally broke.
+        swings = (
+            SwingPoint("high", 2, 4, 300.0),
+            SwingPoint("low", 8, 10, 200.0),
+            SwingPoint("high", 14, 16, 250.0),
+            SwingPoint("low", 20, 22, 140.0),
+            SwingPoint("high", 26, 28, 180.0),  # countertrend pullback
+            SwingPoint("low", 34, 36, 120.0),  # not confirmed at snapshot
+        )
+        result = find_dealing_range(swings, as_of_index=30, direction="bearish")
+        self.assertEqual((result.start_index, result.end_index), (14, 20))
+        self.assertEqual((result.low, result.high, result.equilibrium), (140.0, 250.0, 195.0))
+        self.assertEqual(result.confirmation_index, 22)
+
     def test_anchored_range_requires_direction(self):
         with self.assertRaisesRegex(ValueError, "direction is required"):
             find_dealing_range(
