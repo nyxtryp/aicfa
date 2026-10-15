@@ -24,6 +24,21 @@ class OrderBlockTests(unittest.TestCase):
             (OrderBlock("bullish", 1, 4, 8.5, 9.0, "BOS", 0),),
         )
 
+    def test_same_source_candle_is_not_reemitted_for_consecutive_breaks(self):
+        blocks = find_order_blocks(
+            opens=[8, 9, 10, 11, 10, 10],
+            highs=[9, 10, 11, 12, 13, 14],
+            lows=[7, 8, 9, 10, 9, 9],
+            closes=[8.5, 8.5, 10.5, 11.5, 12.5, 13.5],
+            events=[
+                StructureBreak("BOS", "bullish", 4, 0, 11.0),
+                StructureBreak("BOS", "bullish", 5, 0, 12.0),
+            ],
+        )
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(blocks[0].candle_index, 1)
+        self.assertEqual(blocks[0].confirmation_index, 4)
+
     def test_bearish_break_uses_last_bullish_body(self):
         blocks = find_order_blocks(
             opens=[12, 10, 9, 8],

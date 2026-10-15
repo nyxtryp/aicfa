@@ -52,7 +52,9 @@ def find_order_blocks(
         raise ValueError("OHLC candle values are inconsistent")
 
     result: list[OrderBlock] = []
-    emitted: set[tuple[str, int, int]] = set()
+    # A single opposing candle can be rediscovered by consecutive breaks. It
+    # remains one OB; a later break must not create a duplicate fresh zone.
+    emitted: set[tuple[str, int]] = set()
     for event in events:
         if event.direction not in {"bullish", "bearish"}:
             raise ValueError("event direction must be bullish or bearish")
@@ -82,7 +84,7 @@ def find_order_blocks(
 
         if candidate is None:
             continue
-        identity = (event.direction, candidate, event.candle_index)
+        identity = (event.direction, candidate)
         if identity in emitted:
             continue
         emitted.add(identity)
