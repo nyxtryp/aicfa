@@ -157,18 +157,43 @@ def scan_symbol(
         for gap, fill in zip(zone.fvg, zone.fvg_fill):
             if gap.direction == latest_bias.direction and not fill.fully_filled and gap.confirmation_index <= zone.as_of_index:
                 active_zones.append((float(gap.lower), float(gap.upper), "FVG", int(gap.confirmation_index)))
-        # TZ §6: price must enter the active zone before confirmation; it need
-        # not still be inside the zone when the confirmation candle closes.
-        # Only candles completed before confirmation are eligible, preventing
-        # look-ahead and same-close-time ordering ambiguity.
+        # The latest structure break may be followed by a short, bounded
+        # confirmation window. Requiring the BOS to be on the exact last candle
+        # misses valid closed-candle setups when the feed and HTF bars close at
+        # slightly different times. Entry is still evaluated at the current
+        # trigger close, never retroactively at the BOS candle.
+        latest_trigger_break = confirm.structure_breaks[-1]
+        break_index = int(latest_trigger_break.candle_index)
+        break_age = len(trigger) - 1 - break_index
+        if break_age < 0 or break_age > 2:
+            count("confirmation_break_not_recent")
+            continue
+        expected_break = "bullish" if direction == "long" else "bearish"
+        if latest_trigger_break.direction != expected_break:
+            count("confirmation_direction_mismatch")
+            continue
+        prior_sweeps = [s for s in confirm.sweeps
+                        if s.candle_index < break_index and s.direction == expected_break]
+        if not prior_sweeps:
+            count("no_prior_directional_sweep")
+            continue
+        sweep = prior_sweeps[-1]
+        break_close_ms = trigger[break_index].close_time_ms
+
+        # A zone is created on its zone timeframe but can be tapped by a lower
+        # timeframe candle. Check the actual trigger candles after zone creation
+        # and before BOS; checking only zone-timeframe candles misses valid
+        # intrabar retests and can accidentally accept a touch after confirmation.
         selected = next((z for z in reversed(active_zones)
                          if z[0] <= ote_high and z[1] >= ote_low
+                         and 0 <= z[3] < len(zone_series)
                          and any(
-                             candle.close_time_ms < confirmation_close_ms
-                             and index > z[3]
+                             index < break_index
+                             and candle.close_time_ms > zone_series[z[3]].close_time_ms
+                             and candle.close_time_ms < break_close_ms
                              and float(candle.high) >= z[0]
                              and float(candle.low) <= z[1]
-                             for index, candle in enumerate(zone_series)
+                             for index, candle in enumerate(trigger)
                          )), None)
         if selected is None:
             count("no_active_zone_touched_in_ote_before_confirmation")
@@ -181,20 +206,6 @@ def scan_symbol(
         ob_fvg_overlap = any(a0 <= b1 and b0 <= a1 and max(a0, b0) <= ote_high and min(a1, b1) >= ote_low for a0, a1 in ob_zones for b0, b1 in fvg_zones)
         zone_bias_agreement = bool(zone.structure_breaks and zone.structure_breaks[-1].direction == latest_bias.direction)
 
-        latest_trigger_break = confirm.structure_breaks[-1]
-        if latest_trigger_break.candle_index != len(trigger) - 1:
-            count("confirmation_break_not_latest")
-            continue
-        expected_break = "bullish" if direction == "long" else "bearish"
-        if latest_trigger_break.direction != expected_break:
-            count("confirmation_direction_mismatch")
-            continue
-        prior_sweeps = [s for s in confirm.sweeps if s.candle_index < latest_trigger_break.candle_index
-                        and s.direction == expected_break]
-        if not prior_sweeps:
-            count("no_prior_directional_sweep")
-            continue
-        sweep = prior_sweeps[-1]
         sweep_candle = trigger[sweep.candle_index]
         stop_raw = float(sweep_candle.low if direction == "long" else sweep_candle.high)
         atr = confirm.atr[-1]
@@ -273,7 +284,12 @@ def scan_symbol(
             count("risk_reward_below_minimum")
             continue
         if profile.extra_confirmation_timeframe is not None:
-            if extra is None or not extra.structure_breaks or extra.structure_breaks[-1].direction != expected_break or extra.structure_breaks[-1].candle_index != len(extra_series) - 1:
+            if extra is None or not extra.structure_breaks:
+                count("missing_current_extra_confirmation")
+                continue
+            extra_break = extra.structure_breaks[-1]
+            extra_break_age = len(extra_series) - 1 - int(extra_break.candle_index)
+            if extra_break.direction != expected_break or extra_break_age < 0 or extra_break_age > 2:
                 count("missing_current_extra_confirmation")
                 continue
             # A latest-index 1m break can still be stale when the 1m feed has
@@ -303,7 +319,7 @@ def scan_symbol(
             count("score_below_threshold")
             continue
         # Include zone origin and candle timestamp to make replay idempotent.
-        key = f"{symbol}:{profile_name}:{direction}:{selected[2]}:{zone_series[selected[3]].open_time_ms}:{trigger[-1].open_time_ms}"
+        key = f"{symbol}:{profile_name}:{direction}:{selected[2]}:{zone_series[selected[3]].open_time_ms}:{trigger[break_index].open_time_ms}"
         found.append(SetupCandidate(
             key=key, symbol=symbol, profile=profile_name, direction=direction,
             status="CANDIDATE", confirmation_time_ms=trigger[-1].close_time_ms,
