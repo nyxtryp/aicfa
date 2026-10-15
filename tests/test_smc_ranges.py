@@ -100,6 +100,36 @@ class DealingRangeTests(unittest.TestCase):
         self.assertEqual((result.ote_lower, result.ote_upper), (121.0, 138.0))
         self.assertEqual(result.direction, "bullish")
 
+    def test_htf_range_can_anchor_to_swing_broken_by_structure_event(self):
+        swings = (
+            SwingPoint("low", 2, 4, 100.0),
+            SwingPoint("high", 8, 10, 200.0),
+            SwingPoint("low", 14, 16, 120.0),
+            SwingPoint("high", 20, 22, 220.0),
+        )
+        result = find_dealing_range(
+            swings, as_of_index=25, direction="bullish", end_swing_index=8,
+        )
+        self.assertEqual((result.start_index, result.end_index), (2, 8))
+        self.assertEqual(result.equilibrium, 150.0)
+
+    def test_anchored_range_cannot_use_swing_unconfirmed_at_break(self):
+        swings = (
+            SwingPoint("low", 2, 4, 100.0),
+            SwingPoint("high", 8, 10, 200.0),
+        )
+        result = find_dealing_range(
+            swings, as_of_index=9, direction="bullish", end_swing_index=8,
+        )
+        self.assertIsNone(result)
+
+    def test_anchored_range_requires_direction(self):
+        with self.assertRaisesRegex(ValueError, "direction is required"):
+            find_dealing_range(
+                [SwingPoint("low", 2, 4, 100.0), SwingPoint("high", 8, 10, 200.0)],
+                as_of_index=10, end_swing_index=8,
+            )
+
     def test_invalid_direction_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "direction must be"):
             find_dealing_range([], as_of_index=0, direction="long")
