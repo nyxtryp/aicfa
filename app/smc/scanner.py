@@ -120,8 +120,9 @@ def scan_symbol(
         # countertrend pullback and invert the Premium/Discount classification.
         bias_dr = find_dealing_range(
             bias.swings,
-            as_of_index=bias.as_of_index,
+            as_of_index=latest_bias.candle_index,
             direction=latest_bias.direction,
+            end_swing_index=getattr(latest_bias, "swing_index", None),
         )
         if bias_dr is None:
             count("no_directional_bias_dealing_range")

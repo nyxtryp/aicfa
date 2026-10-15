@@ -64,7 +64,7 @@ class AutomaticScannerTests(unittest.TestCase):
                 base["structure_breaks"] = (SimpleNamespace(direction="bullish", candle_index=last - 2),)
                 base["swings"] = (
                     SimpleNamespace(kind="low", index=20, confirmation_index=22, price=97.0),
-                    SimpleNamespace(kind="high", index=30, confirmation_index=32, price=103.0),
+                    SimpleNamespace(kind="high", index=30, confirmation_index=32, price=104.0),
                 )
                 base["premium_discount"] = "discount"
             elif timeframe == "15m":
@@ -72,7 +72,7 @@ class AutomaticScannerTests(unittest.TestCase):
                     structure_breaks=(SimpleNamespace(direction="bullish", candle_index=last - 2),),
                     swings=(
                         SimpleNamespace(kind="low", index=20, confirmation_index=22, price=97.0),
-                        SimpleNamespace(kind="high", index=30, confirmation_index=32, price=103.0),
+                        SimpleNamespace(kind="high", index=30, confirmation_index=32, price=104.0),
                     ),
                     order_blocks=(block,), order_block_mitigation=(block_state,),
                     fvg=(gap,), fvg_fill=(gap_fill,),
