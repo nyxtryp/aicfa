@@ -296,7 +296,7 @@ def scan_symbol(
             "average_volume": average_volume,
             "clean_path_to_tp1": clean_path,
         }
-        score = 2 + (2 if ob_fvg_overlap else 0) + 1 + 2 + (1 if zone_bias_agreement else 0) + (1 if clean_path else 0)
+        score = 2 + (2 if ob_fvg_overlap else 0) + 1 + 2 + (1 if zone_bias_agreement else 0) + (1 if clean_path else 0) + (1 if pd_aligned else 0)
         if average_volume and float(trigger[-1].volume) > 1.5 * average_volume:
             score += 1
         if score < profile.score_threshold:
