@@ -26,7 +26,7 @@ def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0), swings=()):
     block = SimpleNamespace(
         direction="bullish", lower=98.0, upper=102.0, confirmation_index=30,
     )
-    sweep = SimpleNamespace(direction="bullish", candle_index=38)
+    sweep = SimpleNamespace(direction="bullish", candle_index=38, level=100.0)
     liquidity = tuple(SimpleNamespace(price=price) for price in levels)
     return SimpleNamespace(
         structure_breaks=(bullish_break,),
@@ -153,7 +153,7 @@ class ScannerTests(unittest.TestCase):
         def mocked_analysis(candles, profile, timeframe):
             result = analysis(trigger_index=38 if timeframe == "5m" else 39)
             if timeframe == "5m":
-                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37, level=100.0),)
             return result
 
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
@@ -227,7 +227,7 @@ class ScannerTests(unittest.TestCase):
         def mocked_analysis(candles, profile, timeframe):
             result = analysis()
             if timeframe == "5m":
-                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37, level=100.0),)
             return result
 
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
