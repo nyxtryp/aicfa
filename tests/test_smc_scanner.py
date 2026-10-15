@@ -127,8 +127,11 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidates, [])
 
     def test_intraday_trigger_only_scans_intraday_profile(self):
+        # The 4h bias close must be strictly below the range EQ for a long.
+        series = dict(self.series)
+        series["4h"] = tuple(candle(i, close=99.0) for i in range(40))
         with patch("app.smc.scanner._analysis", side_effect=lambda candles, profile, timeframe: analysis()):
-            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="15m")
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].profile, "intraday")
         self.assertEqual(candidates[0].timeframe, "15m")
