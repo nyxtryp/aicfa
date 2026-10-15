@@ -162,7 +162,9 @@ class ScannerTests(unittest.TestCase):
         zone_series = tuple(candle(i, low=103.0, high=105.0, close=104.0) if i > 30 else candle(i) for i in range(40))
         trigger_series = [candle(i, low=103.0, high=105.0, close=104.0) for i in range(40)]
         trigger_series[35] = candle(35, low=99.0, high=101.0, close=100.0)
+        trigger_series[37] = candle(37, low=97.4, high=97.8, close=97.6)
         trigger_series[38] = candle(38, low=103.0, high=105.0, close=104.0)
+        trigger_series[39] = candle(39, low=99.0, high=101.0, close=100.0)
         series = dict(self.series)
         series["15m"] = zone_series
         series["5m"] = tuple(trigger_series)
