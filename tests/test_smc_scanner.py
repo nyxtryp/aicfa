@@ -48,7 +48,7 @@ def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0), swings=()):
 class ScannerTests(unittest.TestCase):
     def setUp(self):
         self.series = {
-            timeframe: tuple(candle(i) for i in range(40))
+            timeframe: tuple(candle(i, close=99.0) if timeframe == "1h" else candle(i) for i in range(40))
             for timeframe in ("1m", "5m", "15m", "1h", "4h")
         }
 
