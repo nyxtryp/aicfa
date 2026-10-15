@@ -168,7 +168,13 @@ class ScannerTests(unittest.TestCase):
         series = dict(self.series)
         series["15m"] = zone_series
         series["5m"] = tuple(trigger_series)
-        with patch("app.smc.scanner._analysis", side_effect=lambda candles, profile, timeframe: analysis()):
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            if timeframe == "5m":
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+            return result
+
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
             candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
         self.assertEqual(len(candidates), 1)
 
