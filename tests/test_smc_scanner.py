@@ -86,6 +86,21 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].zone, (99.0, 101.0))
 
+    def test_sweep_before_zone_creation_cannot_validate_zone(self):
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            result.sweeps = (SimpleNamespace(direction="bullish", candle_index=20, level=100.0),)
+            return result
+
+        diagnostics = {}
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol(
+                "BTCUSDT", self.series, trigger_timeframe="5m", diagnostics=diagnostics
+            )
+
+        self.assertEqual(candidates, [])
+        self.assertEqual(diagnostics.get("no_prior_directional_sweep_near_zone"), 1)
+
     def test_unrelated_sweep_cannot_validate_a_zone(self):
         def mocked_analysis(candles, profile, timeframe):
             result = analysis()
