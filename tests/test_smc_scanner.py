@@ -66,6 +66,27 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidate.targets, (105.0, 110.0, 120.0))
         self.assertEqual(candidate.status, "CANDIDATE")
 
+    def test_score_is_capped_at_ten_with_all_confluences(self):
+        series = dict(self.series)
+        trigger = list(series["5m"])
+        trigger[-1] = SimpleNamespace(**{**vars(trigger[-1]), "volume": 200.0})
+        series["5m"] = tuple(trigger)
+
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            result.fvg = (SimpleNamespace(
+                direction="bullish", lower=99.0, upper=101.0, confirmation_index=30,
+            ),)
+            result.fvg_fill = (SimpleNamespace(fully_filled=False),)
+            result.average_volume = (100.0,) * 40
+            return result
+
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].score, 10)
+
     def test_tp2_tp3_can_use_confirmed_swings_after_nearest_liquidity_tp1(self):
         swings = (
             SimpleNamespace(kind="high", index=34, confirmation_index=36, price=110.0),
