@@ -21,7 +21,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("$('refresh').addEventListener", PAGE)
         self.assertNotIn("setInterval(", PAGE)
         self.assertIn("let selectedSetup=null", PAGE)
-        self.assertIn("selectedSetup.stop_price", PAGE)
+        self.assertIn("activeSetup.stop_price", PAGE)
         self.assertIn("selectedSetup.targets", PAGE)
         self.assertIn("/api/smc-analysis/", PAGE)
         self.assertIn("canvas", PAGE)
