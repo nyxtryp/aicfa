@@ -29,6 +29,7 @@ def find_dealing_range(
     ote_min: float = 0.62,
     ote_max: float = 0.79,
     direction: str | None = None,
+    end_swing_index: int | None = None,
 ) -> DealingRange | None:
     """Return the latest alternating confirmed swing leg available as of index.
 
@@ -42,6 +43,14 @@ def find_dealing_range(
         raise ValueError("OTE bounds must satisfy 0 < ote_min < ote_max < 1")
     if direction not in (None, "bullish", "bearish"):
         raise ValueError("direction must be None, 'bullish', or 'bearish'")
+    if end_swing_index is not None and (
+        isinstance(end_swing_index, bool)
+        or not isinstance(end_swing_index, Integral)
+        or end_swing_index < 0
+    ):
+        raise ValueError("end_swing_index must be a non-negative integer")
+    if end_swing_index is not None and direction is None:
+        raise ValueError("direction is required when end_swing_index is set")
 
     if any(
         isinstance(s.index, bool) or not isinstance(s.index, Integral)
@@ -60,6 +69,27 @@ def find_dealing_range(
         key=lambda s: (s.confirmation_index, s.index),
     )
 
+    # HTF Premium/Discount can be anchored to the exact swing broken by the
+    # latest BOS/CHoCH. Limit the calculation to swings confirmed by that break
+    # and use the broken swing as the impulse endpoint; later legs must not
+    # silently replace the range that established the current structural bias.
+    if end_swing_index is not None:
+        targets = [s for s in available if s.index == end_swing_index]
+        if not targets:
+            return None
+        target = targets[-1]
+        expected_kind = "high" if direction == "bullish" else "low"
+        if target.kind != expected_kind:
+            return None
+        start_kind = "low" if direction == "bullish" else "high"
+        starts = [s for s in available if s.kind == start_kind and s.index < target.index]
+        if not starts:
+            return None
+        start = max(starts, key=lambda s: s.index)
+        pair = (start, target)
+    else:
+        pair = None
+
     collapsed: list[SwingPoint] = []
     for swing in available:
         if not collapsed or collapsed[-1].kind != swing.kind:
@@ -73,23 +103,23 @@ def find_dealing_range(
         if more_extreme:
             collapsed[-1] = swing
 
-    if len(collapsed) < 2:
-        return None
-    # OTE must be measured on an impulse aligned with the HTF structure bias.
-    # The newest confirmed leg may be a countertrend pullback; using it as the
-    # entry impulse reverses the OTE side and silently filters valid setups.
-    pair = None
-    for end_position in range(len(collapsed) - 1, 0, -1):
-        candidate_start, candidate_end = collapsed[end_position - 1], collapsed[end_position]
-        if candidate_start.kind == candidate_end.kind:
-            continue
-        candidate_direction = (
-            "bullish" if candidate_start.kind == "low" and candidate_end.kind == "high"
-            else "bearish"
-        )
-        if direction is None or candidate_direction == direction:
-            pair = (candidate_start, candidate_end)
-            break
+    if pair is None:
+        if len(collapsed) < 2:
+            return None
+        # OTE must be measured on an impulse aligned with the HTF structure bias.
+        # The newest confirmed leg may be a countertrend pullback; using it as the
+        # entry impulse reverses the OTE side and silently filters valid setups.
+        for end_position in range(len(collapsed) - 1, 0, -1):
+            candidate_start, candidate_end = collapsed[end_position - 1], collapsed[end_position]
+            if candidate_start.kind == candidate_end.kind:
+                continue
+            candidate_direction = (
+                "bullish" if candidate_start.kind == "low" and candidate_end.kind == "high"
+                else "bearish"
+            )
+            if direction is None or candidate_direction == direction:
+                pair = (candidate_start, candidate_end)
+                break
     if pair is None:
         return None
     start, end = pair
