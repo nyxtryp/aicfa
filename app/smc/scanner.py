@@ -290,6 +290,7 @@ def scan_symbol(
             "order_block_fvg_overlap": ob_fvg_overlap,
             "ote_overlap": True,
             "higher_timeframe_bias_aligned": True,
+            "premium_discount_aligned": pd_aligned,
             "higher_timeframe_agreement": zone_bias_agreement,
             "confirmation_volume": float(trigger[-1].volume),
             "average_volume": average_volume,
