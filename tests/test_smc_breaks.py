@@ -32,6 +32,31 @@ class StructureBreakTests(unittest.TestCase):
         events = detect_structure_breaks([8, 9, 10.1, 11, 12], swings)
         self.assertEqual(len(events), 1)
 
+    def test_crossed_older_high_is_consumed_when_same_candle_breaks_newer_high(self):
+        swings = (
+            SwingPoint("high", 0, 0, 10.0),
+            SwingPoint("high", 2, 2, 12.0),
+        )
+        # One close crosses both highs, so the newer high is the single
+        # reported event. The older high was nevertheless broken on that bar
+        # and must not emit a delayed false event after a later recross.
+        events = detect_structure_breaks([8, 9, 9, 13, 8, 11], swings)
+        self.assertEqual(
+            [(e.candle_index, e.swing_index, e.level) for e in events],
+            [(3, 2, 12.0)],
+        )
+
+    def test_crossed_older_low_is_consumed_when_same_candle_breaks_newer_low(self):
+        swings = (
+            SwingPoint("low", 0, 0, 10.0),
+            SwingPoint("low", 2, 2, 8.0),
+        )
+        events = detect_structure_breaks([12, 11, 11, 7, 12, 9], swings)
+        self.assertEqual(
+            [(e.candle_index, e.swing_index, e.level) for e in events],
+            [(3, 2, 8.0)],
+        )
+
     def test_future_swing_is_ignored_until_confirmation(self):
         swings = (SwingPoint("high", 1, 4, 10.0),)
         self.assertEqual(

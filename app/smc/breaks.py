@@ -100,7 +100,10 @@ def detect_structure_breaks(
         if not candidates:
             continue
 
-        # A single candle may not generate two opposing structure events.
+        # A single candle may emit only one structure event, but every
+        # eligible level crossed by that close has been consumed. If we mark
+        # only the selected swing as broken, another level crossed on the same
+        # candle can emit a false BOS/CHoCH later when price recrosses it.
         position, swing = max(candidates, key=lambda item: (item[1].confirmation_index, item[1].index))
         break_direction = "bullish" if swing.kind == "high" else "bearish"
         kind = "BOS" if direction is None or direction == break_direction else "CHoCH"
@@ -112,6 +115,7 @@ def detect_structure_breaks(
             level=float(swing.price),
         ))
         direction = break_direction
-        broken.add(position)
+        broken.update(position for position, _ in highs)
+        broken.update(position for position, _ in lows)
 
     return tuple(events)
