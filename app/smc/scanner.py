@@ -142,12 +142,13 @@ def scan_symbol(
             continue
         direction = "long" if latest_bias.direction == "bullish" else "short"
         required_zone = "discount" if direction == "long" else "premium"
-        # TZ §6 defines Premium/Discount as part of the higher-timeframe bias,
-        # not the zone-timeframe OTE calculation. Keep these independent: HTF
-        # PD validates direction while the zone timeframe supplies the OTE leg.
-        if bias_pd != required_zone:
+        # Premium/Discount is SMC location confluence, not a standalone signal.
+        # Structure determines bias; sweep + confirmed trigger break and an active
+        # zone in OTE determine the setup. Do not hard-veto an otherwise valid setup
+        # solely because price is in the other half of a broad HTF range.
+        pd_aligned = bias_pd == required_zone
+        if not pd_aligned:
             count("premium_discount_mismatch")
-            continue
         ote_low, ote_high = sorted((float(dr.ote_lower), float(dr.ote_upper)))
         active_zones: list[tuple[float, float, str, int]] = []
         for block, state in zip(zone.order_blocks, zone.order_block_mitigation):
@@ -289,12 +290,13 @@ def scan_symbol(
             "order_block_fvg_overlap": ob_fvg_overlap,
             "ote_overlap": True,
             "higher_timeframe_bias_aligned": True,
+            "premium_discount_aligned": pd_aligned,
             "higher_timeframe_agreement": zone_bias_agreement,
             "confirmation_volume": float(trigger[-1].volume),
             "average_volume": average_volume,
             "clean_path_to_tp1": clean_path,
         }
-        score = 2 + (2 if ob_fvg_overlap else 0) + 1 + 2 + (1 if zone_bias_agreement else 0) + (1 if clean_path else 0)
+        score = 2 + (2 if ob_fvg_overlap else 0) + 1 + 2 + (1 if zone_bias_agreement else 0) + (1 if clean_path else 0) + (1 if pd_aligned else 0)
         if average_volume and float(trigger[-1].volume) > 1.5 * average_volume:
             score += 1
         if score < profile.score_threshold:
@@ -307,8 +309,9 @@ def scan_symbol(
             status="CANDIDATE", confirmation_time_ms=trigger[-1].close_time_ms,
             confirmation_price=entry, stop_price=stop,
             targets=tuple(targets[:3]), score=score,
-            reasons=("htf_bias_aligned", "premium_discount_aligned", "active_zone_in_ote",
-                     "liquidity_sweep", "confirmation_break", "rr_passed"),
+            reasons=("htf_bias_aligned",
+                     *(("premium_discount_aligned",) if pd_aligned else ("premium_discount_not_aligned_confluence_only",)),
+                     "active_zone_in_ote", "liquidity_sweep", "confirmation_break", "rr_passed"),
             zone=(selected[0], selected[1]), timeframe=profile.confirmation_timeframe,
             evidence=evidence, atr=float(atr),
         ))
