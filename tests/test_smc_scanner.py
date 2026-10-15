@@ -93,9 +93,21 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].targets, (105.0,))
 
-    def test_old_confirmation_break_is_not_replayed_as_new_candidate(self):
+    def test_recent_confirmation_break_can_produce_candidate(self):
         def mocked_analysis(candles, profile, timeframe):
-            return analysis(trigger_index=38 if timeframe == "5m" else 39)
+            result = analysis(trigger_index=38 if timeframe == "5m" else 39)
+            if timeframe == "5m":
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+            return result
+
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+
+    def test_stale_confirmation_break_is_not_replayed_as_new_candidate(self):
+        def mocked_analysis(candles, profile, timeframe):
+            return analysis(trigger_index=36 if timeframe == "5m" else 39)
 
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
@@ -143,12 +155,26 @@ class ScannerTests(unittest.TestCase):
             candidates = scan_symbol("BTCUSDT", stale_series, trigger_timeframe="5m")
         self.assertEqual(candidates, [])
 
-    def test_zone_touch_before_confirmation_does_not_require_price_still_inside_zone(self):
-        zone_series = list(self.series["15m"])
-        zone_series[-1] = candle(39, low=103.0, high=105.0, close=104.0)
+    def test_trigger_timeframe_retest_counts_even_when_zone_timeframe_has_no_retest(self):
+        # The 15m zone was created at index 30. No later 15m candle taps it,
+        # but a 5m candle does so before the 5m BOS. That lower-timeframe retest
+        # must count, even if price has left the zone by the confirmation close.
+        zone_series = tuple(candle(i, low=103.0, high=105.0, close=104.0) if i > 30 else candle(i) for i in range(40))
+        trigger_series = [candle(i, low=103.0, high=105.0, close=104.0) for i in range(40)]
+        trigger_series[35] = candle(35, low=99.0, high=101.0, close=100.0)
+        trigger_series[37] = candle(37, low=97.4, high=97.8, close=97.6)
+        trigger_series[38] = candle(38, low=103.0, high=105.0, close=104.0)
+        trigger_series[39] = candle(39, low=99.0, high=101.0, close=100.0)
         series = dict(self.series)
-        series["15m"] = tuple(zone_series)
-        with patch("app.smc.scanner._analysis", side_effect=lambda candles, profile, timeframe: analysis()):
+        series["15m"] = zone_series
+        series["5m"] = tuple(trigger_series)
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            if timeframe == "5m":
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+            return result
+
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
             candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
         self.assertEqual(len(candidates), 1)
 
