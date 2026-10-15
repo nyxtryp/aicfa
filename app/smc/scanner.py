@@ -10,7 +10,7 @@ from typing import Mapping, Sequence
 
 from app.market_data import ClosedCandle
 from app.smc.engine import SMCAnalysis, analyze_smc
-from app.smc.ranges import find_dealing_range
+from app.smc.ranges import find_dealing_range, premium_discount
 from app.smc.profiles import PROFILES, STOP_BUFFER_ATR_OVERRIDES, ProfileConfig
 
 
@@ -115,9 +115,18 @@ def scan_symbol(
             continue
 
         latest_bias = bias.structure_breaks[-1]
-        # Keep HTF Premium/Discount as the directional location filter, but
-        # measure entry OTE on the most recent confirmed impulse aligned with
-        # that bias, not on a countertrend pullback leg.
+        # Both HTF Premium/Discount and zone-TF OTE must use an impulse aligned
+        # with the current HTF structure bias. The default latest leg can be a
+        # countertrend pullback and invert the Premium/Discount classification.
+        bias_dr = find_dealing_range(
+            bias.swings,
+            as_of_index=bias.as_of_index,
+            direction=latest_bias.direction,
+        )
+        if bias_dr is None:
+            count("no_directional_bias_dealing_range")
+            continue
+        bias_pd = premium_discount(float(bias_series[-1].close), bias_dr)
         dr = find_dealing_range(
             zone.swings,
             as_of_index=zone.as_of_index,
@@ -131,7 +140,7 @@ def scan_symbol(
         # TZ §6 defines Premium/Discount as part of the higher-timeframe bias,
         # not the zone-timeframe OTE calculation. Keep these independent: HTF
         # PD validates direction while the zone timeframe supplies the OTE leg.
-        if bias.premium_discount != required_zone:
+        if bias_pd != required_zone:
             count("premium_discount_mismatch")
             continue
         ote_low, ote_high = sorted((float(dr.ote_lower), float(dr.ote_upper)))
