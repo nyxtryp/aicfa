@@ -160,7 +160,7 @@ class ScannerTests(unittest.TestCase):
         # but a 5m candle does so before the 5m BOS. That lower-timeframe retest
         # must count, even if price has left the zone by the confirmation close.
         zone_series = tuple(candle(i, low=103.0, high=105.0, close=104.0) if i > 30 else candle(i) for i in range(40))
-        trigger_series = list(self.series["5m"])
+        trigger_series = [candle(i, low=103.0, high=105.0, close=104.0) for i in range(40)]
         trigger_series[35] = candle(35, low=99.0, high=101.0, close=100.0)
         trigger_series[38] = candle(38, low=103.0, high=105.0, close=104.0)
         series = dict(self.series)
