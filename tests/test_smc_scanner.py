@@ -153,20 +153,29 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
 
 
-    def test_premium_discount_alignment_uses_higher_timeframe_bias_range(self):
+    def test_premium_discount_mismatch_is_confluence_not_hard_veto(self):
         def mocked_analysis(candles, profile, timeframe):
             result = analysis()
-            if timeframe == "15m":
+            # Deliberately put price in HTF premium despite bullish structure.
+            if timeframe == "1h":
                 result.premium_discount = "premium"
-            elif timeframe == "1h":
+            elif timeframe == "15m":
                 result.premium_discount = "discount"
             return result
 
+        diagnostics = {}
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
-            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+            candidates = scan_symbol(
+                "BTCUSDT", self.series, trigger_timeframe="5m", diagnostics=diagnostics
+            )
 
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].direction, "long")
+        self.assertFalse(candidates[0].evidence["premium_discount_aligned"])
+        self.assertIn(
+            "premium_discount_not_aligned_confluence_only", candidates[0].reasons
+        )
+        self.assertEqual(diagnostics.get("premium_discount_mismatch"), 1)
 
 
     def test_future_candles_on_other_timeframes_are_excluded_from_snapshot(self):
