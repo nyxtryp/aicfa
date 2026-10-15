@@ -164,9 +164,13 @@ class ScannerTests(unittest.TestCase):
             return result
 
         diagnostics = {}
+        series = dict(self.series)
+        # PD is calculated from the actual HTF close and range, not the mocked
+        # analysis.premium_discount convenience field.
+        series["1h"] = tuple(candle(i, close=103.0) for i in range(40))
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
             candidates = scan_symbol(
-                "BTCUSDT", self.series, trigger_timeframe="5m", diagnostics=diagnostics
+                "BTCUSDT", series, trigger_timeframe="5m", diagnostics=diagnostics
             )
 
         self.assertEqual(len(candidates), 1)
