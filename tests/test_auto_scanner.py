@@ -8,7 +8,7 @@ from app.smc.scanner import SetupCandidate, scan_symbol
 
 
 class AutomaticScannerTests(unittest.TestCase):
-    def candles(self, symbol="BTCUSDT", timeframe="5m", count=20):
+    def candles(self, symbol="BTCUSDT", timeframe="5m", count=20, close=Decimal("100")):
         # Keep each timeframe's real candle duration and align the newest
         # close across series so the scanner's no-look-ahead snapshot has
         # sufficient historical 1m candles at the 5m confirmation time.
@@ -27,7 +27,7 @@ class AutomaticScannerTests(unittest.TestCase):
                 open_time_ms=first_open_ms + i * step,
                 close_time_ms=first_open_ms + (i + 1) * step - 1,
                 open=Decimal("100"), high=Decimal("101"),
-                low=Decimal("99"), close=Decimal("100"),
+                low=Decimal("99"), close=close,
                 volume=Decimal("10"),
             )
             for i in range(count)
@@ -45,7 +45,7 @@ class AutomaticScannerTests(unittest.TestCase):
 
 
     def test_emits_candidate_when_multitimeframe_smc_rules_align(self):
-        series = {tf: self.candles(timeframe=tf, count=60) for tf in TIMEFRAMES}
+        series = {tf: self.candles(timeframe=tf, count=60, close=Decimal("99") if tf == "1h" else Decimal("100")) for tf in TIMEFRAMES}
         block = SimpleNamespace(direction="bullish", lower=99.0, upper=101.0, confirmation_index=10)
         block_state = SimpleNamespace(mitigated=False)
         gap = SimpleNamespace(direction="bullish", lower=99.5, upper=100.5, confirmation_index=12)
@@ -62,6 +62,10 @@ class AutomaticScannerTests(unittest.TestCase):
             )
             if timeframe == "1h":
                 base["structure_breaks"] = (SimpleNamespace(direction="bullish", candle_index=last - 2),)
+                base["swings"] = (
+                    SimpleNamespace(kind="low", index=20, confirmation_index=22, price=97.0),
+                    SimpleNamespace(kind="high", index=30, confirmation_index=32, price=103.0),
+                )
                 base["premium_discount"] = "discount"
             elif timeframe == "15m":
                 base.update(
