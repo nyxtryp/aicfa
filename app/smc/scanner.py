@@ -142,12 +142,13 @@ def scan_symbol(
             continue
         direction = "long" if latest_bias.direction == "bullish" else "short"
         required_zone = "discount" if direction == "long" else "premium"
-        # TZ §6 defines Premium/Discount as part of the higher-timeframe bias,
-        # not the zone-timeframe OTE calculation. Keep these independent: HTF
-        # PD validates direction while the zone timeframe supplies the OTE leg.
-        if bias_pd != required_zone:
+        # Premium/Discount is SMC location confluence, not a standalone signal.
+        # Structure determines bias; sweep + confirmed trigger break and an active
+        # zone in OTE determine the setup. Do not hard-veto an otherwise valid setup
+        # solely because price is in the other half of a broad HTF range.
+        pd_aligned = bias_pd == required_zone
+        if not pd_aligned:
             count("premium_discount_mismatch")
-            continue
         ote_low, ote_high = sorted((float(dr.ote_lower), float(dr.ote_upper)))
         active_zones: list[tuple[float, float, str, int]] = []
         for block, state in zip(zone.order_blocks, zone.order_block_mitigation):
