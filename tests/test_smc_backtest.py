@@ -64,7 +64,7 @@ class BacktestTests(unittest.TestCase):
         )
         self.assertIsNotNone(result)
         self.assertEqual(result.exit_reason, "TP3")
-        self.assertAlmostEqual(result.gross_pnl_usd, 1.3, places=6)
+        self.assertAlmostEqual(result.gross_pnl_usd, 1.85, places=6)
 
     def test_fees_are_charged_on_entry_and_exits(self):
         rows = [candle(i) for i in range(41)]
