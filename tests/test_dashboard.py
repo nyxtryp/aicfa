@@ -81,3 +81,10 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_status_metrics_are_compact(self):
+        self.assertIn("gap: 5px", PAGE)
+        self.assertIn("padding: 4px 7px", PAGE)
+        self.assertIn("font-size: .8rem", PAGE)
+        self.assertIn("margin-bottom: 7px", PAGE)
