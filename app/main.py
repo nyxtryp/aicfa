@@ -15,7 +15,7 @@ from app.market_data import ALL_SYMBOLS, TIMEFRAMES, TRADFI_SYMBOLS, MarketDataM
 from app.smc.engine import analyze_smc
 from app.market_hours import COMMODITY_SYMBOLS, KRX_EQUITY_SYMBOLS, US_EQUITY_SYMBOLS, tradfi_market_is_open, tradfi_scan_block_reason
 from app.smc.presentation import to_chart_payload
-from app.smc.scanner import scan_symbol
+from app.smc.pac_scanner import scan_symbol  # active strategy: PAC-inspired; legacy scanner retained for rollback
 from app.smc.setups import SetupEvidence, evaluate_candidate
 from app.smc.setup_store import SetupStore
 
