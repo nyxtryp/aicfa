@@ -39,6 +39,8 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Could not render setup card", PAGE)
         self.assertNotIn("String(incoming.length)+' актуальных'", PAGE)
         self.assertIn('id="marketHoursStatus"', PAGE)
+        self.assertIn(".metric{background:linear-gradient(145deg,#111b2b,#0d1523);border:1px solid #202e43;border-radius:9px;padding:6px 9px}", PAGE)
+        self.assertIn(".metric .value{font-size:.94rem;line-height:1.15;font-weight:750;margin-top:2px;overflow-wrap:anywhere}", PAGE)
         self.assertIn("Режим: shadow", PAGE)
         self.assertFalse(SCANNER_LIVE_ENABLED)
         self.assertNotIn("$('refresh').addEventListener", PAGE)
