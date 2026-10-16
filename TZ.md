@@ -91,3 +91,9 @@ if __name__ == "__main__":
 - Dashboard must adapt from 3-column desktop to 2-column tablet and stacked mobile; setup lists scroll independently; chart and journal remain legible without horizontal page overflow.
 - Add reduced-motion support and focus-visible styling. Preserve all API routes, authentication behavior, scanner criteria, candidate lifecycle, chart drawing/SMC annotations and shadow-only operation.
 - Acceptance: automated dashboard/auth regression tests and CI pass. Production is not considered updated until deployment and browser checks confirm it.
+
+
+## Interactive dashboard reconstruction (2026-10-17)
+- Replace minor polish with a clearly distinct terminal visual system and responsive panel hierarchy.
+- INTRADAY and SCALP headers are keyboard-accessible accordion controls; opening one collapses the other and the open panel can collapse.
+- Preserve scanner rules, chart/SMC, journal, auth, APIs, and shadow mode.

@@ -80,6 +80,13 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('id="modern-mvp-theme"', PAGE)
         self.assertIn("prefers-reduced-motion:reduce", PAGE)
         self.assertIn('id="modern-login-theme"', LOGIN_PAGE)
+        self.assertIn('id="aicfa-reconstruction"', PAGE)
+        self.assertIn('id="aicfa-layout-rebuild"', PAGE)
+        self.assertIn("accordion-trigger", PAGE)
+        self.assertIn("aria-expanded", PAGE)
+        self.assertIn("both-collapsed", PAGE)
+        self.assertIn("initial.classList.add('is-collapsed')", PAGE)
+        self.assertIn("replaceChildren(label,right)", PAGE)
 
 
 if __name__ == "__main__":

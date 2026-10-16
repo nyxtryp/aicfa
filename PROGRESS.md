@@ -1862,3 +1862,10 @@
 - PR [#29](https://github.com/nyxtryp/aicfa/pull/29) merged as `4e829b60a0403b5cee69ec29c22b8b5d9a0bd78f`; both `tests` and `unit-tests` workflows passed on the merge commit.
 - Superseded PR #28 was closed without merge because its compact-card changes are included in PR #29.
 - **Production deployment and browser visual verification are not confirmed:** Desktop Commander device `nyxtryp` is offline (last seen 23h ago). Do not claim the live site has changed until the deployed release is checked.
+
+
+### 2026-10-17 — Full dashboard reconstruction (PR #30)
+- Added a more distinct terminal visual system with stronger contrast, lime/teal accents, refreshed cards, borders, and responsive dashboard layout.
+- Made INTRADAY and SCALP headers keyboard-accessible accordion controls; one starts collapsed and the panels can be opened/collapsed by click or keyboard.
+- Added dashboard regression assertions and updated TZ.md. No scanner criteria, auth/API, SMC chart logic, journal lifecycle, or shadow mode changes.
+- CI and production browser verification pending; do not treat the live site as updated until deploy is confirmed.
