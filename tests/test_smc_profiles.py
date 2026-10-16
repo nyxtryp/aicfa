@@ -14,7 +14,7 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual((profile.swing_left, profile.swing_right), (2, 2))
         self.assertEqual((profile.lifetime_hours, profile.cooldown_minutes), (3, 30))
         self.assertEqual((profile.min_rr, profile.score_threshold, profile.stop_buffer_atr),
-                         (1.5, 6, 0.3))
+                         (1.49, 6, 0.3))
 
     def test_intraday_profile_matches_tz(self):
         profile = get_profile("intraday")
@@ -26,6 +26,7 @@ class ProfileConfigTests(unittest.TestCase):
         self.assertEqual((profile.swing_left, profile.swing_right), (3, 3))
         self.assertEqual((profile.lifetime_hours, profile.cooldown_minutes), (12, 120))
         self.assertEqual(profile.tradfi_cutoff_minutes, 15)
+        self.assertEqual(get_profile("intraday").min_rr, 1.49)
 
     def test_leveraged_etfs_use_wider_stop_buffer(self):
         self.assertEqual(STOP_BUFFER_ATR_OVERRIDES, {
