@@ -17,7 +17,7 @@ def candle(index, *, low=99.0, high=101.0, close=100.0):
     )
 
 
-def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0), swings=()):
+def analysis(*, trigger_index=37, levels=(105.0, 110.0, 120.0), swings=()):
     bullish_break = SimpleNamespace(direction="bullish", candle_index=trigger_index)
     range_swings = (
         SimpleNamespace(kind="low", index=20, confirmation_index=22, price=96.0),
@@ -26,7 +26,7 @@ def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0), swings=()):
     block = SimpleNamespace(
         direction="bullish", lower=98.0, upper=102.0, candle_index=25, confirmation_index=30,
     )
-    sweep = SimpleNamespace(direction="bullish", candle_index=38, level=100.0)
+    sweep = SimpleNamespace(direction="bullish", candle_index=36, level=100.0)
     liquidity = tuple(SimpleNamespace(price=price) for price in levels)
     return SimpleNamespace(
         structure_breaks=(bullish_break,),
@@ -86,10 +86,10 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].zone, (99.0, 101.0))
 
-    def test_ob_retest_uses_source_candle_not_later_break_confirmation_as_zone_creation(self):
+    def test_ob_retest_uses_source_candle_and_occurs_after_trigger_break(self):
         # The OB's source candle is index 25; the zone-TF BOS confirming that
-        # OB is index 35. A trigger-TF retest at 32 is after zone formation and
-        # before the trigger break at 39, so it must count.
+        # OB is index 35. The trigger break is at 37 and the zone is retested
+        # on a later closed candle, so it must count.
         def mocked_analysis(candles, profile, timeframe):
             result = analysis()
             if timeframe == "15m":
@@ -112,7 +112,9 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidates[0].zone, (98.0, 102.0))
         self.assertEqual(diagnostics.get("active_zone_touched_in_ote"), 1)
 
-    def test_sweep_before_zone_creation_cannot_validate_zone(self):
+    def test_sweep_before_zone_creation_can_validate_later_zone_retest(self):
+        # The sweep causes the displacement/BOS that identifies the zone; it
+        # must not be rejected merely because the zone was confirmed later.
         def mocked_analysis(candles, profile, timeframe):
             result = analysis()
             result.sweeps = (SimpleNamespace(direction="bullish", candle_index=20, level=100.0),)
@@ -124,8 +126,8 @@ class ScannerTests(unittest.TestCase):
                 "BTCUSDT", self.series, trigger_timeframe="5m", diagnostics=diagnostics
             )
 
-        self.assertEqual(candidates, [])
-        self.assertEqual(diagnostics.get("no_prior_directional_sweep_near_zone"), 1)
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(diagnostics.get("active_zone_retested_after_confirmation"), 1)
 
     def test_unrelated_sweep_cannot_validate_a_zone(self):
         def mocked_analysis(candles, profile, timeframe):
