@@ -24,6 +24,8 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('candidate_mode = payload.get("status") == "CANDIDATE"', inspect.getsource(main_module))
         self.assertIn('rr_below_minimum_or_unverifiable_legacy', inspect.getsource(__import__("app.smc.setup_store", fromlist=["SetupStore"])))
         self.assertIn("def list_monitored", inspect.getsource(__import__("app.smc.setup_store", fromlist=["SetupStore"]).SetupStore))
+        self.assertIn('item["expires_at_ms"]', inspect.getsource(main_module))
+        self.assertIn("срок до", PAGE)
         self.assertIn("const key=[item.symbol,item.profile].join('|')", PAGE)
         self.assertIn('id="activeSetups"', PAGE)
         self.assertIn('id="realizedJournal"', PAGE)
