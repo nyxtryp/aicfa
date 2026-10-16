@@ -1817,3 +1817,11 @@
 - Оба workflow `Python tests` для PR head завершились `success`.
 - Incoming candidate payload получает `expires_at_ms` на основе времени подтверждения и TTL профиля; карточка показывает локальное время `срок до HH:MM`.
 - **Production всё ещё не подтверждён:** Desktop Commander device `nyxtryp` offline (last seen 21h ago). Нельзя утверждать, что новый релиз уже запущен или что production DB уже очистилась/обновилась.
+
+
+### 2026-10-17 — Compact market status cards
+
+- User requested the four top status cards (Binance stream, candle series, closed candles, history) to be much thinner with smaller text because they consume too much vertical space.
+- Branch `fix/compact-market-status-cards`: reduced desktop metric-card padding to `6px 9px`, radius to `9px`, grid gap to `6px`; labels to `.64rem`, values to `.94rem`, hints to `.59rem`, with tighter line heights/margins. Mobile cards use tighter padding and smaller typography while retaining the two-column layout.
+- Added a dashboard regression assertion for the compact CSS and documented the requirement in `TZ.md`.
+- Pending CI/PR merge and production deployment; no claim that the live site has changed yet.

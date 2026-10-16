@@ -444,3 +444,9 @@ AICFA считается технически готовой, когда дан�
 - Если SL и TP затронуты одной свечой и порядок неизвестен, применяется консервативная трактовка SL; никакой look-ahead. TTL фиксирует расчётный выход по последней доступной закрытой цене, но такой результат явно является модельным, не фактическим исполнением пользователя.
 - `Принятые сетапы` предназначены только для статусов принятия системой/пользователем; shadow-кандидаты нельзя выдавать за принятые. `Реализованные` хранит расчётные результаты сопровождения сетапов и не утверждает, что пользователь реально открывал сделку.
 - Приёмка: регрессии для legacy RR < 1.49, точного порога 1.49, TP, SL, TTL, same-bar SL+TP, дубликатов событий, рестарт/replay, скрытия терминальных статусов из активных API и сохранения журнала; затем CI и production deploy проверяются отдельно.
+
+
+## Dashboard density — market status metrics
+- Four top-level market status cards (Binance stream, candle series, closed candles, history) must be compact: reduced padding, smaller label/value/hint typography, and tighter grid gaps.
+- On mobile, cards remain a two-column grid and use even smaller padding and text; status remains readable and all four cards remain visible.
+- Regression test asserts compact card CSS. Production deployment is tracked separately in `PROGRESS.md`.
