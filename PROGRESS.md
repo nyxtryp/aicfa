@@ -1853,10 +1853,12 @@
 
 
 
-### 2026-10-17 — Modern MVP design system for the whole site (in progress)
+### 2026-10-17 — Modern MVP design system for the whole site (merged)
 - Started branch `redesign/modern-aicfa-mvp` from the compact-status-card fix so the requested thin status cards are preserved.
 - Applied a unified modern dark-terminal theme to both the authenticated scanner dashboard and the private login/setup page: restrained teal accent, layered low-contrast backgrounds, glass-like header, cleaner hierarchy, refined panels and setup cards, consistent controls, focus-visible states, and reduced-motion support.
 - Kept the four status cards compact (4×7px padding, 5px gap, compact but legible typography) and retained responsive desktop/tablet/mobile layouts.
 - Intentionally CSS-only for the application UI: no scanner logic, RR threshold, auth/API behavior, chart annotations, lifecycle, or shadow/live setting changed.
 - Fixed the dashboard regression test placement so the compact-card check actually runs, and added assertions for the new theme and reduced-motion support.
-- **Status:** implementation branch prepared; CI and review/merge pending. Production deployment and visual browser verification are not yet confirmed.
+- PR [#29](https://github.com/nyxtryp/aicfa/pull/29) merged as `4e829b60a0403b5cee69ec29c22b8b5d9a0bd78f`; both `tests` and `unit-tests` workflows passed on the merge commit.
+- Superseded PR #28 was closed without merge because its compact-card changes are included in PR #29.
+- **Production deployment and browser visual verification are not confirmed:** Desktop Commander device `nyxtryp` is offline (last seen 23h ago). Do not claim the live site has changed until the deployed release is checked.
