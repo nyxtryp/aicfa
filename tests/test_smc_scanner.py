@@ -24,7 +24,7 @@ def analysis(*, trigger_index=39, levels=(105.0, 110.0, 120.0), swings=()):
         SimpleNamespace(kind="high", index=30, confirmation_index=32, price=104.0),
     )
     block = SimpleNamespace(
-        direction="bullish", lower=98.0, upper=102.0, confirmation_index=30,
+        direction="bullish", lower=98.0, upper=102.0, candle_index=25, confirmation_index=30,
     )
     sweep = SimpleNamespace(direction="bullish", candle_index=38, level=100.0)
     liquidity = tuple(SimpleNamespace(price=price) for price in levels)
@@ -71,8 +71,8 @@ class ScannerTests(unittest.TestCase):
             result = analysis()
             if timeframe == "15m":
                 result.order_blocks = (
-                    SimpleNamespace(direction="bullish", lower=98.0, upper=102.0, confirmation_index=30),
-                    SimpleNamespace(direction="bullish", lower=99.0, upper=101.0, confirmation_index=35),
+                    SimpleNamespace(direction="bullish", lower=98.0, upper=102.0, candle_index=25, confirmation_index=30),
+                    SimpleNamespace(direction="bullish", lower=99.0, upper=101.0, candle_index=34, confirmation_index=35),
                 )
                 result.order_block_mitigation = (
                     SimpleNamespace(mitigated=False),
@@ -85,6 +85,32 @@ class ScannerTests(unittest.TestCase):
 
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].zone, (99.0, 101.0))
+
+    def test_ob_retest_uses_source_candle_not_later_break_confirmation_as_zone_creation(self):
+        # The OB's source candle is index 25; the zone-TF BOS confirming that
+        # OB is index 35. A trigger-TF retest at 32 is after zone formation and
+        # before the trigger break at 39, so it must count.
+        def mocked_analysis(candles, profile, timeframe):
+            result = analysis()
+            if timeframe == "15m":
+                result.order_blocks = (
+                    SimpleNamespace(
+                        direction="bullish", lower=98.0, upper=102.0,
+                        candle_index=25, confirmation_index=35,
+                    ),
+                )
+                result.order_block_mitigation = (SimpleNamespace(mitigated=False),)
+            return result
+
+        diagnostics = {}
+        with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
+            candidates = scan_symbol(
+                "BTCUSDT", self.series, trigger_timeframe="5m", diagnostics=diagnostics
+            )
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].zone, (98.0, 102.0))
+        self.assertEqual(diagnostics.get("active_zone_touched_in_ote"), 1)
 
     def test_sweep_before_zone_creation_cannot_validate_zone(self):
         def mocked_analysis(candles, profile, timeframe):
