@@ -241,8 +241,7 @@ def summarize(trades: Sequence[TradeResult], *, margin_usd: float = 5.0, include
         "max_drawdown_usd": max_drawdown,
         "max_consecutive_losses": loss_streak,
         "fees_usd": sum(t.fees_usd for t in sample),
-        "margin_return_pct": 100.0 * sum(t.net_pnl_usd for t in sample) /
-                             (sample[0].net_pnl_usd * 0 + 5.0) if sample else 0.0,
+        "margin_return_pct": 100.0 * sum(t.net_pnl_usd for t in sample) / margin_usd if sample and margin_usd > 0 else 0.0,
     }
 
 
