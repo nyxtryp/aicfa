@@ -395,7 +395,7 @@ market_data.on_closed_candle = _on_closed_candle
 
 def _recover_active_history() -> None:
     """Replay persisted active setups through retained 1m candles after downtime."""
-    active = _get_setup_store().list_active()
+    active = _get_setup_store().list_monitored()
     if not active:
         return
     symbols = {str(setup["symbol"]) for setup in active}
