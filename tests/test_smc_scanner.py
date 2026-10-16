@@ -112,6 +112,22 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(candidates[0].zone, (98.0, 102.0))
         self.assertEqual(diagnostics.get("active_zone_touched_in_ote"), 1)
 
+    def test_pre_break_zone_touch_alone_does_not_create_setup(self):
+        # The zone is touched before the BOS, but price never retests it after
+        # confirmation. The scanner must not accept this reversed event order.
+        series = dict(self.series)
+        trigger = list(series["5m"])
+        trigger[38] = candle(38, low=103.0, high=105.0, close=104.0)
+        trigger[39] = candle(39, low=103.0, high=105.0, close=104.0)
+        series["5m"] = tuple(trigger)
+        diagnostics = {}
+        with patch("app.smc.scanner._analysis", side_effect=lambda candles, profile, timeframe: analysis()):
+            candidates = scan_symbol(
+                "BTCUSDT", series, trigger_timeframe="5m", diagnostics=diagnostics
+            )
+        self.assertEqual(candidates, [])
+        self.assertEqual(diagnostics.get("no_active_zone_retested_after_confirmation"), 1)
+
     def test_sweep_before_zone_creation_can_validate_later_zone_retest(self):
         # The sweep causes the displacement/BOS that identifies the zone; it
         # must not be rejected merely because the zone was confirmed later.
