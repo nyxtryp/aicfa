@@ -892,7 +892,7 @@ footer{padding-top:3px;color:#71849d}
  .chart-wrap{height:270px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
-</style></head>
+<style id="aicfa-reconstruction">body{background:#070a10;color:#edf3ff}header{background:rgba(7,10,16,.94);backdrop-filter:blur(20px);border-bottom:1px solid #202b3c}.top{padding:14px 16px;border:1px solid #253146;border-radius:13px;background:linear-gradient(110deg,#121d2d,#0b111b)}.metric{padding:7px 10px;border-radius:10px;background:#0d1522}.panel{border:1px solid #202c3e;border-radius:13px;background:linear-gradient(155deg,#0e1724,#090f18)}.setup-card{border-radius:10px;background:linear-gradient(135deg,#111c2b,#0a111b)}button{background:#c7f36b;color:#11180b;border-color:#c7f36b}.brand span{color:#c7f36b}</style></head>
 <body>
 <header><div><div class="brand">AICFA<span>.</span></div><div class="sub">PERSONAL MARKET STRUCTURE TERMINAL</div></div><div class="controls"><div class="pill"><i class="led" id="led"></i><span id="connection">Подключение…</span></div><button id="changePassword" type="button">Сменить пароль</button><button id="logout" type="button">Выйти</button></div></header>
 <main>
