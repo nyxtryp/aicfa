@@ -15,7 +15,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Автосканер · все инструменты · scalp / intraday", PAGE)
         self.assertIn('id="intradaySetups"', PAGE)
         self.assertIn('id="scalpSetups"', PAGE)
-        self.assertIn("grid-template-rows:repeat(2,minmax(0,1fr))", PAGE)
+        self.assertIn("grid-template-rows: repeat(2, minmax(0, 1fr))", PAGE)
         self.assertIn(".incoming-panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }", PAGE)
         self.assertIn("flex: 1 1 auto", PAGE)
         self.assertIn("min-height: 0", PAGE)
