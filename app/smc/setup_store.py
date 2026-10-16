@@ -252,7 +252,7 @@ class SetupStore:
     def list_active(self, *, limit: int = 200) -> list[dict[str, Any]]:
         with self._connection() as db:
             rows = db.execute(
-                "SELECT payload_json FROM setup_candidates WHERE status IN ('ACCEPTED','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
+                "SELECT payload_json FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
                 (max(1, min(int(limit), 1000)),),
             ).fetchall()
         return [
@@ -264,7 +264,7 @@ class SetupStore:
         """Candidates and accepted setups that need automatic market monitoring."""
         with self._connection() as db:
             rows = db.execute(
-                "SELECT payload_json FROM setup_candidates WHERE status IN ('CANDIDATE','ACCEPTED','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
+                "SELECT payload_json FROM setup_candidates WHERE status IN ('CANDIDATE','ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
                 (max(1, min(int(limit), 1000)),),
             ).fetchall()
         return [
@@ -277,7 +277,7 @@ class SetupStore:
         encoded = json.dumps(dict(payload), separators=(",", ":"), sort_keys=True)
         with self._connection() as db:
             row = db.execute("SELECT status,payload_json FROM setup_candidates WHERE setup_key=?", (setup_key,)).fetchone()
-            if row is None or row["status"] not in ("CANDIDATE", "ACCEPTED", "TP1", "TP2"):
+            if row is None or row["status"] not in ("CANDIDATE", "ACCEPTED", "ACTIVE", "TP1", "TP2"):
                 return False
             existing_payload = json.loads(row["payload_json"])
             previous_event_ms = int(existing_payload.get("last_event_time_ms", existing_payload.get("confirmation_time_ms", 0)))
