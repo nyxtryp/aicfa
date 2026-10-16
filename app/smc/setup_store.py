@@ -110,6 +110,10 @@ class SetupStore:
         zone_key = str(payload.get("zone_key") or "|".join(map(str, payload.get("zone", []))))
         encoded = json.dumps(decided, separators=(",", ":"), sort_keys=True)
         timestamp = int(payload["confirmation_time_ms"])
+        # Rejected attempts are diagnostic counters, not durable setup records.
+        # Do not write them to setup_candidates or setup_candidate_events.
+        if str(decided.get("status", "REJECTED")).upper() == "REJECTED":
+            return False, decided
         with self._connection() as db:
             if db.execute("SELECT 1 FROM setup_candidates WHERE setup_key=?", (key,)).fetchone():
                 return False, decided
