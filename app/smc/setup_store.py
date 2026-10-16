@@ -159,7 +159,10 @@ class SetupStore:
         with self._connection() as db:
             if include_rejected:
                 rows = db.execute(
-                    "SELECT payload_json FROM setup_candidates ORDER BY confirmation_time_ms DESC LIMIT ?",
+                    """SELECT payload_json FROM setup_candidates
+                       WHERE payload_json NOT LIKE '%tradfi_market_closed%'
+                         AND payload_json NOT LIKE '%market_hours_unverified%'
+                       ORDER BY confirmation_time_ms DESC LIMIT ?""",
                     (max(1, min(int(limit), 1000)),),
                 ).fetchall()
             else:
