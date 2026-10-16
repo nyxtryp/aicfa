@@ -81,8 +81,8 @@ class AutomaticScannerTests(unittest.TestCase):
                 )
             elif timeframe == "5m":
                 base.update(
-                    structure_breaks=(SimpleNamespace(direction="bullish", candle_index=last),),
-                    sweeps=(SimpleNamespace(direction="bullish", candle_index=last - 1, level=100.0),),
+                    structure_breaks=(SimpleNamespace(direction="bullish", candle_index=last - 2),),
+                    sweeps=(SimpleNamespace(direction="bullish", candle_index=last - 3, level=100.0),),
                     liquidity_levels=tuple(SimpleNamespace(price=p) for p in (110.0, 120.0, 130.0)),
                 )
             elif timeframe == "1m":
