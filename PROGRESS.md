@@ -1809,3 +1809,11 @@
 
 - В ветке `feat/setup-expiry-display` API добавляет к актуальным кандидатам `expires_at_ms`, рассчитанный от времени подтверждения и TTL профиля; карточка показывает локальное время `срок до HH:MM`.
 - Добавлен source-contract тест отображения. CI и production deploy ещё не подтверждены.
+
+
+### 2026-10-17 — PR #24 merged: TTL deadline shown on incoming cards
+
+- PR [#24](https://github.com/nyxtryp/aicfa/pull/24) слит в `main` squash-коммитом `6ea050b61d090e34f273b00b537ec22f67279dc8`.
+- Оба workflow `Python tests` для PR head завершились `success`.
+- Incoming candidate payload получает `expires_at_ms` на основе времени подтверждения и TTL профиля; карточка показывает локальное время `срок до HH:MM`.
+- **Production всё ещё не подтверждён:** Desktop Commander device `nyxtryp` offline (last seen 21h ago). Нельзя утверждать, что новый релиз уже запущен или что production DB уже очистилась/обновилась.
