@@ -13,6 +13,8 @@ from app.smc.liquidity import is_level_near_zone
 from app.smc.engine import SMCAnalysis, analyze_smc
 from app.smc.ranges import find_dealing_range, premium_discount
 from app.smc.profiles import PROFILES, STOP_BUFFER_ATR_OVERRIDES, ProfileConfig
+from app.smc.structure import find_confirmed_swings
+from app.smc.breaks import detect_structure_breaks
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +56,29 @@ def _analysis(candles: Sequence[ClosedCandle], profile: ProfileConfig, timeframe
         swing_left=profile.swing_left if timeframe in {profile.bias_timeframe, profile.zone_timeframe} else 2,
         swing_right=profile.swing_right if timeframe in {profile.bias_timeframe, profile.zone_timeframe} else 2,
     )
+
+
+def _recent_internal_structure_direction(candles: Sequence[ClosedCandle], *, max_age: int = 2) -> str | None:
+    """Return a fresh 1-left/1-right internal BOS/CHoCH direction, without look-ahead.
+
+    This is an independent, PAC-inspired internal-structure confluence, not
+    LuxAlgo's proprietary implementation. Swing points are usable only after
+    their right-hand confirmation candle closes.
+    """
+    if len(candles) < 5:
+        return None
+    highs = [float(c.high) for c in candles]
+    lows = [float(c.low) for c in candles]
+    closes = [float(c.close) for c in candles]
+    internal_swings = find_confirmed_swings(highs, lows, left=1, right=1)
+    events = detect_structure_breaks(closes, internal_swings)
+    if not events:
+        return None
+    latest = events[-1]
+    age = len(candles) - 1 - int(latest.candle_index)
+    if age < 0 or age > max_age:
+        return None
+    return latest.direction
 
 
 def scan_symbol(
@@ -177,6 +202,13 @@ def scan_symbol(
         if latest_trigger_break.direction != expected_break:
             count("confirmation_direction_mismatch")
             continue
+        internal_direction = _recent_internal_structure_direction(trigger)
+        internal_structure_confirmed = internal_direction is not None
+        internal_structure_aligned = internal_direction == expected_break
+        if internal_structure_confirmed and not internal_structure_aligned:
+            count("internal_structure_conflict")
+        elif internal_structure_aligned:
+            count("internal_structure_aligned")
         break_close_ms = trigger[break_index].close_time_ms
 
         # SMC sequence: liquidity is swept, structure breaks with displacement,
@@ -341,8 +373,16 @@ def scan_symbol(
             "confirmation_volume": float(trigger[-1].volume),
             "average_volume": average_volume,
             "clean_path_to_tp1": clean_path,
+            "internal_structure_confirmed": internal_structure_confirmed,
+            "internal_structure_aligned": internal_structure_aligned,
         }
         score = 2 + (2 if ob_fvg_overlap else 0) + 1 + 2 + (1 if zone_bias_agreement else 0) + (1 if clean_path else 0) + (1 if pd_aligned else 0)
+        # PAC-style internal structure is a confluence, not a new hard gate:
+        # reward a fresh aligned micro-break and penalize a fresh opposing one.
+        if internal_structure_aligned:
+            score += 1
+        elif internal_structure_confirmed:
+            score -= 1
         if average_volume and float(trigger[-1].volume) > 1.5 * average_volume:
             score += 1
         # The UI and strategy threshold are defined on a ten-point scale.
@@ -360,7 +400,10 @@ def scan_symbol(
             targets=tuple(targets[:3]), score=score,
             reasons=("htf_bias_aligned",
                      *(("premium_discount_aligned",) if pd_aligned else ("premium_discount_not_aligned_confluence_only",)),
-                     "active_zone_in_ote", "liquidity_sweep", "confirmation_break", "rr_passed"),
+                     "active_zone_in_ote", "liquidity_sweep", "confirmation_break",
+                     *(("internal_structure_aligned",) if internal_structure_aligned else
+                       (("internal_structure_conflict",) if internal_structure_confirmed else ())),
+                     "rr_passed"),
             zone=(selected[0], selected[1]), timeframe=profile.confirmation_timeframe,
             evidence=evidence, atr=float(atr),
         ))
