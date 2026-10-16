@@ -179,8 +179,11 @@ def scan_symbol(
             continue
         break_close_ms = trigger[break_index].close_time_ms
 
-        # Find the newest valid zone first, but fall back to older active zones
-        # when the newest zone was not actually retested before the break.
+        # SMC sequence: liquidity is swept, structure breaks with displacement,
+        # then price returns to a fresh OB/FVG in OTE. Requiring the retest
+        # BEFORE the break reverses that sequence and suppresses valid setups.
+        # Choose the newest eligible zone that is actually retested after the
+        # confirming break; entry is still evaluated at the newest closed candle.
         selected = None
         for candidate_zone in reversed(active_zones):
             if not (candidate_zone[0] <= ote_high and candidate_zone[1] >= ote_low):
@@ -190,9 +193,8 @@ def scan_symbol(
                 continue
             zone_created_ms = zone_series[zone_index].close_time_ms
             touched = any(
-                index < break_index
-                and candle.close_time_ms > zone_created_ms
-                and candle.close_time_ms < break_close_ms
+                index > break_index
+                and candle.close_time_ms > max(zone_created_ms, break_close_ms)
                 and float(candle.high) >= candidate_zone[0]
                 and float(candle.low) <= candidate_zone[1]
                 for index, candle in enumerate(trigger)
@@ -201,14 +203,14 @@ def scan_symbol(
                 selected = candidate_zone
                 break
         if selected is None:
-            count("no_active_zone_touched_in_ote_before_confirmation")
+            count("no_active_zone_retested_after_confirmation")
             continue
-        count("active_zone_touched_in_ote")
+        count("active_zone_retested_after_confirmation")
 
-        # A sweep must be relevant to the selected zone, not just any old
-        # same-direction sweep elsewhere in the 500-candle window. Require it
-        # after zone creation and before the confirming break, with the swept
-        # level within one zone-timeframe ATR of the nearest zone edge.
+        # The directional liquidity sweep must precede the structure break and
+        # be close to the selected zone. Do not require the sweep to occur after
+        # the zone's formation: a sweep commonly creates the displacement that
+        # identifies the OB/FVG used for the subsequent retest.
         zone_created_ms = zone_series[selected[3]].close_time_ms
         zone_atr = zone.atr[selected[3]] if selected[3] < len(zone.atr) else None
         if zone_atr is None or zone_atr <= 0:
@@ -218,7 +220,6 @@ def scan_symbol(
             sweep_event for sweep_event in confirm.sweeps
             if sweep_event.candle_index < break_index
             and sweep_event.direction == expected_break
-            and trigger[sweep_event.candle_index].close_time_ms > zone_created_ms
             and is_level_near_zone(
                 float(sweep_event.level), selected[0], selected[1], float(zone_atr),
                 max_distance_atr=1.0,
