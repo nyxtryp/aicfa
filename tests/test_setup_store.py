@@ -62,6 +62,23 @@ class SetupStoreTests(unittest.TestCase):
             self.assertEqual(len(store.list_candidates(include_rejected=True)), 1)
             self.assertEqual(store.event_count(repeated["key"]), 0)
 
+    def test_store_initialization_removes_old_rejections(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "setups.sqlite3"
+            store = SetupStore(path)
+            with store._connection() as db:
+                db.execute(
+                    "INSERT INTO setup_candidates (setup_key,symbol,profile,direction,status,confirmation_time_ms,score,zone_key,payload_json) VALUES (?,?,?,?,?,?,?,?,?)",
+                    ("old-rejected", "BTCUSDT", "scalp", "long", "REJECTED", 2000, 3, "zone", "{}"),
+                )
+                db.execute(
+                    "INSERT INTO setup_candidate_events (setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
+                    ("old-rejected", "SETUP_REJECTED", 2000, "{}"),
+                )
+            store = SetupStore(path)
+            self.assertEqual(store.list_candidates(include_rejected=True), [])
+            self.assertEqual(store.event_count("old-rejected"), 0)
+
     def test_rejected_decisions_are_not_persisted(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SetupStore(Path(directory) / "setups.sqlite3")

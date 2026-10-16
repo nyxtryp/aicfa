@@ -56,6 +56,14 @@ class SetupStore:
                 db.execute("ALTER TABLE setup_candidates ADD COLUMN zone_key TEXT NOT NULL DEFAULT ''")
             db.execute("CREATE INDEX IF NOT EXISTS idx_setup_candidates_status_time ON setup_candidates(status, confirmation_time_ms DESC)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_setup_candidate_events_key_time ON setup_candidate_events(setup_key, event_time_ms)")
+            # One-time cleanup for rejected attempts accumulated by older releases.
+            rejected_keys = [
+                row["setup_key"]
+                for row in db.execute("SELECT setup_key FROM setup_candidates WHERE status='REJECTED'").fetchall()
+            ]
+            if rejected_keys:
+                db.executemany("DELETE FROM setup_candidate_events WHERE setup_key=?", [(key,) for key in rejected_keys])
+                db.executemany("DELETE FROM setup_candidates WHERE setup_key=?", [(key,) for key in rejected_keys])
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
