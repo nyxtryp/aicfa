@@ -146,7 +146,7 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             reached.append(idx + 1)
         if not reached:
             if expired:
-                completed_targets = {"ACCEPTED": 0, "TP1": 1, "TP2": 2}.get(status, len(targets))
+                completed_targets = {"CANDIDATE": 0, "ACCEPTED": 0, "TP1": 1, "TP2": 2}.get(status, len(targets))
                 remaining = max(0.0, 1.0 - sum(target_weights[:completed_targets]))
                 gross_r += remaining * ((close - entry) if direction == "long" else (entry - close)) / risk
                 commission_r += remaining * COMMISSION_RATE_PER_SIDE * (entry + close) / risk
