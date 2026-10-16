@@ -143,6 +143,10 @@ class SetupStore:
                 decided["decision_reasons"] = list(dict.fromkeys(decision_reasons + gate_reasons))
             elif decision_reasons:
                 decided["decision_reasons"] = list(dict.fromkeys(decision_reasons))
+            # Cooldown and other store-level gates can reject a candidate here;
+            # those decisions must also remain transient.
+            if str(decided.get("status", "")).upper() == "REJECTED":
+                return False, decided
             encoded = json.dumps(decided, separators=(",", ":"), sort_keys=True)
             cursor = db.execute(
                 """INSERT OR IGNORE INTO setup_candidates
