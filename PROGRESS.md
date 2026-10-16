@@ -1839,4 +1839,6 @@
 - Preserved the pre-redesign main state at `checkpoint/design-counterpoint-2026-10-17` (commit `d5948de043547264bf496e595c353c12ca002b26`), so the half-size card state remains available as a rollback counterpoint.
 - Started branch `redesign/compact-dashboard-layout` to replace the unreadably tiny top cards and uneven oversized panel spacing with a consistent compact dashboard system.
 - Dashboard stylesheet is being rewritten with readable metric typography, aligned spacing, slimmer setup cards, restrained borders, balanced desktop columns, and responsive tablet/mobile behavior. Scanner and chart logic are intentionally unchanged.
-- Pending tests, CI, review, merge, and production deployment. Production has not been changed or verified.
+- PR [#27](https://github.com/nyxtryp/aicfa/pull/27) merged as `19fd287c92a965600b39e06bdd0b290621afe30d`; both Python test workflows passed on head `0a1ddba4960912be644508981b1123090917668a`.
+- The previous state remains available at checkpoint branch `checkpoint/design-counterpoint-2026-10-17` / commit `d5948de043547264bf496e595c353c12ca002b26`.
+- **Production not verified:** Desktop Commander device remains offline, so the live site has not been confirmed updated.
