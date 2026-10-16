@@ -110,7 +110,7 @@ class ScannerTests(unittest.TestCase):
 
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].zone, (98.0, 102.0))
-        self.assertEqual(diagnostics.get("active_zone_touched_in_ote"), 1)
+        self.assertEqual(diagnostics.get("active_zone_retested_after_confirmation"), 1)
 
     def test_pre_break_zone_touch_alone_does_not_create_setup(self):
         # The zone is touched before the BOS, but price never retests it after
@@ -286,7 +286,7 @@ class ScannerTests(unittest.TestCase):
         def mocked_analysis(candles, profile, timeframe):
             result = analysis()
             if timeframe == "5m":
-                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37, level=100.0),)
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=36, level=100.0),)
             return result
 
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
