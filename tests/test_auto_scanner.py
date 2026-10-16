@@ -46,7 +46,7 @@ class AutomaticScannerTests(unittest.TestCase):
 
     def test_emits_candidate_when_multitimeframe_smc_rules_align(self):
         series = {tf: self.candles(timeframe=tf, count=60, close=Decimal("99") if tf == "1h" else Decimal("100")) for tf in TIMEFRAMES}
-        block = SimpleNamespace(direction="bullish", lower=99.0, upper=101.0, confirmation_index=10)
+        block = SimpleNamespace(direction="bullish", lower=99.0, upper=101.0, candle_index=8, confirmation_index=10)
         block_state = SimpleNamespace(mitigated=False)
         gap = SimpleNamespace(direction="bullish", lower=99.5, upper=100.5, confirmation_index=12)
         gap_fill = SimpleNamespace(fully_filled=False)
