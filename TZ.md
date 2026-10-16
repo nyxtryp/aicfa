@@ -450,3 +450,9 @@ AICFA считается технически готовой, когда дан�
 - Four top-level market status cards (Binance stream, candle series, closed candles, history) must be compact: reduced padding, smaller label/value/hint typography, and tighter grid gaps.
 - On mobile, cards remain a two-column grid and use even smaller padding and text; status remains readable and all four cards remain visible.
 - Regression test asserts compact card CSS. Production deployment is tracked separately in `PROGRESS.md`.
+
+
+## Dashboard density — half-size market status metrics
+- On explicit request, halve the compact top-card dimensions and typography again: desktop padding/radius/grid gaps and label/value/hint font sizes and line heights are 50% of the prior compact-card values.
+- Mobile keeps its two-column layout and halves its previous compact padding and type sizes too.
+- Regression tests must lock these exact half-size values. Production deployment remains separately verified.

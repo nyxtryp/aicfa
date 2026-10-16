@@ -1825,3 +1825,10 @@
 - Branch `fix/compact-market-status-cards`: reduced desktop metric-card padding to `6px 9px`, radius to `9px`, grid gap to `6px`; labels to `.64rem`, values to `.94rem`, hints to `.59rem`, with tighter line heights/margins. Mobile cards use tighter padding and smaller typography while retaining the two-column layout.
 - Added a dashboard regression assertion for the compact CSS and documented the requirement in `TZ.md`.
 - Pending CI/PR merge and production deployment; no claim that the live site has changed yet.
+
+
+### 2026-10-17 — Halve market status card dimensions again
+
+- User requested the four market status cards be reduced to exactly half of the previously compact dimensions.
+- Branch `fix/half-size-market-status-cards` halves desktop card padding, radius, grid gaps, typography, line heights, and value spacing; mobile dimensions and typography are halved as well, with the two-column layout preserved.
+- Updated dashboard regression assertions and `TZ.md`; CI and production deployment are pending. This is a deliberately very small type size per the explicit request; production remains unverified until deploy.
