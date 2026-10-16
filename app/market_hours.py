@@ -83,3 +83,16 @@ def tradfi_market_is_open(symbol: str, now: datetime | None = None) -> bool | No
     if normalized in COMMODITY_SYMBOLS:
         return _commodity_session_is_open(instant)
     return None
+
+
+def tradfi_scan_block_reason(symbol: str, now: datetime | None = None) -> str | None:
+    """Return why a TradFi symbol must be excluded from new setup scanning.
+
+    Closed sessions and unknown calendars fail closed; verified open sessions pass.
+    """
+    is_open = tradfi_market_is_open(symbol, now)
+    if is_open is True:
+        return None
+    if is_open is False:
+        return "tradfi_market_closed"
+    return "market_hours_unverified"
