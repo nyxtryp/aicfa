@@ -7,8 +7,8 @@ from app.smc.pac_scanner import scan_symbol
 
 def candle(index, timeframe_minutes=5, close=100.0):
     return SimpleNamespace(
-        open_time_ms=1_800_000_000_000 + index * timeframe_minutes * 60_000,
-        close_time_ms=1_800_000_000_000 + (index + 1) * timeframe_minutes * 60_000 - 1,
+        open_time_ms=1_800_000_000_000 + index * 60_000,
+        close_time_ms=1_800_000_000_000 + (index + 1) * 60_000 - 1,
         open=close, high=close + 1.0, low=close - 1.0, close=close, volume=100.0,
     )
 
