@@ -122,12 +122,12 @@ def scan_symbol(
              if (float(level.price) > entry if direction == "long" else float(level.price) < entry)},
             reverse=(direction == "short"),
         )
-        targets = [p for p in liquidity if abs(p-entry) >= 1.2*risk][:3]
+        targets = [p for p in liquidity if abs(p-entry) >= 1.49*risk][:3]
         if not targets:
             targets = [entry + 2.0*risk if direction == "long" else entry - 2.0*risk]
         tp1 = targets[0]
         rr = abs(tp1-entry) / risk
-        if rr < 1.2:
+        if rr < 1.49:
             count("risk_reward_below_minimum")
             continue
 

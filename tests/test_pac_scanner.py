@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -48,6 +49,11 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(candidates[0].status, "CANDIDATE")
         self.assertEqual(candidates[0].direction, "long")
         self.assertIn(":PAC:", candidates[0].key)
+
+    def test_scanner_enforces_rr_floor_149(self):
+        source = (Path(__file__).resolve().parents[1] / "app" / "smc" / "pac_scanner.py").read_text()
+        self.assertIn("abs(p-entry) >= 1.49*risk", source)
+        self.assertIn("if rr < 1.49:", source)
 
     def test_intraday_profile_uses_15m_trigger(self):
         def analysis(candles, profile, timeframe):

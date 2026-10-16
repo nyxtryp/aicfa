@@ -1,5 +1,7 @@
+import inspect
 import unittest
 
+import app.main as main_module
 from app.main import PAGE, SCANNER_LIVE_ENABLED, index
 from app.market_data import ALL_SYMBOLS, TIMEFRAMES
 from app.main import LOGIN_PAGE, app
@@ -11,7 +13,10 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("SMC Scanner", response.body.decode())
         self.assertIn("Автосканер · все инструменты · scalp / intraday", PAGE)
-        self.assertIn('id="setups"', PAGE)
+        self.assertIn('id="intradaySetups"', PAGE)
+        self.assertIn('id="scalpSetups"', PAGE)
+        self.assertIn("rr < 1.49 or not target_on_correct_side", inspect.getsource(main_module))
+        self.assertIn("const key=[item.symbol,item.profile].join('|')", PAGE)
         self.assertIn('id="activeSetups"', PAGE)
         self.assertIn('id="realizedJournal"', PAGE)
         self.assertNotIn('id="rejectedSetups"', PAGE)
@@ -42,7 +47,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/api/setups", [route.path for route in app.routes])
         self.assertIn("/api/active-setups", [route.path for route in app.routes])
         self.assertIn("/api/journal", [route.path for route in app.routes])
-        self.assertIn("autocomplete=\"current-password\"", LOGIN_PAGE)
+        self.assertIn('autocomplete="current-password"', LOGIN_PAGE)
         self.assertIn("AICFA_SETUP_TOKEN", LOGIN_PAGE)
         self.assertNotIn("__AICFA_SYMBOLS__", PAGE)
         self.assertNotIn("__AICFA_TIMEFRAMES__", PAGE)
