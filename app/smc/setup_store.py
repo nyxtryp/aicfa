@@ -307,7 +307,7 @@ class SetupStore:
     def list_journal(self, *, limit: int = 200) -> list[dict[str, Any]]:
         with self._connection() as db:
             rows = db.execute(
-                "SELECT payload_json FROM setup_journal ORDER BY closed_at_ms DESC LIMIT ?",
+                "SELECT j.payload_json FROM setup_journal AS j JOIN setup_candidates AS c ON c.setup_key=j.setup_key WHERE lower(c.profile) IN ('scalp','intraday') AND lower(j.profile) IN ('scalp','intraday') ORDER BY j.closed_at_ms DESC LIMIT ?",
                 (max(1, min(int(limit), 1000)),),
             ).fetchall()
         return [json.loads(row["payload_json"]) for row in rows]
