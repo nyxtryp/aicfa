@@ -1864,8 +1864,9 @@
 - **Production deployment and browser visual verification are not confirmed:** Desktop Commander device `nyxtryp` is offline (last seen 23h ago). Do not claim the live site has changed until the deployed release is checked.
 
 
-### 2026-10-17 — Full dashboard reconstruction (PR #30)
+### 2026-10-17 — Full dashboard reconstruction (merged PR #30)
 - Added a more distinct terminal visual system with stronger contrast, lime/teal accents, refreshed cards, borders, and responsive dashboard layout.
 - Made INTRADAY and SCALP headers keyboard-accessible accordion controls; one starts collapsed and the panels can be opened/collapsed by click or keyboard.
 - Added dashboard regression assertions and updated TZ.md. No scanner criteria, auth/API, SMC chart logic, journal lifecycle, or shadow mode changes.
-- CI and production browser verification pending; do not treat the live site as updated until deploy is confirmed.
+- PR #30 merged as `a0d2499a0e8ab60e3f47754d434e834cb16d1b73`; both `tests` and `unit-tests` passed on the reviewed PR head. Merge-commit checks are running.
+- Production deployment and browser verification are still unconfirmed because the remote desktop agent is offline.
