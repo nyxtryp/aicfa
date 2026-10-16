@@ -235,7 +235,7 @@ def summarize(trades: Sequence[TradeResult], *, margin_usd: float = 5.0, include
         "net_profit_usd": sum(t.net_pnl_usd for t in sample),
         "net_r": sum(t.net_r for t in sample),
         "expectancy_r": sum(t.net_r for t in sample) / count if count else 0.0,
-        "profit_factor": gross_profit / gross_loss if gross_loss else (float("inf") if gross_profit else 0.0),
+        "profit_factor": gross_profit / gross_loss if gross_loss else (None if gross_profit else 0.0),
         "average_win_usd": sum(t.net_pnl_usd for t in wins) / len(wins) if wins else 0.0,
         "average_loss_usd": sum(t.net_pnl_usd for t in losses) / len(losses) if losses else 0.0,
         "max_drawdown_usd": max_drawdown,
