@@ -668,19 +668,19 @@ button:hover { background: #1b443b; }
 .grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 5px;
+  margin-bottom: 7px;
 }
 .metric {
   min-width: 0;
-  padding: 8px 10px;
+  padding: 4px 7px;
   border: 1px solid #253247;
-  border-radius: 9px;
+  border-radius: 6px;
   background: #0f1724;
 }
-.metric .label { color: #8e9eb4; font-size: .68rem; line-height: 1.25; }
-.metric .value { margin-top: 3px; font-size: .98rem; line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.metric .hint { margin-top: 2px; color: #71829a; font-size: .64rem; line-height: 1.25; }
+.metric .label { color: #8e9eb4; font-size: .62rem; line-height: 1.1; }
+.metric .value { margin-top: 1px; font-size: .8rem; line-height: 1.1; font-weight: 700; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.metric .hint { margin-top: 1px; color: #71829a; font-size: .57rem; line-height: 1.1; }
 .dashboard {
   display: grid;
   grid-template-columns: minmax(250px, .88fr) minmax(0, 1.75fr) minmax(245px, .86fr);
@@ -788,8 +788,8 @@ footer { margin-top: 12px; color: #61738e; font-size: .68rem; line-height: 1.5; 
   .controls { width: 100%; justify-content: flex-start; }
   main { padding-top: 12px; }
   .top { align-items: flex-start; flex-direction: column; }
-  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-  .metric { padding: 7px 8px; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
+  .metric { padding: 4px 6px; }
   .dashboard { grid-template-columns: minmax(0, 1fr); gap: 9px; }
   .dashboard-column { height: auto; min-height: 0; grid-template-rows: repeat(2, minmax(220px, auto)); gap: 9px; }
   .right-stack { grid-column: auto; grid-template-columns: minmax(0, 1fr); gap: 9px; }
@@ -799,11 +799,11 @@ footer { margin-top: 12px; color: #61738e; font-size: .68rem; line-height: 1.5; 
 }
 @media (max-width: 420px) {
   .sub { font-size: .61rem; }
-  .grid { gap: 6px; }
-  .metric { padding: 6px 7px; }
-  .metric .label { font-size: .63rem; }
-  .metric .value { font-size: .9rem; }
-  .metric .hint { font-size: .59rem; }
+  .grid { gap: 4px; }
+  .metric { padding: 3px 5px; }
+  .metric .label { font-size: .58rem; }
+  .metric .value { font-size: .76rem; }
+  .metric .hint { font-size: .54rem; }
   .panel { padding: 9px; }
   .setup-card { padding: 8px; }
   .chart-wrap { height: 270px; }
