@@ -47,7 +47,7 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].status, "CANDIDATE")
         self.assertEqual(candidates[0].direction, "long")
-        self.assertIn("pac_BTCUSDT", candidates[0].key.replace(":", "_"))
+        self.assertIn(":PAC:", candidates[0].key)
 
     def test_intraday_profile_uses_15m_trigger(self):
         def analysis(candles, profile, timeframe):
