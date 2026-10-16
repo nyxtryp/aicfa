@@ -154,12 +154,13 @@ def scan_symbol(
         active_zones: list[tuple[float, float, str, int]] = []
         for block, state in zip(zone.order_blocks, zone.order_block_mitigation):
             if block.direction == latest_bias.direction and not state.mitigated and block.confirmation_index <= zone.as_of_index:
-                active_zones.append((float(block.lower), float(block.upper), "OB", int(block.confirmation_index)))
+                active_zones.append((float(block.lower), float(block.upper), "OB", int(block.candle_index)))
         for gap, fill in zip(zone.fvg, zone.fvg_fill):
             if gap.direction == latest_bias.direction and not fill.fully_filled and gap.confirmation_index <= zone.as_of_index:
                 active_zones.append((float(gap.lower), float(gap.upper), "FVG", int(gap.confirmation_index)))
-        # Zone families are appended separately above; sort by actual creation
-        # time so a newer OB can be preferred over an older FVG (and vice versa).
+        # For OBs, candle_index is the source candle where the zone formed; confirmation_index
+        # is the later structure-break candle that makes the OB identifiable. FVG confirmation_index
+        # is its third/forming candle. Sort and timestamp both by the actual zone-formation index.
         active_zones.sort(key=lambda item: (item[3], item[2]))
         # The latest structure break may be followed by a short, bounded
         # confirmation window. Requiring the BOS to be on the exact last candle
