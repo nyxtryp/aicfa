@@ -1870,3 +1870,10 @@
 - Added dashboard regression assertions and updated TZ.md. No scanner criteria, auth/API, SMC chart logic, journal lifecycle, or shadow mode changes.
 - PR #30 merged as `a0d2499a0e8ab60e3f47754d434e834cb16d1b73`; both `tests` and `unit-tests` passed on the reviewed PR head. Merge-commit checks are running.
 - Production deployment and browser verification are still unconfirmed because the remote desktop agent is offline.
+
+
+### 2026-10-17 — Rebuilt realized journal analytics (in progress)
+- Replaced the plain realized-trades dump with net-R, win-rate, Profit Factor and max-drawdown summaries plus All / SCALP / INTRADAY filters.
+- Individual trade rows remain clickable; suspicious/non-finite fee records are visibly flagged and excluded from summary statistics pending formula/data audit.
+- Branch `fix/realized-journal-analytics`; implementation commit `d6dadd1549efe7642d27fb17373a00bf9921b5ea`.
+- Still needs regression tests, CI, merge, and production deployment verification. No scanner criteria or live-acceptance mode changed.
