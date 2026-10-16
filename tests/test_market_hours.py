@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from app.market_hours import tradfi_market_is_open
+from app.market_hours import tradfi_market_is_open, tradfi_scan_block_reason
 
 
 class TradFiMarketHoursTests(unittest.TestCase):
@@ -49,6 +49,13 @@ class TradFiMarketHoursTests(unittest.TestCase):
     def test_naive_datetimes_are_rejected(self):
         with self.assertRaises(ValueError):
             tradfi_market_is_open("SPYUSDT", datetime(2026, 10, 13, 14, 0))
+
+    def test_scan_gate_blocks_closed_and_unverified_markets(self):
+        closed = datetime(2026, 10, 13, 7, 0, tzinfo=timezone.utc)  # Samsung after KRX close
+        opened = datetime(2026, 10, 13, 1, 0, tzinfo=timezone.utc)
+        self.assertEqual(tradfi_scan_block_reason("SAMSUNGUSDT", closed), "tradfi_market_closed")
+        self.assertIsNone(tradfi_scan_block_reason("SAMSUNGUSDT", opened))
+        self.assertEqual(tradfi_scan_block_reason("UNMAPPEDUSDT", opened), "market_hours_unverified")
 
 
 if __name__ == "__main__":
