@@ -62,6 +62,7 @@ def scan_symbol(
     *,
     trigger_timeframe: str,
     diagnostics: dict[str, int] | None = None,
+    profiles: Mapping[str, ProfileConfig] | None = None,
 ) -> list[SetupCandidate]:
     """Return only candidates whose confirmation is the newest candle on trigger TF.
 
@@ -77,7 +78,7 @@ def scan_symbol(
         if diagnostics is not None:
             diagnostics[reason] = diagnostics.get(reason, 0) + 1
 
-    for profile_name, profile in PROFILES.items():
+    for profile_name, profile in (profiles if profiles is not None else PROFILES).items():
         if trigger_timeframe != profile.confirmation_timeframe:
             continue
         count("profile_checks")
