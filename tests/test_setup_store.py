@@ -29,7 +29,7 @@ class SetupStoreTests(unittest.TestCase):
             self.assertEqual(store.list_candidates(), [payload])
             self.assertEqual(store.event_count(payload["key"]), 1)
 
-    def test_rejected_market_session_records_are_hidden_from_incoming_list(self):
+    def test_rejected_decisions_are_not_persisted(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SetupStore(Path(directory) / "setups.sqlite3")
             base = {
@@ -48,9 +48,12 @@ class SetupStoreTests(unittest.TestCase):
                 "timeframe": "5m",
                 "decision_reasons": ["tradfi_market_closed"],
             }
-            saved, _ = store.save_decision(base, cooldown_minutes=30)
-            self.assertTrue(saved)
+            saved, returned = store.save_decision(base, cooldown_minutes=30)
+            self.assertFalse(saved)
+            self.assertEqual(returned["status"], "REJECTED")
             self.assertEqual(store.list_candidates(include_rejected=True), [])
+            self.assertEqual(store.event_count(base["key"]), 0)
+
             normal = dict(base)
             normal.update({
                 "key": "BTCUSDT:scalp:long:OB:1:2",
@@ -58,9 +61,8 @@ class SetupStoreTests(unittest.TestCase):
                 "decision_reasons": ["risk_reward_below_minimum"],
             })
             saved, _ = store.save_decision(normal, cooldown_minutes=30)
-            self.assertTrue(saved)
-            listed = store.list_candidates(include_rejected=True)
-            self.assertEqual([item["symbol"] for item in listed], ["BTCUSDT"])
+            self.assertFalse(saved)
+            self.assertEqual(store.list_candidates(include_rejected=True), [])
 
 
 if __name__ == "__main__":
