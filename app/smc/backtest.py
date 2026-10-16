@@ -6,6 +6,7 @@ ambiguous stop/target bars conservatively (stop first).
 """
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import asdict, dataclass, replace
 from math import isfinite
 from typing import Mapping, Sequence
@@ -274,15 +275,17 @@ def run_backtest(
         min_rr=(config.min_rr if config.min_rr is not None else base_profile.min_rr),
         stop_buffer_atr=(config.stop_buffer_atr if config.stop_buffer_atr is not None else base_profile.stop_buffer_atr),
     )
+    ordered_series = {tf: tuple(rows) for tf, rows in series_by_timeframe.items()}
+    close_times = {tf: tuple(int(c.close_time_ms) for c in rows) for tf, rows in ordered_series.items()}
     trades: list[TradeResult] = []
     seen_keys: set[str] = set()
     i = start_index
     while i < end:
         timestamp = int(trigger[i].close_time_ms)
         snapshot: dict[str, tuple[ClosedCandle, ...]] = {}
-        for timeframe, rows in series_by_timeframe.items():
-            closed = tuple(c for c in rows if c.close_time_ms <= timestamp)
-            snapshot[timeframe] = closed[-config.max_candles:]
+        for timeframe, rows in ordered_series.items():
+            cut = bisect_right(close_times[timeframe], timestamp)
+            snapshot[timeframe] = rows[max(0, cut - config.max_candles):cut]
         prefix_trigger = snapshot.get(trigger_timeframe, ())
         if len(prefix_trigger) < 40:
             i += 1
@@ -297,14 +300,8 @@ def run_backtest(
             i += 1
             continue
         seen_keys.add(candidate.key)
-        # scanner snapshot may be capped at 500, so map its final candle back to
-        # the source index by timestamp before simulating future bars.
-        signal_time = int(prefix_trigger[-1].open_time_ms)
-        absolute_signal_index = next(
-            (j for j, row in enumerate(trigger) if row.open_time_ms == signal_time),
-            i,
-        )
-        result = _simulate(candidate, trigger, absolute_signal_index, profile, config, end)
+        # The loop index is the current closed trigger candle in the full replay.
+        result = _simulate(candidate, trigger, i, profile, config, end)
         if result is not None:
             trades.append(result)
             # Avoid overlapping positions for the same symbol/profile.
