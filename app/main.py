@@ -308,7 +308,7 @@ async def _on_closed_candle(candle) -> None:
                             (candidate.targets[0] > candidate.confirmation_price if candidate.direction == "long"
                              else candidate.targets[0] < candidate.confirmation_price)
                         )
-                        if (risk <= 0 or rr < 1.2 or not target_on_correct_side
+                        if (not fresh or risk <= 0 or rr < 1.2 or not target_on_correct_side
                                 or float(tick_info.get("tick_size", 0)) <= 0):
                             payload["status"] = "REJECTED"
                             payload["decision_reasons"] = ["pac_invalid_risk_target_or_rr"]
