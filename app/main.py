@@ -507,76 +507,7 @@ async def require_single_user_auth(request: Request, call_next):
 
 LOGIN_PAGE = """<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AICFA — вход</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#080d18;color:#e8eef8;font:16px system-ui}.box{width:min(90vw,400px);padding:28px;background:#101a2a;border:1px solid #293851;border-radius:16px}input,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0 14px;background:#0b1321;color:#e8eef8;border:1px solid #2a3a53;border-radius:8px}button{background:#17352f}p{color:#a8b8ce}</style>
-<style id="modern-mvp-theme">
-:root{color-scheme:dark;--bg:#080d16;--surface:#0e1725;--surface-raised:#121e2e;--line:#24344a;--line-soft:#1b293b;--text:#e9f0fa;--muted:#8fa1b9;--accent:#69e0bd;--accent-soft:#102e2a;--danger:#ff8796;--warning:#edc477;--radius:12px;--shadow:0 12px 32px rgba(0,0,0,.14)}
-html{scroll-behavior:smooth;scrollbar-color:#344963 #0a111c}
-body{background:radial-gradient(ellipse at 10% -10%,rgba(39,83,112,.24),transparent 42%),radial-gradient(ellipse at 90% 0%,rgba(28,86,73,.12),transparent 32%),var(--bg);color:var(--text);font-feature-settings:"ss01" on,"cv11" on}
-header{position:sticky;top:0;z-index:20;min-height:58px;padding:9px clamp(14px,2.4vw,32px);background:rgba(8,13,22,.88);backdrop-filter:blur(18px);border-bottom:1px solid rgba(83,109,143,.22)}
-.brand{font-size:1.08rem;letter-spacing:.09em}.brand span{color:var(--accent)}
-.sub{font-size:.64rem;letter-spacing:.12em;color:#8396b0}
-main{max-width:1840px;padding-top:15px}
-.top{align-items:flex-end;margin-bottom:12px}.top>div:first-child{min-width:0}
-h1{font-size:clamp(1.45rem,2.2vw,2rem);letter-spacing:-.045em;font-weight:760}
-.muted{font-size:.78rem;color:var(--muted)}
-.controls{gap:7px}
-.pill{border-color:var(--line);background:rgba(16,27,42,.72);border-radius:999px;padding:5px 9px;font-size:.69rem}
-.led{width:7px;height:7px;box-shadow:0 0 0 3px rgba(237,196,119,.12)}
-button,select{min-height:32px;padding:7px 11px;border-color:#30435b;border-radius:8px;background:#111d2c;transition:background .15s,border-color .15s,transform .15s}
-button{background:linear-gradient(180deg,#17483e,#12382f);border-color:#286553;font-weight:650}
-button:hover{background:#1b5145;border-color:#39846d}
-button:active{transform:translateY(1px)}
-button:focus-visible,select:focus-visible,summary:focus-visible,.setup-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.grid{gap:5px;margin-bottom:9px}
-.metric{padding:4px 7px;border-color:var(--line-soft);border-radius:7px;background:linear-gradient(145deg,rgba(17,29,45,.96),rgba(12,21,33,.96));box-shadow:none}
-.metric .label{font-size:.62rem;line-height:1.1;letter-spacing:.015em;color:#9aabc0}
-.metric .value{margin-top:1px;font-size:.8rem;line-height:1.1;font-weight:750;letter-spacing:-.015em}
-.metric .hint{margin-top:1px;font-size:.57rem;line-height:1.1;color:#71849d}
-.dashboard{grid-template-columns:minmax(235px,.86fr) minmax(0,1.72fr) minmax(225px,.82fr);gap:11px}
-.dashboard-column{gap:11px;height:calc(100vh - 248px);min-height:350px}
-.panel{padding:13px;border-color:var(--line-soft);border-radius:var(--radius);background:linear-gradient(160deg,rgba(15,24,38,.97),rgba(11,19,31,.97));box-shadow:var(--shadow)}
-.panel-title{font-size:.79rem;margin-bottom:10px;letter-spacing:.005em}
-.panel-title .pill{font-size:.64rem;padding:3px 8px}
-.setup-list{scrollbar-width:thin;scrollbar-color:#344963 transparent}
-.setup-card{padding:10px;margin-bottom:7px;border-color:#24354a;border-radius:10px;background:linear-gradient(145deg,#0d1725,#0b1420);box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.setup-card:hover{border-color:#4d8e83;background:linear-gradient(145deg,#122436,#0d1b29)}
-.setup-card.selected{border-color:var(--accent);box-shadow:inset 2px 0 var(--accent),0 0 0 1px rgba(105,224,189,.07)}
-.setup-card-head{margin-bottom:8px}.setup-card-title{font-size:.85rem;letter-spacing:-.01em}.setup-card-sub{font-size:.67rem;color:#92a4bb}
-.direction-long{color:#83ebc9;background:#12372f;border:1px solid #225b4d}.direction-short{color:#ffabb4;background:#3a202a;border:1px solid #64313d}
-.setup-status{background:#121e2d;border-color:#2c3d53;border-radius:6px}
-.setup-metrics{gap:5px}.setup-metric{padding:7px;border:1px solid rgba(42,59,80,.48);border-radius:8px;background:rgba(18,30,46,.76)}
-.setup-metric span{color:#8ea1b8;font-size:.62rem}.setup-metric strong{font-size:.76rem}
-.setup-metric.rr strong{color:var(--warning)}.setup-time{font-size:.62rem;color:#8194ad}
-.setup-details{border-color:var(--line-soft)}.setup-details summary{padding:2px 0;color:#a6b7cb}
-.reason-tag{border-color:#2a3b52;border-radius:6px;background:#142236;color:#b3c2d5}
-.chart-wrap{height:clamp(300px,43vh,540px)}
-.chart-note{color:#94a7bf;font-size:.73rem}
-.rows .rowitem{border-color:var(--line-soft);padding:8px 0}.rowitem span:first-child{color:#93a5bc}
-.event{border-color:var(--line-soft);border-radius:9px;background:#0b1522}
-.empty{color:#8fa1b8}
-#chartPlaceholder{border-style:dashed;border-color:#2a3d53;background:linear-gradient(145deg,rgba(16,29,45,.7),rgba(11,19,31,.75))}
-#setupChart .panel{overflow:hidden}
-footer{padding-top:3px;color:#71849d}
-@media(max-width:1180px){.dashboard{grid-template-columns:minmax(220px,.85fr) minmax(0,1.5fr);gap:10px}.dashboard-column{height:calc(100vh - 245px)}.right-stack{gap:10px}}
-@media(max-width:760px){
- header{position:relative;align-items:center;flex-wrap:wrap;gap:8px}
- header>.controls{width:100%;justify-content:flex-start}
- main{padding:12px 12px 22px}
- .top{gap:10px}.top>.pill{align-items:flex-start;flex-direction:column;border-radius:10px;max-width:100%;white-space:normal}
- .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-bottom:8px}
- .metric{padding:4px 6px}.metric .label{font-size:.6rem}.metric .value{font-size:.79rem}.metric .hint{font-size:.55rem}
- .dashboard{gap:9px}.dashboard-column{gap:9px;grid-template-rows:repeat(2,minmax(230px,auto))}
- .right-stack{gap:9px}.panel{padding:11px}.chart-wrap{height:clamp(250px,48vh,400px)}
- .setup-list{max-height:56vh}
-}
-@media(max-width:420px){
- .brand{font-size:1rem}.sub{font-size:.58rem}
- .controls button{min-height:30px;padding:6px 9px;font-size:.71rem}
- .metric{padding:3px 5px}.metric .label{font-size:.57rem}.metric .value{font-size:.74rem}.metric .hint{font-size:.52rem}
- .panel{padding:9px}.panel-title{font-size:.74rem}.setup-card{padding:8px}.setup-metric{padding:6px}
- .chart-wrap{height:270px}
-}
-@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
-</style>
+
 </head><body><main class="box"><h1>AICFA</h1><p id="intro">Проверка…</p><form id="login"><label>Пароль</label><input id="password" type="password" autocomplete="current-password" required><button>Войти</button></form><form id="setup" hidden><label>Токен настройки</label><input id="token" type="password" required><label>Новый пароль (от 12 символов)</label><input id="newpass" type="password" minlength="12" required><button>Установить пароль</button></form><p id="msg" role="status"></p></main><script>
 const $=id=>document.getElementById(id),msg=$('msg'),login=$('login'),setup=$('setup');
 async function post(url,data){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}
@@ -892,6 +823,75 @@ input:focus{outline:2px solid #69e0bd;outline-offset:1px;border-color:#69e0bd}
 button{margin-top:10px;background:linear-gradient(180deg,#1b5145,#12382f);border-color:#2c6c5a;font-weight:700;cursor:pointer}
 button:hover{background:#205b4d}
 #msg{min-height:1.4em;margin-bottom:0;color:#edc477}
+</style><style id="modern-mvp-theme">
+:root{color-scheme:dark;--bg:#080d16;--surface:#0e1725;--surface-raised:#121e2e;--line:#24344a;--line-soft:#1b293b;--text:#e9f0fa;--muted:#8fa1b9;--accent:#69e0bd;--accent-soft:#102e2a;--danger:#ff8796;--warning:#edc477;--radius:12px;--shadow:0 12px 32px rgba(0,0,0,.14)}
+html{scroll-behavior:smooth;scrollbar-color:#344963 #0a111c}
+body{background:radial-gradient(ellipse at 10% -10%,rgba(39,83,112,.24),transparent 42%),radial-gradient(ellipse at 90% 0%,rgba(28,86,73,.12),transparent 32%),var(--bg);color:var(--text);font-feature-settings:"ss01" on,"cv11" on}
+header{position:sticky;top:0;z-index:20;min-height:58px;padding:9px clamp(14px,2.4vw,32px);background:rgba(8,13,22,.88);backdrop-filter:blur(18px);border-bottom:1px solid rgba(83,109,143,.22)}
+.brand{font-size:1.08rem;letter-spacing:.09em}.brand span{color:var(--accent)}
+.sub{font-size:.64rem;letter-spacing:.12em;color:#8396b0}
+main{max-width:1840px;padding-top:15px}
+.top{align-items:flex-end;margin-bottom:12px}.top>div:first-child{min-width:0}
+h1{font-size:clamp(1.45rem,2.2vw,2rem);letter-spacing:-.045em;font-weight:760}
+.muted{font-size:.78rem;color:var(--muted)}
+.controls{gap:7px}
+.pill{border-color:var(--line);background:rgba(16,27,42,.72);border-radius:999px;padding:5px 9px;font-size:.69rem}
+.led{width:7px;height:7px;box-shadow:0 0 0 3px rgba(237,196,119,.12)}
+button,select{min-height:32px;padding:7px 11px;border-color:#30435b;border-radius:8px;background:#111d2c;transition:background .15s,border-color .15s,transform .15s}
+button{background:linear-gradient(180deg,#17483e,#12382f);border-color:#286553;font-weight:650}
+button:hover{background:#1b5145;border-color:#39846d}
+button:active{transform:translateY(1px)}
+button:focus-visible,select:focus-visible,summary:focus-visible,.setup-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{gap:5px;margin-bottom:9px}
+.metric{padding:4px 7px;border-color:var(--line-soft);border-radius:7px;background:linear-gradient(145deg,rgba(17,29,45,.96),rgba(12,21,33,.96));box-shadow:none}
+.metric .label{font-size:.62rem;line-height:1.1;letter-spacing:.015em;color:#9aabc0}
+.metric .value{margin-top:1px;font-size:.8rem;line-height:1.1;font-weight:750;letter-spacing:-.015em}
+.metric .hint{margin-top:1px;font-size:.57rem;line-height:1.1;color:#71849d}
+.dashboard{grid-template-columns:minmax(235px,.86fr) minmax(0,1.72fr) minmax(225px,.82fr);gap:11px}
+.dashboard-column{gap:11px;height:calc(100vh - 248px);min-height:350px}
+.panel{padding:13px;border-color:var(--line-soft);border-radius:var(--radius);background:linear-gradient(160deg,rgba(15,24,38,.97),rgba(11,19,31,.97));box-shadow:var(--shadow)}
+.panel-title{font-size:.79rem;margin-bottom:10px;letter-spacing:.005em}
+.panel-title .pill{font-size:.64rem;padding:3px 8px}
+.setup-list{scrollbar-width:thin;scrollbar-color:#344963 transparent}
+.setup-card{padding:10px;margin-bottom:7px;border-color:#24354a;border-radius:10px;background:linear-gradient(145deg,#0d1725,#0b1420);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.setup-card:hover{border-color:#4d8e83;background:linear-gradient(145deg,#122436,#0d1b29)}
+.setup-card.selected{border-color:var(--accent);box-shadow:inset 2px 0 var(--accent),0 0 0 1px rgba(105,224,189,.07)}
+.setup-card-head{margin-bottom:8px}.setup-card-title{font-size:.85rem;letter-spacing:-.01em}.setup-card-sub{font-size:.67rem;color:#92a4bb}
+.direction-long{color:#83ebc9;background:#12372f;border:1px solid #225b4d}.direction-short{color:#ffabb4;background:#3a202a;border:1px solid #64313d}
+.setup-status{background:#121e2d;border-color:#2c3d53;border-radius:6px}
+.setup-metrics{gap:5px}.setup-metric{padding:7px;border:1px solid rgba(42,59,80,.48);border-radius:8px;background:rgba(18,30,46,.76)}
+.setup-metric span{color:#8ea1b8;font-size:.62rem}.setup-metric strong{font-size:.76rem}
+.setup-metric.rr strong{color:var(--warning)}.setup-time{font-size:.62rem;color:#8194ad}
+.setup-details{border-color:var(--line-soft)}.setup-details summary{padding:2px 0;color:#a6b7cb}
+.reason-tag{border-color:#2a3b52;border-radius:6px;background:#142236;color:#b3c2d5}
+.chart-wrap{height:clamp(300px,43vh,540px)}
+.chart-note{color:#94a7bf;font-size:.73rem}
+.rows .rowitem{border-color:var(--line-soft);padding:8px 0}.rowitem span:first-child{color:#93a5bc}
+.event{border-color:var(--line-soft);border-radius:9px;background:#0b1522}
+.empty{color:#8fa1b8}
+#chartPlaceholder{border-style:dashed;border-color:#2a3d53;background:linear-gradient(145deg,rgba(16,29,45,.7),rgba(11,19,31,.75))}
+#setupChart .panel{overflow:hidden}
+footer{padding-top:3px;color:#71849d}
+@media(max-width:1180px){.dashboard{grid-template-columns:minmax(220px,.85fr) minmax(0,1.5fr);gap:10px}.dashboard-column{height:calc(100vh - 245px)}.right-stack{gap:10px}}
+@media(max-width:760px){
+ header{position:relative;align-items:center;flex-wrap:wrap;gap:8px}
+ header>.controls{width:100%;justify-content:flex-start}
+ main{padding:12px 12px 22px}
+ .top{gap:10px}.top>.pill{align-items:flex-start;flex-direction:column;border-radius:10px;max-width:100%;white-space:normal}
+ .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-bottom:8px}
+ .metric{padding:4px 6px}.metric .label{font-size:.6rem}.metric .value{font-size:.79rem}.metric .hint{font-size:.55rem}
+ .dashboard{gap:9px}.dashboard-column{gap:9px;grid-template-rows:repeat(2,minmax(230px,auto))}
+ .right-stack{gap:9px}.panel{padding:11px}.chart-wrap{height:clamp(250px,48vh,400px)}
+ .setup-list{max-height:56vh}
+}
+@media(max-width:420px){
+ .brand{font-size:1rem}.sub{font-size:.58rem}
+ .controls button{min-height:30px;padding:6px 9px;font-size:.71rem}
+ .metric{padding:3px 5px}.metric .label{font-size:.57rem}.metric .value{font-size:.74rem}.metric .hint{font-size:.52rem}
+ .panel{padding:9px}.panel-title{font-size:.74rem}.setup-card{padding:8px}.setup-metric{padding:6px}
+ .chart-wrap{height:270px}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}}
 </style></head>
 <body>
 <header><div><div class="brand">AICFA<span>.</span></div><div class="sub">PERSONAL MARKET STRUCTURE TERMINAL</div></div><div class="controls"><div class="pill"><i class="led" id="led"></i><span id="connection">Подключение…</span></div><button id="changePassword" type="button">Сменить пароль</button><button id="logout" type="button">Выйти</button></div></header>
