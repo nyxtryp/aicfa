@@ -210,7 +210,7 @@ def _simulate(
     )
 
 
-def summarize(trades: Sequence[TradeResult], *, include_incomplete: bool = False) -> dict:
+def summarize(trades: Sequence[TradeResult], *, margin_usd: float = 5.0, include_incomplete: bool = False) -> dict:
     sample = [t for t in trades if include_incomplete or t.complete]
     wins = [t for t in sample if t.net_pnl_usd > 0]
     losses = [t for t in sample if t.net_pnl_usd < 0]
@@ -264,7 +264,7 @@ def run_backtest(
         raise ValueError("trigger_timeframe does not match profile")
     trigger = tuple(series_by_timeframe.get(trigger_timeframe, ()))
     if len(trigger) < 41:
-        return {"metrics": summarize(()), "trades": [], "reason": "insufficient_history"}
+        return {"metrics": summarize((), margin_usd=config.margin_usd), "trades": [], "reason": "insufficient_history"}
     end = min(len(trigger) - 1, end_index if end_index is not None else len(trigger) - 1)
     if start_index < 40 or start_index > end:
         raise ValueError("start_index must be >= 40 and <= end_index")
@@ -317,7 +317,7 @@ def run_backtest(
                 i = max(i + 1, exit_index + 1)
                 continue
         i += 1
-    metrics = summarize(trades)
+    metrics = summarize(trades, margin_usd=config.margin_usd)
     metrics["incomplete_trades_excluded"] = sum(not t.complete for t in trades)
     return {
         "symbol": symbol, "profile": profile_name, "trigger_timeframe": trigger_timeframe,
