@@ -97,3 +97,10 @@ if __name__ == "__main__":
 - Replace minor polish with a clearly distinct terminal visual system and responsive panel hierarchy.
 - INTRADAY and SCALP headers are keyboard-accessible accordion controls; opening one collapses the other and the open panel can collapse.
 - Preserve scanner rules, chart/SMC, journal, auth, APIs, and shadow mode.
+
+
+## Realized journal analytics (2026-10-17)
+- Replace the raw realized-trade dump with strategy KPIs: net R, win rate, Profit Factor, and maximum drawdown.
+- Add All / SCALP / INTRADAY filters; individual trades remain clickable to open their chart/details.
+- Flag implausible or invalid commission/result records and exclude them from aggregate metrics rather than silently letting extreme fee values distort the statistics.
+- Acceptance: dashboard tests pass; calculations are derived from closed journal records; abnormal fees remain visible for audit and are not represented as trusted performance.
