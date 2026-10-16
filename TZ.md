@@ -83,3 +83,11 @@ if __name__ == "__main__":
 - Use a restrained dark terminal palette, tighter headers and controls, balanced 3-column desktop layout, responsive tablet/mobile stacking, compact setup cards, and readable chart/journal panels.
 - Keep all scanner functionality, chart annotations, auth controls, and API behavior unchanged. CSS should be formatted with consistent indentation; no functionality removed to make layout easier.
 - Acceptance: dashboard regression tests and CI pass; visual layout should be checked at desktop, tablet, and mobile widths. Production deployment is tracked separately.
+
+
+## Modern MVP visual system — acceptance requirements (2026-10-17)
+- Apply one consistent modern dark terminal visual language across dashboard and password login: restrained teal accent, subtle layered backgrounds, readable contrast, consistent radii/borders, compact status strip, clear hierarchy and visible keyboard focus.
+- Four top market status cards remain deliberately slim: desktop padding 4×7px, 5px grid gap, readable compact labels/values/hints; mobile remains a 2-column grid with further compact overrides.
+- Dashboard must adapt from 3-column desktop to 2-column tablet and stacked mobile; setup lists scroll independently; chart and journal remain legible without horizontal page overflow.
+- Add reduced-motion support and focus-visible styling. Preserve all API routes, authentication behavior, scanner criteria, candidate lifecycle, chart drawing/SMC annotations and shadow-only operation.
+- Acceptance: automated dashboard/auth regression tests and CI pass. Production is not considered updated until deployment and browser checks confirm it.

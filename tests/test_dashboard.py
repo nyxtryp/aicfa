@@ -40,15 +40,8 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Could not render setup card", PAGE)
         self.assertNotIn("String(incoming.length)+' актуальных'", PAGE)
         self.assertIn('id="marketHoursStatus"', PAGE)
-        self.assertIn("padding: 8px 10px", PAGE)
-        self.assertIn("border-radius: 9px", PAGE)
         self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", PAGE)
-        self.assertIn("font-size: .98rem", PAGE)
-        self.assertIn("font-size: .68rem", PAGE)
-        self.assertIn(".metric .label { color: #8e9eb4; font-size: .68rem; line-height: 1.25; }", PAGE)
-        self.assertIn(".metric .hint { margin-top: 2px; color: #71829a; font-size: .64rem; line-height: 1.25; }", PAGE)
         self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", PAGE)
-        self.assertIn("gap: 8px", PAGE)
         self.assertIn(".dashboard-column {", PAGE)
         self.assertIn("Режим: shadow", PAGE)
         self.assertFalse(SCANNER_LIVE_ENABLED)
@@ -77,6 +70,16 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         for timeframe in TIMEFRAMES:
             self.assertIn(timeframe, PAGE)
         self.assertNotIn("каркас сайта запущен", PAGE.lower())
+
+    def test_status_metrics_are_compact(self):
+        self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", PAGE)
+        self.assertIn("gap: 5px", PAGE)
+        self.assertIn("padding: 4px 7px", PAGE)
+        self.assertIn("font-size: .8rem", PAGE)
+        self.assertIn("margin-bottom: 7px", PAGE)
+        self.assertIn('id="modern-mvp-theme"', PAGE)
+        self.assertIn("prefers-reduced-motion:reduce", PAGE)
+        self.assertIn('id="modern-login-theme"', LOGIN_PAGE)
 
 
 if __name__ == "__main__":

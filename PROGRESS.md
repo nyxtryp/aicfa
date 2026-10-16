@@ -1842,3 +1842,21 @@
 - PR [#27](https://github.com/nyxtryp/aicfa/pull/27) merged as `19fd287c92a965600b39e06bdd0b290621afe30d`; both Python test workflows passed on head `0a1ddba4960912be644508981b1123090917668a`.
 - The previous state remains available at checkpoint branch `checkpoint/design-counterpoint-2026-10-17` / commit `d5948de043547264bf496e595c353c12ca002b26`.
 - **Production not verified:** Desktop Commander device remains offline, so the live site has not been confirmed updated.
+
+
+### 2026-10-17 — Slimmed the four top status cards again
+
+- User feedback: the four top market/status cards were too bulky after the broad redesign.
+- Follow-up branch `fix/slim-four-status-cards`: reduce only the four metric cards padding, vertical gaps, corner radius and typography; retain four columns on desktop and two columns on mobile.
+- CSS changes are isolated to `.grid`, `.metric`, and responsive overrides. Scanner behavior, chart rendering, setup panels, and auth remain unchanged.
+- Waiting for CI/merge. Production deployment remains unverified.
+
+
+
+### 2026-10-17 — Modern MVP design system for the whole site (in progress)
+- Started branch `redesign/modern-aicfa-mvp` from the compact-status-card fix so the requested thin status cards are preserved.
+- Applied a unified modern dark-terminal theme to both the authenticated scanner dashboard and the private login/setup page: restrained teal accent, layered low-contrast backgrounds, glass-like header, cleaner hierarchy, refined panels and setup cards, consistent controls, focus-visible states, and reduced-motion support.
+- Kept the four status cards compact (4×7px padding, 5px gap, compact but legible typography) and retained responsive desktop/tablet/mobile layouts.
+- Intentionally CSS-only for the application UI: no scanner logic, RR threshold, auth/API behavior, chart annotations, lifecycle, or shadow/live setting changed.
+- Fixed the dashboard regression test placement so the compact-card check actually runs, and added assertions for the new theme and reduced-motion support.
+- **Status:** implementation branch prepared; CI and review/merge pending. Production deployment and visual browser verification are not yet confirmed.
