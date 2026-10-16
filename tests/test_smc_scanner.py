@@ -196,7 +196,7 @@ class ScannerTests(unittest.TestCase):
         def mocked_analysis(candles, profile, timeframe):
             result = analysis(trigger_index=38 if timeframe == "5m" else 39)
             if timeframe == "5m":
-                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37, level=100.0),)
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=36, level=100.0),)
             return result
 
         with patch("app.smc.scanner._analysis", side_effect=mocked_analysis):
@@ -261,7 +261,7 @@ class ScannerTests(unittest.TestCase):
         zone_series = tuple(candle(i, low=103.0, high=105.0, close=104.0) if i > 30 else candle(i) for i in range(40))
         trigger_series = [candle(i, low=103.0, high=105.0, close=104.0) for i in range(40)]
         trigger_series[35] = candle(35, low=99.0, high=101.0, close=100.0)
-        trigger_series[37] = candle(37, low=97.4, high=97.8, close=97.6)
+        trigger_series[36] = candle(36, low=97.4, high=97.8, close=97.6)
         trigger_series[38] = candle(38, low=103.0, high=105.0, close=104.0)
         trigger_series[39] = candle(39, low=99.0, high=101.0, close=100.0)
         series = dict(self.series)
