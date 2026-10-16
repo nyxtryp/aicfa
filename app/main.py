@@ -13,7 +13,7 @@ from app.auth import AuthError, AuthStore
 from app.backup import create_verified_backup
 from app.market_data import ALL_SYMBOLS, TIMEFRAMES, TRADFI_SYMBOLS, MarketDataManager
 from app.smc.engine import analyze_smc
-from app.market_hours import COMMODITY_SYMBOLS, KRX_EQUITY_SYMBOLS, US_EQUITY_SYMBOLS, tradfi_market_is_open
+from app.market_hours import COMMODITY_SYMBOLS, KRX_EQUITY_SYMBOLS, US_EQUITY_SYMBOLS, tradfi_market_is_open, tradfi_scan_block_reason
 from app.smc.presentation import to_chart_payload
 from app.smc.scanner import scan_symbol
 from app.smc.setups import SetupEvidence, evaluate_candidate
@@ -237,15 +237,34 @@ async def _on_closed_candle(candle) -> None:
         _scanner_last_error = None
         scan_diagnostics: dict[str, int] = {}
         try:
-            candidates = await asyncio.to_thread(
-                scan_symbol, candle.symbol, snapshot,
-                trigger_timeframe=candle.timeframe, diagnostics=scan_diagnostics,
+            # Closed or unverified TradFi sessions must not generate incoming setups.
+            block_reason = (
+                tradfi_scan_block_reason(candle.symbol)
+                if candle.symbol in TRADFI_SYMBOLS else None
             )
+            if block_reason is not None:
+                scan_diagnostics[f"{block_reason}_scan_skipped"] = 1
+                candidates = []
+            else:
+                candidates = await asyncio.to_thread(
+                    scan_symbol, candle.symbol, snapshot,
+                    trigger_timeframe=candle.timeframe, diagnostics=scan_diagnostics,
+                )
             _scanner_last_candidate_count = len(candidates)
             _scanner_last_rejections = dict(scan_diagnostics)
             for reason, count in scan_diagnostics.items():
                 _scanner_rejection_totals[reason] += count
             for candidate in candidates:
+                # Recheck before persistence in case the session closes mid-scan.
+                candidate_block_reason = (
+                    tradfi_scan_block_reason(candidate.symbol)
+                    if candidate.symbol in TRADFI_SYMBOLS else None
+                )
+                if candidate_block_reason is not None:
+                    reason = f"{candidate_block_reason}_scan_skipped"
+                    _scanner_last_rejections[reason] = _scanner_last_rejections.get(reason, 0) + 1
+                    _scanner_rejection_totals[reason] += 1
+                    continue
                 payload = candidate.as_dict()
                 tick_info = market_data.exchange_filters.get(candidate.symbol)
                 latest = snapshot.get(candidate.timeframe, ())
