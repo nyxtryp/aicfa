@@ -78,13 +78,16 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(timeframe, PAGE)
         self.assertNotIn("каркас сайта запущен", PAGE.lower())
 
-
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_status_metrics_are_compact(self):
+        self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", PAGE)
         self.assertIn("gap: 5px", PAGE)
         self.assertIn("padding: 4px 7px", PAGE)
         self.assertIn("font-size: .8rem", PAGE)
         self.assertIn("margin-bottom: 7px", PAGE)
+        self.assertIn('id="modern-mvp-theme"', PAGE)
+        self.assertIn("prefers-reduced-motion:reduce", PAGE)
+        self.assertIn('id="modern-login-theme"', LOGIN_PAGE)
+
+
+if __name__ == "__main__":
+    unittest.main()
