@@ -296,32 +296,55 @@ async def _on_closed_candle(candle) -> None:
                     payload["status"] = "REJECTED"
                     payload["decision_reasons"] = ["tradfi_market_closed"]
                 else:
-                    evidence = SetupEvidence(**candidate.evidence)
-                    decision = evaluate_candidate(
-                        evidence,
-                        direction=candidate.direction,
-                        higher_timeframe_bias=candidate.direction,
-                        premium_discount_zone="discount" if candidate.direction == "long" else "premium",
-                        zone_intersects_ote=True,
-                        confirmation_aligned=True,
-                        one_minute_confirmed=True,
-                        profile=candidate.profile,
-                        entry_price=candidate.confirmation_price,
-                        current_price=float(latest[-1].close),
-                        stop_price=candidate.stop_price,
-                        tp1_price=candidate.targets[0],
-                        tick_size=float(tick_info["tick_size"]),
-                        min_stop_distance=max(0.5 * candidate.atr, candidate.confirmation_price * 4 * COMMISSION_RATE_PER_SIDE),
-                        data_fresh=fresh,
-                        tradfi_market_open=market_open,
-                    )
-                    payload["entry_limit"] = decision.entry_limit
-                    payload["risk_reward"] = decision.risk_reward
-                    payload["score"] = decision.score.total
-                    payload["decision_reasons"] = list(decision.reasons)
-                    payload["status"] = ("ACCEPTED" if SCANNER_LIVE_ENABLED else "CANDIDATE") if decision.status == "ELIGIBLE" else decision.status
-                    if decision.status == "ELIGIBLE" and not SCANNER_LIVE_ENABLED:
-                        payload["decision_reasons"].append("live_acceptance_disabled_until_phase1_accepted")
+                    if ":PAC:" in candidate.key:
+                        # PAC candidates have already passed the PAC scanner's own
+                        # structural/zone/ATR/RR rules. Do not run the legacy SMC
+                        # hard-gates here (sweep, PD/OTE, mandatory 1m, old score).
+                        risk = abs(candidate.confirmation_price - candidate.stop_price)
+                        reward = abs(candidate.targets[0] - candidate.confirmation_price) if candidate.targets else 0.0
+                        rr = reward / risk if risk > 0 else 0.0
+                        target_on_correct_side = (
+                            candidate.targets and
+                            (candidate.targets[0] > candidate.confirmation_price if candidate.direction == "long"
+                             else candidate.targets[0] < candidate.confirmation_price)
+                        )
+                        if (risk <= 0 or rr < 1.2 or not target_on_correct_side
+                                or float(tick_info.get("tick_size", 0)) <= 0):
+                            payload["status"] = "REJECTED"
+                            payload["decision_reasons"] = ["pac_invalid_risk_target_or_rr"]
+                        else:
+                            payload["entry_limit"] = candidate.confirmation_price
+                            payload["risk_reward"] = rr
+                            payload["score"] = candidate.score
+                            payload["status"] = "CANDIDATE"
+                            payload["decision_reasons"] = list(candidate.reasons) + ["pac_shadow_candidate"]
+                    else:
+                        evidence = SetupEvidence(**candidate.evidence)
+                        decision = evaluate_candidate(
+                            evidence,
+                            direction=candidate.direction,
+                            higher_timeframe_bias=candidate.direction,
+                            premium_discount_zone="discount" if candidate.direction == "long" else "premium",
+                            zone_intersects_ote=True,
+                            confirmation_aligned=True,
+                            one_minute_confirmed=True,
+                            profile=candidate.profile,
+                            entry_price=candidate.confirmation_price,
+                            current_price=float(latest[-1].close),
+                            stop_price=candidate.stop_price,
+                            tp1_price=candidate.targets[0],
+                            tick_size=float(tick_info["tick_size"]),
+                            min_stop_distance=max(0.5 * candidate.atr, candidate.confirmation_price * 4 * COMMISSION_RATE_PER_SIDE),
+                            data_fresh=fresh,
+                            tradfi_market_open=market_open,
+                        )
+                        payload["entry_limit"] = decision.entry_limit
+                        payload["risk_reward"] = decision.risk_reward
+                        payload["score"] = decision.score.total
+                        payload["decision_reasons"] = list(decision.reasons)
+                        payload["status"] = ("ACCEPTED" if SCANNER_LIVE_ENABLED else "CANDIDATE") if decision.status == "ELIGIBLE" else decision.status
+                        if decision.status == "ELIGIBLE" and not SCANNER_LIVE_ENABLED:
+                            payload["decision_reasons"].append("live_acceptance_disabled_until_phase1_accepted")
                 saved, payload = _get_setup_store().save_decision(
                     payload, cooldown_minutes=30 if candidate.profile == "scalp" else 120, max_active=8
                 )
