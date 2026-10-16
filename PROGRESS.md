@@ -1,3 +1,10 @@
+### 2026-10-16 — minimum RR 1.49R, deduplication and profile-separated panels
+
+- PAC scanner target selection and RR validation raised from 1.2R to 1.49R; server-side eligibility gate independently rejects RR below 1.49R. `profiles.py` now also declares `min_rr=1.49` for both profiles.
+- Incoming list deduplication uses `symbol + profile`, not direction: newest candidate replaces prior candidate for the same coin/profile; scalp and intraday remain separate.
+- Dashboard now has two vertically stacked left-side lists: INTRADAY above SCALP. Counts are based on rendered cards, separately per list.
+- Added source-contract tests for the PAC RR floor and dashboard panel/dedup rules. This branch must pass GitHub CI and be merged/deployed before production behavior is considered verified. No profitability claim is made.
+
 ### 2026-10-16 — счётчик входящих синхронизирован с реально созданными карточками
 
 - Диагностика несоответствия: заголовок показывал количество уникальных кандидатов до завершения рендера карточек. Если одна карточка вызывала JS-ошибку, цикл прерывался, но счётчик оставался завышенным.
