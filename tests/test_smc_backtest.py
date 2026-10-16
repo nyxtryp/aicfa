@@ -39,7 +39,7 @@ class BacktestTests(unittest.TestCase):
 
     def test_fixed_five_dollar_margin_and_ten_x_leverage(self):
         rows = [candle(i) for i in range(41)]
-        rows.append(candle(41, open_=100, high=106, low=99, close=105))
+        rows.append(candle(41, open_=100, high=104, low=99, close=103))
         result = _simulate(candidate(), rows, 40, PROFILES["scalp"], self.config(), 41)
         self.assertIsNotNone(result)
         self.assertTrue(result.complete)
@@ -57,7 +57,7 @@ class BacktestTests(unittest.TestCase):
 
     def test_three_targets_use_half_thirty_twenty_distribution(self):
         rows = [candle(i) for i in range(41)]
-        rows.append(candle(41, open_=100, high=104, low=99, close=103))
+        rows.append(candle(41, open_=100, high=106, low=99, close=105))
         result = _simulate(
             candidate(targets=(103.0, 104.0, 105.0)),
             rows, 40, PROFILES["scalp"], self.config(), 41,
