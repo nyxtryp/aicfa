@@ -3,9 +3,33 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Mapping
+
+
+MINIMUM_RR = 1.49
+
+
+def _actual_rr(payload: Mapping[str, Any]) -> float:
+    """Recalculate RR from entry, stop and TP1; never trust a stale stored RR field."""
+    try:
+        entry = float(payload["confirmation_price"])
+        stop = float(payload["stop_price"])
+        targets = payload.get("targets") or []
+        target = float(targets[0])
+        risk = abs(entry - stop)
+        if risk <= 0:
+            return 0.0
+        direction = str(payload.get("direction", "")).lower()
+        if (direction == "long" and not (stop < entry < target)) or (
+            direction == "short" and not (target < entry < stop)
+        ):
+            return 0.0
+        return abs(target - entry) / risk
+    except (KeyError, TypeError, ValueError, IndexError, OverflowError):
+        return 0.0
 
 
 class SetupStore:
@@ -64,6 +88,31 @@ class SetupStore:
             if rejected_keys:
                 db.executemany("DELETE FROM setup_candidate_events WHERE setup_key=?", [(key,) for key in rejected_keys])
                 db.executemany("DELETE FROM setup_candidates WHERE setup_key=?", [(key,) for key in rejected_keys])
+            # Quarantine legacy active records that do not meet today's RR floor.
+            # Preserve their audit trail, but never let them reappear in active panels.
+            active_rows = db.execute(
+                "SELECT setup_key,payload_json FROM setup_candidates WHERE status IN ('CANDIDATE','ACCEPTED','ACTIVE','TP1','TP2')"
+            ).fetchall()
+            now_ms = int(time.time() * 1000)
+            for row in active_rows:
+                payload = json.loads(row["payload_json"])
+                if _actual_rr(payload) >= 1.49:
+                    continue
+                payload["status"] = "REJECTED"
+                payload["final_status"] = "REJECTED"
+                payload["closed_at_ms"] = now_ms
+                payload["decision_reasons"] = list(dict.fromkeys(
+                    list(payload.get("decision_reasons", [])) + ["rr_below_minimum_or_unverifiable_legacy"]
+                ))
+                encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+                db.execute(
+                    "UPDATE setup_candidates SET status='REJECTED',payload_json=?,updated_at_ms=? WHERE setup_key=?",
+                    (encoded, now_ms, row["setup_key"]),
+                )
+                db.execute(
+                    "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
+                    (row["setup_key"], "LEGACY_RR_QUARANTINED", now_ms, encoded),
+                )
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
@@ -86,6 +135,8 @@ class SetupStore:
     def save_candidate(self, payload: Mapping[str, Any]) -> bool:
         """Insert once; return False on replay so candle redelivery cannot duplicate it."""
         key = str(payload["key"])
+        if str(payload.get("status", "")).upper() in {"CANDIDATE", "ACCEPTED", "ACTIVE", "TP1", "TP2"} and _actual_rr(payload) < MINIMUM_RR:
+            return False
         encoded = json.dumps(dict(payload), separators=(",", ":"), sort_keys=True)
         with self._connection() as db:
             cursor = db.execute(
@@ -121,6 +172,12 @@ class SetupStore:
         # Rejected attempts are diagnostic counters, not durable setup records.
         # Do not write them to setup_candidates or setup_candidate_events.
         if str(decided.get("status", "REJECTED")).upper() == "REJECTED":
+            return False, decided
+        if str(decided.get("status", "")).upper() in {"CANDIDATE", "ACCEPTED", "ACTIVE", "TP1", "TP2"} and _actual_rr(decided) < MINIMUM_RR:
+            decided["status"] = "REJECTED"
+            decided["decision_reasons"] = list(dict.fromkeys(
+                list(decided.get("decision_reasons", [])) + ["rr_below_minimum"]
+            ))
             return False, decided
         with self._connection() as db:
             if db.execute("SELECT 1 FROM setup_candidates WHERE setup_key=?", (key,)).fetchone():
@@ -186,23 +243,41 @@ class SetupStore:
                     "SELECT payload_json FROM setup_candidates WHERE status IN ('CANDIDATE','ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
                     (max(1, min(int(limit), 1000)),),
                 ).fetchall()
-        return [json.loads(row["payload_json"]) for row in rows]
+        return [
+            payload for row in rows
+            if _actual_rr(payload := json.loads(row["payload_json"])) >= MINIMUM_RR
+        ]
 
 
     def list_active(self, *, limit: int = 200) -> list[dict[str, Any]]:
         with self._connection() as db:
             rows = db.execute(
-                "SELECT payload_json FROM setup_candidates WHERE status IN ('ACCEPTED','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
+                "SELECT payload_json FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
                 (max(1, min(int(limit), 1000)),),
             ).fetchall()
-        return [json.loads(row["payload_json"]) for row in rows]
+        return [
+            payload for row in rows
+            if _actual_rr(payload := json.loads(row["payload_json"])) >= MINIMUM_RR
+        ]
+
+    def list_monitored(self, *, limit: int = 200) -> list[dict[str, Any]]:
+        """Candidates and accepted setups that need automatic market monitoring."""
+        with self._connection() as db:
+            rows = db.execute(
+                "SELECT payload_json FROM setup_candidates WHERE status IN ('CANDIDATE','ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
+                (max(1, min(int(limit), 1000)),),
+            ).fetchall()
+        return [
+            payload for row in rows
+            if _actual_rr(payload := json.loads(row["payload_json"])) >= MINIMUM_RR
+        ]
 
     def transition(self, setup_key: str, payload: Mapping[str, Any], *, event_type: str,
                    event_time_ms: int, final_journal: Mapping[str, Any] | None = None) -> bool:
         encoded = json.dumps(dict(payload), separators=(",", ":"), sort_keys=True)
         with self._connection() as db:
             row = db.execute("SELECT status,payload_json FROM setup_candidates WHERE setup_key=?", (setup_key,)).fetchone()
-            if row is None or row["status"] not in ("ACCEPTED", "TP1", "TP2"):
+            if row is None or row["status"] not in ("CANDIDATE", "ACCEPTED", "ACTIVE", "TP1", "TP2"):
                 return False
             existing_payload = json.loads(row["payload_json"])
             previous_event_ms = int(existing_payload.get("last_event_time_ms", existing_payload.get("confirmation_time_ms", 0)))

@@ -76,14 +76,15 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
         return
     store = _get_setup_store()
     now_ms = candle.close_time_ms
-    for setup in store.list_active():
+    for setup in store.list_monitored():
         if candle.symbol != setup.get("symbol") or now_ms <= max(int(setup.get("confirmation_time_ms", 0)), int(setup.get("last_event_time_ms", 0))):
             continue
         payload = dict(setup)
         direction = payload["direction"]
         entry = float(payload["confirmation_price"])
         original_stop = float(payload["stop_price"])
-        targets = [float(x) for x in payload.get("targets", [])][:3]
+        candidate_mode = payload.get("status") == "CANDIDATE"
+        targets = [float(x) for x in payload.get("targets", [])][:1 if candidate_mode else 3]
         if not targets:
             # A persisted setup must have TP1, but guard corrupted legacy rows.
             continue
@@ -121,7 +122,7 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
             _finish_setup(payload, store, now_ms, "SL", publish=publish)
             continue
-        stages = {"ACCEPTED": 0, "TP1": 1, "TP2": 2}
+        stages = {"CANDIDATE": 0, "ACCEPTED": 0, "TP1": 1, "TP2": 2}
         stage = stages.get(status, 3)
         first_target_hit = (high >= targets[0]) if direction == "long" else (low <= targets[0])
         breakeven_hit = (low <= entry) if direction == "long" else (high >= entry)
@@ -145,7 +146,7 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             reached.append(idx + 1)
         if not reached:
             if expired:
-                completed_targets = {"ACCEPTED": 0, "TP1": 1, "TP2": 2}.get(status, len(targets))
+                completed_targets = {"CANDIDATE": 0, "ACCEPTED": 0, "TP1": 1, "TP2": 2}.get(status, len(targets))
                 remaining = max(0.0, 1.0 - sum(target_weights[:completed_targets]))
                 gross_r += remaining * ((close - entry) if direction == "long" else (entry - close)) / risk
                 commission_r += remaining * COMMISSION_RATE_PER_SIDE * (entry + close) / risk
@@ -154,7 +155,7 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             continue
         last = reached[-1]
         payload.update({"gross_r": gross_r, "commission_r": commission_r, "last_event_time_ms": now_ms})
-        if last == len(targets):
+        if candidate_mode or last == len(targets):
             payload["status"] = "CLOSED"
             _finish_setup(payload, store, now_ms, f"TP{last}", publish=publish)
         else:
@@ -193,8 +194,8 @@ async def _invalidate_on_opposite_choch(candle) -> None:
     """Invalidate an unscaled active setup on an opposite CHoCH at its confirmation timeframe."""
     if candle.timeframe not in {"5m", "15m"}:
         return
-    for setup in _get_setup_store().list_active():
-        if setup.get("symbol") != candle.symbol or setup.get("status") != "ACCEPTED" or setup.get("timeframe") != candle.timeframe:
+    for setup in _get_setup_store().list_monitored():
+        if setup.get("symbol") != candle.symbol or setup.get("status") not in {"CANDIDATE", "ACCEPTED"} or setup.get("timeframe") != candle.timeframe:
             continue
         if candle.close_time_ms <= int(setup.get("confirmation_time_ms", 0)):
             continue
@@ -394,7 +395,7 @@ market_data.on_closed_candle = _on_closed_candle
 
 def _recover_active_history() -> None:
     """Replay persisted active setups through retained 1m candles after downtime."""
-    active = _get_setup_store().list_active()
+    active = _get_setup_store().list_monitored()
     if not active:
         return
     symbols = {str(setup["symbol"]) for setup in active}
