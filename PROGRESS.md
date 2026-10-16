@@ -1842,3 +1842,11 @@
 - PR [#27](https://github.com/nyxtryp/aicfa/pull/27) merged as `19fd287c92a965600b39e06bdd0b290621afe30d`; both Python test workflows passed on head `0a1ddba4960912be644508981b1123090917668a`.
 - The previous state remains available at checkpoint branch `checkpoint/design-counterpoint-2026-10-17` / commit `d5948de043547264bf496e595c353c12ca002b26`.
 - **Production not verified:** Desktop Commander device remains offline, so the live site has not been confirmed updated.
+
+
+### 2026-10-17 — Slimmed the four top status cards again
+
+- User feedback: the four top market/status cards were too bulky after the broad redesign.
+- Follow-up branch `fix/slim-four-status-cards`: reduce only the four metric cards padding, vertical gaps, corner radius and typography; retain four columns on desktop and two columns on mobile.
+- CSS changes are isolated to `.grid`, `.metric`, and responsive overrides. Scanner behavior, chart rendering, setup panels, and auth remain unchanged.
+- Waiting for CI/merge. Production deployment remains unverified.
