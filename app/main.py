@@ -506,7 +506,20 @@ async def require_single_user_auth(request: Request, call_next):
     return await call_next(request)
 
 LOGIN_PAGE = """<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AICFA — вход</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#080d18;color:#e8eef8;font:16px system-ui}.box{width:min(90vw,400px);padding:28px;background:#101a2a;border:1px solid #293851;border-radius:16px}input,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0 14px;background:#0b1321;color:#e8eef8;border:1px solid #2a3a53;border-radius:8px}button{background:#17352f}p{color:#a8b8ce}</style>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#080d18;color:#e8eef8;font:16px system-ui}.box{width:min(90vw,400px);padding:28px;background:#101a2a;border:1px solid #293851;border-radius:16px}input,button{box-sizing:border-box;width:100%;padding:12px;margin:6px 0 14px;background:#0b1321;color:#e8eef8;border:1px solid #2a3a53;border-radius:8px}button{background:#17352f}p{color:#a8b8ce}</style><style id="modern-login-theme">
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#e9f0fa;background:#080d16;font-synthesis:none;text-rendering:optimizeLegibility}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 20% 0%,rgba(39,83,112,.3),transparent 45%),radial-gradient(ellipse at 100% 100%,rgba(28,86,73,.16),transparent 35%),#080d16;color:#e9f0fa;font:15px/1.5 Inter,ui-sans-serif,system-ui,sans-serif}
+.box{width:min(100%,420px);padding:clamp(24px,5vw,34px);background:linear-gradient(155deg,rgba(18,30,46,.98),rgba(11,19,31,.98));border:1px solid #2a3c52;border-radius:20px;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+h1{margin:0;font-size:1.7rem;letter-spacing:-.05em}.box h1:after{content:".";color:#69e0bd}
+p{color:#94a7bf;font-size:.88rem}
+label{display:block;margin-top:12px;color:#b8c7d9;font-size:.8rem;font-weight:650}
+input,button{box-sizing:border-box;width:100%;padding:12px 13px;margin:6px 0 12px;background:#0b1421;color:#e9f0fa;border:1px solid #30435b;border-radius:9px;font:inherit}
+input:focus{outline:2px solid #69e0bd;outline-offset:1px;border-color:#69e0bd}
+button{margin-top:10px;background:linear-gradient(180deg,#1b5145,#12382f);border-color:#2c6c5a;font-weight:700;cursor:pointer}
+button:hover{background:#205b4d}
+#msg{min-height:1.4em;margin-bottom:0;color:#edc477}
+</style>
 
 </head><body><main class="box"><h1>AICFA</h1><p id="intro">Проверка…</p><form id="login"><label>Пароль</label><input id="password" type="password" autocomplete="current-password" required><button>Войти</button></form><form id="setup" hidden><label>Токен настройки</label><input id="token" type="password" required><label>Новый пароль (от 12 символов)</label><input id="newpass" type="password" minlength="12" required><button>Установить пароль</button></form><p id="msg" role="status"></p></main><script>
 const $=id=>document.getElementById(id),msg=$('msg'),login=$('login'),setup=$('setup');
@@ -810,19 +823,6 @@ footer { margin-top: 12px; color: #61738e; font-size: .68rem; line-height: 1.5; 
   .setup-card { padding: 8px; }
   .chart-wrap { height: 270px; }
 }
-</style><style id="modern-login-theme">
-:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#e9f0fa;background:#080d16;font-synthesis:none;text-rendering:optimizeLegibility}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 20% 0%,rgba(39,83,112,.3),transparent 45%),radial-gradient(ellipse at 100% 100%,rgba(28,86,73,.16),transparent 35%),#080d16;color:#e9f0fa;font:15px/1.5 Inter,ui-sans-serif,system-ui,sans-serif}
-.box{width:min(100%,420px);padding:clamp(24px,5vw,34px);background:linear-gradient(155deg,rgba(18,30,46,.98),rgba(11,19,31,.98));border:1px solid #2a3c52;border-radius:20px;box-shadow:0 24px 80px rgba(0,0,0,.35)}
-h1{margin:0;font-size:1.7rem;letter-spacing:-.05em}.box h1:after{content:".";color:#69e0bd}
-p{color:#94a7bf;font-size:.88rem}
-label{display:block;margin-top:12px;color:#b8c7d9;font-size:.8rem;font-weight:650}
-input,button{box-sizing:border-box;width:100%;padding:12px 13px;margin:6px 0 12px;background:#0b1421;color:#e9f0fa;border:1px solid #30435b;border-radius:9px;font:inherit}
-input:focus{outline:2px solid #69e0bd;outline-offset:1px;border-color:#69e0bd}
-button{margin-top:10px;background:linear-gradient(180deg,#1b5145,#12382f);border-color:#2c6c5a;font-weight:700;cursor:pointer}
-button:hover{background:#205b4d}
-#msg{min-height:1.4em;margin-bottom:0;color:#edc477}
 </style><style id="modern-mvp-theme">
 :root{color-scheme:dark;--bg:#080d16;--surface:#0e1725;--surface-raised:#121e2e;--line:#24344a;--line-soft:#1b293b;--text:#e9f0fa;--muted:#8fa1b9;--accent:#69e0bd;--accent-soft:#102e2a;--danger:#ff8796;--warning:#edc477;--radius:12px;--shadow:0 12px 32px rgba(0,0,0,.14)}
 html{scroll-behavior:smooth;scrollbar-color:#344963 #0a111c}
