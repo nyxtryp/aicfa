@@ -27,8 +27,9 @@ class SetupDecisionStoreTests(unittest.TestCase):
             self.assertTrue(inserted)
             self.assertEqual(first["status"], "ACCEPTED")
             inserted, second = store.save_decision(self.candidate("two"), cooldown_minutes=30)
-            self.assertTrue(inserted)
+            self.assertFalse(inserted)
             self.assertEqual(second["status"], "REJECTED")
+            self.assertEqual(len(store.list_candidates(include_rejected=True)), 1)
             self.assertIn("active_setup_for_symbol_profile", second["decision_reasons"])
             self.assertEqual(store.active_count(), 1)
 
@@ -46,7 +47,7 @@ class SetupDecisionStoreTests(unittest.TestCase):
             inserted, ninth = store.save_decision(
                 self.candidate("key-9", symbol="SYM9"), cooldown_minutes=30
             )
-            self.assertTrue(inserted)
+            self.assertFalse(inserted)
             self.assertEqual(ninth["status"], "REJECTED")
             self.assertIn("active_setup_limit_reached", ninth["decision_reasons"])
             self.assertEqual(store.active_count(), 8)
@@ -63,8 +64,9 @@ class SetupDecisionStoreTests(unittest.TestCase):
             second = self.candidate("shadow-two", status="CANDIDATE")
             second["confirmation_time_ms"] = 1_100_000
             inserted, repeated = store.save_decision(second, cooldown_minutes=30)
-            self.assertTrue(inserted)
+            self.assertFalse(inserted)
             self.assertEqual(repeated["status"], "REJECTED")
+            self.assertEqual(store.event_count("shadow-two"), 0)
             self.assertIn("cooldown_active", repeated["decision_reasons"])
 
     def test_zone_cooldown_survives_setup_completion(self):
@@ -78,8 +80,9 @@ class SetupDecisionStoreTests(unittest.TestCase):
             second = self.candidate("second")
             second["confirmation_time_ms"] = 1_200_000
             inserted, decision = store.save_decision(second, cooldown_minutes=30)
-            self.assertTrue(inserted)
+            self.assertFalse(inserted)
             self.assertEqual(decision["status"], "REJECTED")
+            self.assertEqual(store.event_count("second"), 0)
             self.assertIn("cooldown_active", decision["decision_reasons"])
 
     def test_expiry_realizes_remaining_position_at_last_close(self):

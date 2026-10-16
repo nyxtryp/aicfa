@@ -29,7 +29,40 @@ class SetupStoreTests(unittest.TestCase):
             self.assertEqual(store.list_candidates(), [payload])
             self.assertEqual(store.event_count(payload["key"]), 1)
 
-    def test_rejected_market_session_records_are_hidden_from_incoming_list(self):
+    def test_cooldown_rejections_are_not_persisted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SetupStore(Path(directory) / "setups.sqlite3")
+            first = {
+                "key": "BTCUSDT:scalp:long:OB:1:2",
+                "symbol": "BTCUSDT",
+                "profile": "scalp",
+                "direction": "long",
+                "status": "CANDIDATE",
+                "confirmation_time_ms": 2000,
+                "confirmation_price": 100.0,
+                "stop_price": 95.0,
+                "targets": [110.0],
+                "score": 7,
+                "reasons": [],
+                "zone": [98.0, 101.0],
+                "timeframe": "5m",
+            }
+            saved, _ = store.save_decision(first, cooldown_minutes=30)
+            self.assertTrue(saved)
+
+            repeated = dict(first)
+            repeated.update({
+                "key": "BTCUSDT:scalp:long:OB:1:3",
+                "confirmation_time_ms": 2500,
+            })
+            saved, decision = store.save_decision(repeated, cooldown_minutes=30)
+            self.assertFalse(saved)
+            self.assertEqual(decision["status"], "REJECTED")
+            self.assertIn("cooldown_active", decision["decision_reasons"])
+            self.assertEqual(len(store.list_candidates(include_rejected=True)), 1)
+            self.assertEqual(store.event_count(repeated["key"]), 0)
+
+    def test_rejected_decisions_are_not_persisted(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SetupStore(Path(directory) / "setups.sqlite3")
             base = {
@@ -48,9 +81,12 @@ class SetupStoreTests(unittest.TestCase):
                 "timeframe": "5m",
                 "decision_reasons": ["tradfi_market_closed"],
             }
-            saved, _ = store.save_decision(base, cooldown_minutes=30)
-            self.assertTrue(saved)
+            saved, returned = store.save_decision(base, cooldown_minutes=30)
+            self.assertFalse(saved)
+            self.assertEqual(returned["status"], "REJECTED")
             self.assertEqual(store.list_candidates(include_rejected=True), [])
+            self.assertEqual(store.event_count(base["key"]), 0)
+
             normal = dict(base)
             normal.update({
                 "key": "BTCUSDT:scalp:long:OB:1:2",
@@ -58,9 +94,8 @@ class SetupStoreTests(unittest.TestCase):
                 "decision_reasons": ["risk_reward_below_minimum"],
             })
             saved, _ = store.save_decision(normal, cooldown_minutes=30)
-            self.assertTrue(saved)
-            listed = store.list_candidates(include_rejected=True)
-            self.assertEqual([item["symbol"] for item in listed], ["BTCUSDT"])
+            self.assertFalse(saved)
+            self.assertEqual(store.list_candidates(include_rejected=True), [])
 
 
 if __name__ == "__main__":
