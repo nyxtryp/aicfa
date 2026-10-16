@@ -1832,3 +1832,11 @@
 - User requested the four market status cards be reduced to exactly half of the previously compact dimensions.
 - Branch `fix/half-size-market-status-cards` halves desktop card padding, radius, grid gaps, typography, line heights, and value spacing; mobile dimensions and typography are halved as well, with the two-column layout preserved.
 - Updated dashboard regression assertions and `TZ.md`; CI and production deployment are pending. This is a deliberately very small type size per the explicit request; production remains unverified until deploy.
+
+
+### 2026-10-17 — Full dashboard redesign started; checkpoint preserved
+
+- Preserved the pre-redesign main state at `checkpoint/design-counterpoint-2026-10-17` (commit `d5948de043547264bf496e595c353c12ca002b26`), so the half-size card state remains available as a rollback counterpoint.
+- Started branch `redesign/compact-dashboard-layout` to replace the unreadably tiny top cards and uneven oversized panel spacing with a consistent compact dashboard system.
+- Dashboard stylesheet is being rewritten with readable metric typography, aligned spacing, slimmer setup cards, restrained borders, balanced desktop columns, and responsive tablet/mobile behavior. Scanner and chart logic are intentionally unchanged.
+- Pending tests, CI, review, merge, and production deployment. Production has not been changed or verified.
