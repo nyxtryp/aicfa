@@ -34,23 +34,18 @@ class SetupDecisionStoreTests(unittest.TestCase):
             self.assertEqual(store.active_count(), 1)
 
 
-    def test_global_active_cap_is_eight(self):
+    def test_distinct_active_setups_have_no_global_cap(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SetupStore(Path(directory) / "setups.sqlite3")
-            for index in range(8):
+            for index in range(105):
                 inserted, payload = store.save_decision(
                     self.candidate(f"key-{index}", symbol=f"SYM{index}"),
-                    cooldown_minutes=30,
+                    cooldown_minutes=0,
                 )
-                self.assertTrue(inserted)
+                self.assertTrue(inserted, f"SYM{index}")
                 self.assertEqual(payload["status"], "ACCEPTED")
-            inserted, ninth = store.save_decision(
-                self.candidate("key-9", symbol="SYM9"), cooldown_minutes=30
-            )
-            self.assertFalse(inserted)
-            self.assertEqual(ninth["status"], "REJECTED")
-            self.assertIn("active_setup_limit_reached", ninth["decision_reasons"])
-            self.assertEqual(store.active_count(), 8)
+            self.assertEqual(store.active_count(), 105)
+            self.assertEqual(len(store.list_active()), 105)
 
 
     def test_shadow_candidate_is_kept_but_zone_cooldown_prevents_repeats(self):
