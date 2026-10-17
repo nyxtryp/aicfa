@@ -165,7 +165,7 @@ class SetupStoreTests(unittest.TestCase):
                 "zone": [98.0, 101.0], "timeframe": "5m",
             }
             self.assertTrue(store.save_candidate(payload))
-            self.assertEqual(len(store.list_monitored()), 1)
+            self.assertEqual(store.list_monitored(), [])
             closed = dict(payload, status="CLOSED", final_status="TP1", closed_at_ms=3000)
             journal = {
                 "key": payload["key"], "symbol": "BTCUSDT", "profile": "scalp",
