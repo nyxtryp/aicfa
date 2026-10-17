@@ -198,7 +198,17 @@ class AcceptedLifecycleTests(unittest.TestCase):
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "TP1")
         self.assertAlmostEqual(journal[0]["gross_r"], 2.0)
+        # Closed setups must disappear from both profile panels and Accepted.
         self.assertEqual(self.store.active_count(), 0)
+        self.assertEqual(self.store.list_active(), [])
+        self.assertEqual(self.store.list_monitored(), [])
+        self.assertEqual(self.store.list_candidates(), [])
+        connected_status = {"groups": {"tradfi": {"status": "connected"}, "crypto": {"status": "connected"}}}
+        with patch.object(main.market_data, "status", return_value=connected_status):
+            panels = asyncio.run(main.setup_candidates())
+            accepted = asyncio.run(main.active_setups())
+        self.assertEqual(panels["candidates"], [])
+        self.assertEqual(accepted["setups"], [])
 
     def test_stop_wins_when_stop_and_target_hit_in_same_candle(self):
         self.accepted_setup()
