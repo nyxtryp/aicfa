@@ -220,6 +220,36 @@ class AcceptedLifecycleTests(unittest.TestCase):
         self.assertAlmostEqual(journal[0]["gross_r"], 0.4)
 
 
+    def test_accepted_setup_survives_close_outside_zone_until_sl_tp_or_expiry(self):
+        self.accepted_setup()
+        main._advance_active_setups(self.candle(
+            close_time_ms=2_000, low=96.0, high=99.0, close=97.0
+        ), publish=False)
+        active = self.store.list_active()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["status"], "ACCEPTED")
+        self.assertEqual(self.store.list_journal(), [])
+
+    def test_opposite_choch_does_not_invalidate_accepted_setup(self):
+        self.accepted_setup()
+        candle = SimpleNamespace(
+            symbol="BTCUSDT", timeframe="5m", close_time_ms=2_000,
+        )
+        main.market_data = SimpleNamespace(candles={
+            ("BTCUSDT", "5m"): [SimpleNamespace(
+                open=100.0, high=102.0, low=98.0, close=99.0,
+                volume=10.0, open_time_ms=1_000, close_time_ms=2_000,
+            )] * 40
+        })
+        with patch.object(main, "analyze_smc", return_value=SimpleNamespace(
+            structure_breaks=[SimpleNamespace(kind="CHoCH", direction="bearish")]
+        )):
+            asyncio.run(main._invalidate_on_opposite_choch(candle))
+        active = self.store.list_active()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["status"], "ACCEPTED")
+        self.assertEqual(self.store.list_journal(), [])
+
     def test_invalidated_accepted_setup_is_not_a_strategy_result(self):
         payload = self.accepted_setup("BTCUSDT:scalp:long:OB:invalidated")
         invalidated = dict(payload)

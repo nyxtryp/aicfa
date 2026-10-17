@@ -1910,3 +1910,10 @@
 - This explains why the incoming list could contain PAC candidates while Accepted stayed at zero. Because the strategy journal requires a prior `SETUP_ACCEPTED` event, candidate closures were also excluded from Strategy Results.
 - Branch `fix/pac-setups-accepted-tracking` / PR #34 changes newly eligible PAC setups to `ACCEPTED` for paper tracking only, and includes a startup backfill for fresh, RR-valid persisted PAC candidates. The backfill promotes at most one active setup per symbol/profile and respects the 100-active cap.
 - Regression tests cover both new PAC acceptance and migration of existing PAC candidates. PR #34 passed GitHub Actions and was squash-merged to `main` as `dcfb4680eb83337d69833e5d24cfa229ddd3a8d3`. No exchange orders are submitted. Production deployment and post-deploy verification remain pending.
+
+
+### 2026-10-18 — Prevent premature INVALIDATED transitions for accepted setups
+- Confirmed with production candle data: AVAXUSDT SCALP SHORT was accepted at 9.843, then invalidated one minute later when a 1m candle closed at 9.854 above the FVG boundary 9.848 but below the configured SL 9.855437.
+- Root cause: `_advance_active_setups()` treated a close beyond the original OB/FVG zone as a final `INVALIDATED` outcome; `_invalidate_on_opposite_choch()` also invalidated accepted setups independently of SL/TP.
+- Branch `fix/accepted-setups-close-only-by-trade-lifecycle`: accepted setups now close only by SL, TP1 (entire setup), or profile expiry. Zone-boundary invalidation is removed after acceptance; opposite CHoCH invalidation remains limited to unaccepted `CANDIDATE` rows. Scanner signal criteria and shadow-only/no-exchange-order behavior are unchanged.
+- Added lifecycle regressions for close outside the zone and opposite CHoCH. CI and deployment verification pending; existing historical INVALIDATED records are not rewritten.

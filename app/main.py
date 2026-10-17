@@ -93,13 +93,8 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
         lifetime_hours = 3 if payload["profile"] == "scalp" else 12
         expired = now_ms >= opened + lifetime_hours * 3_600_000
         low, high, close = float(candle.low), float(candle.high), float(candle.close)
-        zone = payload.get("zone", [])
-        invalidated = len(zone) == 2 and ((direction == "long" and close < min(zone)) or
-                                           (direction == "short" and close > max(zone)))
-        if invalidated and payload.get("status") == "ACCEPTED":
-            payload["status"] = "INVALIDATED"
-            _finish_setup(payload, store, now_ms, "INVALIDATED", publish=publish)
-            continue
+        # Once accepted, the zone is setup evidence, not a post-entry stop.
+        # Accepted setups close only through SL, TP1, or profile expiry.
         status = payload["status"]
         stop = entry if status in ("TP1", "TP2") else original_stop
         stop_hit = low <= stop if direction == "long" else high >= stop
@@ -191,11 +186,11 @@ def _finish_setup(payload: dict, store: SetupStore, event_time_ms: int, final_st
 
 
 async def _invalidate_on_opposite_choch(candle) -> None:
-    """Invalidate an unscaled active setup on an opposite CHoCH at its confirmation timeframe."""
+    """Invalidate only unaccepted candidates on opposite CHoCH; accepted trades follow SL/TP/expiry."""
     if candle.timeframe not in {"5m", "15m"}:
         return
     for setup in _get_setup_store().list_monitored():
-        if setup.get("symbol") != candle.symbol or setup.get("status") not in {"CANDIDATE", "ACCEPTED"} or setup.get("timeframe") != candle.timeframe:
+        if setup.get("symbol") != candle.symbol or setup.get("status") != "CANDIDATE" or setup.get("timeframe") != candle.timeframe:
             continue
         if candle.close_time_ms <= int(setup.get("confirmation_time_ms", 0)):
             continue
