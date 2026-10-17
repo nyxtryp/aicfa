@@ -154,7 +154,7 @@ class SetupStoreTests(unittest.TestCase):
             self.assertEqual(row["status"], "REJECTED")
             self.assertIn("rr_below_minimum_or_unverifiable_legacy", row["payload_json"])
 
-    def test_candidate_is_monitored_and_can_write_final_journal(self):
+    def test_candidate_closure_does_not_enter_strategy_journal(self):
         with tempfile.TemporaryDirectory() as directory:
             store = SetupStore(Path(directory) / "setups.sqlite3")
             payload = {
@@ -176,6 +176,28 @@ class SetupStoreTests(unittest.TestCase):
             }
             self.assertTrue(store.transition(payload["key"], closed, event_type="TP1", event_time_ms=3000, final_journal=journal))
             self.assertEqual(store.list_candidates(), [])
+            self.assertEqual(store.list_journal(), [])
+
+    def test_accepted_setup_is_journaled_only_when_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = SetupStore(Path(directory) / "setups.sqlite3")
+            payload = {
+                "key": "ETHUSDT:intraday:long:OB:3:4", "symbol": "ETHUSDT",
+                "profile": "intraday", "direction": "long", "status": "ACCEPTED",
+                "confirmation_time_ms": 2000, "confirmation_price": 100.0,
+                "stop_price": 95.0, "targets": [110.0], "score": 8,
+                "zone": [98.0, 101.0], "timeframe": "15m",
+            }
+            self.assertTrue(store.save_decision(payload, cooldown_minutes=0)[0])
+            closed = dict(payload, status="CLOSED", final_status="TP1", closed_at_ms=3000)
+            journal = {
+                "key": payload["key"], "symbol": "ETHUSDT", "profile": "intraday",
+                "direction": "long", "timeframe": "15m", "final_status": "TP1",
+                "confirmation_price": 100.0, "stop_price": 95.0, "targets": [110.0],
+                "zone": [98.0, 101.0], "opened_at_ms": 2000, "closed_at_ms": 3000,
+                "gross_r": 2.0, "commission_r": 0.02, "net_r": 1.98,
+            }
+            self.assertTrue(store.transition(payload["key"], closed, event_type="TP1", event_time_ms=3000, final_journal=journal))
             self.assertEqual(store.list_journal()[0]["final_status"], "TP1")
 
 if __name__ == "__main__":

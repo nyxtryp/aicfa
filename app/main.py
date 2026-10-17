@@ -84,7 +84,7 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
         entry = float(payload["confirmation_price"])
         original_stop = float(payload["stop_price"])
         candidate_mode = payload.get("status") == "CANDIDATE"
-        targets = [float(x) for x in payload.get("targets", [])][:1 if candidate_mode else 3]
+        targets = [float(x) for x in payload.get("targets", [])][:1]  # TP1 closes the entire paper setup.
         if not targets:
             # A persisted setup must have TP1, but guard corrupted legacy rows.
             continue
@@ -343,11 +343,11 @@ async def _on_closed_candle(candle) -> None:
                         payload["risk_reward"] = decision.risk_reward
                         payload["score"] = decision.score.total
                         payload["decision_reasons"] = list(decision.reasons)
-                        payload["status"] = ("ACCEPTED" if SCANNER_LIVE_ENABLED else "CANDIDATE") if decision.status == "ELIGIBLE" else decision.status
-                        if decision.status == "ELIGIBLE" and not SCANNER_LIVE_ENABLED:
-                            payload["decision_reasons"].append("live_acceptance_disabled_until_phase1_accepted")
+                        # "Accepted" means the scanner is tracking this setup in the paper journal;
+                        # it never submits an exchange order or enables real trading.
+                        payload["status"] = "ACCEPTED" if decision.status == "ELIGIBLE" else decision.status
                 saved, payload = _get_setup_store().save_decision(
-                    payload, cooldown_minutes=30 if candidate.profile == "scalp" else 120, max_active=8
+                    payload, cooldown_minutes=30 if candidate.profile == "scalp" else 120, max_active=100
                 )
                 if saved:
                     _setup_candidates[candidate.key] = payload

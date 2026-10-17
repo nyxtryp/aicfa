@@ -291,7 +291,10 @@ class SetupStore:
                 "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
                 (setup_key, event_type, int(event_time_ms), encoded),
             )
-            if final_journal is not None:
+            # Only setups that entered the Accepted panel can become strategy results.
+            # A legacy CANDIDATE that closes during shadow tracking is not a journal trade.
+            was_accepted = row["status"] in ("ACCEPTED", "ACTIVE", "TP1", "TP2")
+            if final_journal is not None and was_accepted:
                 journal = dict(final_journal)
                 db.execute(
                     """INSERT OR REPLACE INTO setup_journal
@@ -307,7 +310,7 @@ class SetupStore:
     def list_journal(self, *, limit: int = 200) -> list[dict[str, Any]]:
         with self._connection() as db:
             rows = db.execute(
-                "SELECT j.payload_json FROM setup_journal AS j JOIN setup_candidates AS c ON c.setup_key=j.setup_key WHERE lower(c.profile) IN ('scalp','intraday') AND lower(j.profile) IN ('scalp','intraday') ORDER BY j.closed_at_ms DESC LIMIT ?",
+                "SELECT j.payload_json FROM setup_journal AS j JOIN setup_candidates AS c ON c.setup_key=j.setup_key WHERE lower(c.profile) IN ('scalp','intraday') AND lower(j.profile) IN ('scalp','intraday') AND EXISTS (SELECT 1 FROM setup_candidate_events AS e WHERE e.setup_key=j.setup_key AND e.event_type='SETUP_ACCEPTED') ORDER BY j.closed_at_ms DESC LIMIT ?",
                 (max(1, min(int(limit), 1000)),),
             ).fetchall()
         return [json.loads(row["payload_json"]) for row in rows]

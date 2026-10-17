@@ -110,3 +110,10 @@ if __name__ == "__main__":
 - Incoming SCALP and INTRADAY panels must display every persisted valid setup, not only the newest setup per symbol/profile. Deduplication by symbol/profile hides setups that can later appear in the realized journal.
 - The realized journal API must join journal rows to their persisted setup candidate by the exact `setup_key`, and allow only `scalp` and `intraday` profiles on both records.
 - Preserve Binance candle history, auth, settings, scanner criteria, and shadow mode. Acceptance requires regression tests showing every journal row has a matching persisted setup and no unsupported profile is returned.
+
+
+### Journal lifecycle rule (2026-10-17)
+
+- Eligible SCALP and INTRADAY setups are automatically tracked in Accepted as paper setups; this does not enable exchange execution.
+- A setup is added to Strategy Results only after it was accepted/tracked and then reaches a final close status. Candidate-only/legacy simulation closures must not be counted.
+- Strategy statistics are computed only from these accepted-and-closed setup records.
