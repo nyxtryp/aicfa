@@ -37,15 +37,19 @@ class AcceptedLifecycleTests(unittest.TestCase):
             low=low, high=high, close=close,
         )
 
-    def test_accepted_setup_closes_and_journals_at_tp1(self):
+    def test_accepted_setup_is_journaled_only_after_final_close(self):
         self.accepted_setup()
         main._advance_active_setups(self.candle(
             close_time_ms=2_000, low=100.5, high=111.0, close=110.0
         ), publish=False)
         self.assertEqual(self.store.list_candidates()[0]["status"], "TP1")
+        self.assertEqual(self.store.list_journal(), [])
+        main._advance_active_setups(self.candle(
+            close_time_ms=3_000, low=99.0, high=109.0, close=100.0
+        ), publish=False)
         journal = self.store.list_journal()
         self.assertEqual(len(journal), 1)
-        self.assertEqual(journal[0]["final_status"], "TP1")
+        self.assertEqual(journal[0]["final_status"], "SL")
         self.assertAlmostEqual(journal[0]["gross_r"], 2.0)
 
     def test_stop_wins_when_stop_and_target_hit_in_same_candle(self):
@@ -58,8 +62,8 @@ class AcceptedLifecycleTests(unittest.TestCase):
         self.assertEqual(journal[0]["final_status"], "SL")
         self.assertEqual(self.store.list_candidates()[0]["status"], "SL")
 
-    def test_candidate_expires_after_profile_lifetime(self):
-        self.candidate()
+    def test_accepted_setup_expires_after_profile_lifetime(self):
+        self.accepted_setup()
         main._advance_active_setups(self.candle(
             close_time_ms=1_000 + 3 * 3_600_000, low=99.0, high=101.0, close=102.0
         ), publish=False)
