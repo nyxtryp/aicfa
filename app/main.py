@@ -1039,6 +1039,21 @@ async def smc_analysis(symbol: str, timeframe: str) -> dict:
     }
 
 
+def _current_accepted_setups() -> list[dict]:
+    """Decorate every accepted setup without deduping or truncating the panel set."""
+    setups = _get_setup_store().list_active()
+    result: list[dict] = []
+    for setup in setups:
+        item = dict(setup)
+        profile = str(item.get("profile", "")).lower()
+        if profile not in {"scalp", "intraday"}:
+            continue
+        lifetime_hours = 3 if profile == "scalp" else 12
+        item["expires_at_ms"] = int(item.get("confirmation_time_ms", 0)) + lifetime_hours * 3_600_000
+        result.append(item)
+    return result
+
+
 @app.get("/api/setups")
 async def setup_candidates() -> dict:
     """Current incoming candidates; rejected decisions are not persisted or returned."""
@@ -1064,12 +1079,12 @@ async def setup_candidates() -> dict:
                 "total": len(TRADFI_SYMBOLS),
                 "unmapped": sorted(set(TRADFI_SYMBOLS) - US_EQUITY_SYMBOLS - KRX_EQUITY_SYMBOLS - COMMODITY_SYMBOLS),
             },
-            "candidates": _get_setup_store().list_active()}
+            "candidates": _current_accepted_setups()}
 
 
 @app.get("/api/active-setups")
 async def active_setups() -> dict:
-    return {"setups": _get_setup_store().list_active()}
+    return {"setups": _current_accepted_setups()}
 
 
 @app.get("/api/journal")
