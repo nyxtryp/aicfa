@@ -61,13 +61,14 @@ class AcceptedLifecycleTests(unittest.TestCase):
         active = self.store.list_active()
         self.assertEqual(len(active), 1)
         self.assertEqual(active[0]["status"], "ACCEPTED")
-        self.assertIn(
-            "SETUP_ACCEPTED",
-            [event[0] for event in self.store._connect().execute(
-                "SELECT event_type FROM setup_candidate_events WHERE setup_key=?",
-                (payload["key"],),
-            ).fetchall()],
-        )
+        with self.store._connection() as db:
+            event_types = [
+                row["event_type"] for row in db.execute(
+                    "SELECT event_type FROM setup_candidate_events WHERE setup_key=?",
+                    (payload["key"],),
+                ).fetchall()
+            ]
+        self.assertIn("SETUP_ACCEPTED", event_types)
 
     def candle(self, *, close_time_ms, low, high, close):
         return SimpleNamespace(
