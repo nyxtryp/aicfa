@@ -1895,5 +1895,5 @@
 ### 2026-10-17 — PAC accepted-tracking root cause (PR #34 pending)
 - Confirmed the active scanner path emits PAC keys containing `:PAC:`, but `app/main.py` still assigned these eligible candidates `CANDIDATE` with `pac_shadow_candidate`. PR #33 changed only the legacy SMC branch to `ACCEPTED`; it did not change this PAC-specific branch.
 - This explains why the incoming list could contain PAC candidates while Accepted stayed at zero. Because the strategy journal requires a prior `SETUP_ACCEPTED` event, candidate closures were also excluded from Strategy Results.
-- Branch `fix/pac-setups-accepted-tracking` / PR #34 changes eligible PAC setups to `ACCEPTED` for paper tracking only and adds a regression test. No exchange orders are submitted.
-- CI, merge, deployment, and post-deploy verification are still pending. Existing rows already persisted as `CANDIDATE` will not be retroactively accepted by this code change alone; verify/reconcile them separately after deployment.
+- Branch `fix/pac-setups-accepted-tracking` / PR #34 changes newly eligible PAC setups to `ACCEPTED` for paper tracking only, and includes a startup backfill for fresh, RR-valid persisted PAC candidates. The backfill promotes at most one active setup per symbol/profile and respects the 100-active cap.
+- Regression tests cover both new PAC acceptance and migration of existing PAC candidates. No exchange orders are submitted. CI, merge, deployment, and post-deploy verification are still pending.
