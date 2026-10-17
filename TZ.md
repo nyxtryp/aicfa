@@ -117,3 +117,9 @@ if __name__ == "__main__":
 - Eligible SCALP and INTRADAY setups are automatically tracked in Accepted as paper setups; this does not enable exchange execution.
 - A setup is added to Strategy Results only after it was accepted/tracked and then reaches a final close status. Candidate-only/legacy simulation closures must not be counted.
 - Strategy statistics are computed only from these accepted-and-closed setup records.
+
+
+### PAC accepted-tracking regression (2026-10-17)
+- Every eligible PAC scanner setup in SCALP or INTRADAY must enter `ACCEPTED` paper tracking, just like eligible legacy SMC setups. Do not leave the active PAC path in `CANDIDATE` solely because live exchange execution is disabled.
+- `ACCEPTED` means monitored by AICFA only; it must not submit exchange orders or enable live execution.
+- Regression test must prove an eligible `:PAC:` candidate is persisted as `ACCEPTED` and emits `SETUP_ACCEPTED`. Strategy Results remain restricted to setups that were accepted and then closed.
