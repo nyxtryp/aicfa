@@ -84,7 +84,7 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
         entry = float(payload["confirmation_price"])
         original_stop = float(payload["stop_price"])
         candidate_mode = payload.get("status") == "CANDIDATE"
-        targets = [float(x) for x in payload.get("targets", [])][:1 if candidate_mode else 3]
+        targets = [float(x) for x in payload.get("targets", [])][:1]  # TP1 closes the entire paper setup.
         if not targets:
             # A persisted setup must have TP1, but guard corrupted legacy rows.
             continue
