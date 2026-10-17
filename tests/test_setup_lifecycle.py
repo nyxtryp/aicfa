@@ -218,6 +218,10 @@ class AcceptedLifecycleTests(unittest.TestCase):
         journal = self.store.list_journal()
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "SL")
+        self.assertEqual(self.store.active_count(), 0)
+        self.assertEqual(self.store.list_active(), [])
+        self.assertEqual(self.store.list_monitored(), [])
+        self.assertEqual(self.store.list_candidates(), [])
 
     def test_accepted_setup_expires_after_profile_lifetime(self):
         self.accepted_setup()
@@ -228,6 +232,10 @@ class AcceptedLifecycleTests(unittest.TestCase):
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "EXPIRED")
         self.assertAlmostEqual(journal[0]["gross_r"], 0.4)
+        self.assertEqual(self.store.active_count(), 0)
+        self.assertEqual(self.store.list_active(), [])
+        self.assertEqual(self.store.list_monitored(), [])
+        self.assertEqual(self.store.list_candidates(), [])
 
 
     def test_accepted_setup_survives_close_outside_zone_until_sl_tp_or_expiry(self):
