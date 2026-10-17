@@ -374,7 +374,8 @@ class SetupStore:
             # Only setups that entered the Accepted panel can become strategy results.
             # A legacy CANDIDATE that closes during shadow tracking is not a journal trade.
             was_accepted = row["status"] in ("ACCEPTED", "ACTIVE", "TP1", "TP2")
-            if final_journal is not None and was_accepted:
+            if (final_journal is not None and was_accepted
+                    and str(final_journal.get("final_status", "")).upper() in {"TP1", "TP2", "TP3", "SL", "EXPIRED"}):
                 journal = dict(final_journal)
                 db.execute(
                     """INSERT OR REPLACE INTO setup_journal
@@ -400,6 +401,7 @@ class SetupStore:
                    JOIN setup_candidates AS c ON c.setup_key=j.setup_key
                    WHERE lower(c.profile) IN ('scalp','intraday')
                      AND lower(j.profile) IN ('scalp','intraday')
+                     AND upper(j.final_status) IN ('TP1','TP2','TP3','SL','EXPIRED')
                      AND EXISTS (
                          SELECT 1 FROM setup_candidate_events AS e
                          WHERE e.setup_key=j.setup_key AND e.event_type='SETUP_ACCEPTED'

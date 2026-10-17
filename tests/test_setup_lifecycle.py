@@ -220,5 +220,28 @@ class AcceptedLifecycleTests(unittest.TestCase):
         self.assertAlmostEqual(journal[0]["gross_r"], 0.4)
 
 
+    def test_invalidated_accepted_setup_is_not_a_strategy_result(self):
+        payload = self.accepted_setup("BTCUSDT:scalp:long:OB:invalidated")
+        invalidated = dict(payload)
+        invalidated.update({
+            "status": "INVALIDATED", "final_status": "INVALIDATED",
+            "closed_at_ms": 2_000, "gross_r": 0.0,
+            "commission_r": 0.0, "net_r": 0.0,
+        })
+        journal = {
+            "key": payload["key"], "symbol": payload["symbol"],
+            "profile": payload["profile"], "direction": payload["direction"],
+            "timeframe": payload["timeframe"], "final_status": "INVALIDATED",
+            "opened_at_ms": payload["confirmation_time_ms"], "closed_at_ms": 2_000,
+            "gross_r": 0.0, "commission_r": 0.0, "net_r": 0.0,
+        }
+        self.assertTrue(self.store.transition(
+            payload["key"], invalidated, event_type="INVALIDATED",
+            event_time_ms=2_000, final_journal=journal,
+        ))
+        self.assertEqual(self.store.list_journal(), [])
+        self.assertEqual(self.store.active_count(), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
