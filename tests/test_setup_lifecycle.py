@@ -7,7 +7,7 @@ import app.main as main
 from app.smc.setup_store import SetupStore
 
 
-class CandidateLifecycleTests(unittest.TestCase):
+class AcceptedLifecycleTests(unittest.TestCase):
     def setUp(self):
         self._original_store = main.setup_store
         self.tmp = tempfile.TemporaryDirectory()
@@ -37,26 +37,26 @@ class CandidateLifecycleTests(unittest.TestCase):
             low=low, high=high, close=close,
         )
 
-    def test_candidate_closes_and_journals_at_tp1(self):
+    def test_accepted_setup_closes_and_journals_at_tp1(self):
         self.accepted_setup()
         main._advance_active_setups(self.candle(
             close_time_ms=2_000, low=100.5, high=111.0, close=110.0
         ), publish=False)
-        self.assertEqual(self.store.list_candidates(), [])
+        self.assertEqual(self.store.list_candidates()[0]["status"], "TP1")
         journal = self.store.list_journal()
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "TP1")
         self.assertAlmostEqual(journal[0]["gross_r"], 2.0)
 
     def test_stop_wins_when_stop_and_target_hit_in_same_candle(self):
-        self.candidate()
+        self.accepted_setup()
         main._advance_active_setups(self.candle(
             close_time_ms=2_000, low=94.0, high=111.0, close=105.0
         ), publish=False)
         journal = self.store.list_journal()
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "SL")
-        self.assertEqual(self.store.list_candidates(), [])
+        self.assertEqual(self.store.list_candidates()[0]["status"], "SL")
 
     def test_candidate_expires_after_profile_lifetime(self):
         self.candidate()
@@ -67,7 +67,7 @@ class CandidateLifecycleTests(unittest.TestCase):
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "EXPIRED")
         self.assertAlmostEqual(journal[0]["gross_r"], 0.4)
-        self.assertEqual(self.store.list_candidates(), [])
+        self.assertEqual(self.store.list_candidates()[0]["status"], "EXPIRED")
 
 
 if __name__ == "__main__":
