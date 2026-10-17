@@ -161,6 +161,7 @@ class AcceptedLifecycleTests(unittest.TestCase):
         panel_keys = [x["key"] for x in panels["candidates"]]
         accepted_keys = [x["key"] for x in accepted["setups"]]
         self.assertEqual(panel_keys, accepted_keys)
+        self.assertEqual(panels["candidates"], accepted["setups"])
         self.assertEqual(len(panel_keys), 3)
         self.assertEqual(sum(x["profile"] == "scalp" for x in panels["candidates"]), 2)
         self.assertEqual(sum(x["profile"] == "intraday" for x in panels["candidates"]), 1)
