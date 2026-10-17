@@ -80,6 +80,25 @@ class SetupStore:
                 db.execute("ALTER TABLE setup_candidates ADD COLUMN zone_key TEXT NOT NULL DEFAULT ''")
             db.execute("CREATE INDEX IF NOT EXISTS idx_setup_candidates_status_time ON setup_candidates(status, confirmation_time_ms DESC)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_setup_candidate_events_key_time ON setup_candidate_events(setup_key, event_time_ms)")
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS setup_store_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            # One-time clean start for the single source of truth. Older releases
+            # kept stale ACCEPTED rows and auto-promoted old CANDIDATE rows, so their
+            # active panel and strategy journal cannot be trusted. Preserve the
+            # database/schema but clear those unsynchronized records once per DB.
+            if db.execute(
+                "SELECT 1 FROM setup_store_meta WHERE key='accepted_source_sync_v1'"
+            ).fetchone() is None:
+                db.execute("DELETE FROM setup_candidate_events")
+                db.execute("DELETE FROM setup_journal")
+                db.execute("DELETE FROM setup_candidates")
+                db.execute(
+                    "INSERT INTO setup_store_meta(key, value) VALUES ('accepted_source_sync_v1', 'done')"
+                )
             # One-time cleanup for rejected attempts accumulated by older releases.
             rejected_keys = [
                 row["setup_key"]
@@ -113,49 +132,6 @@ class SetupStore:
                     "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
                     (row["setup_key"], "LEGACY_RR_QUARANTINED", now_ms, encoded),
                 )
-            # Backfill active PAC setups created by releases that incorrectly left them
-            # as CANDIDATE. Promote only fresh, RR-valid SCALP/INTRADAY records, newest
-            # first, while preserving the same one-active-setup-per-symbol/profile cap.
-            pac_candidates = db.execute(
-                """SELECT setup_key,symbol,profile,confirmation_time_ms,payload_json
-                   FROM setup_candidates
-                   WHERE status='CANDIDATE' AND setup_key LIKE '%:PAC:%'
-                     AND lower(profile) IN ('scalp','intraday')
-                   ORDER BY confirmation_time_ms DESC"""
-            ).fetchall()
-            promoted_symbols: set[tuple[str, str]] = {
-                (row["symbol"], str(row["profile"]).lower())
-                for row in db.execute(
-                    "SELECT symbol,profile FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
-                ).fetchall()
-            }
-            active_count = int(db.execute(
-                "SELECT COUNT(*) FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
-            ).fetchone()[0])
-            for row in pac_candidates:
-                profile = str(row["profile"]).lower()
-                lifetime_ms = (3 if profile == "scalp" else 12) * 3_600_000
-                age_ms = now_ms - int(row["confirmation_time_ms"])
-                symbol_profile = (str(row["symbol"]), profile)
-                if age_ms < -120_000 or age_ms >= lifetime_ms or symbol_profile in promoted_symbols or active_count >= 100:
-                    continue
-                payload = json.loads(row["payload_json"])
-                payload["status"] = "ACCEPTED"
-                payload["decision_reasons"] = list(dict.fromkeys(
-                    list(payload.get("decision_reasons", [])) + ["pac_paper_tracking_backfill"]
-                ))
-                encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-                db.execute(
-                    "UPDATE setup_candidates SET status='ACCEPTED',payload_json=?,updated_at_ms=? WHERE setup_key=?",
-                    (encoded, now_ms, row["setup_key"]),
-                )
-                db.execute(
-                    "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
-                    (row["setup_key"], "SETUP_ACCEPTED", now_ms, encoded),
-                )
-                promoted_symbols.add(symbol_profile)
-                active_count += 1
-
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
         db.row_factory = sqlite3.Row
@@ -201,11 +177,11 @@ class SetupStore:
     def active_count(self) -> int:
         with self._connection() as db:
             return int(db.execute(
-                "SELECT COUNT(*) FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
+                "SELECT COUNT(*) FROM setup_candidates WHERE lower(profile) IN ('scalp','intraday') AND status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
             ).fetchone()[0])
 
-    def save_decision(self, payload: Mapping[str, Any], *, cooldown_minutes: int, max_active: int = 8) -> tuple[bool, dict[str, Any]]:
-        """Persist one decision atomically with global cap, symbol/profile and zone cooldown gates."""
+    def save_decision(self, payload: Mapping[str, Any], *, cooldown_minutes: int) -> tuple[bool, dict[str, Any]]:
+        """Persist one eligible setup; panel and tracking views read the same accepted rows."""
         key = str(payload["key"])
         decided = dict(payload)
         zone_key = str(payload.get("zone_key") or "|".join(map(str, payload.get("zone", []))))
@@ -228,11 +204,6 @@ class SetupStore:
             gate_reasons: list[str] = []
             status = str(decided.get("status", "REJECTED"))
             if status == "ACCEPTED":
-                active = int(db.execute(
-                    "SELECT COUNT(*) FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
-                ).fetchone()[0])
-                if active >= max_active:
-                    gate_reasons.append("active_setup_limit_reached")
                 if db.execute(
                     "SELECT 1 FROM setup_candidates WHERE symbol=? AND profile=? AND status IN ('ACCEPTED','ACTIVE','TP1','TP2') LIMIT 1",
                     (decided["symbol"], decided["profile"]),
@@ -270,45 +241,72 @@ class SetupStore:
             )
             return True, decided
 
-    def list_candidates(self, *, limit: int = 200, include_rejected: bool = False) -> list[dict[str, Any]]:
+    def list_candidates(self, *, limit: int | None = None, include_rejected: bool = False) -> list[dict[str, Any]]:
+        """List persisted scanner candidates; no implicit row cap when limit is omitted."""
+        limit_sql = ""
+        params: tuple[Any, ...] = ()
+        if limit is not None:
+            limit_sql = " LIMIT ?"
+            params = (max(1, int(limit)),)
         with self._connection() as db:
             if include_rejected:
-                rows = db.execute(
+                query = (
                     """SELECT payload_json FROM setup_candidates
                        WHERE payload_json NOT LIKE '%tradfi_market_closed%'
                          AND payload_json NOT LIKE '%market_hours_unverified%'
-                       ORDER BY confirmation_time_ms DESC LIMIT ?""",
-                    (max(1, min(int(limit), 1000)),),
-                ).fetchall()
+                       ORDER BY confirmation_time_ms DESC"""
+                    + limit_sql
+                )
             else:
-                rows = db.execute(
-                    "SELECT payload_json FROM setup_candidates WHERE status IN ('CANDIDATE','ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
-                    (max(1, min(int(limit), 1000)),),
-                ).fetchall()
+                query = (
+                    """SELECT payload_json FROM setup_candidates
+                       WHERE status IN ('CANDIDATE','ACCEPTED','ACTIVE','TP1','TP2')
+                       ORDER BY confirmation_time_ms DESC"""
+                    + limit_sql
+                )
+            rows = db.execute(query, params).fetchall()
         return [
             payload for row in rows
             if _actual_rr(payload := json.loads(row["payload_json"])) >= MINIMUM_RR
         ]
 
-
-    def list_active(self, *, limit: int = 200) -> list[dict[str, Any]]:
+    def list_active(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """The canonical live panel set: every accepted, still-tracked SCALP/INTRADAY setup."""
+        limit_sql = ""
+        params: tuple[Any, ...] = ()
+        if limit is not None:
+            limit_sql = " LIMIT ?"
+            params = (max(1, int(limit)),)
         with self._connection() as db:
-            rows = db.execute(
-                "SELECT payload_json FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
-                (max(1, min(int(limit), 1000)),),
-            ).fetchall()
+            query = (
+                """SELECT payload_json FROM setup_candidates
+                   WHERE lower(profile) IN ('scalp','intraday')
+                     AND status IN ('ACCEPTED','ACTIVE','TP1','TP2')
+                   ORDER BY confirmation_time_ms DESC"""
+                + limit_sql
+            )
+            rows = db.execute(query, params).fetchall()
         return [
             payload for row in rows
             if _actual_rr(payload := json.loads(row["payload_json"])) >= MINIMUM_RR
         ]
 
-    def list_monitored(self, *, limit: int = 200) -> list[dict[str, Any]]:
-        """Candidates and accepted setups that need automatic market monitoring."""
+    def list_monitored(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Accepted setups only; unaccepted historical candidates are never paper-tracked."""
+        limit_sql = ""
+        params: tuple[Any, ...] = ()
+        if limit is not None:
+            limit_sql = " LIMIT ?"
+            params = (max(1, int(limit)),)
         with self._connection() as db:
-            rows = db.execute(
-                "SELECT payload_json FROM setup_candidates WHERE status IN ('CANDIDATE','ACCEPTED','ACTIVE','TP1','TP2') ORDER BY confirmation_time_ms DESC LIMIT ?",
-                (max(1, min(int(limit), 1000)),),
-            ).fetchall()
+            query = (
+                """SELECT payload_json FROM setup_candidates
+                   WHERE lower(profile) IN ('scalp','intraday')
+                     AND status IN ('ACCEPTED','ACTIVE','TP1','TP2')
+                   ORDER BY confirmation_time_ms DESC"""
+                + limit_sql
+            )
+            rows = db.execute(query, params).fetchall()
         return [
             payload for row in rows
             if _actual_rr(payload := json.loads(row["payload_json"])) >= MINIMUM_RR
@@ -349,12 +347,27 @@ class SetupStore:
                 )
             return True
 
-    def list_journal(self, *, limit: int = 200) -> list[dict[str, Any]]:
+    def list_journal(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return only finalized trades from the fresh accepted-tracking generation."""
+        limit_sql = ""
+        params: tuple[Any, ...] = ()
+        if limit is not None:
+            limit_sql = " LIMIT ?"
+            params = (max(1, int(limit)),)
         with self._connection() as db:
-            rows = db.execute(
-                "SELECT j.payload_json FROM setup_journal AS j JOIN setup_candidates AS c ON c.setup_key=j.setup_key WHERE lower(c.profile) IN ('scalp','intraday') AND lower(j.profile) IN ('scalp','intraday') AND EXISTS (SELECT 1 FROM setup_candidate_events AS e WHERE e.setup_key=j.setup_key AND e.event_type='SETUP_ACCEPTED') ORDER BY j.closed_at_ms DESC LIMIT ?",
-                (max(1, min(int(limit), 1000)),),
-            ).fetchall()
+            query = (
+                """SELECT j.payload_json FROM setup_journal AS j
+                   JOIN setup_candidates AS c ON c.setup_key=j.setup_key
+                   WHERE lower(c.profile) IN ('scalp','intraday')
+                     AND lower(j.profile) IN ('scalp','intraday')
+                     AND EXISTS (
+                         SELECT 1 FROM setup_candidate_events AS e
+                         WHERE e.setup_key=j.setup_key AND e.event_type='SETUP_ACCEPTED'
+                     )
+                   ORDER BY j.closed_at_ms DESC"""
+                + limit_sql
+            )
+            rows = db.execute(query, params).fetchall()
         return [json.loads(row["payload_json"]) for row in rows]
 
     def event_count(self, setup_key: str) -> int:
