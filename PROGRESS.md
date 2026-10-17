@@ -1883,3 +1883,10 @@
 - Root cause found in dashboard presentation: incoming cards were deduplicated by `symbol|profile`, while the journal retained completed records for individual setup keys. Older valid setups could therefore finish and appear in the journal despite being hidden by the incoming-card deduplication.
 - Branch `fix/journal-only-visible-scan-setups`: incoming panels now render every persisted setup with a non-empty key and only the SCALP/INTRADAY profiles; journal query joins `setup_journal` to `setup_candidates` on exact `setup_key` and filters both profiles to SCALP/INTRADAY.
 - No candle data, auth, settings, scanner criteria, or shadow/live mode changed. CI, merge, and production deployment remain pending; do not claim production is fixed until deploy and post-deploy API checks.
+
+
+### 2026-10-17 — journal only from accepted tracked setups
+
+- Eligible SCALP/INTRADAY scanner setups enter the Accepted/monitoring lifecycle automatically as paper-tracked signals; no exchange orders are submitted.
+- Strategy Results now only includes a setup after it has entered ACCEPTED and then closes. Legacy CANDIDATE simulations cannot contribute to the journal or its statistics.
+- Added store tests for candidate-close exclusion and accepted-close inclusion. Deployment and CI verification pending.
