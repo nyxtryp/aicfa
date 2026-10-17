@@ -134,7 +134,8 @@ class AcceptedLifecycleTests(unittest.TestCase):
         saved, _ = clean.save_decision(fresh, cooldown_minutes=0)
         self.assertTrue(saved)
         reopened = SetupStore(legacy_path)
-        self.assertEqual([x["key"] for x in reopened.list_active()], [fresh["key"]])
+        self.assertEqual({x["key"] for x in reopened.list_active()}, {fresh["key"], stale_payload["key"]})
+        self.assertEqual(reopened.list_journal(), [])
 
     def test_active_panel_and_accepted_api_are_the_same_set(self):
         now_ms = int(time.time() * 1000)
