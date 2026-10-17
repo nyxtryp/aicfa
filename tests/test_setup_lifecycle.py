@@ -1,5 +1,8 @@
+import asyncio
 import tempfile
+import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,12 +13,14 @@ from app.smc.setup_store import SetupStore
 class AcceptedLifecycleTests(unittest.TestCase):
     def setUp(self):
         self._original_store = main.setup_store
+        self._original_market_data = main.market_data
         self.tmp = tempfile.TemporaryDirectory()
         self.store = SetupStore(Path(self.tmp.name) / "setups.sqlite3")
         main.setup_store = self.store
 
     def tearDown(self):
         main.setup_store = self._original_store
+        main.market_data = self._original_market_data
         self.tmp.cleanup()
 
     def accepted_setup(self, key="BTCUSDT:scalp:long:OB:1:2"):
@@ -30,6 +35,39 @@ class AcceptedLifecycleTests(unittest.TestCase):
         self.assertTrue(saved)
         self.assertEqual(decided["status"], "ACCEPTED")
         return payload
+
+    def test_pac_scanner_candidate_enters_accepted_tracking(self):
+        now_ms = int(time.time() * 1000)
+        candle = SimpleNamespace(
+            symbol="BTCUSDT", timeframe="5m", close_time_ms=now_ms - 10_000,
+            open_time_ms=now_ms - 310_000, open=100.0, high=101.0,
+            low=99.0, close=100.0, volume=10.0,
+        )
+        payload = {
+            "key": "BTCUSDT:scalp:PAC:long:OB:1:2",
+            "symbol": "BTCUSDT", "profile": "scalp", "direction": "long",
+            "status": "CANDIDATE", "confirmation_time_ms": candle.close_time_ms,
+            "confirmation_price": 100.0, "stop_price": 95.0, "targets": [110.0],
+            "score": 7, "reasons": ["pac_structure"], "zone": [98.0, 101.0],
+            "timeframe": "5m", "evidence": {}, "atr": 1.0,
+        }
+        candidate = SimpleNamespace(**payload, as_dict=lambda: dict(payload))
+        main.market_data = SimpleNamespace(
+            candles={("BTCUSDT", "5m"): [candle]},
+            exchange_filters={"BTCUSDT": {"tick_size": 0.1}},
+        )
+        with patch.object(main, "scan_symbol", return_value=[candidate]):
+            asyncio.run(main._on_closed_candle(candle))
+        active = self.store.list_active()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["status"], "ACCEPTED")
+        self.assertIn(
+            "SETUP_ACCEPTED",
+            [event[0] for event in self.store._connect().execute(
+                "SELECT event_type FROM setup_candidate_events WHERE setup_key=?",
+                (payload["key"],),
+            ).fetchall()],
+        )
 
     def candle(self, *, close_time_ms, low, high, close):
         return SimpleNamespace(
