@@ -317,8 +317,10 @@ async def _on_closed_candle(candle) -> None:
                             payload["entry_limit"] = candidate.confirmation_price
                             payload["risk_reward"] = rr
                             payload["score"] = candidate.score
-                            payload["status"] = "CANDIDATE"
-                            payload["decision_reasons"] = list(candidate.reasons) + ["pac_shadow_candidate"]
+                            # PAC candidates are eligible scanner setups too: track them in Accepted.
+                            # This is paper tracking only and never submits an exchange order.
+                            payload["status"] = "ACCEPTED"
+                            payload["decision_reasons"] = list(candidate.reasons) + ["pac_paper_tracking"]
                     else:
                         evidence = SetupEvidence(**candidate.evidence)
                         decision = evaluate_candidate(
