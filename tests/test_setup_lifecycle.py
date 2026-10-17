@@ -18,15 +18,17 @@ class CandidateLifecycleTests(unittest.TestCase):
         main.setup_store = self._original_store
         self.tmp.cleanup()
 
-    def candidate(self, key="BTCUSDT:scalp:long:OB:1:2"):
+    def accepted_setup(self, key="BTCUSDT:scalp:long:OB:1:2"):
         payload = {
             "key": key, "symbol": "BTCUSDT", "profile": "scalp",
-            "direction": "long", "status": "CANDIDATE",
+            "direction": "long", "status": "ACCEPTED",
             "confirmation_time_ms": 1_000, "confirmation_price": 100.0,
             "stop_price": 95.0, "targets": [110.0, 115.0],
             "score": 7, "zone": [98.0, 101.0], "timeframe": "5m",
         }
-        self.assertTrue(self.store.save_candidate(payload))
+        saved, decided = self.store.save_decision(payload, cooldown_minutes=0, max_active=100)
+        self.assertTrue(saved)
+        self.assertEqual(decided["status"], "ACCEPTED")
         return payload
 
     def candle(self, *, close_time_ms, low, high, close):
@@ -36,7 +38,7 @@ class CandidateLifecycleTests(unittest.TestCase):
         )
 
     def test_candidate_closes_and_journals_at_tp1(self):
-        self.candidate()
+        self.accepted_setup()
         main._advance_active_setups(self.candle(
             close_time_ms=2_000, low=100.5, high=111.0, close=110.0
         ), publish=False)
