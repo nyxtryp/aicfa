@@ -349,7 +349,7 @@ async def _on_closed_candle(candle) -> None:
                         # it never submits an exchange order or enables real trading.
                         payload["status"] = "ACCEPTED" if decision.status == "ELIGIBLE" else decision.status
                 saved, payload = _get_setup_store().save_decision(
-                    payload, cooldown_minutes=30 if candidate.profile == "scalp" else 120, max_active=100
+                    payload, cooldown_minutes=30 if candidate.profile == "scalp" else 120
                 )
                 if saved:
                     _setup_candidates[candidate.key] = payload
@@ -1039,27 +1039,6 @@ async def smc_analysis(symbol: str, timeframe: str) -> dict:
     }
 
 
-def _latest_unique_candidates(candidates: list[dict]) -> list[dict]:
-    """Keep newest symbol/profile candidate and expose its profile TTL deadline."""
-    latest: dict[tuple[str, str], dict] = {}
-    for candidate in candidates:
-        key = (str(candidate.get("symbol", "")), str(candidate.get("profile", "")))
-        previous = latest.get(key)
-        if previous is None or int(candidate.get("confirmation_time_ms", 0)) > int(previous.get("confirmation_time_ms", 0)):
-            latest[key] = candidate
-    result = []
-    for candidate in latest.values():
-        item = dict(candidate)
-        lifetime_hours = 3 if str(item.get("profile", "")).lower() == "scalp" else 12
-        item["expires_at_ms"] = int(item.get("confirmation_time_ms", 0)) + lifetime_hours * 3_600_000
-        result.append(item)
-    return sorted(
-        result,
-        key=lambda item: (int(item.get("score", 0)), int(item.get("confirmation_time_ms", 0))),
-        reverse=True,
-    )
-
-
 @app.get("/api/setups")
 async def setup_candidates() -> dict:
     """Current incoming candidates; rejected decisions are not persisted or returned."""
@@ -1085,7 +1064,7 @@ async def setup_candidates() -> dict:
                 "total": len(TRADFI_SYMBOLS),
                 "unmapped": sorted(set(TRADFI_SYMBOLS) - US_EQUITY_SYMBOLS - KRX_EQUITY_SYMBOLS - COMMODITY_SYMBOLS),
             },
-            "candidates": _latest_unique_candidates(_get_setup_store().list_candidates(include_rejected=False))}
+            "candidates": _get_setup_store().list_active()}
 
 
 @app.get("/api/active-setups")
