@@ -122,4 +122,4 @@ if __name__ == "__main__":
 ### PAC accepted-tracking regression (2026-10-17)
 - Every eligible PAC scanner setup in SCALP or INTRADAY must enter `ACCEPTED` paper tracking, just like eligible legacy SMC setups. Do not leave the active PAC path in `CANDIDATE` solely because live exchange execution is disabled.
 - `ACCEPTED` means monitored by AICFA only; it must not submit exchange orders or enable live execution.
-- Regression test must prove an eligible `:PAC:` candidate is persisted as `ACCEPTED` and emits `SETUP_ACCEPTED`. Strategy Results remain restricted to setups that were accepted and then closed.
+- Regression tests must prove both that a newly eligible `:PAC:` candidate is persisted as `ACCEPTED` and emits `SETUP_ACCEPTED`, and that a fresh, RR-valid PAC candidate persisted by an older release is backfilled on startup. Backfill must preserve the active cap and one active setup per symbol/profile. Strategy Results remain restricted to setups that were accepted and then closed.
