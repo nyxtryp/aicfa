@@ -113,6 +113,48 @@ class SetupStore:
                     "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
                     (row["setup_key"], "LEGACY_RR_QUARANTINED", now_ms, encoded),
                 )
+            # Backfill active PAC setups created by releases that incorrectly left them
+            # as CANDIDATE. Promote only fresh, RR-valid SCALP/INTRADAY records, newest
+            # first, while preserving the same one-active-setup-per-symbol/profile cap.
+            pac_candidates = db.execute(
+                """SELECT setup_key,symbol,profile,confirmation_time_ms,payload_json
+                   FROM setup_candidates
+                   WHERE status='CANDIDATE' AND setup_key LIKE '%:PAC:%'
+                     AND lower(profile) IN ('scalp','intraday')
+                   ORDER BY confirmation_time_ms DESC"""
+            ).fetchall()
+            promoted_symbols: set[tuple[str, str]] = {
+                (row["symbol"], str(row["profile"]).lower())
+                for row in db.execute(
+                    "SELECT symbol,profile FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
+                ).fetchall()
+            }
+            active_count = int(db.execute(
+                "SELECT COUNT(*) FROM setup_candidates WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
+            ).fetchone()[0])
+            for row in pac_candidates:
+                profile = str(row["profile"]).lower()
+                lifetime_ms = (3 if profile == "scalp" else 12) * 3_600_000
+                age_ms = now_ms - int(row["confirmation_time_ms"])
+                symbol_profile = (str(row["symbol"]), profile)
+                if age_ms < -120_000 or age_ms >= lifetime_ms or symbol_profile in promoted_symbols or active_count >= 100:
+                    continue
+                payload = json.loads(row["payload_json"])
+                payload["status"] = "ACCEPTED"
+                payload["decision_reasons"] = list(dict.fromkeys(
+                    list(payload.get("decision_reasons", [])) + ["pac_paper_tracking_backfill"]
+                ))
+                encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+                db.execute(
+                    "UPDATE setup_candidates SET status='ACCEPTED',payload_json=?,updated_at_ms=? WHERE setup_key=?",
+                    (encoded, now_ms, row["setup_key"]),
+                )
+                db.execute(
+                    "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
+                    (row["setup_key"], "SETUP_ACCEPTED", now_ms, encoded),
+                )
+                promoted_symbols.add(symbol_profile)
+                active_count += 1
 
     def _connect(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=10)
