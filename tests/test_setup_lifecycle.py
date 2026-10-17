@@ -85,7 +85,7 @@ class AcceptedLifecycleTests(unittest.TestCase):
             ]
         self.assertIn("SETUP_ACCEPTED", event_types)
 
-    def test_first_sync_migration_clears_stale_accepted_and_strategy_results_once(self):
+    def test_first_sync_migration_preserves_live_accepted_and_clears_old_results(self):
         legacy_path = Path(self.tmp.name) / "legacy.sqlite3"
         legacy = SetupStore(legacy_path)
         stale_payload = {
@@ -121,9 +121,9 @@ class AcceptedLifecycleTests(unittest.TestCase):
                  2.0, 0.2, 1.8, json.dumps(stale_payload)),
             )
         clean = SetupStore(legacy_path)
-        self.assertEqual(clean.list_active(), [])
+        self.assertEqual([x["key"] for x in clean.list_active()], [stale_payload["key"]])
         self.assertEqual(clean.list_journal(), [])
-        self.assertEqual(clean.list_candidates(), [])
+        self.assertEqual([x["key"] for x in clean.list_candidates()], [stale_payload["key"]])
         fresh = {
             "key": "ETHUSDT:scalp:long:PAC:fresh:setup",
             "symbol": "ETHUSDT", "profile": "scalp", "direction": "long",
