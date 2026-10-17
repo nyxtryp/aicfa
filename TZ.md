@@ -123,3 +123,12 @@ if __name__ == "__main__":
 - Every eligible PAC scanner setup in SCALP or INTRADAY must enter `ACCEPTED` paper tracking, just like eligible legacy SMC setups. Do not leave the active PAC path in `CANDIDATE` solely because live exchange execution is disabled.
 - `ACCEPTED` means monitored by AICFA only; it must not submit exchange orders or enable live execution.
 - Regression tests must prove both that a newly eligible `:PAC:` candidate is persisted as `ACCEPTED` and emits `SETUP_ACCEPTED`, and that a fresh, RR-valid PAC candidate persisted by an older release is backfilled on startup. Backfill must preserve the active cap and one active setup per symbol/profile. Strategy Results remain restricted to setups that were accepted and then closed.
+
+
+## Синхронизация панелей SCALP / INTRADAY, Accepted и Strategy Results
+
+- Текущие панели SCALP и INTRADAY и блок Accepted используют один и тот же набор ключей активных принятых сетапов. Нельзя отдельно дедуплицировать входящие сигналы по символу/профилю так, чтобы Accepted продолжал показывать скрытые записи.
+- В Accepted разрешено любое количество допустимых сетапов: фиксированного общего или профильного cap нет.
+- Перезапуск приложения не имеет права автоматически повышать старый CANDIDATE до ACCEPTED. При первой установке этого правила старые несинхронизированные записи и старые результаты очищаются однократно; после этого метка миграции предотвращает повторную очистку при обычных рестартах.
+- Мониторинг и завершённые результаты учитывают только реально принятые сетапы профилей SCALP/INTRADAY. Финальный результат создаётся ровно один раз при завершении жизненного цикла. Достижение TP1 закрывает весь сетап.
+- Регрессия: API панелей и Accepted возвращают идентичные упорядоченные ключи; более 100 отдельных активных сетапов не блокируются общим лимитом; legacy записи до миграции не появляются после старта.
