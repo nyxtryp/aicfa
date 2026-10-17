@@ -86,18 +86,58 @@ class SetupStore:
                     value TEXT NOT NULL
                 )
             """)
-            # One-time clean start for the single source of truth. Older releases
-            # kept stale ACCEPTED rows and auto-promoted old CANDIDATE rows, so their
-            # active panel and strategy journal cannot be trusted. Preserve the
-            # database/schema but clear those unsynchronized records once per DB.
+            # Rebuild the accepted/results boundary without deleting live setups.
+            # Accepted/active setups remain paper-tracked; only completed accepted
+            # setups belong in the strategy journal. Legacy CANDIDATE rows are not
+            # promoted and are removed from the live source.
             if db.execute(
                 "SELECT 1 FROM setup_store_meta WHERE key='accepted_source_sync_v1'"
             ).fetchone() is None:
-                db.execute("DELETE FROM setup_candidate_events")
                 db.execute("DELETE FROM setup_journal")
-                db.execute("DELETE FROM setup_candidates")
+                db.execute(
+                    "DELETE FROM setup_candidate_events WHERE setup_key IN "
+                    "(SELECT setup_key FROM setup_candidates WHERE status NOT IN ('ACCEPTED','ACTIVE','TP1','TP2'))"
+                )
+                db.execute(
+                    "DELETE FROM setup_candidates WHERE status NOT IN ('ACCEPTED','ACTIVE','TP1','TP2')"
+                )
                 db.execute(
                     "INSERT INTO setup_store_meta(key, value) VALUES ('accepted_source_sync_v1', 'done')"
+                )
+            # Versioned cleanup also runs on databases where v1 was already marked
+            # complete: reset stale strategy history, but retain all live accepted rows.
+            if db.execute(
+                "SELECT 1 FROM setup_store_meta WHERE key='accepted_source_sync_v2'"
+            ).fetchone() is None:
+                db.execute("DELETE FROM setup_journal")
+                db.execute(
+                    "DELETE FROM setup_candidate_events WHERE setup_key IN "
+                    "(SELECT setup_key FROM setup_candidates WHERE status NOT IN ('ACCEPTED','ACTIVE','TP1','TP2'))"
+                )
+                db.execute(
+                    "DELETE FROM setup_candidates WHERE status NOT IN ('ACCEPTED','ACTIVE','TP1','TP2')"
+                )
+                now_ms = int(time.time() * 1000)
+                retained = db.execute(
+                    "SELECT setup_key,payload_json,confirmation_time_ms FROM setup_candidates "
+                    "WHERE status IN ('ACCEPTED','ACTIVE','TP1','TP2')"
+                ).fetchall()
+                for row in retained:
+                    payload = json.loads(row["payload_json"])
+                    if _actual_rr(payload) < MINIMUM_RR:
+                        continue
+                    exists = db.execute(
+                        "SELECT 1 FROM setup_candidate_events WHERE setup_key=? AND event_type='SETUP_ACCEPTED' LIMIT 1",
+                        (row["setup_key"],),
+                    ).fetchone()
+                    if exists is None:
+                        db.execute(
+                            "INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json) VALUES (?,?,?,?)",
+                            (row["setup_key"], "SETUP_ACCEPTED", int(row["confirmation_time_ms"] or now_ms),
+                             json.dumps(payload, separators=(",", ":"), sort_keys=True)),
+                        )
+                db.execute(
+                    "INSERT INTO setup_store_meta(key, value) VALUES ('accepted_source_sync_v2', 'done')"
                 )
             # One-time cleanup for rejected attempts accumulated by older releases.
             rejected_keys = [
