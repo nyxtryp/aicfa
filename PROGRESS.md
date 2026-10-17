@@ -1,3 +1,14 @@
+## 2026-10-18 — lifecycle regression coverage for closed setups (PR #39)
+
+- PR [#39](https://github.com/nyxtryp/aicfa/pull/39) merged into main as `4d942895fc75626d6d98aef702e075fc28a1308c`.
+- Added regression assertions that TP1, SL, and EXPIRED setups disappear from active, monitored, and candidate store lists; TP1 also verifies both incoming setup and Accepted APIs return no closed setup. The finalized trade remains in the strategy journal.
+- Both CI checks (`tests` and `unit-tests`) passed on reviewed PR head `5698a0b425e067501ed91be7d01b5d2eaa57bf9f`. Post-merge checks on merge commit were still running at the time of this note.
+- PR #38 fixes premature lifecycle invalidation: accepted setups are not invalidated merely for closing outside the original OB/FVG or due to opposite CHoCH; they close on SL, TP1, or expiry. TP1 closes the whole setup.
+- No scanner thresholds, candle data, or historical INVALIDATED rows were changed by PR #39.
+- **Production deployment and post-deploy verification are not confirmed.** Remote Desktop Commander device `nyxtryp` is offline (last seen 48h ago). Do not claim live behavior is fixed until the active release SHA and production API/database are checked.
+
+---
+
 ## 2026-10-17 — единый источник для SCALP / INTRADAY → Accepted → Strategy Results
 
 - Найдена причина рассинхронизации: `/api/setups` выбирал лишь самый свежий сетап для каждой пары символ/профиль, а `/api/active-setups` отдавал все активные записи. Старый сигнал (например, SOL SHORT) мог оставаться в Accepted, хотя исчезал из профильных панелей.
