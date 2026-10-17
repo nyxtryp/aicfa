@@ -1877,3 +1877,9 @@
 - Individual trade rows remain clickable; suspicious/non-finite fee records are visibly flagged and excluded from summary statistics pending formula/data audit.
 - Branch `fix/realized-journal-analytics`; implementation commit `d6dadd1549efe7642d27fb17373a00bf9921b5ea`.
 - Still needs regression tests, CI, merge, and production deployment verification. No scanner criteria or live-acceptance mode changed.
+
+
+### 2026-10-17 — Journal source integrity fix (PR pending)
+- Root cause found in dashboard presentation: incoming cards were deduplicated by `symbol|profile`, while the journal retained completed records for individual setup keys. Older valid setups could therefore finish and appear in the journal despite being hidden by the incoming-card deduplication.
+- Branch `fix/journal-only-visible-scan-setups`: incoming panels now render every persisted setup with a non-empty key and only the SCALP/INTRADAY profiles; journal query joins `setup_journal` to `setup_candidates` on exact `setup_key` and filters both profiles to SCALP/INTRADAY.
+- No candle data, auth, settings, scanner criteria, or shadow/live mode changed. CI, merge, and production deployment remain pending; do not claim production is fixed until deploy and post-deploy API checks.

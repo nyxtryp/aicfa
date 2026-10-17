@@ -104,3 +104,9 @@ if __name__ == "__main__":
 - Add All / SCALP / INTRADAY filters; individual trades remain clickable to open their chart/details.
 - Flag implausible or invalid commission/result records and exclude them from aggregate metrics rather than silently letting extreme fee values distort the statistics.
 - Acceptance: dashboard tests pass; calculations are derived from closed journal records; abnormal fees remain visible for audit and are not represented as trusted performance.
+
+
+## Journal/setup source integrity (2026-10-17)
+- Incoming SCALP and INTRADAY panels must display every persisted valid setup, not only the newest setup per symbol/profile. Deduplication by symbol/profile hides setups that can later appear in the realized journal.
+- The realized journal API must join journal rows to their persisted setup candidate by the exact `setup_key`, and allow only `scalp` and `intraday` profiles on both records.
+- Preserve Binance candle history, auth, settings, scanner criteria, and shadow mode. Acceptance requires regression tests showing every journal row has a matching persisted setup and no unsupported profile is returned.
