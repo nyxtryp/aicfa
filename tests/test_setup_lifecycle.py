@@ -36,6 +36,30 @@ class AcceptedLifecycleTests(unittest.TestCase):
         self.assertEqual(decided["status"], "ACCEPTED")
         return payload
 
+    def test_existing_fresh_pac_candidate_is_backfilled_to_accepted(self):
+        now_ms = int(time.time() * 1000)
+        payload = {
+            "key": "SOLUSDT:scalp:long:PAC:OB:100:200",
+            "symbol": "SOLUSDT", "profile": "scalp", "direction": "long",
+            "status": "CANDIDATE", "confirmation_time_ms": now_ms - 10_000,
+            "confirmation_price": 100.0, "stop_price": 95.0, "targets": [110.0],
+            "score": 7, "zone": [98.0, 101.0], "timeframe": "5m",
+        }
+        saved, _ = self.store.save_decision(payload, cooldown_minutes=0, max_active=100)
+        self.assertTrue(saved)
+        migrated = SetupStore(self.store.path)
+        active = migrated.list_active()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["status"], "ACCEPTED")
+        with migrated._connection() as db:
+            events = [
+                row["event_type"] for row in db.execute(
+                    "SELECT event_type FROM setup_candidate_events WHERE setup_key=?",
+                    (payload["key"],),
+                ).fetchall()
+            ]
+        self.assertIn("SETUP_ACCEPTED", events)
+
     def test_pac_scanner_candidate_enters_accepted_tracking(self):
         now_ms = int(time.time() * 1000)
         candle = SimpleNamespace(
