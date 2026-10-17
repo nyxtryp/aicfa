@@ -1,3 +1,16 @@
+## 2026-10-17 — единый источник для SCALP / INTRADAY → Accepted → Strategy Results
+
+- Найдена причина рассинхронизации: `/api/setups` выбирал лишь самый свежий сетап для каждой пары символ/профиль, а `/api/active-setups` отдавал все активные записи. Старый сигнал (например, SOL SHORT) мог оставаться в Accepted, хотя исчезал из профильных панелей.
+- Отключён автоматический backfill старых `CANDIDATE` в `ACCEPTED`; это не источник реальных новых сетапов.
+- Добавлена однократная миграция `accepted_source_sync_v1`: старые несинхронизированные candidates/events и старый journal очищаются при первом запуске нового кода, но обычные последующие перезапуски не сбрасывают новые записи.
+- `/api/setups` и `/api/active-setups` теперь читают один и тот же полный список активных принятых SCALP/INTRADAY сетапов. Дедупликация входящих карточек по symbol/profile снята с этого пути.
+- Удалён произвольный общий cap 100; списки активных сетапов и мониторинга больше не обрезаются неявным лимитом 200. Сохранён gate повторного активного сигнала по одному symbol/profile и cooldown одинаковой зоны.
+- Journal продолжает пополняться только при финальном закрытии ранее принятого сетапа; TP1 завершает весь сетап.
+- Добавлены тесты: однократная очистка legacy-состояния, запрет backfill CANDIDATE, идентичность ключей в двух API и отсутствие общего cap на 105 сетапов.
+- Статус: изменения в отдельной ветке; требуются CI, review/merge и production deploy. До подтверждения активного релиза не считать исправление включённым в production.
+
+---
+
 ### 2026-10-16 — minimum RR 1.49R, deduplication and profile-separated panels
 
 - PAC scanner target selection and RR validation raised from 1.2R to 1.49R; server-side eligibility gate independently rejects RR below 1.49R. `profiles.py` now also declares `min_rr=1.49` for both profiles.

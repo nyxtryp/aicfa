@@ -31,12 +31,12 @@ class AcceptedLifecycleTests(unittest.TestCase):
             "stop_price": 95.0, "targets": [110.0, 115.0],
             "score": 7, "zone": [98.0, 101.0], "timeframe": "5m",
         }
-        saved, decided = self.store.save_decision(payload, cooldown_minutes=0, max_active=100)
+        saved, decided = self.store.save_decision(payload, cooldown_minutes=0)
         self.assertTrue(saved)
         self.assertEqual(decided["status"], "ACCEPTED")
         return payload
 
-    def test_existing_fresh_pac_candidate_is_backfilled_to_accepted(self):
+    def test_existing_candidate_is_not_backfilled_to_accepted(self):
         now_ms = int(time.time() * 1000)
         payload = {
             "key": "SOLUSDT:scalp:long:PAC:OB:100:200",
@@ -45,20 +45,11 @@ class AcceptedLifecycleTests(unittest.TestCase):
             "confirmation_price": 100.0, "stop_price": 95.0, "targets": [110.0],
             "score": 7, "zone": [98.0, 101.0], "timeframe": "5m",
         }
-        saved, _ = self.store.save_decision(payload, cooldown_minutes=0, max_active=100)
+        saved, _ = self.store.save_decision(payload, cooldown_minutes=0)
         self.assertTrue(saved)
-        migrated = SetupStore(self.store.path)
-        active = migrated.list_active()
-        self.assertEqual(len(active), 1)
-        self.assertEqual(active[0]["status"], "ACCEPTED")
-        with migrated._connection() as db:
-            events = [
-                row["event_type"] for row in db.execute(
-                    "SELECT event_type FROM setup_candidate_events WHERE setup_key=?",
-                    (payload["key"],),
-                ).fetchall()
-            ]
-        self.assertIn("SETUP_ACCEPTED", events)
+        reopened = SetupStore(self.store.path)
+        self.assertEqual(reopened.list_active(), [])
+        self.assertEqual(reopened.list_monitored(), [])
 
     def test_pac_scanner_candidate_enters_accepted_tracking(self):
         now_ms = int(time.time() * 1000)
@@ -93,6 +84,103 @@ class AcceptedLifecycleTests(unittest.TestCase):
                 ).fetchall()
             ]
         self.assertIn("SETUP_ACCEPTED", event_types)
+
+    def test_first_sync_migration_clears_stale_accepted_and_strategy_results_once(self):
+        legacy_path = Path(self.tmp.name) / "legacy.sqlite3"
+        legacy = SetupStore(legacy_path)
+        stale_payload = {
+            "key": "SOLUSDT:intraday:short:PAC:old:setup",
+            "symbol": "SOLUSDT", "profile": "intraday", "direction": "short",
+            "status": "ACCEPTED", "confirmation_time_ms": int(time.time() * 1000) - 60_000,
+            "confirmation_price": 100.0, "stop_price": 105.0, "targets": [90.0],
+            "score": 8, "zone": [99.0, 101.0], "timeframe": "15m",
+        }
+        import json
+        with legacy._connection() as db:
+            db.execute("DROP TABLE setup_store_meta")
+            db.execute(
+                """INSERT INTO setup_candidates
+                   (setup_key,symbol,profile,direction,status,confirmation_time_ms,score,zone_key,payload_json)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (stale_payload["key"], stale_payload["symbol"], stale_payload["profile"],
+                 stale_payload["direction"], "ACCEPTED", stale_payload["confirmation_time_ms"],
+                 8, "old-zone", json.dumps(stale_payload)),
+            )
+            db.execute(
+                """INSERT INTO setup_candidate_events(setup_key,event_type,event_time_ms,payload_json)
+                   VALUES (?,?,?,?)""",
+                (stale_payload["key"], "SETUP_ACCEPTED", stale_payload["confirmation_time_ms"], json.dumps(stale_payload)),
+            )
+            db.execute(
+                """INSERT INTO setup_journal
+                   (setup_key,symbol,profile,direction,final_status,opened_at_ms,closed_at_ms,
+                    gross_r,commission_r,net_r,payload_json)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (stale_payload["key"], "SOLUSDT", "intraday", "short", "TP1",
+                 stale_payload["confirmation_time_ms"] - 10_000, stale_payload["confirmation_time_ms"],
+                 2.0, 0.2, 1.8, json.dumps(stale_payload)),
+            )
+        clean = SetupStore(legacy_path)
+        self.assertEqual(clean.list_active(), [])
+        self.assertEqual(clean.list_journal(), [])
+        self.assertEqual(clean.list_candidates(), [])
+        fresh = {
+            "key": "ETHUSDT:scalp:long:PAC:fresh:setup",
+            "symbol": "ETHUSDT", "profile": "scalp", "direction": "long",
+            "status": "ACCEPTED", "confirmation_time_ms": int(time.time() * 1000),
+            "confirmation_price": 100.0, "stop_price": 95.0, "targets": [110.0],
+            "score": 7, "zone": [98.0, 101.0], "timeframe": "5m",
+        }
+        saved, _ = clean.save_decision(fresh, cooldown_minutes=0)
+        self.assertTrue(saved)
+        reopened = SetupStore(legacy_path)
+        self.assertEqual([x["key"] for x in reopened.list_active()], [fresh["key"]])
+
+    def test_active_panel_and_accepted_api_are_the_same_set(self):
+        now_ms = int(time.time() * 1000)
+        for symbol, profile, direction in (
+            ("SOLUSDT", "scalp", "long"),
+            ("BTCUSDT", "scalp", "short"),
+            ("ETHUSDT", "intraday", "long"),
+        ):
+            payload = {
+                "key": f"{symbol}:{profile}:{direction}:PAC:fresh",
+                "symbol": symbol, "profile": profile, "direction": direction,
+                "status": "ACCEPTED", "confirmation_time_ms": now_ms,
+                "confirmation_price": 100.0,
+                "stop_price": 95.0 if direction == "long" else 105.0,
+                "targets": [110.0 if direction == "long" else 90.0],
+                "score": 7, "zone": [98.0, 101.0], "timeframe": "5m",
+            }
+            saved, _ = self.store.save_decision(payload, cooldown_minutes=0)
+            self.assertTrue(saved)
+        connected_status = {"groups": {"tradfi": {"status": "connected"}, "crypto": {"status": "connected"}}}
+        with patch.object(main.market_data, "status", return_value=connected_status):
+            panels = asyncio.run(main.setup_candidates())
+            accepted = asyncio.run(main.active_setups())
+        panel_keys = [x["key"] for x in panels["candidates"]]
+        accepted_keys = [x["key"] for x in accepted["setups"]]
+        self.assertEqual(panel_keys, accepted_keys)
+        self.assertEqual(panels["candidates"], accepted["setups"])
+        self.assertEqual(len(panel_keys), 3)
+        self.assertEqual(sum(x["profile"] == "scalp" for x in panels["candidates"]), 2)
+        self.assertEqual(sum(x["profile"] == "intraday" for x in panels["candidates"]), 1)
+
+    def test_more_than_one_hundred_distinct_setups_are_not_capped(self):
+        now_ms = int(time.time() * 1000)
+        for index in range(105):
+            symbol = f"TEST{index}USDT"
+            payload = {
+                "key": f"{symbol}:scalp:long:PAC:{index}",
+                "symbol": symbol, "profile": "scalp", "direction": "long",
+                "status": "ACCEPTED", "confirmation_time_ms": now_ms + index,
+                "confirmation_price": 100.0, "stop_price": 95.0, "targets": [110.0],
+                "score": 7, "zone": [98.0, 101.0], "timeframe": "5m",
+            }
+            saved, _ = self.store.save_decision(payload, cooldown_minutes=0)
+            self.assertTrue(saved, symbol)
+        self.assertEqual(self.store.active_count(), 105)
+        self.assertEqual(len(self.store.list_active()), 105)
 
     def candle(self, *, close_time_ms, low, high, close):
         return SimpleNamespace(
