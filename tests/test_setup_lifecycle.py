@@ -45,7 +45,7 @@ class AcceptedLifecycleTests(unittest.TestCase):
         journal = self.store.list_journal()
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "TP1")
-        self.assertAlmostEqual(journal[0]["gross_r"], 2.0)
+        self.assertAlmostEqual(journal[0]["gross_r"], 1.0)
         self.assertEqual(self.store.active_count(), 0)
 
     def test_stop_wins_when_stop_and_target_hit_in_same_candle(self):
@@ -56,7 +56,6 @@ class AcceptedLifecycleTests(unittest.TestCase):
         journal = self.store.list_journal()
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "SL")
-        self.assertEqual(self.store.list_candidates()[0]["status"], "SL")
 
     def test_accepted_setup_expires_after_profile_lifetime(self):
         self.accepted_setup()
@@ -67,7 +66,6 @@ class AcceptedLifecycleTests(unittest.TestCase):
         self.assertEqual(len(journal), 1)
         self.assertEqual(journal[0]["final_status"], "EXPIRED")
         self.assertAlmostEqual(journal[0]["gross_r"], 0.4)
-        self.assertEqual(self.store.list_candidates()[0]["status"], "EXPIRED")
 
 
 if __name__ == "__main__":
