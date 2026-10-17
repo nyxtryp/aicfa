@@ -347,7 +347,7 @@ async def _on_closed_candle(candle) -> None:
                         # it never submits an exchange order or enables real trading.
                         payload["status"] = "ACCEPTED" if decision.status == "ELIGIBLE" else decision.status
                 saved, payload = _get_setup_store().save_decision(
-                    payload, cooldown_minutes=30 if candidate.profile == "scalp" else 120, max_active=8
+                    payload, cooldown_minutes=30 if candidate.profile == "scalp" else 120, max_active=100
                 )
                 if saved:
                     _setup_candidates[candidate.key] = payload
