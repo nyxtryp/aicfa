@@ -1943,3 +1943,11 @@
 - Removed the invented partial-close/breakeven path. Original SL is still evaluated first, so if the same candle reaches original SL and TP1, the conservative SL outcome remains.
 - Added a regression test asserting full TP1 gross R, round-trip commission R, and net R when the candle also revisits entry. Historical journal rows are not rewritten; this affects future lifecycle results after deploy.
 - Pending CI and review; production deployment not yet verified.
+
+
+## 2026-10-18 — Fee-aware PAC risk and legacy journal anomalies
+
+- Production DB audit found historical commission costs as high as 8.25R, including 5 rows above the old UI's 5R anomaly cutoff; several legacy rows also have final status SL with positive gross R, inconsistent with the current rule that TP1 closes the whole setup.
+- Increased the PAC stop floor from max(0.5 × ATR, entry × 4 × per-side fee) to max(0.5 × ATR, entry × 8 × per-side fee), reducing the maximum expected fee burden for newly accepted setups without widening stops or bypassing filters.
+- Strategy metrics now exclude commission >0.75R and SL rows with positive gross R. The raw journal entries remain visible and flagged; no historical rows are deleted or rewritten.
+- Added dashboard regression assertions for both changes. This is a code change only until CI is green, merged, and the deployed release is verified.
