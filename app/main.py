@@ -119,16 +119,6 @@ def _advance_active_setups(candle, *, publish: bool = True) -> None:
             continue
         stages = {"CANDIDATE": 0, "ACCEPTED": 0, "TP1": 1, "TP2": 2}
         stage = stages.get(status, 3)
-        first_target_hit = (high >= targets[0]) if direction == "long" else (low <= targets[0])
-        breakeven_hit = (low <= entry) if direction == "long" else (high >= entry)
-        if status == "ACCEPTED" and first_target_hit and breakeven_hit:
-            target = targets[0]
-            gross_r += 0.5 * ((target - entry) if direction == "long" else (entry - target)) / risk
-            commission_r += 0.5 * COMMISSION_RATE_PER_SIDE * (entry + target) / risk
-            commission_r += 0.5 * COMMISSION_RATE_PER_SIDE * (entry + entry) / risk
-            payload.update({"status": "SL", "gross_r": gross_r, "commission_r": commission_r})
-            _finish_setup(payload, store, now_ms, "SL", publish=publish)
-            continue
         reached = []
         for idx in range(stage, len(targets)):
             target = targets[idx]
