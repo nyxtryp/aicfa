@@ -213,6 +213,19 @@ class AcceptedLifecycleTests(unittest.TestCase):
             low=low, high=high, close=close,
         )
 
+    def test_tp1_closes_full_setup_even_if_same_candle_revisits_entry(self):
+        self.accepted_setup()
+        main._advance_active_setups(self.candle(
+            close_time_ms=2_000, low=99.5, high=111.0, close=110.0
+        ), publish=False)
+        journal = self.store.list_journal()
+        self.assertEqual(len(journal), 1)
+        self.assertEqual(journal[0]["final_status"], "TP1")
+        self.assertAlmostEqual(journal[0]["gross_r"], 2.0)
+        self.assertAlmostEqual(journal[0]["commission_r"], 0.021)
+        self.assertAlmostEqual(journal[0]["net_r"], 1.979)
+        self.assertEqual(self.store.active_count(), 0)
+
     def test_accepted_setup_closes_and_is_journaled_at_tp1(self):
         self.accepted_setup()
         main._advance_active_setups(self.candle(
