@@ -129,17 +129,29 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(candidates, [])
 
     def test_rejects_price_chasing_far_from_zone(self):
+        series = dict(self.series)
+        trigger = list(series["5m"])
+        # Candle 38 retests the zone after the trigger; the latest close then
+        # moves 1 ATR away, so the scanner must reject the chased entry.
+        for index, high, low in ((38, 100.5, 98.5), (39, 101.0, 99.5)):
+            original = trigger[index]
+            trigger[index] = SimpleNamespace(
+                open_time_ms=original.open_time_ms, close_time_ms=original.close_time_ms,
+                open=100.0, high=high, low=low, close=100.0, volume=100.0,
+            )
+        series["5m"] = tuple(trigger)
+
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "15m":
                 result.order_blocks = (
-                    SimpleNamespace(direction="bullish", lower=95.0, upper=96.0,
+                    SimpleNamespace(direction="bullish", lower=98.0, upper=99.0,
                                     candle_index=25, confirmation_index=30),
                 )
             return result
 
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
-            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
 
         self.assertEqual(candidates, [])
 
