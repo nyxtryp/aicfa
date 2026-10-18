@@ -1951,3 +1951,10 @@
 - Increased the PAC stop floor from max(0.5 × ATR, entry × 4 × per-side fee) to max(0.5 × ATR, entry × 8 × per-side fee), reducing the maximum expected fee burden for newly accepted setups without widening stops or bypassing filters.
 - Strategy metrics now exclude commission >0.75R and SL rows with positive gross R. The raw journal entries remain visible and flagged; no historical rows are deleted or rewritten.
 - Added dashboard regression assertions for both changes. This is a code change only until CI is green, merged, and the deployed release is verified.
+
+
+## 2026-10-18 — Require a real PAC confirmation-timeframe trigger
+- Audit found PAC candidates could be accepted with `trigger_structure_aligned=false`: the score starts at 4 and the acceptance branch does not enforce a recent confirmation-timeframe BOS/CHoCH.
+- Added a hard entry-trigger requirement: a direction-aligned confirmation-timeframe structure break must be no more than three closed candles old. This does not make sweep or PD mandatory and does not loosen any filter.
+- Added regression coverage for rejecting the missing-trigger case and updated the PAC fixture to include a recent break in its eligible case.
+- Pending CI/review/merge/deploy. Existing accepted/journal rows are not rewritten.

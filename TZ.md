@@ -145,3 +145,10 @@ if __name__ == "__main__":
 - PAC acceptance requires stop distance >= max(0.5 × ATR, entry × 8 × configured per-side commission rate). This bounds estimated round-trip fees relative to initial risk; never widen a stop artificially to force acceptance.
 - Strategy summary excludes records with commission above 0.75R or with final status SL and positive gross R. These legacy records remain visible in the journal with an anomaly warning; they are not deleted or silently rewritten.
 - Regression tests cover the stricter cost floor and anomaly classification.
+
+
+## PAC entry trigger structure requirement (2026-10-18)
+- A PAC candidate must have a recent BOS/CHoCH in the profile's confirmation timeframe, aligned with the higher-timeframe direction and no older than three closed candles.
+- Higher-timeframe bias plus a nearby/retested OB/FVG and valid risk/reward is not sufficient by itself to create an ACCEPTED setup.
+- Liquidity sweep, Premium/Discount, internal structure, and extra-timeframe alignment remain confluences, not universal hard gates.
+- Regression: PAC scanner rejects a setup when no recent aligned confirmation-timeframe structure break exists and accepts the aligned-trigger case.
