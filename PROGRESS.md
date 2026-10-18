@@ -1935,3 +1935,11 @@
 - PAC acceptance now requires stop distance >= max(0.5 × ATR, entry × 4 × configured per-side commission rate). Too-tight stops are rejected with reason `pac_stop_too_tight`; no stop is artificially widened and no scanner filters are bypassed.
 - Added a lifecycle regression test ensuring a PAC candidate with a 0.1% stop distance at entry 100 / ATR 1 is not accepted (minimum is 0.5 price units under the current rule).
 - Pending CI and review; do not consider production fixed until PR is merged, deployed, and active release verified. Existing journal results are historical and are not rewritten by this fix.
+
+
+## 2026-10-18 — TP1 result calculation consistency
+
+- Found a lifecycle accounting branch that treated a 1m candle touching both TP1 and entry (but not the original SL) as a 50% TP1 close plus 50% breakeven. This contradicted the documented rule that TP1 closes the entire paper setup.
+- Removed the invented partial-close/breakeven path. Original SL is still evaluated first, so if the same candle reaches original SL and TP1, the conservative SL outcome remains.
+- Added a regression test asserting full TP1 gross R, round-trip commission R, and net R when the candle also revisits entry. Historical journal rows are not rewritten; this affects future lifecycle results after deploy.
+- Pending CI and review; production deployment not yet verified.
