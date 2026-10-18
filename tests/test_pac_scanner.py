@@ -61,6 +61,18 @@ class PACScannerTests(unittest.TestCase):
         self.assertGreaterEqual(candidate.score, 6)
         self.assertEqual(candidate.evidence["zone_distance_atr"], 0.0)
 
+    def test_scalp_rejects_without_current_aligned_one_minute_confirmation(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "1m":
+                result.structure_breaks = ()
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
+
     def test_rejects_without_recent_trigger_structure(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
