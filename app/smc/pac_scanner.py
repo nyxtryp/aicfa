@@ -175,6 +175,11 @@ def scan_symbol(
             ev = extra.structure_breaks[-1]
             age = len(extra_series) - 1 - int(ev.candle_index)
             extra_aligned = ev.direction == expected and 0 <= age <= 4
+        # Scalp's configured 1m extra timeframe is an entry confirmation, not
+        # a bonus that can be outweighed by unrelated confluences.
+        if profile.extra_confirmation_timeframe and not extra_aligned:
+            count("no_recent_extra_confirmation")
+            continue
 
         # Four base points represent mandatory gates already passed:
         # HTF bias, confirmed directional zone, causal post-trigger retest,
