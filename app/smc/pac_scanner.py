@@ -140,6 +140,11 @@ def scan_symbol(
         trigger_break = confirm.structure_breaks[-1] if confirm.structure_breaks else None
         trigger_break_age = len(trigger) - 1 - int(trigger_break.candle_index) if trigger_break else 999
         trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 3)
+        # A PAC setup needs a recent BOS/CHoCH in the confirmation timeframe.
+        # HTF bias plus a nearby zone alone is not an entry trigger.
+        if not trigger_aligned:
+            count("no_recent_trigger_structure")
+            continue
         internal = False
         if len(trigger) >= 5:
             # Existing internal-structure helper is intentionally optional;
