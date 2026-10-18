@@ -139,3 +139,9 @@ if __name__ == "__main__":
 - Принятый paper-сетап завершается по фактическому SL, достижению TP1 (закрывает весь сетап) либо сроку жизни профиля; зона остаётся доказательством исходного входа, а не дополнительным стопом.
 - Противоположный CHoCH может инвалидировать только ещё не принятый `CANDIDATE`; новые критерии сканера и RR не меняются.
 - Regression: выход за границу зоны и противоположный CHoCH не снимают `ACCEPTED`; SL/TP/EXPIRED по-прежнему завершают жизненный цикл.
+
+
+### Fee-aware stop and journal integrity (2026-10-18)
+- PAC acceptance requires stop distance >= max(0.5 × ATR, entry × 8 × configured per-side commission rate). This bounds estimated round-trip fees relative to initial risk; never widen a stop artificially to force acceptance.
+- Strategy summary excludes records with commission above 0.75R or with final status SL and positive gross R. These legacy records remain visible in the journal with an anomaly warning; they are not deleted or silently rewritten.
+- Regression tests cover the stricter cost floor and anomaly classification.
