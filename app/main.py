@@ -308,8 +308,8 @@ async def _on_closed_candle(candle) -> None:
                             (candidate.targets[0] > candidate.confirmation_price if candidate.direction == "long"
                              else candidate.targets[0] < candidate.confirmation_price)
                         )
-                        if (not fresh or risk < min_stop_distance or rr < 1.49 or not target_on_correct_side
-                                or float(tick_info.get("tick_size", 0)) <= 0):
+                        if (not fresh or risk <= 0 or rr < 1.49 or not target_on_correct_side
+                                or risk < min_stop_distance or float(tick_info.get("tick_size", 0)) <= 0):
                             payload["status"] = "REJECTED"
                             payload["decision_reasons"] = [
                                 "pac_stop_too_tight" if risk > 0 and risk < min_stop_distance
