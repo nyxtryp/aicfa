@@ -1928,3 +1928,10 @@
 - Root cause: `_advance_active_setups()` treated a close beyond the original OB/FVG zone as a final `INVALIDATED` outcome; `_invalidate_on_opposite_choch()` also invalidated accepted setups independently of SL/TP.
 - Branch `fix/accepted-setups-close-only-by-trade-lifecycle`: accepted setups now close only by SL, TP1 (entire setup), or profile expiry. Zone-boundary invalidation is removed after acceptance; opposite CHoCH invalidation remains limited to unaccepted `CANDIDATE` rows. Scanner signal criteria and shadow-only/no-exchange-order behavior are unchanged.
 - Added lifecycle regressions for close outside the zone and opposite CHoCH. CI and deployment verification pending; existing historical INVALIDATED records are not rewritten.
+
+## 2026-10-18 — reject PAC setups with excessively tight stops
+
+- Root cause: the PAC acceptance branch checked freshness, positive risk, RR, target direction, and tick size, but skipped the minimum stop-distance gate used by the regular SMC path.
+- PAC acceptance now requires stop distance >= max(0.5 × ATR, entry × 4 × configured per-side commission rate). Too-tight stops are rejected with reason `pac_stop_too_tight`; no stop is artificially widened and no scanner filters are bypassed.
+- Added a lifecycle regression test ensuring a PAC candidate with a 0.1% stop distance at entry 100 / ATR 1 is not accepted (minimum is 0.5 price units under the current rule).
+- Pending CI and review; do not consider production fixed until PR is merged, deployed, and active release verified. Existing journal results are historical and are not rewritten by this fix.

@@ -297,6 +297,10 @@ async def _on_closed_candle(candle) -> None:
                         # structural/zone/ATR/RR rules. Do not run the legacy SMC
                         # hard-gates here (sweep, PD/OTE, mandatory 1m, old score).
                         risk = abs(candidate.confirmation_price - candidate.stop_price)
+                        min_stop_distance = max(
+                            0.5 * float(candidate.atr),
+                            candidate.confirmation_price * 4 * COMMISSION_RATE_PER_SIDE,
+                        )
                         reward = abs(candidate.targets[0] - candidate.confirmation_price) if candidate.targets else 0.0
                         rr = reward / risk if risk > 0 else 0.0
                         target_on_correct_side = (
@@ -305,9 +309,12 @@ async def _on_closed_candle(candle) -> None:
                              else candidate.targets[0] < candidate.confirmation_price)
                         )
                         if (not fresh or risk <= 0 or rr < 1.49 or not target_on_correct_side
-                                or float(tick_info.get("tick_size", 0)) <= 0):
+                                or risk < min_stop_distance or float(tick_info.get("tick_size", 0)) <= 0):
                             payload["status"] = "REJECTED"
-                            payload["decision_reasons"] = ["pac_invalid_risk_target_or_rr"]
+                            payload["decision_reasons"] = [
+                                "pac_stop_too_tight" if risk > 0 and risk < min_stop_distance
+                                else "pac_invalid_risk_target_or_rr"
+                            ]
                         else:
                             payload["entry_limit"] = candidate.confirmation_price
                             payload["risk_reward"] = rr
