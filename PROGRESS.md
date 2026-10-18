@@ -1969,3 +1969,6 @@
 - Enforce each profile's configured score threshold. Four base points represent mandatory gates already passed; additional points are explicit confluences.
 - Add regressions for stale/pre-trigger retests, missing liquidity, nearest target below RR floor, price chasing, trigger freshness and score threshold.
 - No exchange orders are submitted. Changes remain unmerged until CI passes; no production deployment is implied.
+
+
+- Follow-up: PAC scalp now treats its configured 1m timeframe as mandatory fresh direction-aligned entry confirmation, matching the scalp profile intent; absence or stale/opposite structure rejects the setup instead of merely reducing its score.
