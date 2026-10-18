@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -100,19 +101,30 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(candidates, [])
 
     def test_old_touch_before_trigger_does_not_count_as_retest(self):
+        # Candle 36 touched the zone and candle 37 is the trigger break. Candles
+        # 38-39 stay above it; entry remains within 0.75 ATR so only causality
+        # (not the anti-chase rule) should reject this candidate.
+        series = dict(self.series)
+        trigger = list(series["5m"])
+        for index in (38, 39):
+            original = trigger[index]
+            trigger[index] = SimpleNamespace(
+                open_time_ms=original.open_time_ms, close_time_ms=original.close_time_ms,
+                open=100.0, high=100.5, low=99.8, close=100.0, volume=100.0,
+            )
+        series["5m"] = tuple(trigger)
+
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
-            if timeframe == "5m":
-                # Trigger break is on candle 37; no post-trigger candle touches zone.
+            if timeframe == "15m":
                 result.order_blocks = (
-                    SimpleNamespace(direction="bullish", lower=90.0, upper=91.0,
+                    SimpleNamespace(direction="bullish", lower=99.2, upper=99.5,
                                     candle_index=25, confirmation_index=30),
                 )
-                result.liquidity_levels = (SimpleNamespace(price=104.0),)
             return result
 
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
-            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
 
         self.assertEqual(candidates, [])
 
@@ -132,14 +144,14 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(candidates, [])
 
     def test_profile_threshold_is_enforced(self):
+        strict_scalp = replace(PROFILES_FOR_TEST["scalp"], score_threshold=8)
         with patch("app.smc.pac_scanner._analysis", side_effect=lambda candles, profile, timeframe: fake_analysis(timeframe)):
             with patch("app.smc.pac_scanner.PROFILES", {
-                "scalp": PROFILES_FOR_TEST["scalp"],
+                "scalp": strict_scalp,
                 "intraday": PROFILES_FOR_TEST["intraday"],
             }):
                 candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
-        self.assertEqual(len(candidates), 1)
-        self.assertGreaterEqual(candidates[0].score, 6)
+        self.assertEqual(candidates, [])
 
     def test_intraday_profile_uses_15m_trigger(self):
         def analysis(candles, profile, timeframe):
