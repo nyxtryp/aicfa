@@ -1958,3 +1958,14 @@
 - Added a hard entry-trigger requirement: a direction-aligned confirmation-timeframe structure break must be no more than three closed candles old. This does not make sweep or PD mandatory and does not loosen any filter.
 - Added regression coverage for rejecting the missing-trigger case and updated the PAC fixture to include a recent break in its eligible case.
 - Pending CI/review/merge/deploy. Existing accepted/journal rows are not rewritten.
+
+
+## 2026-10-18 — PAC causal retest, real liquidity targets, score enforcement (PR in progress)
+
+- Require a direction-aligned confirmation-timeframe BOS/CHoCH no older than three closed candles before considering a PAC entry.
+- Separate OB source-candle time from OB confirmation-candle time; a retest only qualifies when a closed trigger candle touches the zone strictly after both zone confirmation and trigger BOS/CHoCH.
+- Reject setups that have moved more than 0.75 ATR away from the selected zone; a historical touch alone no longer justifies chasing price.
+- Remove the synthetic 2R fallback. TP1 must be the nearest directional liquidity target; if it does not meet the profile minimum RR, reject instead of skipping it for a farther target.
+- Enforce each profile's configured score threshold. Four base points represent mandatory gates already passed; additional points are explicit confluences.
+- Add regressions for stale/pre-trigger retests, missing liquidity, nearest target below RR floor, price chasing, trigger freshness and score threshold.
+- No exchange orders are submitted. Changes remain unmerged until CI passes; no production deployment is implied.
