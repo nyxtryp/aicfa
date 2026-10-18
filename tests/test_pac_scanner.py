@@ -6,10 +6,15 @@ from unittest.mock import patch
 from app.smc.pac_scanner import scan_symbol
 
 
+END_MS = 1_800_000_000_000
+
+
 def candle(index, timeframe_minutes=5, close=100.0):
+    step = timeframe_minutes * 60_000
+    opened = END_MS - (40 - index) * step
     return SimpleNamespace(
-        open_time_ms=1_800_000_000_000 + index * 60_000,
-        close_time_ms=1_800_000_000_000 + (index + 1) * 60_000 - 1,
+        open_time_ms=opened,
+        close_time_ms=opened + step - 1,
         open=close, high=close + 1.0, low=close - 1.0, close=close, volume=100.0,
     )
 
@@ -19,12 +24,13 @@ def fake_analysis(timeframe):
     block = SimpleNamespace(direction="bullish", lower=98.0, upper=101.0,
                             candle_index=25, confirmation_index=30)
     return SimpleNamespace(
-        structure_breaks=(bias_break,) if timeframe in {"1h", "15m", "5m"} else (),
+        structure_breaks=(bias_break,) if timeframe in {"1h", "15m", "5m", "1m"} else (),
         swings=(), as_of_index=39, order_blocks=(block,),
         order_block_mitigation=(SimpleNamespace(mitigated=False),),
         fvg=(), fvg_fill=(), atr=(1.0,) * 40,
         liquidity_levels=(SimpleNamespace(price=104.0),),
-        sweeps=(), average_volume=(100.0,) * 40,
+        sweeps=(SimpleNamespace(direction="bullish", candle_index=37),),
+        average_volume=(100.0,) * 40,
     )
 
 
@@ -38,7 +44,7 @@ class PACScannerTests(unittest.TestCase):
             "4h": tuple(candle(i, 240, 99.0) for i in range(40)),
         }
 
-    def test_pac_path_generates_candidate_without_sweep_or_pd_gate(self):
+    def test_pac_path_generates_candidate_with_real_liquidity_and_score(self):
         def analysis(candles, profile, timeframe):
             return fake_analysis(timeframe)
 
@@ -46,11 +52,15 @@ class PACScannerTests(unittest.TestCase):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
 
         self.assertEqual(len(candidates), 1)
-        self.assertEqual(candidates[0].status, "CANDIDATE")
-        self.assertEqual(candidates[0].direction, "long")
-        self.assertIn(":PAC:", candidates[0].key)
+        candidate = candidates[0]
+        self.assertEqual(candidate.status, "CANDIDATE")
+        self.assertEqual(candidate.direction, "long")
+        self.assertIn(":PAC:", candidate.key)
+        self.assertEqual(candidate.targets[0], 104.0)
+        self.assertGreaterEqual(candidate.score, 6)
+        self.assertEqual(candidate.evidence["zone_distance_atr"], 0.0)
 
-    def test_pac_rejects_without_recent_trigger_structure(self):
+    def test_rejects_without_recent_trigger_structure(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "5m":
@@ -62,10 +72,74 @@ class PACScannerTests(unittest.TestCase):
 
         self.assertEqual(candidates, [])
 
-    def test_scanner_enforces_rr_floor_149(self):
-        source = (Path(__file__).resolve().parents[1] / "app" / "smc" / "pac_scanner.py").read_text()
-        self.assertIn("abs(p-entry) >= 1.49*risk", source)
-        self.assertIn("if rr < 1.49:", source)
+    def test_rejects_when_no_directional_liquidity_target(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                result.liquidity_levels = ()
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
+
+    def test_nearest_liquidity_below_minimum_rr_is_not_skipped(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                result.liquidity_levels = (
+                    SimpleNamespace(price=101.0),
+                    SimpleNamespace(price=104.0),
+                )
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
+
+    def test_old_touch_before_trigger_does_not_count_as_retest(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                # Trigger break is on candle 37; no post-trigger candle touches zone.
+                result.order_blocks = (
+                    SimpleNamespace(direction="bullish", lower=90.0, upper=91.0,
+                                    candle_index=25, confirmation_index=30),
+                )
+                result.liquidity_levels = (SimpleNamespace(price=104.0),)
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
+
+    def test_rejects_price_chasing_far_from_zone(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                result.order_blocks = (
+                    SimpleNamespace(direction="bullish", lower=95.0, upper=96.0,
+                                    candle_index=25, confirmation_index=30),
+                )
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
+
+    def test_profile_threshold_is_enforced(self):
+        with patch("app.smc.pac_scanner._analysis", side_effect=lambda candles, profile, timeframe: fake_analysis(timeframe)):
+            with patch("app.smc.pac_scanner.PROFILES", {
+                "scalp": PROFILES_FOR_TEST["scalp"],
+                "intraday": PROFILES_FOR_TEST["intraday"],
+            }):
+                candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+        self.assertEqual(len(candidates), 1)
+        self.assertGreaterEqual(candidates[0].score, 6)
 
     def test_intraday_profile_uses_15m_trigger(self):
         def analysis(candles, profile, timeframe):
@@ -80,6 +154,9 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].profile, "intraday")
         self.assertEqual(candidates[0].timeframe, "15m")
+
+
+from app.smc.profiles import PROFILES as PROFILES_FOR_TEST
 
 
 if __name__ == "__main__":
