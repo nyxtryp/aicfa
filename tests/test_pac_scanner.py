@@ -15,11 +15,11 @@ def candle(index, timeframe_minutes=5, close=100.0):
 
 
 def fake_analysis(timeframe):
-    bias_break = SimpleNamespace(direction="bullish", candle_index=35, swing_index=30)
+    bias_break = SimpleNamespace(direction="bullish", candle_index=37, swing_index=30)
     block = SimpleNamespace(direction="bullish", lower=98.0, upper=101.0,
                             candle_index=25, confirmation_index=30)
     return SimpleNamespace(
-        structure_breaks=(bias_break,) if timeframe in {"1h", "15m"} else (),
+        structure_breaks=(bias_break,) if timeframe in {"1h", "15m", "5m"} else (),
         swings=(), as_of_index=39, order_blocks=(block,),
         order_block_mitigation=(SimpleNamespace(mitigated=False),),
         fvg=(), fvg_fill=(), atr=(1.0,) * 40,
@@ -49,6 +49,18 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(candidates[0].status, "CANDIDATE")
         self.assertEqual(candidates[0].direction, "long")
         self.assertIn(":PAC:", candidates[0].key)
+
+    def test_pac_rejects_without_recent_trigger_structure(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                result.structure_breaks = ()
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
 
     def test_scanner_enforces_rr_floor_149(self):
         source = (Path(__file__).resolve().parents[1] / "app" / "smc" / "pac_scanner.py").read_text()
