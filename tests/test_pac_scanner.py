@@ -131,7 +131,7 @@ class PACScannerTests(unittest.TestCase):
     def test_rejects_price_chasing_far_from_zone(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
-            if timeframe == "5m":
+            if timeframe == "15m":
                 result.order_blocks = (
                     SimpleNamespace(direction="bullish", lower=95.0, upper=96.0,
                                     candle_index=25, confirmation_index=30),
