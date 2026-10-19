@@ -209,7 +209,7 @@ def scan_symbol(
         evidence = {
             "higher_timeframe_bias_aligned": True,
             "active_ob_fvg_zone": True,
-            "zone_retested_or_current": bool(retested or in_zone),
+            "zone_retested_or_current": True,
             "trigger_structure_aligned": trigger_aligned,
             "internal_structure_aligned": internal,
             "liquidity_sweep": sweep_aligned,
