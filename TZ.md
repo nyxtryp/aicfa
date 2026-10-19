@@ -169,3 +169,10 @@ if __name__ == "__main__":
 ## 2026-10-19 — Revert PAC minimum stop-distance gate (2d8ce31)
 - Remove the additional PAC acceptance gate requiring stop distance >= 0.5 × ATR. Keep positive risk, RR >= 1.49, correct-side target, valid tick size, freshness, causal retest, profile score, scalp 1m confirmation, and the other existing PAC quality filters.
 - This restores prior candidate eligibility; it does not widen stops or disable unrelated filters. Review candidate quality and stop-distance distribution after deployment.
+
+### PAC scanner zone-selection regression — 2026-10-20
+
+- For each symbol/profile, determine causal post-trigger retests for all active, direction-aligned OB/FVG zones before selecting the entry zone.
+- Select the nearest zone only from those with a confirmed post-zone-confirmation and post-directional-BOS/CHoCH retest in the recent trigger-candle window.
+- An untouched nearer zone must not suppress a farther valid retested zone. Keep the existing six-candle lookback, anti-chase limit, nearest confirmed liquidity TP1, minimum 1.49R, closed-candle-only processing, and profile score requirements.
+- Regression: nearest zone untouched + second zone retested => choose second zone; pre-trigger-only touch => reject; no retested zones => reject. Validate with unit tests and offline replay before production deployment.
