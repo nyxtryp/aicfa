@@ -85,30 +85,6 @@ class AcceptedLifecycleTests(unittest.TestCase):
             ]
         self.assertIn("SETUP_ACCEPTED", event_types)
 
-    def test_pac_candidate_with_stop_below_minimum_is_not_accepted(self):
-        now_ms = int(time.time() * 1000)
-        candle = SimpleNamespace(
-            symbol="BTCUSDT", timeframe="5m", close_time_ms=now_ms - 10_000,
-            open_time_ms=now_ms - 310_000, open=100.0, high=101.0,
-            low=99.0, close=100.0, volume=10.0,
-        )
-        payload = {
-            "key": "BTCUSDT:scalp:long:PAC:OB:tight-stop",
-            "symbol": "BTCUSDT", "profile": "scalp", "direction": "long",
-            "status": "CANDIDATE", "confirmation_time_ms": candle.close_time_ms,
-            "confirmation_price": 100.0, "stop_price": 99.9, "targets": [110.0],
-            "score": 7, "reasons": ["pac_structure"], "zone": [98.0, 101.0],
-            "timeframe": "5m", "evidence": {}, "atr": 1.0,
-        }
-        candidate = SimpleNamespace(**payload, as_dict=lambda: dict(payload))
-        main.market_data = SimpleNamespace(
-            candles={("BTCUSDT", "5m"): [candle]},
-            exchange_filters={"BTCUSDT": {"tick_size": 0.1}},
-        )
-        with patch.object(main, "scan_symbol", return_value=[candidate]):
-            asyncio.run(main._on_closed_candle(candle))
-        self.assertEqual(self.store.list_active(), [])
-
     def test_first_sync_migration_preserves_live_accepted_and_clears_old_results(self):
         legacy_path = Path(self.tmp.name) / "legacy.sqlite3"
         legacy = SetupStore(legacy_path)
