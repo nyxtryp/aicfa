@@ -67,11 +67,13 @@ def scan_symbol(
         trigger_break = confirm.structure_breaks[-1] if confirm.structure_breaks else None
         trigger_break_age = len(trigger) - 1 - int(trigger_break.candle_index) if trigger_break else 999
         trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 3)
-        # A PAC setup needs a recent BOS/CHoCH in the confirmation timeframe.
-        if not trigger_aligned:
-            count("no_recent_trigger_structure")
-            continue
-        trigger_break_close_ms = int(trigger[int(trigger_break.candle_index)].close_time_ms)
+        # A recent aligned trigger is a confluence, not a universal hard gate.
+        # If present, use it to enforce causal retesting; otherwise require a retest
+        # after the zone itself was confirmed.
+        trigger_break_close_ms = (
+            int(trigger[int(trigger_break.candle_index)].close_time_ms)
+            if trigger_break and trigger_break.direction == expected else None
+        )
 
         # Keep source and confirmation indices separate: an OB is not actionable
         # until its confirmation candle has closed.
@@ -107,7 +109,7 @@ def scan_symbol(
 
         # Require an actual retest AFTER both the zone was confirmed and the
         # directional trigger BOS/CHoCH closed. Old touches cannot qualify.
-        causal_after_ms = max(zone_confirmation_ms, trigger_break_close_ms)
+        causal_after_ms = max(zone_confirmation_ms, trigger_break_close_ms or zone_confirmation_ms)
         recent = [
             c for c in trigger[-6:]
             if int(c.close_time_ms) > causal_after_ms
@@ -181,11 +183,10 @@ def scan_symbol(
             count("no_recent_extra_confirmation")
             continue
 
-        # Four base points represent mandatory gates already passed:
-        # HTF bias, confirmed directional zone, causal post-trigger retest,
-        # and fresh aligned trigger structure. Remaining points are explicit
-        # confluences; enforce the profile threshold rather than merely display it.
-        score = min(10, 4 + int(internal) + int(sweep_aligned) + int(zone_tf_aligned) + int(pd_aligned) + int(extra_aligned))
+        # Three base points represent mandatory gates already passed:
+        # HTF bias, confirmed directional zone, and causal retest. Structure
+        # confirmation and other confluences add points; enforce the profile threshold.
+        score = min(10, 3 + int(trigger_aligned) + int(internal) + int(sweep_aligned) + int(zone_tf_aligned) + int(pd_aligned) + int(extra_aligned))
         if score < profile.score_threshold:
             count("score_below_profile_threshold")
             continue

@@ -152,3 +152,9 @@ if __name__ == "__main__":
 - Higher-timeframe bias plus a nearby/retested OB/FVG and valid risk/reward is not sufficient by itself to create an ACCEPTED setup.
 - Liquidity sweep, Premium/Discount, internal structure, and extra-timeframe alignment remain confluences, not universal hard gates.
 - Regression: PAC scanner rejects a setup when no recent aligned confirmation-timeframe structure break exists and accepts the aligned-trigger case.
+
+
+## 2026-10-19 — Revert mandatory recent PAC trigger gate (70c016c)
+- The confirmation-timeframe BOS/CHoCH is restored as a scored confluence rather than a universal hard rejection. A valid directional zone and a retest after zone confirmation remain required; when a directional trigger exists, retesting must still occur after it.
+- Score base reduced from four to three mandatory gates to avoid implicitly retaining the reverted trigger requirement. Profile score thresholds, 1m scalp confirmation, fee-aware stop, nearest-liquidity TP1, RR floor, anti-chase, and causal retest checks remain enabled.
+- Added regression coverage that a candidate can qualify without a recent confirmation-timeframe trigger when the remaining confluences satisfy the profile score. No production deployment implied; run CI and verify live rejection counters after deploy.
