@@ -97,8 +97,33 @@ def scan_symbol(
             count("no_directional_ob_fvg")
             continue
 
+        # Evaluate causal retests for every active zone before choosing one.
+        # Previously we picked the nearest zone first, then rejected the whole
+        # symbol if that one had no post-trigger retest—even when another valid
+        # directional OB/FVG had been retested and remained close to price.
+        retested_zones: list[tuple[float, float, str, int, int]] = []
+        for candidate_zone in zones:
+            candidate_low, candidate_high, _, _, candidate_confirmation_index = candidate_zone
+            candidate_confirmation_ms = int(zone_series[candidate_confirmation_index].close_time_ms)
+            if candidate_confirmation_ms > snapshot_ms:
+                continue
+            causal_after_ms = max(
+                candidate_confirmation_ms,
+                trigger_break_close_ms or candidate_confirmation_ms,
+            )
+            recent = [
+                c for c in trigger[-6:]
+                if int(c.close_time_ms) > causal_after_ms
+            ]
+            if any(float(c.high) >= candidate_low and float(c.low) <= candidate_high for c in recent):
+                retested_zones.append(candidate_zone)
+
+        if not retested_zones:
+            count("no_causal_post_trigger_retest")
+            continue
+
         selected = min(
-            zones,
+            retested_zones,
             key=lambda z: 0.0 if z[0] <= entry <= z[1] else min(abs(entry-z[0]), abs(entry-z[1])) / max(atr, 1e-12),
         )
         low, high, zone_kind, zone_index, zone_confirmation_index = selected
@@ -107,17 +132,8 @@ def scan_symbol(
             count("future_zone")
             continue
 
-        # Require an actual retest AFTER both the zone was confirmed and the
-        # directional trigger BOS/CHoCH closed. Old touches cannot qualify.
-        causal_after_ms = max(zone_confirmation_ms, trigger_break_close_ms or zone_confirmation_ms)
-        recent = [
-            c for c in trigger[-6:]
-            if int(c.close_time_ms) > causal_after_ms
-        ]
-        retested = any(float(c.high) >= low and float(c.low) <= high for c in recent)
-        if not retested:
-            count("no_causal_post_trigger_retest")
-            continue
+        # The selected zone has a real retest after both zone confirmation and
+        # the directional trigger BOS/CHoCH; pre-break touches never qualify.
         in_zone = low <= entry <= high
         distance_atr = 0.0 if in_zone else min(abs(entry-low), abs(entry-high)) / atr
         if distance_atr > 0.75:
