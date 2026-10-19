@@ -178,6 +178,44 @@ class PACScannerTests(unittest.TestCase):
                 candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
         self.assertEqual(candidates, [])
 
+    def test_uses_nearest_causally_retested_zone_not_nearest_unretested_zone(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "15m":
+                result.order_blocks = (
+                    SimpleNamespace(direction="bullish", lower=100.2, upper=100.5,
+                                    candle_index=20, confirmation_index=30),
+                    SimpleNamespace(direction="bullish", lower=98.5, upper=99.3,
+                                    candle_index=24, confirmation_index=30),
+                )
+                result.order_block_mitigation = (
+                    SimpleNamespace(mitigated=False),
+                    SimpleNamespace(mitigated=False),
+                )
+            if timeframe == "5m":
+                result.liquidity_levels = (SimpleNamespace(price=104.0),)
+            return result
+
+        # The closer OB is never touched; the farther OB is retested after
+        # the trigger break and remains within the 0.75 ATR chase limit.
+        trigger = list(self.series["5m"])
+        for i in range(36, 40):
+            trigger[i] = SimpleNamespace(
+                open_time_ms=trigger[i].open_time_ms,
+                close_time_ms=trigger[i].close_time_ms,
+                open=100.0, high=100.1, low=99.2, close=100.0, volume=100.0,
+            )
+        series = dict(self.series)
+        series["5m"] = tuple(trigger)
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].zone, (98.5, 99.3))
+        self.assertGreaterEqual(abs(candidates[0].targets[0] - candidates[0].confirmation_price) /
+                                abs(candidates[0].confirmation_price - candidates[0].stop_price), 1.49)
+
     def test_intraday_profile_uses_15m_trigger(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
