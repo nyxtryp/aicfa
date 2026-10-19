@@ -1984,3 +1984,9 @@
 - Restore the prior PAC minimum stop-distance fee multiplier from 8× to 4× the configured per-side commission rate; the 8× floor was an additional acceptance gate and can reduce SCALP/INTRADAY candidates.
 - Restore the prior journal metrics anomaly threshold of commission <= 5R; this rollback does not alter historical journal rows or setup records.
 - This change does not bypass the other PAC quality filters. Production deployment still needs verification.
+
+
+## 2026-10-19 — Revert PAC minimum stop-distance gate (2d8ce31)
+- Removed the additional PAC acceptance rejection `pac_stop_too_tight` based on max(0.5 × ATR, entry × 4 × per-side commission). Existing risk-positive, RR >= 1.49, target-side, tick-size, freshness, and other scanner checks remain.
+- Removed the regression test that specifically required rejection by this extra stop floor. Do not interpret the rollback as widening stops or disabling other quality gates.
+- Deployment and post-deploy candidate/rejection-counter verification are still required.
