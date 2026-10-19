@@ -164,3 +164,8 @@ if __name__ == "__main__":
 - Restore the prior PAC minimum stop-distance fee multiplier from 8× to 4× the configured per-side commission rate; the 8× floor was an additional acceptance gate and can reduce SCALP/INTRADAY candidates.
 - Restore the prior journal metrics anomaly threshold of commission <= 5R; this rollback does not alter historical journal rows or setup records.
 - This change does not bypass the other PAC quality filters. Production deployment still needs verification.
+
+
+## 2026-10-19 — Revert PAC minimum stop-distance gate (2d8ce31)
+- Remove the additional PAC acceptance gate requiring stop distance >= 0.5 × ATR. Keep positive risk, RR >= 1.49, correct-side target, valid tick size, freshness, causal retest, profile score, scalp 1m confirmation, and the other existing PAC quality filters.
+- This restores prior candidate eligibility; it does not widen stops or disable unrelated filters. Review candidate quality and stop-distance distribution after deployment.
