@@ -158,3 +158,9 @@ if __name__ == "__main__":
 - The confirmation-timeframe BOS/CHoCH is restored as a scored confluence rather than a universal hard rejection. A valid directional zone and a retest after zone confirmation remain required; when a directional trigger exists, retesting must still occur after it.
 - Score base reduced from four to three mandatory gates to avoid implicitly retaining the reverted trigger requirement. Profile score thresholds, 1m scalp confirmation, fee-aware stop, nearest-liquidity TP1, RR floor, anti-chase, and causal retest checks remain enabled.
 - Added regression coverage that a candidate can qualify without a recent confirmation-timeframe trigger when the remaining confluences satisfy the profile score. No production deployment implied; run CI and verify live rejection counters after deploy.
+
+
+## 2026-10-19 — Roll back fee-aware stop tightening (d67ced8)
+- Restore the prior PAC minimum stop-distance fee multiplier from 8× to 4× the configured per-side commission rate; the 8× floor was an additional acceptance gate and can reduce SCALP/INTRADAY candidates.
+- Restore the prior journal metrics anomaly threshold of commission <= 5R; this rollback does not alter historical journal rows or setup records.
+- This change does not bypass the other PAC quality filters. Production deployment still needs verification.
