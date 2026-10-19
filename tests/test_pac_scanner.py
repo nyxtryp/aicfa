@@ -73,7 +73,7 @@ class PACScannerTests(unittest.TestCase):
 
         self.assertEqual(candidates, [])
 
-    def test_rejects_without_recent_trigger_structure(self):
+    def test_recent_trigger_structure_is_confluence_not_hard_gate(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "5m":
@@ -83,7 +83,8 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
 
-        self.assertEqual(candidates, [])
+        self.assertEqual(len(candidates), 1)
+        self.assertFalse(candidates[0].evidence["trigger_structure_aligned"])
 
     def test_rejects_when_no_directional_liquidity_target(self):
         def analysis(candles, profile, timeframe):
