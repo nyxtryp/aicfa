@@ -1,3 +1,9 @@
+## 2026-10-20 — PAC zone selection regression fix (under review)
+
+- Found a false-negative path in `pac_scanner.py`: the scanner selected the single nearest active directional OB/FVG first, then required that zone to have a causal post-trigger retest. If the nearest zone was untouched, the symbol was rejected even when a different active zone had a valid post-trigger retest and price remained within the anti-chase limit.
+- Proposed fix evaluates causal post-trigger retests for all active directional zones first, then selects the nearest among only the retested zones. It preserves closed-candle causality, the six-candle retest window, the 0.75 ATR anti-chase limit, and the nearest-liquidity RR floor; it does not synthesize targets or relax retest ordering.
+- Added a regression test where the nearer OB is untouched but a farther OB is causally retested. CI/replay/deployment not yet verified.
+
 ## 2026-10-18 — lifecycle regression coverage for closed setups (PR #39)
 
 - PR [#39](https://github.com/nyxtryp/aicfa/pull/39) merged into main as `4d942895fc75626d6d98aef702e075fc28a1308c`.
