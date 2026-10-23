@@ -25,7 +25,7 @@ def fake_analysis(timeframe):
     block = SimpleNamespace(direction="bullish", lower=98.0, upper=101.0,
                             candle_index=25, confirmation_index=30)
     return SimpleNamespace(
-        structure_breaks=(bias_break,) if timeframe in {"1h", "15m", "5m", "1m"} else (),
+        structure_breaks=(bias_break,) if timeframe in {"4h", "1h", "15m", "5m", "1m"} else (),
         swings=(), as_of_index=39, order_blocks=(block,),
         order_block_mitigation=(SimpleNamespace(mitigated=False),),
         fvg=(), fvg_fill=(), atr=(1.0,) * 40,
@@ -72,6 +72,26 @@ class PACScannerTests(unittest.TestCase):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
 
         self.assertEqual(candidates, [])
+
+    def test_scalp_accepts_older_break_when_recent_sweep_retest_and_reaction_follow(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                result.structure_breaks = (
+                    SimpleNamespace(direction="bullish", candle_index=32, swing_index=30),
+                )
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=28),)
+            if timeframe == "1m":
+                result.structure_breaks = (
+                    SimpleNamespace(direction="bullish", candle_index=33, swing_index=30),
+                )
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "scalp")
 
     def test_scalp_rejects_without_recent_aligned_trigger_structure(self):
         def analysis(candles, profile, timeframe):
@@ -128,7 +148,25 @@ class PACScannerTests(unittest.TestCase):
 
         self.assertEqual(candidates, [])
 
-    def test_nearest_liquidity_below_minimum_rr_is_not_skipped(self):
+    def test_intraday_preserves_legacy_target_fallback_in_scalp_only_change(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "15m":
+                result.liquidity_levels = ()
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "intraday")
+        self.assertAlmostEqual(
+            candidates[0].targets[0],
+            candidates[0].confirmation_price
+            + 2.0 * abs(candidates[0].confirmation_price - candidates[0].stop_price),
+        )
+
+    def test_uses_nearest_real_liquidity_that_meets_minimum_rr(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "5m":
@@ -141,7 +179,9 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
 
-        self.assertEqual(candidates, [])
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].targets[0], 104.0)
+        self.assertGreaterEqual(candidates[0].evidence["risk_reward"], 1.49)
 
     def test_old_touch_before_trigger_does_not_count_as_retest(self):
         # Candle 36 touched the zone and candle 37 is the trigger break. Candles
