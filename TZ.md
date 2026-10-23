@@ -107,12 +107,34 @@
 - INTRADAY scanner gates are unchanged in this phase. Stop width is not hard-coded to 0.75% or 1% because the historical threshold result varied materially by day; evaluate fee-aware stop rules separately before deployment.
 - Acceptance: tests cover missing trigger, pre-trigger sweep, pre-retest 1m confirmation, missing/too-close liquidity, causal retests, and INTRADAY profile behavior. Production deployment requires CI success and offline replay/candidate-count review.
 
+## 2026-10-23 — INTRADAY quality phase (draft, depends on SCALP PR #50)
+
+- Historical results: 171 closed INTRADAY setups, gross -35.17R, fees 6.66R, net -41.83R. FVG LONG -2.79R/67; FVG SHORT -9.83R/45; OB LONG -8.56R/35; OB SHORT -20.65R/24. Do not ban OB SHORT solely on this small sample.
+- INTRADAY uses a causal 15m retest of a confirmed 1h OB/FVG after the aligned 15m BOS/CHoCH. A same-direction sweep only counts as a score confluence when it precedes the trigger; it is not a hard gate.
+- Existing INTRADAY timeframe/profile, stop buffer, RR threshold, targets, and TTL remain unchanged by this phase.
+- Tests cover a valid sweep-trigger-retest, reject a sweep on/after the trigger as score credit, and reject a zone touched only before the 15m trigger.
+- Four-snapshot replay: current scanner produced 19 SCALP / 13 INTRADAY candidates; updated dependent branch produced 4 SCALP / 5 INTRADAY candidates. Both profiles remain nonzero, but the drop means more availability validation is required.
+- Draft only; do not merge/deploy until CI passes and broader offline replay shows acceptable availability.
+
 ## 2026-10-23 — SCALP sequence availability correction (PR #50)
 
 - The first strict implementation accidentally applied causal retest and real-liquidity target rules to INTRADAY as well as SCALP. Corrected the branch so PR #50 scopes the hard causal sequence, 0.75 ATR anti-chase limit, and real-liquidity target policy to SCALP; INTRADAY retains its prior retest and target behavior in this PR.
 - SCALP sequence remains mandatory: a same-direction sweep must precede the aligned 5m BOS/CHoCH; a directional OB/FVG must retest after the trigger; aligned 1m structure must close after that retest and trigger.
 - Allow a qualifying 5m trigger up to 12 closed candles old only when the sweep remains recent and the later retest and 1m reaction are causal. The 1m reaction may be up to 8 closed candles old, but must still close after the retest and trigger.
 - TP1 is the nearest real directional liquidity level that meets the profile's minimum RR (at least 1.49R); no synthetic 2R target is allowed. If no real level qualifies, reject the setup.
-- INTRADAY quality changes are separate in PR #52; do not merge the dependent PR until replay demonstrates that valid candidates continue to occur.
 - Rolling replay across four consecutive snapshots generated 4 SCALP candidates across 3 symbols and 27 INTRADAY candidates across 12 symbols, versus 43 SCALP and 13 INTRADAY from the current scanner on the same replay run. This is nonzero but a large SCALP reduction; the sample is too short to approve deployment.
 - Production remains unchanged during validation. No production database, accepted setups, or journal rows were modified.
+
+## 2026-10-23 — INTRADAY sweep scoring correction
+
+- INTRADAY sweep is optional confluence, not an acceptance gate. Award its score only when a same-direction sweep precedes the aligned 15m BOS/CHoCH; a missing, late, or misaligned sweep does not independently reject a setup.
+- SCALP's causal sweep requirement is unchanged by this INTRADAY-only correction.
+- A short rolling replay previously showed a material candidate-count reduction when the new causal requirements were combined. Keep PRs in draft until identical-window replay and CI establish acceptable availability and net results after fees.
+- Production remains untouched; no production setup, accepted record, candle, or journal data was modified.
+
+
+## 2026-10-23 — Сохранение INTRADAY retest policy
+
+- После сравнения на одном текущем снимке свечей строгий causal retest давал ноль INTRADAY-кандидатов. Поэтому PR #52 возвращает для INTRADAY прежнюю политику выбора ближайшей зоны и касания в последних 6 свечах; обязательная последовательность sweep → trigger → retest остаётся отдельным SCALP-правилом.
+- INTRADAY sweep остаётся дополнительным подтверждением и получает балл только при совпадении направления и появлении до BOS/CHoCH. Само отсутствие sweep не отклоняет сетап.
+- Это изменение уменьшает риск остановки потока сетапов, но ещё не доказывает улучшение net R. Проверить CI и одинаковый replay до merge; production не менялся.

@@ -78,8 +78,9 @@ def scan_symbol(
             and 0 <= int(trigger_break.candle_index) < len(trigger) else None
         )
 
-        # SCALP must follow a causal sequence: aligned sweep -> 5m BOS/CHoCH
-        # -> retest -> 1m reaction. INTRADAY retains its existing policy.
+        # SCALP requires sweep -> aligned 5m BOS/CHoCH -> retest -> 1m reaction.
+        # INTRADAY uses a slower 15m trigger and causal 1h-zone retest; sweep
+        # remains a scored confluence rather than a hard gate.
         if profile_name == "scalp" and not scalp_trigger_aligned:
             count("no_recent_trigger_structure")
             continue
@@ -94,7 +95,6 @@ def scan_symbol(
         if profile_name == "scalp" and not sweep_before_trigger:
             count("no_pre_trigger_liquidity_sweep")
             continue
-
         # Keep source and confirmation indices separate: an OB is not actionable
         # until its confirmation candle has closed.
         zones: list[tuple[float, float, str, int, int]] = []
@@ -164,10 +164,10 @@ def scan_symbol(
             if distance_atr > 0.75:
                 count("price_chased_away_from_zone")
                 continue
-        else:
-            # Preserve the existing INTRADAY zone-selection and retest policy
-            # in the SCALP-only change. INTRADAY-specific causal refinement is
-            # handled separately by its dependent PR.
+        elif profile_name == "intraday":
+            # Preserve the existing INTRADAY zone/retest policy while its
+            # results are evaluated separately. Sweep is optional confluence,
+            # not a hard gate; only a same-direction pre-trigger sweep scores.
             selected = min(
                 zones,
                 key=lambda z: 0.0 if z[0] <= entry <= z[1] else min(
@@ -251,11 +251,9 @@ def scan_symbol(
             from app.smc.scanner import _recent_internal_structure_direction
             internal = _recent_internal_structure_direction(trigger) == expected
 
-        sweep_aligned = (
-            sweep_before_trigger if profile_name == "scalp" else
-            any(s.direction == expected and len(trigger)-1-int(s.candle_index) <= 12
-                for s in confirm.sweeps)
-        )
+        # Score sweep confluence only when it precedes the aligned trigger.
+        # SCALP hard-requires this; INTRADAY treats it as optional confluence.
+        sweep_aligned = sweep_before_trigger
         zone_tf_aligned = bool(zone.structure_breaks and zone.structure_breaks[-1].direction == expected)
         extra_aligned = False
         if extra is not None and extra.structure_breaks:

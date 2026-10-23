@@ -1,3 +1,9 @@
+## 2026-10-23 — INTRADAY causal sweep phase (draft; depends on SCALP PR #50)
+
+- Production remains untouched; current accepted counts observed: 10 INTRADAY and 12 SCALP.
+- Historical INTRADAY journal: 171 closed records, gross -35.17R, fees 6.66R, net -41.83R. Worst segment is OB SHORT (-20.65R/24); no hard direction ban adopted due limited sample.
+- Separate draft based on SCALP causal-sequence PR #50 keeps the post-trigger 1h-zone retest for INTRADAY. A sweep only counts as a confluence if it precedes the aligned 15m BOS/CHoCH; it is not a hard gate because the hard-gate replay produced zero candidates. Other INTRADAY settings remain unchanged.
+- Regression tests added. Offline replay and candidate-count validation still required; not deployed.
 ## 2026-10-23 — SCALP causal confirmation correction (PR under review)
 
 - Direct production inspection: service was active, candle store contained 125,000 rows across 50 symbols and five timeframes, and the journal had 1,100 closed records plus 25 active setups (12 SCALP, 13 INTRADAY).
@@ -2014,3 +2020,25 @@
 - Offline rolling replay over four consecutive snapshots: current scanner produced 43 SCALP / 13 INTRADAY candidates; revised branch produced 4 SCALP / 27 INTRADAY candidates. The revised SCALP path is nonzero but materially lower; this short sample is not sufficient to deploy.
 - Full unit suite passed: 249 tests. TZ.md was repaired to contain Markdown strategy/project notes rather than an embedded copy of dashboard test code.
 - Production remains unchanged: no deployment, restart, or database write. Continue validating candidate availability before merging or deploying either draft PR.
+
+## 2026-10-23 — INTRADAY causal retest follow-up (PR #52)
+
+- Rebased the work logically on updated SCALP PR #50 commit 1849652. INTRADAY now requires an aligned closed 15m BOS/CHoCH and a confirmed 1h OB/FVG retest that occurs after both zone confirmation and the trigger.
+- A same-direction sweep is credited only when it precedes the 15m trigger; absence of a sweep is not a hard rejection. INTRADAY stop buffer, RR floor, target policy, timeframe profile and TTL remain unchanged.
+- Four-snapshot replay: current scanner produced 19 SCALP / 13 INTRADAY candidates; updated dependent branch produced 4 SCALP / 5 INTRADAY candidates. Both profiles remain nonzero, but the drop means more availability validation is required.
+- Local unit suite passed: 252 tests. Production health endpoint remained HTTP 200; no deploy, restart, or production DB writes occurred.
+- Keep PR #52 draft until broader rolling replay and GitHub CI confirm acceptable candidate availability.
+
+## 2026-10-23 — INTRADAY sweep scoring correction
+
+- Updated scanner scoring so sweep confluence is credited only when the same-direction sweep precedes the aligned trigger. INTRADAY still does not hard-require a sweep; SCALP's hard causal requirement is unchanged.
+- This correction is committed to the PR #52 branch as a draft change. It does not affect production.
+- Validation is still required: run CI and compare baseline/candidate rolling replay on identical snapshots, including per-profile candidate counts and net R after fees. Do not merge or deploy solely because unit tests pass.
+
+
+## 2026-10-23 — INTRADAY availability safeguard
+
+- Reverted the newly added mandatory causal post-trigger retest for INTRADAY to the previous active-zone / recent-touch policy (last 6 confirmation candles, max distance 2 ATR). The strict sweep → trigger → retest → 1m reaction sequence remains SCALP-specific.
+- INTRADAY sweep remains optional score confluence and is counted only when same-direction and before the aligned trigger.
+- Same-snapshot diagnostic of the stricter candidate code produced zero candidates in both profiles, while deployed scanner produced 3 SCALP candidates. The stricter INTRADAY retest gate was therefore not retained. This is an availability safeguard, not evidence of profitability improvement.
+- Production remains untouched. Keep PR draft until CI and a replay on identical snapshots confirm per-profile candidate availability and net R after fees.

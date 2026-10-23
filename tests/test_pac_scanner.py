@@ -136,6 +136,56 @@ class PACScannerTests(unittest.TestCase):
 
         self.assertEqual(candidates, [])
 
+    def test_intraday_accepts_sweep_before_15m_trigger_and_post_trigger_retest(self):
+        with patch("app.smc.pac_scanner._analysis",
+                   side_effect=lambda candles, profile, timeframe: fake_analysis(timeframe)):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "intraday")
+
+    def test_intraday_sweep_at_or_after_trigger_is_not_counted_as_confluence(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "15m":
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+            return result
+
+        diagnostics = {}
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol(
+                "BTCUSDT", self.series, trigger_timeframe="15m", diagnostics=diagnostics
+            )
+
+        # A sweep on the trigger candle must not earn the sweep confluence point.
+        self.assertEqual(candidates, [])
+        self.assertEqual(diagnostics.get("score_below_profile_threshold"), 1)
+
+    def test_intraday_rejects_zone_touched_only_before_15m_trigger(self):
+        series = dict(self.series)
+        trigger = list(series["15m"])
+        for index in (38, 39):
+            original = trigger[index]
+            trigger[index] = SimpleNamespace(
+                open_time_ms=original.open_time_ms, close_time_ms=original.close_time_ms,
+                open=100.0, high=100.5, low=99.8, close=100.0, volume=original.volume,
+            )
+        series["15m"] = tuple(trigger)
+
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "1h":
+                result.order_blocks = (
+                    SimpleNamespace(direction="bullish", lower=99.2, upper=99.5,
+                                    candle_index=25, confirmation_index=30),
+                )
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="15m")
+
+        self.assertEqual(candidates, [])
+
     def test_rejects_when_no_directional_liquidity_target(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
