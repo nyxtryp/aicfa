@@ -131,3 +131,10 @@
 - SCALP's causal sweep requirement is unchanged by this INTRADAY-only correction.
 - A short rolling replay previously showed a material candidate-count reduction when the new causal requirements were combined. Keep PRs in draft until identical-window replay and CI establish acceptable availability and net results after fees.
 - Production remains untouched; no production setup, accepted record, candle, or journal data was modified.
+
+
+## 2026-10-23 — Сохранение INTRADAY retest policy
+
+- После сравнения на одном текущем снимке свечей строгий causal retest давал ноль INTRADAY-кандидатов. Поэтому PR #52 возвращает для INTRADAY прежнюю политику выбора ближайшей зоны и касания в последних 6 свечах; обязательная последовательность sweep → trigger → retest остаётся отдельным SCALP-правилом.
+- INTRADAY sweep остаётся дополнительным подтверждением и получает балл только при совпадении направления и появлении до BOS/CHoCH. Само отсутствие sweep не отклоняет сетап.
+- Это изменение уменьшает риск остановки потока сетапов, но ещё не доказывает улучшение net R. Проверить CI и одинаковый replay до merge; production не менялся.
