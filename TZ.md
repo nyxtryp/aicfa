@@ -176,3 +176,11 @@ if __name__ == "__main__":
 - Select the nearest zone only from those with a confirmed post-zone-confirmation and post-directional-BOS/CHoCH retest in the recent trigger-candle window.
 - An untouched nearer zone must not suppress a farther valid retested zone. Keep the existing six-candle lookback, anti-chase limit, nearest confirmed liquidity TP1, minimum 1.49R, closed-candle-only processing, and profile score requirements.
 - Regression: nearest zone untouched + second zone retested => choose second zone; pre-trigger-only touch => reject; no retested zones => reject. Validate with unit tests and offline replay before production deployment.
+
+## 2026-10-23 — INTRADAY causal retest correction (draft, not deployed)
+
+- Historical journal review: 171 INTRADAY outcomes; net -41.83R, gross -35.17R, fees 6.66R. FVG LONG was closest to flat (-2.79R/67 trades); FVG SHORT -9.83R/45; OB LONG -8.56R/35; OB SHORT -20.65R/24. The short OB sample is small and is not enough evidence for a permanent direction/zone ban.
+- The deployed scanner chose the nearest active OB/FVG before checking whether that selected zone had been retested after the 15m trigger. For OBs, the selected timestamp also used the origin candle rather than the confirmation candle.
+- Draft fix: INTRADAY retains its current bias, score, stop and target policies, but the selected 1h zone must have a closed 15m retest after both zone confirmation and aligned 15m BOS/CHoCH. SCALP behavior is not changed by this branch.
+- Added tests that preserve a valid post-trigger INTRADAY candidate and reject a touch that happened only before the trigger.
+- Safety: production still has 10 accepted INTRADAY and 12 accepted SCALP setups; service is active. No deployment, restart, or database writes performed. Candidate-count/offline replay validation and CI are required before merging or deployment.
