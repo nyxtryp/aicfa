@@ -2028,3 +2028,9 @@
 - Four-snapshot replay: current scanner produced 19 SCALP / 13 INTRADAY candidates; updated dependent branch produced 4 SCALP / 5 INTRADAY candidates. Both profiles remain nonzero, but the drop means more availability validation is required.
 - Local unit suite passed: 252 tests. Production health endpoint remained HTTP 200; no deploy, restart, or production DB writes occurred.
 - Keep PR #52 draft until broader rolling replay and GitHub CI confirm acceptable candidate availability.
+
+## 2026-10-23 — INTRADAY sweep scoring correction
+
+- Updated scanner scoring so sweep confluence is credited only when the same-direction sweep precedes the aligned trigger. INTRADAY still does not hard-require a sweep; SCALP's hard causal requirement is unchanged.
+- This correction is committed to the PR #52 branch as a draft change. It does not affect production.
+- Validation is still required: run CI and compare baseline/candidate rolling replay on identical snapshots, including per-profile candidate counts and net R after fees. Do not merge or deploy solely because unit tests pass.
