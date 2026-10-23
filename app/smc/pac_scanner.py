@@ -214,12 +214,17 @@ def scan_symbol(
                  if (float(level.price) > entry if direction == "long" else float(level.price) < entry)},
                 key=lambda p: abs(p-entry),
             )
-            targets = [p for p in liquidity if abs(p-entry) >= profile.min_rr * risk][:3]
-            if not targets:
-                count("no_directional_liquidity_target_meets_minimum_rr")
+            if not liquidity:
+                count("no_directional_liquidity_target")
                 continue
+            # The nearest real liquidity is TP1. Reject if it is too close;
+            # never skip it to manufacture a compliant RR using a farther level.
+            targets = liquidity[:3]
             tp1 = targets[0]
             rr = abs(tp1-entry) / risk
+            if rr < profile.min_rr:
+                count("nearest_liquidity_below_minimum_rr")
+                continue
         else:
             # Preserve the existing INTRADAY target policy in the SCALP-only
             # change; evaluate its target policy separately in the INTRADAY PR.
