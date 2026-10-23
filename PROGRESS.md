@@ -2014,3 +2014,10 @@
 - Offline rolling replay over four consecutive snapshots: current scanner produced 43 SCALP / 13 INTRADAY candidates; revised branch produced 4 SCALP / 27 INTRADAY candidates. The revised SCALP path is nonzero but materially lower; this short sample is not sufficient to deploy.
 - Full unit suite passed: 249 tests. TZ.md was repaired to contain Markdown strategy/project notes rather than an embedded copy of dashboard test code.
 - Production remains unchanged: no deployment, restart, or database write. Continue validating candidate availability before merging or deploying either draft PR.
+
+## 2026-10-23 — Sweep больше не является hard gate для SCALP
+
+- SCALP теперь может пройти без sweep, если выполнены остальные обязательные условия; sweep остаётся дополнительным баллом только при правильном причинном порядке.
+- Уточнена политика TP1: ближайший реальный directional liquidity target используется первым; если RR меньше минимума, сетап отклоняется, а не перескакивает к более дальнему уровню.
+- Добавлен/обновлён тест на optional sweep и сохранён тест отказа при слишком близкой ближайшей ликвидности.
+- Требуется CI и одинаковый historical replay; production не менялся.
