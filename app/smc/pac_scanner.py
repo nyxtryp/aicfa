@@ -165,47 +165,32 @@ def scan_symbol(
                 count("price_chased_away_from_zone")
                 continue
         elif profile_name == "intraday":
-            # INTRADAY uses a causal 15m trigger -> confirmed 1h zone retest.
-            # Sweep remains a score confluence, not a hard gate.
-            if not trigger_aligned or trigger_break_close_ms is None:
-                count("no_recent_trigger_structure")
-                continue
-            retested_zones: list[tuple[tuple[float, float, str, int, int], int]] = []
-            for candidate_zone in zones:
-                candidate_low, candidate_high, _, _, candidate_confirmation_index = candidate_zone
-                candidate_confirmation_ms = int(zone_series[candidate_confirmation_index].close_time_ms)
-                if candidate_confirmation_ms > snapshot_ms:
-                    continue
-                causal_after_ms = max(candidate_confirmation_ms, trigger_break_close_ms)
-                recent = [
-                    c for c in trigger[-6:]
-                    if int(c.close_time_ms) > causal_after_ms
-                ]
-                touch_times = [
-                    int(c.close_time_ms) for c in recent
-                    if float(c.high) >= candidate_low and float(c.low) <= candidate_high
-                ]
-                if touch_times:
-                    retested_zones.append((candidate_zone, min(touch_times)))
-            if not retested_zones:
-                count("no_causal_post_trigger_retest")
-                continue
-            selected, retest_close_ms = min(
-                retested_zones,
-                key=lambda item: 0.0 if item[0][0] <= entry <= item[0][1] else min(
-                    abs(entry-item[0][0]), abs(entry-item[0][1])
+            # Preserve the existing INTRADAY zone/retest policy while its
+            # results are evaluated separately. Sweep is optional confluence,
+            # not a hard gate; only a same-direction pre-trigger sweep scores.
+            selected = min(
+                zones,
+                key=lambda z: 0.0 if z[0] <= entry <= z[1] else min(
+                    abs(entry-z[0]), abs(entry-z[1])
                 ) / max(atr, 1e-12),
             )
             low, high, zone_kind, zone_index, zone_confirmation_index = selected
-            zone_confirmation_ms = int(zone_series[zone_confirmation_index].close_time_ms)
-            if zone_confirmation_ms > snapshot_ms:
+            zone_created_ms = int(zone_series[zone_index].close_time_ms)
+            if zone_created_ms > snapshot_ms:
                 count("future_zone")
                 continue
+            recent = trigger[-6:]
             in_zone = low <= entry <= high
+            retested = any(float(c.high) >= low and float(c.low) <= high for c in recent)
             distance_atr = 0.0 if in_zone else min(abs(entry-low), abs(entry-high)) / atr
-            if distance_atr > 2.0:
-                count("price_chased_away_from_zone")
+            if not (in_zone or retested) or distance_atr > 2.0:
+                count("zone_not_recently_retested")
                 continue
+            retest_close_ms = max(
+                (int(c.close_time_ms) for c in recent
+                 if float(c.high) >= low and float(c.low) <= high),
+                default=int(trigger[-1].close_time_ms),
+            )
 
         # Use structural stop beyond the selected zone with ATR buffer.
         buffer = max(profile.stop_buffer_atr, STOP_BUFFER_ATR_OVERRIDES.get(symbol, profile.stop_buffer_atr))
