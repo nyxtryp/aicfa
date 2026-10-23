@@ -88,13 +88,6 @@ def scan_symbol(
         if profile_name == "scalp" and not sweep_before_trigger:
             count("no_pre_trigger_liquidity_sweep")
             continue
-        # INTRADAY uses the same causal order at a slower cadence: a same-side
-        # liquidity sweep must precede the aligned 15m BOS/CHoCH, then the
-        # existing post-trigger 1h-zone retest gate must pass.
-        if profile_name == "intraday" and not sweep_before_trigger:
-            count("no_pre_trigger_liquidity_sweep")
-            continue
-
         # Keep source and confirmation indices separate: an OB is not actionable
         # until its confirmation candle has closed.
         zones: list[tuple[float, float, str, int, int]] = []
@@ -212,7 +205,7 @@ def scan_symbol(
             internal = _recent_internal_structure_direction(trigger) == expected
 
         sweep_aligned = (
-            sweep_before_trigger if profile_name == "scalp" else
+            sweep_before_trigger if profile_name in {"scalp", "intraday"} else
             any(s.direction == expected and len(trigger)-1-int(s.candle_index) <= 12
                 for s in confirm.sweeps)
         )
