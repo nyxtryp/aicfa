@@ -85,6 +85,18 @@ class PACScannerTests(unittest.TestCase):
 
         self.assertEqual(candidates, [])
 
+    def test_scalp_rejects_sweep_that_is_not_before_trigger(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
+
     def test_scalp_rejects_one_minute_confirmation_before_retest(self):
         # A 1m BOS at the current index but with a close time before the 5m
         # retest must not qualify as a reaction confirmation.
