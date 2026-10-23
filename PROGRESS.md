@@ -1,3 +1,11 @@
+## 2026-10-23 — SCALP causal confirmation correction (PR under review)
+
+- Direct production inspection: service was active, candle store contained 125,000 rows across 50 symbols and five timeframes, and the journal had 1,100 closed records plus 25 active setups (12 SCALP, 13 INTRADAY).
+- Found the deployed PAC scanner had been restored to a looser pre-e600 implementation: synthetic 2R targets were permitted when no directional liquidity target existed, zone retests could be non-causal, and sweep/structure/1m confirmations were only score confluences.
+- Reintroduced the test-backed causal zone-selection and real-liquidity rules on a feature branch; tightened SCALP only to require sweep before aligned 5m BOS/CHoCH, retest after trigger, and aligned 1m structure reaction after the retest. INTRADAY criteria remain unchanged.
+- Historical stop-width threshold experiment: >=1% stop had +23.92R over 247 trades overall, but daily results were materially inconsistent (e.g. negative on Oct 19–21 and Oct 23, strongly positive Oct 22). Do not deploy a fixed 1% threshold based on this short, non-out-of-sample sample.
+- Status: code/tests updated on fix/scalp-causal-confirmation; CI and offline replay/candidate-count validation still required. Do not deploy or modify production DB until those checks pass.
+
 ## 2026-10-20 — PAC zone selection regression fix (under review)
 
 - Found a false-negative path in `pac_scanner.py`: the scanner selected the single nearest active directional OB/FVG first, then required that zone to have a causal post-trigger retest. If the nearest zone was untouched, the symbol was rejected even when a different active zone had a valid post-trigger retest and price remained within the anti-chase limit.
