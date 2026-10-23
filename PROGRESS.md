@@ -2042,3 +2042,11 @@
 - INTRADAY sweep remains optional score confluence and is counted only when same-direction and before the aligned trigger.
 - Same-snapshot diagnostic of the stricter candidate code produced zero candidates in both profiles, while deployed scanner produced 3 SCALP candidates. The stricter INTRADAY retest gate was therefore not retained. This is an availability safeguard, not evidence of profitability improvement.
 - Production remains untouched. Keep PR draft until CI and a replay on identical snapshots confirm per-profile candidate availability and net R after fees.
+
+
+## 2026-10-23 — Убрано обязательное требование sweep
+
+- Для SCALP и INTRADAY отсутствие sweep не блокирует сетап. Sweep получает балл только при совпадении направления и наличии до BOS/CHoCH.
+- INTRADAY оставлен на прежней политике ретеста зоны; более строгая причинная последовательность остаётся специфичной для SCALP.
+- Исправлена проверка TP1 в SCALP: ближайшая реальная ликвидность не пропускается ради формального RR; при недостаточном RR кандидат отклоняется.
+- Тесты обновлены. До CI/replay merge/deploy запрещены; production не изменялся.
