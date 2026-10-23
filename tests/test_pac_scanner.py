@@ -21,16 +21,16 @@ def candle(index, timeframe_minutes=5, close=100.0):
 
 
 def fake_analysis(timeframe):
-    bias_break = SimpleNamespace(direction="bullish", candle_index=37, swing_index=30)
+    bias_break = SimpleNamespace(direction="bullish", candle_index=39 if timeframe == "1m" else 37, swing_index=30)
     block = SimpleNamespace(direction="bullish", lower=98.0, upper=101.0,
                             candle_index=25, confirmation_index=30)
     return SimpleNamespace(
-        structure_breaks=(bias_break,) if timeframe in {"1h", "15m", "5m", "1m"} else (),
+        structure_breaks=(bias_break,) if timeframe in {"4h", "1h", "15m", "5m", "1m"} else (),
         swings=(), as_of_index=39, order_blocks=(block,),
         order_block_mitigation=(SimpleNamespace(mitigated=False),),
         fvg=(), fvg_fill=(), atr=(1.0,) * 40,
         liquidity_levels=(SimpleNamespace(price=104.0),),
-        sweeps=(SimpleNamespace(direction="bullish", candle_index=37),),
+        sweeps=(SimpleNamespace(direction="bullish", candle_index=35),),
         average_volume=(100.0,) * 40,
     )
 
@@ -73,7 +73,27 @@ class PACScannerTests(unittest.TestCase):
 
         self.assertEqual(candidates, [])
 
-    def test_recent_trigger_structure_is_confluence_not_hard_gate(self):
+    def test_scalp_accepts_older_break_when_recent_sweep_retest_and_reaction_follow(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                result.structure_breaks = (
+                    SimpleNamespace(direction="bullish", candle_index=32, swing_index=30),
+                )
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=28),)
+            if timeframe == "1m":
+                result.structure_breaks = (
+                    SimpleNamespace(direction="bullish", candle_index=33, swing_index=30),
+                )
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "scalp")
+
+    def test_scalp_rejects_without_recent_aligned_trigger_structure(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "5m":
@@ -83,8 +103,39 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
 
+        self.assertEqual(candidates, [])
+
+    def test_scalp_sweep_is_optional_when_not_before_trigger(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "5m":
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
+
         self.assertEqual(len(candidates), 1)
-        self.assertFalse(candidates[0].evidence["trigger_structure_aligned"])
+        self.assertFalse(candidates[0].evidence["liquidity_sweep"])
+
+    def test_scalp_rejects_one_minute_confirmation_before_retest(self):
+        # A 1m BOS at the current index but with a close time before the 5m
+        # retest must not qualify as a reaction confirmation.
+        series = dict(self.series)
+        one_minute = list(series["1m"])
+        last = one_minute[-1]
+        retest_close_ms = series["5m"][-2].close_time_ms
+        one_minute[-1] = SimpleNamespace(
+            open_time_ms=last.open_time_ms, close_time_ms=retest_close_ms - 1,
+            open=last.open, high=last.high, low=last.low, close=last.close, volume=last.volume,
+        )
+        series["1m"] = tuple(one_minute)
+
+        with patch("app.smc.pac_scanner._analysis",
+                   side_effect=lambda candles, profile, timeframe: fake_analysis(timeframe)):
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
 
     def test_rejects_when_no_directional_liquidity_target(self):
         def analysis(candles, profile, timeframe):
@@ -98,7 +149,25 @@ class PACScannerTests(unittest.TestCase):
 
         self.assertEqual(candidates, [])
 
-    def test_nearest_liquidity_below_minimum_rr_is_not_skipped(self):
+    def test_intraday_preserves_legacy_target_fallback_in_scalp_only_change(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "15m":
+                result.liquidity_levels = ()
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "intraday")
+        self.assertAlmostEqual(
+            candidates[0].targets[0],
+            candidates[0].confirmation_price
+            + 2.0 * abs(candidates[0].confirmation_price - candidates[0].stop_price),
+        )
+
+    def test_rejects_when_nearest_real_liquidity_fails_minimum_rr(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "5m":
@@ -111,6 +180,7 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
 
+        # Do not skip the nearest level at 101 to manufacture RR using 104.
         self.assertEqual(candidates, [])
 
     def test_old_touch_before_trigger_does_not_count_as_retest(self):

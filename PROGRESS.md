@@ -1,3 +1,11 @@
+## 2026-10-23 — SCALP causal confirmation correction (PR under review)
+
+- Direct production inspection: service was active, candle store contained 125,000 rows across 50 symbols and five timeframes, and the journal had 1,100 closed records plus 25 active setups (12 SCALP, 13 INTRADAY).
+- Found the deployed PAC scanner had been restored to a looser pre-e600 implementation: synthetic 2R targets were permitted when no directional liquidity target existed, zone retests could be non-causal, and sweep/structure/1m confirmations were only score confluences.
+- Reintroduced the test-backed causal zone-selection and real-liquidity rules on a feature branch; tightened SCALP only to require sweep before aligned 5m BOS/CHoCH, retest after trigger, and aligned 1m structure reaction after the retest. INTRADAY criteria remain unchanged.
+- Historical stop-width threshold experiment: >=1% stop had +23.92R over 247 trades overall, but daily results were materially inconsistent (e.g. negative on Oct 19–21 and Oct 23, strongly positive Oct 22). Do not deploy a fixed 1% threshold based on this short, non-out-of-sample sample.
+- Status: code/tests updated on fix/scalp-causal-confirmation; CI and offline replay/candidate-count validation still required. Do not deploy or modify production DB until those checks pass.
+
 ## 2026-10-20 — PAC zone selection regression fix (under review)
 
 - Found a false-negative path in `pac_scanner.py`: the scanner selected the single nearest active directional OB/FVG first, then required that zone to have a causal post-trigger retest. If the nearest zone was untouched, the symbol was rejected even when a different active zone had a valid post-trigger retest and price remained within the anti-chase limit.
@@ -1996,3 +2004,20 @@
 - Removed the additional PAC acceptance rejection `pac_stop_too_tight` based on max(0.5 × ATR, entry × 4 × per-side commission). Existing risk-positive, RR >= 1.49, target-side, tick-size, freshness, and other scanner checks remain.
 - Removed the regression test that specifically required rejection by this extra stop floor. Do not interpret the rollback as widening stops or disabling other quality gates.
 - Deployment and post-deploy candidate/rejection-counter verification are still required.
+
+
+## 2026-10-23 — SCALP availability follow-up (PR #50)
+
+- Corrected an over-broad diff: strict causal retest and real-liquidity TP1 rules are now scoped to SCALP in PR #50; INTRADAY keeps its prior retest and target behavior in that PR. Its separate improvements remain in dependent PR #52.
+- SCALP requires sweep before aligned 5m structure break, a post-break retest, and aligned 1m reaction after retest and trigger. The trigger window is up to 12 closed 5m candles; 1m reaction may be up to 8 closed candles, but ordering remains mandatory.
+- TP1 selects the nearest real directional liquidity level that satisfies the configured minimum RR (>=1.49R); no synthetic 2R target is permitted.
+- Offline rolling replay over four consecutive snapshots: current scanner produced 43 SCALP / 13 INTRADAY candidates; revised branch produced 4 SCALP / 27 INTRADAY candidates. The revised SCALP path is nonzero but materially lower; this short sample is not sufficient to deploy.
+- Full unit suite passed: 249 tests. TZ.md was repaired to contain Markdown strategy/project notes rather than an embedded copy of dashboard test code.
+- Production remains unchanged: no deployment, restart, or database write. Continue validating candidate availability before merging or deploying either draft PR.
+
+## 2026-10-23 — Sweep больше не является hard gate для SCALP
+
+- SCALP теперь может пройти без sweep, если выполнены остальные обязательные условия; sweep остаётся дополнительным баллом только при правильном причинном порядке.
+- Уточнена политика TP1: ближайший реальный directional liquidity target используется первым; если RR меньше минимума, сетап отклоняется, а не перескакивает к более дальнему уровню.
+- Добавлен/обновлён тест на optional sweep и сохранён тест отказа при слишком близкой ближайшей ликвидности.
+- Требуется CI и одинаковый historical replay; production не менялся.

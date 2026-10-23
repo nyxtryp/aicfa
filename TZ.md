@@ -1,82 +1,3 @@
-import inspect
-import unittest
-
-import app.main as main_module
-from app.main import PAGE, SCANNER_LIVE_ENABLED, index
-from app.market_data import ALL_SYMBOLS, TIMEFRAMES
-from app.main import LOGIN_PAGE, app
-
-
-class DashboardTests(unittest.IsolatedAsyncioTestCase):
-    async def test_root_serves_scanner_dashboard_not_placeholder(self):
-        response = await index()
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("SMC Scanner", response.body.decode())
-        self.assertIn("Автосканер · все инструменты · scalp / intraday", PAGE)
-        self.assertIn('id="intradaySetups"', PAGE)
-        self.assertIn('id="scalpSetups"', PAGE)
-        self.assertIn("grid-template-rows:repeat(2,minmax(0,1fr))", PAGE)
-        self.assertIn("overflow:hidden;position:static", PAGE)
-        self.assertIn("flex:1 1 auto;min-height:0;max-height:none", PAGE)
-        self.assertIn("grid-template-rows:repeat(2,minmax(0,42vh))", PAGE)
-        self.assertIn("rr < 1.49 or not target_on_correct_side", inspect.getsource(main_module))
-        self.assertIn("list_monitored()", inspect.getsource(main_module))
-        self.assertIn('candidate_mode = payload.get("status") == "CANDIDATE"', inspect.getsource(main_module))
-        self.assertIn('rr_below_minimum_or_unverifiable_legacy', inspect.getsource(__import__("app.smc.setup_store", fromlist=["SetupStore"])))
-        self.assertIn("def list_monitored", inspect.getsource(__import__("app.smc.setup_store", fromlist=["SetupStore"]).SetupStore))
-        self.assertIn('item["expires_at_ms"]', inspect.getsource(main_module))
-        self.assertIn("срок до", PAGE)
-        self.assertIn("const key=[item.symbol,item.profile].join('|')", PAGE)
-        self.assertIn('id="activeSetups"', PAGE)
-        self.assertIn('id="realizedJournal"', PAGE)
-        self.assertNotIn('id="rejectedSetups"', PAGE)
-        self.assertNotIn('id="rejectedCount"', PAGE)
-        self.assertNotIn("data.rejected_candidates", PAGE)
-        self.assertNotIn("selectSetupTab", PAGE)
-        self.assertNotIn('id="showRejected"', PAGE)
-        self.assertIn("uniqueCandidates", PAGE)
-        self.assertIn("host.querySelectorAll('.setup-card').length", PAGE)
-        self.assertIn("Could not render setup card", PAGE)
-        self.assertNotIn("String(incoming.length)+' актуальных'", PAGE)
-        self.assertIn('id="marketHoursStatus"', PAGE)
-        self.assertIn(".metric,.panel{background:linear-gradient(145deg,#111b2b,#0d1523);border:1px solid #202e43;border-radius:4.5px;padding:3px 4.5px}", PAGE)
-        self.assertIn(".metric .value{font-size:.47rem;line-height:.575;font-weight:750;margin-top:1px;overflow-wrap:anywhere}", PAGE)
-        self.assertIn(".metric .label{font-size:.32rem;line-height:.575;color:#8fa0b8}", PAGE)
-        self.assertIn(".metric .hint{font-size:.295rem;line-height:.575;color:#70839f;margin-top:.5px}", PAGE)
-        self.assertIn(".grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin-bottom:4px}", PAGE)
-        self.assertIn("Режим: shadow", PAGE)
-        self.assertFalse(SCANNER_LIVE_ENABLED)
-        self.assertNotIn("$('refresh').addEventListener", PAGE)
-        self.assertNotIn("setInterval(", PAGE)
-        self.assertIn("let selectedSetup=null", PAGE)
-        self.assertIn("activeSetup.stop_price", PAGE)
-        self.assertIn("activeSetup.targets", PAGE)
-        self.assertIn("/api/smc-analysis/", PAGE)
-        self.assertIn("canvas", PAGE)
-        self.assertIn("zone((ann.order_blocks||[])", PAGE)
-        self.assertIn("zone((ann.fvg||[])", PAGE)
-        self.assertIn("for(const e of ann.structure_breaks||[])", PAGE)
-        self.assertIn("for(const e of ann.sweeps||[])", PAGE)
-        self.assertIn("/api/auth/login", [route.path for route in app.routes])
-        self.assertIn("/api/settings/password", [route.path for route in app.routes])
-        self.assertIn("/api/setups", [route.path for route in app.routes])
-        self.assertIn("/api/active-setups", [route.path for route in app.routes])
-        self.assertIn("/api/journal", [route.path for route in app.routes])
-        self.assertIn('autocomplete="current-password"', LOGIN_PAGE)
-        self.assertIn("AICFA_SETUP_TOKEN", LOGIN_PAGE)
-        self.assertNotIn("__AICFA_SYMBOLS__", PAGE)
-        self.assertNotIn("__AICFA_TIMEFRAMES__", PAGE)
-        for symbol in ALL_SYMBOLS:
-            self.assertIn(symbol, PAGE)
-        for timeframe in TIMEFRAMES:
-            self.assertIn(timeframe, PAGE)
-        self.assertNotIn("каркас сайта запущен", PAGE.lower())
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-
 ## Dashboard redesign — compact spacing and consistent layout (2026-10-17)
 - Preserve checkpoint `d5948de043547264bf496e595c353c12ca002b26` as the rollback point before the full redesign.
 - Replace the half-size status cards that made text effectively unreadable with compact but legible cards; use consistent spacing, type scale, borders, and panel padding throughout the dashboard.
@@ -176,3 +97,28 @@ if __name__ == "__main__":
 - Select the nearest zone only from those with a confirmed post-zone-confirmation and post-directional-BOS/CHoCH retest in the recent trigger-candle window.
 - An untouched nearer zone must not suppress a farther valid retested zone. Keep the existing six-candle lookback, anti-chase limit, nearest confirmed liquidity TP1, minimum 1.49R, closed-candle-only processing, and profile score requirements.
 - Regression: nearest zone untouched + second zone retested => choose second zone; pre-trigger-only touch => reject; no retested zones => reject. Validate with unit tests and offline replay before production deployment.
+
+## 2026-10-23 — SCALP causal entry sequence correction (PR under review)
+
+- SCALP only: require a recent aligned 5m BOS/CHoCH and a same-direction liquidity sweep that occurred before that structure break.
+- Choose the nearest active directional OB/FVG among zones with a confirmed retest after zone confirmation and the 5m trigger; reject chased entries beyond 0.75 ATR.
+- Require the aligned 1m structure reaction to close after the qualifying 5m retest and after the 5m trigger. A stale/pre-retest 1m event cannot confirm the entry.
+- Use the nearest real directional liquidity target that meets the existing minimum 1.49R; do not synthesize a 2R target. If no real level meets the RR floor, reject the setup.
+- INTRADAY scanner gates are unchanged in this phase. Stop width is not hard-coded to 0.75% or 1% because the historical threshold result varied materially by day; evaluate fee-aware stop rules separately before deployment.
+- Acceptance: tests cover missing trigger, pre-trigger sweep, pre-retest 1m confirmation, missing/too-close liquidity, causal retests, and INTRADAY profile behavior. Production deployment requires CI success and offline replay/candidate-count review.
+
+## 2026-10-23 — SCALP sequence availability correction (PR #50)
+
+- The first strict implementation accidentally applied causal retest and real-liquidity target rules to INTRADAY as well as SCALP. Corrected the branch so PR #50 scopes the hard causal sequence, 0.75 ATR anti-chase limit, and real-liquidity target policy to SCALP; INTRADAY retains its prior retest and target behavior in this PR.
+- SCALP sequence remains mandatory: a same-direction sweep must precede the aligned 5m BOS/CHoCH; a directional OB/FVG must retest after the trigger; aligned 1m structure must close after that retest and trigger.
+- Allow a qualifying 5m trigger up to 12 closed candles old only when the sweep remains recent and the later retest and 1m reaction are causal. The 1m reaction may be up to 8 closed candles old, but must still close after the retest and trigger.
+- TP1 is the nearest real directional liquidity level that meets the profile's minimum RR (at least 1.49R); no synthetic 2R target is allowed. If no real level qualifies, reject the setup.
+- INTRADAY quality changes are separate in PR #52; do not merge the dependent PR until replay demonstrates that valid candidates continue to occur.
+- Rolling replay across four consecutive snapshots generated 4 SCALP candidates across 3 symbols and 27 INTRADAY candidates across 12 symbols, versus 43 SCALP and 13 INTRADAY from the current scanner on the same replay run. This is nonzero but a large SCALP reduction; the sample is too short to approve deployment.
+- Production remains unchanged during validation. No production database, accepted setups, or journal rows were modified.
+
+## 2026-10-23 — Sweep как дополнительное подтверждение SCALP
+
+- Убрано обязательное отклонение SCALP без sweep. Sweep учитывается в score только при совпадении направления и если произошёл до BOS/CHoCH; отсутствие sweep само по себе не блокирует сетап.
+- Сохраняются причинные требования SCALP: актуальный направленный BOS/CHoCH, ретест после триггера и 1m reaction после ретеста. TP1 — ближайшая реальная ликвидность; если её RR ниже минимума, сетап отклоняется, более дальняя ликвидность не подменяет TP1.
+- Тесты обновлены для нового правила. Не выкатывать до CI и replay на одинаковом окне; production не менялся.
