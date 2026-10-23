@@ -124,7 +124,7 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].profile, "intraday")
 
-    def test_intraday_rejects_sweep_at_or_after_15m_trigger(self):
+    def test_intraday_sweep_at_or_after_trigger_is_not_counted_as_confluence(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "15m":
@@ -134,7 +134,8 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
 
-        self.assertEqual(candidates, [])
+        self.assertEqual(len(candidates), 1)
+        self.assertFalse(candidates[0].evidence["liquidity_sweep"])
 
     def test_rejects_when_no_directional_liquidity_target(self):
         def analysis(candles, profile, timeframe):
