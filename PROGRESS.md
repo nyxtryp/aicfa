@@ -2034,3 +2034,11 @@
 - Updated scanner scoring so sweep confluence is credited only when the same-direction sweep precedes the aligned trigger. INTRADAY still does not hard-require a sweep; SCALP's hard causal requirement is unchanged.
 - This correction is committed to the PR #52 branch as a draft change. It does not affect production.
 - Validation is still required: run CI and compare baseline/candidate rolling replay on identical snapshots, including per-profile candidate counts and net R after fees. Do not merge or deploy solely because unit tests pass.
+
+
+## 2026-10-23 — INTRADAY availability safeguard
+
+- Reverted the newly added mandatory causal post-trigger retest for INTRADAY to the previous active-zone / recent-touch policy (last 6 confirmation candles, max distance 2 ATR). The strict sweep → trigger → retest → 1m reaction sequence remains SCALP-specific.
+- INTRADAY sweep remains optional score confluence and is counted only when same-direction and before the aligned trigger.
+- Same-snapshot diagnostic of the stricter candidate code produced zero candidates in both profiles, while deployed scanner produced 3 SCALP candidates. The stricter INTRADAY retest gate was therefore not retained. This is an availability safeguard, not evidence of profitability improvement.
+- Production remains untouched. Keep PR draft until CI and a replay on identical snapshots confirm per-profile candidate availability and net R after fees.
