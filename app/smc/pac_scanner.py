@@ -229,9 +229,9 @@ def scan_symbol(
             count("no_recent_extra_confirmation")
             continue
 
-        # Three base points represent mandatory gates already passed:
-        # HTF bias, confirmed directional zone, and causal retest. Structure
-        # confirmation and other confluences add points; enforce the profile threshold.
+        # Three base points represent HTF bias, a confirmed directional zone,
+        # and a causal retest. SCALP's trigger/sweep/1m sequence is additionally
+        # enforced above; remaining confluences contribute to the profile score.
         score = min(10, 3 + int(trigger_aligned) + int(internal) + int(sweep_aligned) + int(zone_tf_aligned) + int(pd_aligned) + int(extra_aligned))
         if score < profile.score_threshold:
             count("score_below_profile_threshold")
