@@ -86,6 +86,35 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertFalse(candidates[0].evidence["trigger_structure_aligned"])
 
+    def test_intraday_accepts_retest_after_15m_trigger(self):
+        with patch("app.smc.pac_scanner._analysis",
+                   side_effect=lambda candles, profile, timeframe: fake_analysis(timeframe)):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "intraday")
+
+    def test_intraday_rejects_touch_that_only_precedes_15m_trigger(self):
+        series = dict(self.series)
+        trigger = list(series["15m"])
+        # Candle 36 touches the zone before the structure break at candle 37.
+        # The two closed candles after the break stay above the zone.
+        for index in (38, 39):
+            original = trigger[index]
+            trigger[index] = SimpleNamespace(
+                open_time_ms=original.open_time_ms,
+                close_time_ms=original.close_time_ms,
+                open=original.open, high=104.0, low=102.0,
+                close=102.5, volume=original.volume,
+            )
+        series["15m"] = tuple(trigger)
+
+        with patch("app.smc.pac_scanner._analysis",
+                   side_effect=lambda candles, profile, timeframe: fake_analysis(timeframe)):
+            candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="15m")
+
+        self.assertEqual(candidates, [])
+
     def test_rejects_when_no_directional_liquidity_target(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
