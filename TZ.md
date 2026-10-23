@@ -124,3 +124,10 @@
 - TP1 is the nearest real directional liquidity level that meets the profile's minimum RR (at least 1.49R); no synthetic 2R target is allowed. If no real level qualifies, reject the setup.
 - Rolling replay across four consecutive snapshots generated 4 SCALP candidates across 3 symbols and 27 INTRADAY candidates across 12 symbols, versus 43 SCALP and 13 INTRADAY from the current scanner on the same replay run. This is nonzero but a large SCALP reduction; the sample is too short to approve deployment.
 - Production remains unchanged during validation. No production database, accepted setups, or journal rows were modified.
+
+## 2026-10-23 — INTRADAY sweep scoring correction
+
+- INTRADAY sweep is optional confluence, not an acceptance gate. Award its score only when a same-direction sweep precedes the aligned 15m BOS/CHoCH; a missing, late, or misaligned sweep does not independently reject a setup.
+- SCALP's causal sweep requirement is unchanged by this INTRADAY-only correction.
+- A short rolling replay previously showed a material candidate-count reduction when the new causal requirements were combined. Keep PRs in draft until identical-window replay and CI establish acceptable availability and net results after fees.
+- Production remains untouched; no production setup, accepted record, candle, or journal data was modified.
