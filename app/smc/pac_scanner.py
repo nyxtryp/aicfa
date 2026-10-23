@@ -68,7 +68,7 @@ def scan_symbol(
         trigger_break_age = len(trigger) - 1 - int(trigger_break.candle_index) if trigger_break else 999
         # Keep the legacy scoring window, but allow the causal SCALP sequence
         # to start from a slightly older 5m break when a fresh retest/reaction
-        # follows it. The sweep still must be recent and precede that break.
+        # follows it. A same-direction pre-break sweep is optional score confluence.
         trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 3)
         scalp_trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 12)
         causal_trigger_aligned = scalp_trigger_aligned if profile_name == "scalp" else trigger_aligned
@@ -78,9 +78,8 @@ def scan_symbol(
             and 0 <= int(trigger_break.candle_index) < len(trigger) else None
         )
 
-        # SCALP requires sweep -> aligned 5m BOS/CHoCH -> retest -> 1m reaction.
-        # INTRADAY uses a slower 15m trigger and causal 1h-zone retest; sweep
-        # remains a scored confluence rather than a hard gate.
+        # SCALP requires aligned 5m BOS/CHoCH -> post-trigger retest -> 1m reaction.
+        # INTRADAY keeps its existing zone policy; sweep is optional confluence.
         if profile_name == "scalp" and not scalp_trigger_aligned:
             count("no_recent_trigger_structure")
             continue
@@ -256,7 +255,7 @@ def scan_symbol(
             internal = _recent_internal_structure_direction(trigger) == expected
 
         # Score sweep confluence only when it precedes the aligned trigger.
-        # SCALP hard-requires this; INTRADAY treats it as optional confluence.
+        # Sweep is optional confluence for both profiles; it never gates acceptance.
         sweep_aligned = sweep_before_trigger
         zone_tf_aligned = bool(zone.structure_breaks and zone.structure_breaks[-1].direction == expected)
         extra_aligned = False
