@@ -1,3 +1,9 @@
+## 2026-10-23 — INTRADAY causal retest correction (draft, not deployed)
+
+- Read-only production check: systemd service active; 125,000 candle rows; 1,106 journal records; 10 accepted INTRADAY and 12 accepted SCALP setups currently present.
+- INTRADAY historical journal: 171 trades, gross -35.17R, fees 6.66R, net -41.83R. FVG LONG -2.79R/67; FVG SHORT -9.83R/45; OB LONG -8.56R/35; OB SHORT -20.65R/24. OB SHORT is concerning but the sample is too small to justify banning it outright.
+- Draft branch requires the 1h OB/FVG retest to occur on a closed 15m candle after both zone confirmation and aligned 15m BOS/CHoCH; it does not change INTRADAY stop/target policy or SCALP gates.
+- Added valid-retest and pre-trigger-touch regression tests. Not deployed; CI and offline replay/candidate-count review remain mandatory.
 ## 2026-10-20 — PAC zone selection regression fix (under review)
 
 - Found a false-negative path in `pac_scanner.py`: the scanner selected the single nearest active directional OB/FVG first, then required that zone to have a causal post-trigger retest. If the nearest zone was untouched, the symbol was rejected even when a different active zone had a valid post-trigger retest and price remained within the anti-chase limit.
