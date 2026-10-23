@@ -131,11 +131,15 @@ class PACScannerTests(unittest.TestCase):
                 result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
             return result
 
+        diagnostics = {}
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
-            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
+            candidates = scan_symbol(
+                "BTCUSDT", self.series, trigger_timeframe="15m", diagnostics=diagnostics
+            )
 
-        self.assertEqual(len(candidates), 1)
-        self.assertFalse(candidates[0].evidence["liquidity_sweep"])
+        # A sweep on the trigger candle must not earn the sweep confluence point.
+        self.assertEqual(candidates, [])
+        self.assertEqual(diagnostics.get("score_below_profile_threshold"), 1)
 
     def test_rejects_when_no_directional_liquidity_target(self):
         def analysis(candles, profile, timeframe):
