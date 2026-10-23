@@ -116,3 +116,9 @@
 - INTRADAY quality changes are separate in PR #52; do not merge the dependent PR until replay demonstrates that valid candidates continue to occur.
 - Rolling replay across four consecutive snapshots generated 4 SCALP candidates across 3 symbols and 27 INTRADAY candidates across 12 symbols, versus 43 SCALP and 13 INTRADAY from the current scanner on the same replay run. This is nonzero but a large SCALP reduction; the sample is too short to approve deployment.
 - Production remains unchanged during validation. No production database, accepted setups, or journal rows were modified.
+
+## 2026-10-23 — Sweep как дополнительное подтверждение SCALP
+
+- Убрано обязательное отклонение SCALP без sweep. Sweep учитывается в score только при совпадении направления и если произошёл до BOS/CHoCH; отсутствие sweep само по себе не блокирует сетап.
+- Сохраняются причинные требования SCALP: актуальный направленный BOS/CHoCH, ретест после триггера и 1m reaction после ретеста. TP1 — ближайшая реальная ликвидность; если её RR ниже минимума, сетап отклоняется, более дальняя ликвидность не подменяет TP1.
+- Тесты обновлены для нового правила. Не выкатывать до CI и replay на одинаковом окне; production не менялся.
