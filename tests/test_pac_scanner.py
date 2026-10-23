@@ -182,7 +182,6 @@ class PACScannerTests(unittest.TestCase):
 
         # Do not skip the nearest level at 101 to manufacture RR using 104.
         self.assertEqual(candidates, [])
-        self.assertGreaterEqual(candidates[0].evidence["risk_reward"], 1.49)
 
     def test_old_touch_before_trigger_does_not_count_as_retest(self):
         # Candle 36 touched the zone and candle 37 is the trigger break. Candles
