@@ -266,11 +266,9 @@ def scan_symbol(
             from app.smc.scanner import _recent_internal_structure_direction
             internal = _recent_internal_structure_direction(trigger) == expected
 
-        sweep_aligned = (
-            sweep_before_trigger if profile_name in {"scalp", "intraday"} else
-            any(s.direction == expected and len(trigger)-1-int(s.candle_index) <= 12
-                for s in confirm.sweeps)
-        )
+        # Score sweep confluence only when it precedes the aligned trigger.
+        # SCALP hard-requires this; INTRADAY treats it as optional confluence.
+        sweep_aligned = sweep_before_trigger
         zone_tf_aligned = bool(zone.structure_breaks and zone.structure_breaks[-1].direction == expected)
         extra_aligned = False
         if extra is not None and extra.structure_breaks:
