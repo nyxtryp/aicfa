@@ -185,3 +185,10 @@ if __name__ == "__main__":
 - Require a real nearest directional liquidity target and the existing minimum 1.49R; do not synthesize a 2R target when real liquidity is absent or skip a nearer target that fails RR.
 - INTRADAY scanner gates are unchanged in this phase. Stop width is not hard-coded to 0.75% or 1% because the historical threshold result varied materially by day; evaluate fee-aware stop rules separately before deployment.
 - Acceptance: tests cover missing trigger, pre-trigger sweep, pre-retest 1m confirmation, missing/too-close liquidity, causal retests, and INTRADAY profile behavior. Production deployment requires CI success and offline replay/candidate-count review.
+
+## 2026-10-23 — INTRADAY quality phase (draft, depends on SCALP PR #50)
+
+- Historical results: 171 closed INTRADAY setups, gross -35.17R, fees 6.66R, net -41.83R. FVG LONG -2.79R/67; FVG SHORT -9.83R/45; OB LONG -8.56R/35; OB SHORT -20.65R/24. Do not ban OB SHORT solely on this small sample.
+- INTRADAY now requires the causal sequence on its own cadence: a same-direction sweep before the aligned 15m BOS/CHoCH, followed by a closed 15m retest of the confirmed 1h OB/FVG after the trigger. The PR #50 base already supplies causal zone selection; this phase adds the INTRADAY sweep gate.
+- Existing INTRADAY timeframe/profile, stop buffer, RR threshold, targets, and TTL remain unchanged by this phase.
+- Tests cover a valid sweep-trigger-retest and reject a sweep on/after the trigger. Draft only; do not merge/deploy until CI passes and offline replay/candidate counts show acceptable availability.
