@@ -1,3 +1,9 @@
+## 2026-10-23 — INTRADAY causal sweep phase (draft; depends on SCALP PR #50)
+
+- Production remains untouched; current accepted counts observed: 10 INTRADAY and 12 SCALP.
+- Historical INTRADAY journal: 171 closed records, gross -35.17R, fees 6.66R, net -41.83R. Worst segment is OB SHORT (-20.65R/24); no hard direction ban adopted due limited sample.
+- Separate draft based on SCALP causal-sequence PR #50 adds a same-side liquidity sweep before aligned 15m BOS/CHoCH for INTRADAY; the post-trigger 1h-zone retest remains required. Other INTRADAY settings remain unchanged.
+- Regression tests added. Offline replay and candidate-count validation still required; not deployed.
 ## 2026-10-23 — SCALP causal confirmation correction (PR under review)
 
 - Direct production inspection: service was active, candle store contained 125,000 rows across 50 symbols and five timeframes, and the journal had 1,100 closed records plus 25 active setups (12 SCALP, 13 INTRADAY).
