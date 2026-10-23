@@ -2010,3 +2010,21 @@
 - Removed the additional PAC acceptance rejection `pac_stop_too_tight` based on max(0.5 × ATR, entry × 4 × per-side commission). Existing risk-positive, RR >= 1.49, target-side, tick-size, freshness, and other scanner checks remain.
 - Removed the regression test that specifically required rejection by this extra stop floor. Do not interpret the rollback as widening stops or disabling other quality gates.
 - Deployment and post-deploy candidate/rejection-counter verification are still required.
+
+
+## 2026-10-23 — SCALP availability follow-up (PR #50)
+
+- Corrected an over-broad diff: strict causal retest and real-liquidity TP1 rules are now scoped to SCALP in PR #50; INTRADAY keeps its prior retest and target behavior in that PR. Its separate improvements remain in dependent PR #52.
+- SCALP requires sweep before aligned 5m structure break, a post-break retest, and aligned 1m reaction after retest and trigger. The trigger window is up to 12 closed 5m candles; 1m reaction may be up to 8 closed candles, but ordering remains mandatory.
+- TP1 selects the nearest real directional liquidity level that satisfies the configured minimum RR (>=1.49R); no synthetic 2R target is permitted.
+- Offline rolling replay over four consecutive snapshots: current scanner produced 43 SCALP / 13 INTRADAY candidates; revised branch produced 4 SCALP / 27 INTRADAY candidates. The revised SCALP path is nonzero but materially lower; this short sample is not sufficient to deploy.
+- Full unit suite passed: 249 tests. TZ.md was repaired to contain Markdown strategy/project notes rather than an embedded copy of dashboard test code.
+- Production remains unchanged: no deployment, restart, or database write. Continue validating candidate availability before merging or deploying either draft PR.
+
+## 2026-10-23 — INTRADAY causal retest follow-up (PR #52)
+
+- Rebased the work logically on updated SCALP PR #50 commit 1849652. INTRADAY now requires an aligned closed 15m BOS/CHoCH and a confirmed 1h OB/FVG retest that occurs after both zone confirmation and the trigger.
+- A same-direction sweep is credited only when it precedes the 15m trigger; absence of a sweep is not a hard rejection. INTRADAY stop buffer, RR floor, target policy, timeframe profile and TTL remain unchanged.
+- Four-snapshot replay: current scanner produced 19 SCALP / 13 INTRADAY candidates; updated dependent branch produced 4 SCALP / 5 INTRADAY candidates. Both profiles remain nonzero, but the drop means more availability validation is required.
+- Local unit suite passed: 252 tests. Production health endpoint remained HTTP 200; no deploy, restart, or production DB writes occurred.
+- Keep PR #52 draft until broader rolling replay and GitHub CI confirm acceptable candidate availability.

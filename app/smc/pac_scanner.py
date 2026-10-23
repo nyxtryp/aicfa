@@ -66,19 +66,26 @@ def scan_symbol(
 
         trigger_break = confirm.structure_breaks[-1] if confirm.structure_breaks else None
         trigger_break_age = len(trigger) - 1 - int(trigger_break.candle_index) if trigger_break else 999
+        # Keep the legacy scoring window, but allow the causal SCALP sequence
+        # to start from a slightly older 5m break when a fresh retest/reaction
+        # follows it. The sweep still must be recent and precede that break.
         trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 3)
+        scalp_trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 12)
+        causal_trigger_aligned = scalp_trigger_aligned if profile_name == "scalp" else trigger_aligned
         trigger_break_close_ms = (
             int(trigger[int(trigger_break.candle_index)].close_time_ms)
-            if trigger_aligned and 0 <= int(trigger_break.candle_index) < len(trigger) else None
+            if causal_trigger_aligned and trigger_break is not None
+            and 0 <= int(trigger_break.candle_index) < len(trigger) else None
         )
 
-        # SCALP must follow a causal sequence: aligned sweep -> 5m BOS/CHoCH
-        # -> retest -> 1m reaction. INTRADAY retains its existing policy.
-        if profile_name == "scalp" and not trigger_aligned:
+        # SCALP requires sweep -> aligned 5m BOS/CHoCH -> retest -> 1m reaction.
+        # INTRADAY uses a slower 15m trigger and causal 1h-zone retest; sweep
+        # remains a scored confluence rather than a hard gate.
+        if profile_name == "scalp" and not scalp_trigger_aligned:
             count("no_recent_trigger_structure")
             continue
         sweep_before_trigger = bool(
-            trigger_aligned and any(
+            causal_trigger_aligned and any(
                 s.direction == expected
                 and 0 <= int(s.candle_index) < int(trigger_break.candle_index)
                 and 0 <= len(trigger) - 1 - int(s.candle_index) <= 12
@@ -110,54 +117,95 @@ def scan_symbol(
             count("no_directional_ob_fvg")
             continue
 
-        # Evaluate causal retests for every active zone before choosing one.
-        # Previously we picked the nearest zone first, then rejected the whole
-        # symbol if that one had no post-trigger retest—even when another valid
-        # directional OB/FVG had been retested and remained close to price.
-        retested_zones: list[tuple[tuple[float, float, str, int, int], int]] = []
-        for candidate_zone in zones:
-            candidate_low, candidate_high, _, _, candidate_confirmation_index = candidate_zone
-            candidate_confirmation_ms = int(zone_series[candidate_confirmation_index].close_time_ms)
-            if candidate_confirmation_ms > snapshot_ms:
+        if profile_name == "scalp":
+            # SCALP requires a retest after both zone confirmation and the
+            # aligned 5m BOS/CHoCH. Evaluate every zone before choosing one so
+            # an untouched nearer zone cannot hide a valid retested zone.
+            retested_zones: list[tuple[tuple[float, float, str, int, int], int]] = []
+            for candidate_zone in zones:
+                candidate_low, candidate_high, _, _, candidate_confirmation_index = candidate_zone
+                candidate_confirmation_ms = int(zone_series[candidate_confirmation_index].close_time_ms)
+                if candidate_confirmation_ms > snapshot_ms:
+                    continue
+                causal_after_ms = max(
+                    candidate_confirmation_ms,
+                    trigger_break_close_ms or candidate_confirmation_ms,
+                )
+                recent = [
+                    c for c in trigger[-12:]
+                    if int(c.close_time_ms) > causal_after_ms
+                ]
+                touch_times = [
+                    int(c.close_time_ms) for c in recent
+                    if float(c.high) >= candidate_low and float(c.low) <= candidate_high
+                ]
+                if touch_times:
+                    retested_zones.append((candidate_zone, min(touch_times)))
+
+            if not retested_zones:
+                count("no_causal_post_trigger_retest")
                 continue
-            causal_after_ms = max(
-                candidate_confirmation_ms,
-                trigger_break_close_ms or candidate_confirmation_ms,
+
+            selected, retest_close_ms = min(
+                retested_zones,
+                key=lambda item: 0.0 if item[0][0] <= entry <= item[0][1] else min(
+                    abs(entry-item[0][0]), abs(entry-item[0][1])
+                ) / max(atr, 1e-12),
             )
-            recent = [
-                c for c in trigger[-6:]
-                if int(c.close_time_ms) > causal_after_ms
-            ]
-            touch_times = [
-                int(c.close_time_ms) for c in recent
-                if float(c.high) >= candidate_low and float(c.low) <= candidate_high
-            ]
-            if touch_times:
-                retested_zones.append((candidate_zone, min(touch_times)))
+            low, high, zone_kind, zone_index, zone_confirmation_index = selected
+            zone_confirmation_ms = int(zone_series[zone_confirmation_index].close_time_ms)
+            if zone_confirmation_ms > snapshot_ms:
+                count("future_zone")
+                continue
 
-        if not retested_zones:
-            count("no_causal_post_trigger_retest")
-            continue
-
-        selected, retest_close_ms = min(
-            retested_zones,
-            key=lambda item: 0.0 if item[0][0] <= entry <= item[0][1] else min(
-                abs(entry-item[0][0]), abs(entry-item[0][1])
-            ) / max(atr, 1e-12),
-        )
-        low, high, zone_kind, zone_index, zone_confirmation_index = selected
-        zone_confirmation_ms = int(zone_series[zone_confirmation_index].close_time_ms)
-        if zone_confirmation_ms > snapshot_ms:
-            count("future_zone")
-            continue
-
-        # The selected zone has a real retest after both zone confirmation and
-        # the directional trigger BOS/CHoCH; pre-break touches never qualify.
-        in_zone = low <= entry <= high
-        distance_atr = 0.0 if in_zone else min(abs(entry-low), abs(entry-high)) / atr
-        if distance_atr > 0.75:
-            count("price_chased_away_from_zone")
-            continue
+            # Strict anti-chase applies to SCALP only.
+            in_zone = low <= entry <= high
+            distance_atr = 0.0 if in_zone else min(abs(entry-low), abs(entry-high)) / atr
+            if distance_atr > 0.75:
+                count("price_chased_away_from_zone")
+                continue
+        elif profile_name == "intraday":
+            # INTRADAY uses a causal 15m trigger -> confirmed 1h zone retest.
+            # Sweep remains a score confluence, not a hard gate.
+            if not trigger_aligned or trigger_break_close_ms is None:
+                count("no_recent_trigger_structure")
+                continue
+            retested_zones: list[tuple[tuple[float, float, str, int, int], int]] = []
+            for candidate_zone in zones:
+                candidate_low, candidate_high, _, _, candidate_confirmation_index = candidate_zone
+                candidate_confirmation_ms = int(zone_series[candidate_confirmation_index].close_time_ms)
+                if candidate_confirmation_ms > snapshot_ms:
+                    continue
+                causal_after_ms = max(candidate_confirmation_ms, trigger_break_close_ms)
+                recent = [
+                    c for c in trigger[-6:]
+                    if int(c.close_time_ms) > causal_after_ms
+                ]
+                touch_times = [
+                    int(c.close_time_ms) for c in recent
+                    if float(c.high) >= candidate_low and float(c.low) <= candidate_high
+                ]
+                if touch_times:
+                    retested_zones.append((candidate_zone, min(touch_times)))
+            if not retested_zones:
+                count("no_causal_post_trigger_retest")
+                continue
+            selected, retest_close_ms = min(
+                retested_zones,
+                key=lambda item: 0.0 if item[0][0] <= entry <= item[0][1] else min(
+                    abs(entry-item[0][0]), abs(entry-item[0][1])
+                ) / max(atr, 1e-12),
+            )
+            low, high, zone_kind, zone_index, zone_confirmation_index = selected
+            zone_confirmation_ms = int(zone_series[zone_confirmation_index].close_time_ms)
+            if zone_confirmation_ms > snapshot_ms:
+                count("future_zone")
+                continue
+            in_zone = low <= entry <= high
+            distance_atr = 0.0 if in_zone else min(abs(entry-low), abs(entry-high)) / atr
+            if distance_atr > 2.0:
+                count("price_chased_away_from_zone")
+                continue
 
         # Use structural stop beyond the selected zone with ATR buffer.
         buffer = max(profile.stop_buffer_atr, STOP_BUFFER_ATR_OVERRIDES.get(symbol, profile.stop_buffer_atr))
@@ -173,23 +221,37 @@ def scan_symbol(
             count("invalid_stop")
             continue
 
-        # TP1 must be the nearest confirmed liquidity level in the trade
-        # direction. Never skip a nearer opposing level to manufacture >=1.49R,
-        # and never synthesize a 2R target when structure provides no target.
-        liquidity = sorted(
-            {float(level.price) for level in confirm.liquidity_levels
-             if (float(level.price) > entry if direction == "long" else float(level.price) < entry)},
-            key=lambda p: abs(p-entry),
-        )
-        if not liquidity:
-            count("no_directional_liquidity_target")
-            continue
-        targets = liquidity[:3]
-        tp1 = targets[0]
-        rr = abs(tp1-entry) / risk
-        if rr < profile.min_rr:
-            count("nearest_liquidity_below_minimum_rr")
-            continue
+        if profile_name == "scalp":
+            # TP1 is the nearest real directional liquidity level that can
+            # satisfy the profile RR floor. Do not synthesize a 2R target; if
+            # no real level qualifies, reject the setup.
+            liquidity = sorted(
+                {float(level.price) for level in confirm.liquidity_levels
+                 if (float(level.price) > entry if direction == "long" else float(level.price) < entry)},
+                key=lambda p: abs(p-entry),
+            )
+            targets = [p for p in liquidity if abs(p-entry) >= profile.min_rr * risk][:3]
+            if not targets:
+                count("no_directional_liquidity_target_meets_minimum_rr")
+                continue
+            tp1 = targets[0]
+            rr = abs(tp1-entry) / risk
+        else:
+            # Preserve the existing INTRADAY target policy in the SCALP-only
+            # change; evaluate its target policy separately in the INTRADAY PR.
+            liquidity = sorted(
+                {float(level.price) for level in confirm.liquidity_levels
+                 if (float(level.price) > entry if direction == "long" else float(level.price) < entry)},
+                reverse=(direction == "short"),
+            )
+            targets = [p for p in liquidity if abs(p-entry) >= profile.min_rr * risk][:3]
+            if not targets:
+                targets = [entry + 2.0*risk if direction == "long" else entry - 2.0*risk]
+            tp1 = targets[0]
+            rr = abs(tp1-entry) / risk
+            if rr < profile.min_rr:
+                count("risk_reward_below_minimum")
+                continue
 
         pd = None
         dr = find_dealing_range(bias.swings, as_of_index=bias.as_of_index, direction=expected)
@@ -216,7 +278,8 @@ def scan_symbol(
             ev_index = int(ev.candle_index)
             age = len(extra_series) - 1 - ev_index
             ev_close_ms = int(extra_series[ev_index].close_time_ms) if 0 <= ev_index < len(extra_series) else 0
-            extra_aligned = ev.direction == expected and 0 <= age <= 4
+            extra_max_age = 8 if profile_name == "scalp" else 4
+            extra_aligned = ev.direction == expected and 0 <= age <= extra_max_age
             if profile_name == "scalp":
                 # 1m confirmation must close after both the 5m retest and BOS.
                 extra_aligned = bool(
