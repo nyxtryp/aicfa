@@ -2,7 +2,7 @@
 
 - Production remains untouched; current accepted counts observed: 10 INTRADAY and 12 SCALP.
 - Historical INTRADAY journal: 171 closed records, gross -35.17R, fees 6.66R, net -41.83R. Worst segment is OB SHORT (-20.65R/24); no hard direction ban adopted due limited sample.
-- Separate draft based on SCALP causal-sequence PR #50 adds a same-side liquidity sweep before aligned 15m BOS/CHoCH for INTRADAY; the post-trigger 1h-zone retest remains required. Other INTRADAY settings remain unchanged.
+- Separate draft based on SCALP causal-sequence PR #50 keeps the post-trigger 1h-zone retest for INTRADAY. A sweep only counts as a confluence if it precedes the aligned 15m BOS/CHoCH; it is not a hard gate because the hard-gate replay produced zero candidates. Other INTRADAY settings remain unchanged.
 - Regression tests added. Offline replay and candidate-count validation still required; not deployed.
 ## 2026-10-23 — SCALP causal confirmation correction (PR under review)
 
