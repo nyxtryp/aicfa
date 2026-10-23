@@ -176,3 +176,12 @@ if __name__ == "__main__":
 - Select the nearest zone only from those with a confirmed post-zone-confirmation and post-directional-BOS/CHoCH retest in the recent trigger-candle window.
 - An untouched nearer zone must not suppress a farther valid retested zone. Keep the existing six-candle lookback, anti-chase limit, nearest confirmed liquidity TP1, minimum 1.49R, closed-candle-only processing, and profile score requirements.
 - Regression: nearest zone untouched + second zone retested => choose second zone; pre-trigger-only touch => reject; no retested zones => reject. Validate with unit tests and offline replay before production deployment.
+
+## 2026-10-23 — SCALP causal entry sequence correction (PR under review)
+
+- SCALP only: require a recent aligned 5m BOS/CHoCH and a same-direction liquidity sweep that occurred before that structure break.
+- Choose the nearest active directional OB/FVG among zones with a confirmed retest after zone confirmation and the 5m trigger; reject chased entries beyond 0.75 ATR.
+- Require the aligned 1m structure reaction to close after the qualifying 5m retest and after the 5m trigger. A stale/pre-retest 1m event cannot confirm the entry.
+- Require a real nearest directional liquidity target and the existing minimum 1.49R; do not synthesize a 2R target when real liquidity is absent or skip a nearer target that fails RR.
+- INTRADAY scanner gates are unchanged in this phase. Stop width is not hard-coded to 0.75% or 1% because the historical threshold result varied materially by day; evaluate fee-aware stop rules separately before deployment.
+- Acceptance: tests cover missing trigger, pre-trigger sweep, pre-retest 1m confirmation, missing/too-close liquidity, causal retests, and INTRADAY profile behavior. Production deployment requires CI success and offline replay/candidate-count review.
