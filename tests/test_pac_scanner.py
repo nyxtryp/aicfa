@@ -105,7 +105,7 @@ class PACScannerTests(unittest.TestCase):
 
         self.assertEqual(candidates, [])
 
-    def test_scalp_rejects_sweep_that_is_not_before_trigger(self):
+    def test_scalp_sweep_is_optional_when_not_before_trigger(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "5m":
@@ -115,7 +115,8 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
 
-        self.assertEqual(candidates, [])
+        self.assertEqual(len(candidates), 1)
+        self.assertFalse(candidates[0].evidence["liquidity_sweep"])
 
     def test_scalp_rejects_one_minute_confirmation_before_retest(self):
         # A 1m BOS at the current index but with a close time before the 5m
