@@ -64,21 +64,50 @@ def scan_symbol(
             count("invalid_atr")
             continue
 
+        trigger_break = confirm.structure_breaks[-1] if confirm.structure_breaks else None
+        trigger_break_age = len(trigger) - 1 - int(trigger_break.candle_index) if trigger_break else 999
+        trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 3)
+        trigger_break_close_ms = None
+        if trigger_aligned and 0 <= int(trigger_break.candle_index) < len(trigger):
+            trigger_break_close_ms = int(trigger[int(trigger_break.candle_index)].close_time_ms)
+
         # Current, causally confirmed OB/FVG zones aligned with HTF structure.
-        zones: list[tuple[float, float, str, int]] = []
+        # Keep both the zone-origin index (stable setup key) and confirmation
+        # index (when the zone became actionable).
+        zones: list[tuple[float, float, str, int, int]] = []
         for block, state in zip(zone.order_blocks, zone.order_block_mitigation):
             if block.direction == expected and not state.mitigated and block.confirmation_index <= zone.as_of_index:
-                zones.append((float(block.lower), float(block.upper), "OB", int(block.candle_index)))
+                zones.append((float(block.lower), float(block.upper), "OB",
+                              int(block.candle_index), int(block.confirmation_index)))
         for gap, fill in zip(zone.fvg, zone.fvg_fill):
             if gap.direction == expected and not fill.fully_filled and gap.confirmation_index <= zone.as_of_index:
-                zones.append((float(gap.lower), float(gap.upper), "FVG", int(gap.confirmation_index)))
+                zones.append((float(gap.lower), float(gap.upper), "FVG",
+                              int(gap.confirmation_index), int(gap.confirmation_index)))
         if not zones:
             count("no_directional_ob_fvg")
             continue
 
         # Prefer zones close to price; do not require an exact OTE overlap or
         # a specific sweep->break->retest ordering as independent hard gates.
-        zones = [z for z in zones if 0 <= z[3] < len(zone_series)]
+        zones = [z for z in zones if 0 <= z[3] < len(zone_series) and 0 <= z[4] < len(zone_series)]
+        if profile_name == "intraday" and trigger_aligned and trigger_break_close_ms is not None:
+            # INTRADAY's 15m entry trigger must precede the 1h-zone retest.
+            # A touch that happened before BOS/CHoCH is not an entry retest.
+            causal_zones = []
+            for candidate_zone in zones:
+                candidate_confirmation_ms = int(zone_series[candidate_zone[4]].close_time_ms)
+                after_ms = max(candidate_confirmation_ms, trigger_break_close_ms)
+                if any(
+                    int(c.close_time_ms) > after_ms
+                    and float(c.high) >= candidate_zone[0]
+                    and float(c.low) <= candidate_zone[1]
+                    for c in trigger[-6:]
+                ):
+                    causal_zones.append(candidate_zone)
+            zones = causal_zones
+            if not zones:
+                count("no_causal_post_trigger_retest")
+                continue
         if not zones:
             count("no_causally_confirmed_zone")
             continue
@@ -86,8 +115,8 @@ def scan_symbol(
             zones,
             key=lambda z: 0.0 if z[0] <= entry <= z[1] else min(abs(entry-z[0]), abs(entry-z[1])) / max(atr, 1e-12),
         )
-        low, high, zone_kind, zone_index = selected
-        zone_created_ms = zone_series[zone_index].close_time_ms
+        low, high, zone_kind, zone_index, zone_confirmation_index = selected
+        zone_created_ms = zone_series[zone_confirmation_index].close_time_ms if profile_name == "intraday" else zone_series[zone_index].close_time_ms
         if zone_created_ms > snapshot_ms:
             count("future_zone")
             continue
@@ -137,9 +166,6 @@ def scan_symbol(
             pd = premium_discount(float(bias_series[-1].close), dr)
         pd_aligned = pd == ("discount" if direction == "long" else "premium")
 
-        trigger_break = confirm.structure_breaks[-1] if confirm.structure_breaks else None
-        trigger_break_age = len(trigger) - 1 - int(trigger_break.candle_index) if trigger_break else 999
-        trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 3)
         # A PAC setup needs a recent BOS/CHoCH in the confirmation timeframe.
         # HTF bias plus a nearby zone alone is not an entry trigger.
         if not trigger_aligned:
