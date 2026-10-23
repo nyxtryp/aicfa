@@ -25,7 +25,7 @@ def fake_analysis(timeframe):
     block = SimpleNamespace(direction="bullish", lower=98.0, upper=101.0,
                             candle_index=25, confirmation_index=30)
     return SimpleNamespace(
-        structure_breaks=(bias_break,) if timeframe in {"1h", "15m", "5m", "1m"} else (),
+        structure_breaks=(bias_break,) if timeframe in {"4h", "1h", "15m", "5m", "1m"} else (),
         swings=(), as_of_index=39, order_blocks=(block,),
         order_block_mitigation=(SimpleNamespace(mitigated=False),),
         fvg=(), fvg_fill=(), atr=(1.0,) * 40,
@@ -113,6 +113,26 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis",
                    side_effect=lambda candles, profile, timeframe: fake_analysis(timeframe)):
             candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="5m")
+
+        self.assertEqual(candidates, [])
+
+    def test_intraday_accepts_sweep_before_15m_trigger_and_post_trigger_retest(self):
+        with patch("app.smc.pac_scanner._analysis",
+                   side_effect=lambda candles, profile, timeframe: fake_analysis(timeframe)):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "intraday")
+
+    def test_intraday_rejects_sweep_at_or_after_15m_trigger(self):
+        def analysis(candles, profile, timeframe):
+            result = fake_analysis(timeframe)
+            if timeframe == "15m":
+                result.sweeps = (SimpleNamespace(direction="bullish", candle_index=37),)
+            return result
+
+        with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
+            candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="15m")
 
         self.assertEqual(candidates, [])
 
