@@ -189,6 +189,6 @@ if __name__ == "__main__":
 ## 2026-10-23 — INTRADAY quality phase (draft, depends on SCALP PR #50)
 
 - Historical results: 171 closed INTRADAY setups, gross -35.17R, fees 6.66R, net -41.83R. FVG LONG -2.79R/67; FVG SHORT -9.83R/45; OB LONG -8.56R/35; OB SHORT -20.65R/24. Do not ban OB SHORT solely on this small sample.
-- INTRADAY now requires the causal sequence on its own cadence: a same-direction sweep before the aligned 15m BOS/CHoCH, followed by a closed 15m retest of the confirmed 1h OB/FVG after the trigger. The PR #50 base already supplies causal zone selection; this phase adds the INTRADAY sweep gate.
+- INTRADAY uses the causal 15m retest of a confirmed 1h OB/FVG after the aligned 15m BOS/CHoCH. A same-direction sweep only counts as a score confluence when it precedes the trigger; it is not a hard gate, because the live snapshot replay showed that hard-gating the sweep reduced candidate output to zero.
 - Existing INTRADAY timeframe/profile, stop buffer, RR threshold, targets, and TTL remain unchanged by this phase.
 - Tests cover a valid sweep-trigger-retest and reject a sweep on/after the trigger. Draft only; do not merge/deploy until CI passes and offline replay/candidate counts show acceptable availability.
