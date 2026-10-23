@@ -64,40 +64,100 @@ def scan_symbol(
             count("invalid_atr")
             continue
 
-        # Current, causally confirmed OB/FVG zones aligned with HTF structure.
-        zones: list[tuple[float, float, str, int]] = []
+        trigger_break = confirm.structure_breaks[-1] if confirm.structure_breaks else None
+        trigger_break_age = len(trigger) - 1 - int(trigger_break.candle_index) if trigger_break else 999
+        trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 3)
+        trigger_break_close_ms = (
+            int(trigger[int(trigger_break.candle_index)].close_time_ms)
+            if trigger_aligned and 0 <= int(trigger_break.candle_index) < len(trigger) else None
+        )
+
+        # SCALP must follow a causal sequence: aligned sweep -> 5m BOS/CHoCH
+        # -> retest -> 1m reaction. INTRADAY retains its existing policy.
+        if profile_name == "scalp" and not trigger_aligned:
+            count("no_recent_trigger_structure")
+            continue
+        sweep_before_trigger = bool(
+            trigger_aligned and any(
+                s.direction == expected
+                and 0 <= int(s.candle_index) < int(trigger_break.candle_index)
+                and 0 <= len(trigger) - 1 - int(s.candle_index) <= 12
+                for s in confirm.sweeps
+            )
+        )
+        if profile_name == "scalp" and not sweep_before_trigger:
+            count("no_pre_trigger_liquidity_sweep")
+            continue
+
+        # Keep source and confirmation indices separate: an OB is not actionable
+        # until its confirmation candle has closed.
+        zones: list[tuple[float, float, str, int, int]] = []
         for block, state in zip(zone.order_blocks, zone.order_block_mitigation):
-            if block.direction == expected and not state.mitigated and block.confirmation_index <= zone.as_of_index:
-                zones.append((float(block.lower), float(block.upper), "OB", int(block.candle_index)))
+            source_index = int(block.candle_index)
+            confirmation_index = int(block.confirmation_index)
+            if (block.direction == expected and not state.mitigated
+                    and 0 <= source_index < len(zone_series)
+                    and 0 <= confirmation_index < len(zone_series)
+                    and confirmation_index <= zone.as_of_index):
+                zones.append((float(block.lower), float(block.upper), "OB", source_index, confirmation_index))
         for gap, fill in zip(zone.fvg, zone.fvg_fill):
-            if gap.direction == expected and not fill.fully_filled and gap.confirmation_index <= zone.as_of_index:
-                zones.append((float(gap.lower), float(gap.upper), "FVG", int(gap.confirmation_index)))
+            source_index = int(gap.confirmation_index)
+            confirmation_index = int(gap.confirmation_index)
+            if (gap.direction == expected and not fill.fully_filled
+                    and 0 <= source_index < len(zone_series)
+                    and confirmation_index <= zone.as_of_index):
+                zones.append((float(gap.lower), float(gap.upper), "FVG", source_index, confirmation_index))
         if not zones:
             count("no_directional_ob_fvg")
             continue
 
-        # Prefer zones close to price; do not require an exact OTE overlap or
-        # a specific sweep->break->retest ordering as independent hard gates.
-        zones = [z for z in zones if 0 <= z[3] < len(zone_series)]
-        if not zones:
-            count("no_causally_confirmed_zone")
+        # Evaluate causal retests for every active zone before choosing one.
+        # Previously we picked the nearest zone first, then rejected the whole
+        # symbol if that one had no post-trigger retest—even when another valid
+        # directional OB/FVG had been retested and remained close to price.
+        retested_zones: list[tuple[tuple[float, float, str, int, int], int]] = []
+        for candidate_zone in zones:
+            candidate_low, candidate_high, _, _, candidate_confirmation_index = candidate_zone
+            candidate_confirmation_ms = int(zone_series[candidate_confirmation_index].close_time_ms)
+            if candidate_confirmation_ms > snapshot_ms:
+                continue
+            causal_after_ms = max(
+                candidate_confirmation_ms,
+                trigger_break_close_ms or candidate_confirmation_ms,
+            )
+            recent = [
+                c for c in trigger[-6:]
+                if int(c.close_time_ms) > causal_after_ms
+            ]
+            touch_times = [
+                int(c.close_time_ms) for c in recent
+                if float(c.high) >= candidate_low and float(c.low) <= candidate_high
+            ]
+            if touch_times:
+                retested_zones.append((candidate_zone, min(touch_times)))
+
+        if not retested_zones:
+            count("no_causal_post_trigger_retest")
             continue
-        selected = min(
-            zones,
-            key=lambda z: 0.0 if z[0] <= entry <= z[1] else min(abs(entry-z[0]), abs(entry-z[1])) / max(atr, 1e-12),
+
+        selected, retest_close_ms = min(
+            retested_zones,
+            key=lambda item: 0.0 if item[0][0] <= entry <= item[0][1] else min(
+                abs(entry-item[0][0]), abs(entry-item[0][1])
+            ) / max(atr, 1e-12),
         )
-        low, high, zone_kind, zone_index = selected
-        zone_created_ms = zone_series[zone_index].close_time_ms
-        if zone_created_ms > snapshot_ms:
+        low, high, zone_kind, zone_index, zone_confirmation_index = selected
+        zone_confirmation_ms = int(zone_series[zone_confirmation_index].close_time_ms)
+        if zone_confirmation_ms > snapshot_ms:
             count("future_zone")
             continue
-        # The zone is actionable if price is in it now or has touched it recently.
-        recent = trigger[-6:]
-        retested = any(float(c.high) >= low and float(c.low) <= high for c in recent)
+
+        # The selected zone has a real retest after both zone confirmation and
+        # the directional trigger BOS/CHoCH; pre-break touches never qualify.
         in_zone = low <= entry <= high
         distance_atr = 0.0 if in_zone else min(abs(entry-low), abs(entry-high)) / atr
-        if not (in_zone or retested) or distance_atr > 2.0:
-            count("zone_not_recently_retested")
+        if distance_atr > 0.75:
+            count("price_chased_away_from_zone")
             continue
 
         # Use structural stop beyond the selected zone with ATR buffer.
@@ -114,21 +174,22 @@ def scan_symbol(
             count("invalid_stop")
             continue
 
-        # Nearest valid liquidity is preferred; if absent or too close, use a
-        # deterministic 2R objective rather than rejecting the setup for missing
-        # a precomputed liquidity object.
+        # TP1 must be the nearest confirmed liquidity level in the trade
+        # direction. Never skip a nearer opposing level to manufacture >=1.49R,
+        # and never synthesize a 2R target when structure provides no target.
         liquidity = sorted(
             {float(level.price) for level in confirm.liquidity_levels
              if (float(level.price) > entry if direction == "long" else float(level.price) < entry)},
-            reverse=(direction == "short"),
+            key=lambda p: abs(p-entry),
         )
-        targets = [p for p in liquidity if abs(p-entry) >= 1.49*risk][:3]
-        if not targets:
-            targets = [entry + 2.0*risk if direction == "long" else entry - 2.0*risk]
+        if not liquidity:
+            count("no_directional_liquidity_target")
+            continue
+        targets = liquidity[:3]
         tp1 = targets[0]
         rr = abs(tp1-entry) / risk
-        if rr < 1.49:
-            count("risk_reward_below_minimum")
+        if rr < profile.min_rr:
+            count("nearest_liquidity_below_minimum_rr")
             continue
 
         pd = None
@@ -137,14 +198,6 @@ def scan_symbol(
             pd = premium_discount(float(bias_series[-1].close), dr)
         pd_aligned = pd == ("discount" if direction == "long" else "premium")
 
-        trigger_break = confirm.structure_breaks[-1] if confirm.structure_breaks else None
-        trigger_break_age = len(trigger) - 1 - int(trigger_break.candle_index) if trigger_break else 999
-        trigger_aligned = bool(trigger_break and trigger_break.direction == expected and 0 <= trigger_break_age <= 3)
-        # A PAC setup needs a recent BOS/CHoCH in the confirmation timeframe.
-        # HTF bias plus a nearby zone alone is not an entry trigger.
-        if not trigger_aligned:
-            count("no_recent_trigger_structure")
-            continue
         internal = False
         if len(trigger) >= 5:
             # Existing internal-structure helper is intentionally optional;
@@ -152,21 +205,41 @@ def scan_symbol(
             from app.smc.scanner import _recent_internal_structure_direction
             internal = _recent_internal_structure_direction(trigger) == expected
 
-        sweep_aligned = any(s.direction == expected and len(trigger)-1-int(s.candle_index) <= 12
-                            for s in confirm.sweeps)
+        sweep_aligned = (
+            sweep_before_trigger if profile_name == "scalp" else
+            any(s.direction == expected and len(trigger)-1-int(s.candle_index) <= 12
+                for s in confirm.sweeps)
+        )
         zone_tf_aligned = bool(zone.structure_breaks and zone.structure_breaks[-1].direction == expected)
         extra_aligned = False
         if extra is not None and extra.structure_breaks:
             ev = extra.structure_breaks[-1]
-            age = len(extra_series) - 1 - int(ev.candle_index)
+            ev_index = int(ev.candle_index)
+            age = len(extra_series) - 1 - ev_index
+            ev_close_ms = int(extra_series[ev_index].close_time_ms) if 0 <= ev_index < len(extra_series) else 0
             extra_aligned = ev.direction == expected and 0 <= age <= 4
+            if profile_name == "scalp":
+                # 1m confirmation must close after both the 5m retest and BOS.
+                extra_aligned = bool(
+                    extra_aligned and ev_close_ms > retest_close_ms
+                    and trigger_break_close_ms is not None
+                    and ev_close_ms > trigger_break_close_ms
+                )
+        if profile.extra_confirmation_timeframe and not extra_aligned:
+            count("no_recent_extra_confirmation")
+            continue
 
-        score = 4 + int(trigger_aligned) + int(internal) + int(sweep_aligned) + int(zone_tf_aligned) + int(pd_aligned) + int(extra_aligned)
-        score = min(10, score)
+        # Three base points represent mandatory gates already passed:
+        # HTF bias, confirmed directional zone, and causal retest. Structure
+        # confirmation and other confluences add points; enforce the profile threshold.
+        score = min(10, 3 + int(trigger_aligned) + int(internal) + int(sweep_aligned) + int(zone_tf_aligned) + int(pd_aligned) + int(extra_aligned))
+        if score < profile.score_threshold:
+            count("score_below_profile_threshold")
+            continue
         evidence = {
             "higher_timeframe_bias_aligned": True,
             "active_ob_fvg_zone": True,
-            "zone_retested_or_current": bool(retested or in_zone),
+            "zone_retested_or_current": True,
             "trigger_structure_aligned": trigger_aligned,
             "internal_structure_aligned": internal,
             "liquidity_sweep": sweep_aligned,
