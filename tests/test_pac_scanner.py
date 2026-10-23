@@ -162,7 +162,7 @@ class PACScannerTests(unittest.TestCase):
         self.assertEqual(candidates, [])
         self.assertEqual(diagnostics.get("score_below_profile_threshold"), 1)
 
-    def test_intraday_rejects_zone_touched_only_before_15m_trigger(self):
+    def test_intraday_preserves_legacy_recent_zone_touch_policy(self):
         series = dict(self.series)
         trigger = list(series["15m"])
         for index in (38, 39):
@@ -185,7 +185,8 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
             candidates = scan_symbol("BTCUSDT", series, trigger_timeframe="15m")
 
-        self.assertEqual(candidates, [])
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].profile, "intraday")
 
     def test_rejects_when_no_directional_liquidity_target(self):
         def analysis(candles, profile, timeframe):
@@ -217,7 +218,7 @@ class PACScannerTests(unittest.TestCase):
             + 2.0 * abs(candidates[0].confirmation_price - candidates[0].stop_price),
         )
 
-    def test_uses_nearest_real_liquidity_that_meets_minimum_rr(self):
+    def test_rejects_when_nearest_real_liquidity_fails_minimum_rr(self):
         def analysis(candles, profile, timeframe):
             result = fake_analysis(timeframe)
             if timeframe == "5m":
@@ -230,9 +231,8 @@ class PACScannerTests(unittest.TestCase):
         with patch("app.smc.pac_scanner._analysis", side_effect=analysis):
             candidates = scan_symbol("BTCUSDT", self.series, trigger_timeframe="5m")
 
-        self.assertEqual(len(candidates), 1)
-        self.assertEqual(candidates[0].targets[0], 104.0)
-        self.assertGreaterEqual(candidates[0].evidence["risk_reward"], 1.49)
+        # Do not skip the nearest level at 101 to manufacture RR using 104.
+        self.assertEqual(candidates, [])
 
     def test_old_touch_before_trigger_does_not_count_as_retest(self):
         # Candle 36 touched the zone and candle 37 is the trigger break. Candles
