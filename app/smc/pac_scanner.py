@@ -92,9 +92,8 @@ def scan_symbol(
                 for s in confirm.sweeps
             )
         )
-        if profile_name == "scalp" and not sweep_before_trigger:
-            count("no_pre_trigger_liquidity_sweep")
-            continue
+        # Sweep is optional confluence, not a hard rejection gate.
+        # When present, it only scores if same-direction and before the trigger.
         # Keep source and confirmation indices separate: an OB is not actionable
         # until its confirmation candle has closed.
         zones: list[tuple[float, float, str, int, int]] = []
